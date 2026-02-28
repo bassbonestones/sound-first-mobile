@@ -13,7 +13,7 @@ global.console = {
 // Re-enable for debugging when needed
 // global.console = console;
 
-// Mock Expo modules as virtual modules (don't require them to exist)
+// Mock Expo modules
 jest.mock('expo-audio', () => ({
   useAudioPlayer: () => ({
     play: jest.fn(),
@@ -26,7 +26,7 @@ jest.mock('expo-audio', () => ({
     pause: jest.fn(),
     release: jest.fn(),
   }),
-}), { virtual: true });
+}));
 
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(),
