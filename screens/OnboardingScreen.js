@@ -22,6 +22,19 @@ const capabilityList = [
   "Fermata Symbol",
 ];
 
+function getBackendUrl() {
+  // Set to your actual local IP address
+  const LOCAL_IP = "192.168.1.118";
+  if (Platform.OS === "android") {
+    return "http://10.0.2.2:8000";
+  } else if (Platform.OS === "ios") {
+    return `http://${LOCAL_IP}:8000`;
+  } else if (Platform.OS === "web") {
+    return `http://${window.location.hostname}:8000`;
+  }
+  return `http://${LOCAL_IP}:8000`;
+}
+
 function OnboardingScreen({ navigation }) {
   const [instrument, setInstrument] = useState("");
   const [open, setOpen] = useState(false);
@@ -41,7 +54,7 @@ function OnboardingScreen({ navigation }) {
       return;
     }
     try {
-      const response = await fetch("http://" + window.location.hostname + ":8000/onboarding", {
+      const response = await fetch(`${getBackendUrl()}/onboarding`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

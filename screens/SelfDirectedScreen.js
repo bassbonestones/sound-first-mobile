@@ -12,7 +12,7 @@ import {
 } from "react-native";
 
 function getBackendUrl(endpoint) {
-  const LOCAL_IP = "192.168.1.19";
+  const LOCAL_IP = "192.168.1.118";
   if (Platform.OS === "android") {
     return `http://10.0.2.2:8000/${endpoint}`;
   } else if (Platform.OS === "ios") {
