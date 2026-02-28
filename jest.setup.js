@@ -26,7 +26,7 @@ jest.mock('expo-audio', () => ({
     pause: jest.fn(),
     release: jest.fn(),
   }),
-}));
+}), { virtual: true });
 
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(),

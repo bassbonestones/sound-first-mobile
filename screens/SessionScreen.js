@@ -80,6 +80,9 @@ export default function SessionScreen({ navigation, route }) {
   const [showHelpMenu, setShowHelpMenu] = useState(false);
   const [showMiniLesson, setShowMiniLesson] = useState(false);
   const [selectedCapabilityId, setSelectedCapabilityId] = useState(null);
+  
+  // Metronome state - available as optional tool for all materials
+  const [showMetronome, setShowMetronome] = useState(false);
 
   // Variable assignments after hooks
   const duration = route?.params?.duration || 20;
@@ -586,8 +589,8 @@ export default function SessionScreen({ navigation, route }) {
         ) : null}
       </View>
 
-      {/* Metronome for tempo_build goals */}
-      {mini.goal_type === "tempo_build" && (
+      {/* Metronome - shows for tempo_build goals OR when user toggles it on */}
+      {(mini.goal_type === "tempo_build" || showMetronome) && (
         <View style={{
           backgroundColor: "#2d232e",
           borderRadius: 14,
@@ -595,21 +598,26 @@ export default function SessionScreen({ navigation, route }) {
           marginBottom: 14,
           width: 320,
           borderWidth: 2,
-          borderColor: "#FF9800",
+          borderColor: mini.goal_type === "tempo_build" ? "#FF9800" : "#9C27B0",
         }}>
-          <Text style={{
-            color: "#FF9800",
-            fontSize: 16,
-            fontWeight: "bold",
-            marginBottom: 8,
-            textAlign: "center",
-          }}>
-            ⏱️ Tempo Build Mode
-          </Text>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <Text style={{
+              color: mini.goal_type === "tempo_build" ? "#FF9800" : "#9C27B0",
+              fontSize: 16,
+              fontWeight: "bold",
+            }}>
+              {mini.goal_type === "tempo_build" ? "⏱️ Tempo Build Mode" : "🎵 Metronome"}
+            </Text>
+            {mini.goal_type !== "tempo_build" && (
+              <TouchableOpacity onPress={() => setShowMetronome(false)}>
+                <Text style={{ color: "#888", fontSize: 18 }}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <Metronome 
             initialBpm={80}
             minBpm={40}
-            maxBpm={200}
+            maxBpm={350}
             beatsPerMeasure={4}
             showControls={true}
           />
@@ -979,28 +987,61 @@ export default function SessionScreen({ navigation, route }) {
         </View>
       )}
 
-      {/* Help Button - Access capability explanations */}
+      {/* Tool Buttons - Help and Metronome */}
       {mini && mini.material_id && (
-        <TouchableOpacity
-          onPress={() => setShowHelpMenu(true)}
-          style={{
-            position: "absolute",
-            top: 16,
-            right: 16,
-            backgroundColor: "#333",
-            borderRadius: 24,
-            padding: 12,
-            flexDirection: "row",
-            alignItems: "center",
-            shadowColor: "#000",
-            shadowOpacity: 0.3,
-            shadowRadius: 4,
-            shadowOffset: { width: 0, height: 2 },
-          }}
-        >
-          <Text style={{ fontSize: 18, marginRight: 4 }}>📚</Text>
-          <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>Help</Text>
-        </TouchableOpacity>
+        <View style={{
+          position: "absolute",
+          top: 16,
+          right: 16,
+          flexDirection: "row",
+          zIndex: 100,
+        }}>
+          {/* Metronome Toggle Button - only show if not tempo_build (which shows it automatically) */}
+          {mini.goal_type !== "tempo_build" && (
+            <TouchableOpacity
+              onPress={() => {
+                console.log("[SessionScreen] Metronome toggle pressed, current:", showMetronome, "-> new:", !showMetronome);
+                setShowMetronome(!showMetronome);
+              }}
+              accessibilityLabel="Toggle Metronome"
+              accessibilityHint="Show or hide the metronome tool"
+              {...(Platform.OS === "web" ? { title: "Toggle Metronome" } : {})}
+              style={{
+                backgroundColor: showMetronome ? "#9C27B0" : "#333",
+                borderRadius: 24,
+                padding: 12,
+                marginRight: 8,
+                flexDirection: "row",
+                alignItems: "center",
+                shadowColor: "#000",
+                shadowOpacity: 0.3,
+                shadowRadius: 4,
+                shadowOffset: { width: 0, height: 2 },
+              }}
+            >
+              <Text style={{ fontSize: 18 }}>🎵</Text>
+            </TouchableOpacity>
+          )}
+          
+          {/* Help Button */}
+          <TouchableOpacity
+            onPress={() => setShowHelpMenu(true)}
+            style={{
+              backgroundColor: "#333",
+              borderRadius: 24,
+              padding: 12,
+              flexDirection: "row",
+              alignItems: "center",
+              shadowColor: "#000",
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+              shadowOffset: { width: 0, height: 2 },
+            }}
+          >
+            <Text style={{ fontSize: 18, marginRight: 4 }}>📚</Text>
+            <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>Help</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* Help Menu Modal */}
