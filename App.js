@@ -1,5 +1,45 @@
 import React, { useEffect, useState } from "react";
 import { Platform, View, ActivityIndicator, Text } from "react-native";
+
+// ============= STARTUP TIMING =============
+const TIMING = {
+  bundleLoaded: Date.now(),  // When JS bundle finished loading (Expo startup complete)
+};
+
+// Get backend URL for logging
+function getBackendUrl() {
+  const LOCAL_IP = "192.168.1.118";
+  if (Platform.OS === "android") {
+    return "http://10.0.2.2:8000";
+  } else if (Platform.OS === "ios") {
+    return `http://${LOCAL_IP}:8000`;
+  } else if (Platform.OS === "web") {
+    return `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:8000`;
+  }
+  return `http://${LOCAL_IP}:8000`;
+}
+
+// Log to both console and server
+function logTiming(event, data) {
+  const message = `[TIMING] ${event}`;
+  const fullData = { ...data, platform: Platform.OS };
+  
+  // Console log (shows in browser dev tools)
+  console.log(message, fullData);
+  
+  // Server log (shows in uvicorn/Metro terminal)
+  fetch(`${getBackendUrl()}/log/client`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      event: `TIMING: ${event}`,
+      data: fullData,
+      timestamp: new Date().toISOString(),
+    }),
+  }).catch(() => {}); // Ignore errors - logging shouldn't break the app
+}
+
+logTiming('Bundle loaded', { timestamp: new Date(TIMING.bundleLoaded).toISOString() });
 console.log("[App.js] File loaded");
 // Simple error boundary for debugging
 class ErrorBoundary extends React.Component {
@@ -41,11 +81,21 @@ export default function App() {
   const [initialRoute, setInitialRoute] = useState(null);
 
   useEffect(() => {
-      // Use a hardcoded backend URL for React Native
-      // For Android emulator: 10.0.2.2, for iOS simulator: localhost
-      const backendHost = Platform.OS === "android" ? "10.0.2.2" : "localhost";
-      const url = `http://${backendHost}:8000/onboarding/1`;
+      // ============= APP STARTUP TIMING =============
+      const appMountTime = Date.now();
+      const expoStartupMs = appMountTime - TIMING.bundleLoaded;
+      
+      logTiming('App mounted', { 
+        expoStartupMs,
+        timestamp: new Date(appMountTime).toISOString()
+      });
+      
+      // Fetch onboarding status
+      const url = `${getBackendUrl()}/onboarding/1`;
       console.log("[Onboarding] Fetching onboarding info from:", url);
+      
+      const fetchStartTime = Date.now();
+      
       fetch(url)
         .then((res) => {
           console.log("[Onboarding] Response status:", res.status);
@@ -53,17 +103,50 @@ export default function App() {
           return res.json();
         })
         .then((data) => {
+          const fetchEndTime = Date.now();
+          const fetchDurationMs = fetchEndTime - fetchStartTime;
+          const appStartupMs = fetchEndTime - appMountTime;
+          const totalMs = fetchEndTime - TIMING.bundleLoaded;
+          
           console.log("[Onboarding] Response data:", data);
+          
           if (data.instrument && data.resonant_note) {
-            console.log("[Onboarding] Found onboarding info, navigating to StartPractice");
+            // ============= RETURNING USER SCENARIO =============
+            logTiming('RETURNING USER (instrument selected)', {
+              expoStartupMs,
+              fetchMs: fetchDurationMs,
+              appStartupMs,
+              totalMs,
+              breakdown: `Expo=${expoStartupMs}ms + App=${appStartupMs}ms`
+            });
             setInitialRoute("StartPractice");
           } else {
-            console.log("[Onboarding] Missing onboarding info, navigating to Onboarding");
+            // ============= NEW USER SCENARIO =============
+            logTiming('NEW USER (no instrument)', {
+              expoStartupMs,
+              fetchMs: fetchDurationMs,
+              appStartupMs,
+              totalMs,
+              breakdown: `Expo=${expoStartupMs}ms + App=${appStartupMs}ms`
+            });
             setInitialRoute("Onboarding");
           }
         })
         .catch((err) => {
+          const fetchEndTime = Date.now();
+          const fetchDurationMs = fetchEndTime - fetchStartTime;
+          const appStartupMs = fetchEndTime - appMountTime;
+          const totalMs = fetchEndTime - TIMING.bundleLoaded;
+          
           console.log("[Onboarding] Fetch error:", err);
+          logTiming('NEW USER (fetch failed)', {
+            expoStartupMs,
+            fetchMs: fetchDurationMs,
+            appStartupMs,
+            totalMs,
+            error: String(err),
+            breakdown: `Expo=${expoStartupMs}ms + App=${appStartupMs}ms`
+          });
           setInitialRoute("Onboarding");
         });
   }, []);

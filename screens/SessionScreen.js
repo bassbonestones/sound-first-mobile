@@ -14,6 +14,7 @@ import Metronome from "../components/Metronome";
 import NotationDisplay, { NotationPlaceholder } from "../components/NotationDisplay";
 import HelpMenu from "../components/HelpMenu";
 import MiniLesson from "../components/MiniLesson";
+import AudioPlayer from "../components/AudioPlayer";
 
 function getBackendUrl(selfDirected = false) {
   // Set to your actual local IP address
@@ -694,6 +695,19 @@ export default function SessionScreen({ navigation, route }) {
                   {getCurrentStep().prompt}
                 </Text>
               ) : null}
+              
+              {/* Audio Player for LISTEN steps */}
+              {getCurrentStep().step_type === "LISTEN" && (
+                <View style={{ marginTop: 16 }}>
+                  <AudioPlayer
+                    materialId={mini?.material_id}
+                    targetKey={mini?.target_key}
+                    instrument="piano"  // TODO: get from user profile
+                    title="Listen to the model phrase"
+                    accentColor="#FFD700"
+                  />
+                </View>
+              )}
               
               {/* Range Work Safety Panel */}
               {getCurrentStep().step_type === "PLAY" && mini.goal_type === "range_expansion" && (
