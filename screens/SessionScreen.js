@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ScrollView,
   TouchableOpacity,
+  Pressable,
   ActivityIndicator,
   Platform,
   View,
@@ -10,7 +11,9 @@ import {
   Alert,
   Modal,
 } from "react-native";
+import Slider from "@react-native-community/slider";
 import Metronome from "../components/Metronome";
+import PitchDrone from "../components/PitchDrone";
 import NotationDisplay, { NotationPlaceholder } from "../components/NotationDisplay";
 import HelpMenu from "../components/HelpMenu";
 import MiniLesson from "../components/MiniLesson";
@@ -91,11 +94,27 @@ export default function SessionScreen({ navigation, route }) {
   const [metronomeIsPlaying, setMetronomeIsPlaying] = useState(false);
   const [audioMuted, setAudioMuted] = useState(false);
   
-  // Reset metronome when mini-session changes
+  // Pitch Drone state - same pattern as metronome
+  const [droneEnabled, setDroneEnabled] = useState(false);
+  const [droneVisible, setDroneVisible] = useState(false);
+  const [droneIsPlaying, setDroneIsPlaying] = useState(false);
+  
+  // Volume controls (0-1 scale)
+  const [metronomeVolume, setMetronomeVolume] = useState(0.5);
+  const [droneVolume, setDroneVolume] = useState(0.5);
+  const [showVolumeModal, setShowVolumeModal] = useState(false);
+  
+  // Long-press timer ref for mute button
+  const longPressTimerRef = useRef(null);
+  
+  // Reset metronome and drone when mini-session changes
   useEffect(() => {
     setMetronomeEnabled(false);
     setMetronomeVisible(false);
     setMetronomeIsPlaying(false);
+    setDroneEnabled(false);
+    setDroneVisible(false);
+    setDroneIsPlaying(false);
     setAudioMuted(false);
   }, [current]);
 
@@ -647,8 +666,56 @@ export default function SessionScreen({ navigation, route }) {
             beatsPerMeasure={4}
             showControls={true}
             muted={audioMuted}
+            volume={metronomeVolume}
+            droneVolume={droneVolume}
             onPlayingChange={setMetronomeIsPlaying}
             onMuteChange={setAudioMuted}
+            onVolumeChange={setMetronomeVolume}
+            onDroneVolumeChange={setDroneVolume}
+          />
+        </View>
+      )}
+
+      {/* Pitch Drone - shows when user toggles it on */}
+      {droneEnabled && (
+        <View style={{
+          backgroundColor: "#2d232e",
+          borderRadius: 14,
+          padding: 14,
+          marginBottom: droneVisible ? 14 : 0,
+          width: 320,
+          borderWidth: 2,
+          borderColor: "#00BCD4",
+          // Hide by making it invisible and collapsing height when not visible
+          ...(!droneVisible && {
+            height: 0,
+            overflow: "hidden",
+            opacity: 0,
+            padding: 0,
+            margin: 0,
+            borderWidth: 0,
+          }),
+        }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <Text style={{
+              color: "#00BCD4",
+              fontSize: 16,
+              fontWeight: "bold",
+            }}>
+              🎶 Pitch Drone
+            </Text>
+            <TouchableOpacity onPress={() => setDroneVisible(false)}>
+              <Text style={{ color: "#888", fontSize: 18 }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <PitchDrone 
+            muted={audioMuted}
+            volume={droneVolume}
+            metronomeVolume={metronomeVolume}
+            onPlayingChange={setDroneIsPlaying}
+            onMuteChange={setAudioMuted}
+            onVolumeChange={setDroneVolume}
+            onMetronomeVolumeChange={setMetronomeVolume}
           />
         </View>
       )}
@@ -1026,9 +1093,11 @@ export default function SessionScreen({ navigation, route }) {
           zIndex: 100,
         }}>
           {/* Metronome Toggle Button - only show if not tempo_build (which shows it automatically) */}
+          {/* Disabled when drone panel is open (mutually exclusive) */}
           {mini.goal_type !== "tempo_build" && (
             <TouchableOpacity
               onPress={() => {
+                if (droneVisible) return; // Disabled when drone is open
                 console.log("[SessionScreen] Metronome toggle pressed, enabled:", metronomeEnabled, "visible:", metronomeVisible);
                 if (!metronomeVisible) {
                   // Showing the metronome - also enable it if not already
@@ -1040,8 +1109,8 @@ export default function SessionScreen({ navigation, route }) {
                 }
               }}
               accessibilityLabel="Toggle Metronome"
-              accessibilityHint="Show or hide the metronome tool"
-              {...(Platform.OS === "web" ? { title: metronomeIsPlaying ? "Metronome running (tap to show/hide)" : "Toggle Metronome" } : {})}
+              accessibilityHint={droneVisible ? "Close drone panel first" : "Show or hide the metronome tool"}
+              {...(Platform.OS === "web" ? { title: droneVisible ? "Close drone panel first" : (metronomeIsPlaying ? "Metronome running (tap to show/hide)" : "Toggle Metronome") } : {})}
               style={{
                 backgroundColor: metronomeIsPlaying ? "#9C27B0" : "#333",
                 borderRadius: 24,
@@ -1053,21 +1122,58 @@ export default function SessionScreen({ navigation, route }) {
                 shadowOpacity: 0.3,
                 shadowRadius: 4,
                 shadowOffset: { width: 0, height: 2 },
+                opacity: droneVisible ? 0.4 : 1,
               }}
             >
               <Text style={{ fontSize: 18 }}>🎵</Text>
             </TouchableOpacity>
           )}
           
-          {/* Mute Button - only show when metronome (or later drone) is playing */}
-          {metronomeIsPlaying && (
-            <TouchableOpacity
+          {/* Pitch Drone Toggle Button */}
+          {/* Disabled when metronome panel is open (mutually exclusive) */}
+          <TouchableOpacity
+            onPress={() => {
+              if (metronomeVisible) return; // Disabled when metronome is open
+              console.log("[SessionScreen] Drone toggle pressed, enabled:", droneEnabled, "visible:", droneVisible);
+              if (!droneVisible) {
+                setDroneVisible(true);
+                setDroneEnabled(true);
+              } else {
+                setDroneVisible(false);
+              }
+            }}
+            accessibilityLabel="Toggle Pitch Drone"
+            accessibilityHint={metronomeVisible ? "Close metronome panel first" : "Show or hide the pitch drone tool"}
+            {...(Platform.OS === "web" ? { title: metronomeVisible ? "Close metronome panel first" : (droneIsPlaying ? "Drone playing (tap to show/hide)" : "Toggle Pitch Drone") } : {})}
+            style={{
+              backgroundColor: droneIsPlaying ? "#00BCD4" : "#333",
+              borderRadius: 24,
+              padding: 12,
+              marginRight: 8,
+              flexDirection: "row",
+              alignItems: "center",
+              shadowColor: "#000",
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+              shadowOffset: { width: 0, height: 2 },
+              opacity: metronomeVisible ? 0.4 : 1,
+            }}
+          >
+            <Text style={{ fontSize: 18 }}>🎶</Text>
+          </TouchableOpacity>
+          
+          {/* Mute Button - only show when metronome or drone is playing */}
+          {/* Tap to toggle mute, long-press for volume controls */}
+          {(metronomeIsPlaying || droneIsPlaying) && (
+            <Pressable
               onPress={() => setAudioMuted(!audioMuted)}
+              onLongPress={() => setShowVolumeModal(true)}
+              delayLongPress={400}
               accessibilityLabel={audioMuted ? "Unmute" : "Mute"}
-              accessibilityHint="Toggle audio mute"
-              {...(Platform.OS === "web" ? { title: audioMuted ? "Unmute audio" : "Mute audio" } : {})}
-              style={{
-                backgroundColor: audioMuted ? "#c0392b" : "#333",
+              accessibilityHint="Tap to mute/unmute, hold for volume controls"
+              {...(Platform.OS === "web" ? { title: "Tap: mute/unmute | Hold: volume controls" } : {})}
+              style={({ pressed }) => ({
+                backgroundColor: audioMuted ? "#c0392b" : (pressed ? "#444" : "#333"),
                 borderRadius: 24,
                 padding: 12,
                 marginRight: 8,
@@ -1077,10 +1183,10 @@ export default function SessionScreen({ navigation, route }) {
                 shadowOpacity: 0.3,
                 shadowRadius: 4,
                 shadowOffset: { width: 0, height: 2 },
-              }}
+              })}
             >
               <Text style={{ fontSize: 18 }}>{audioMuted ? "🔇" : "🔊"}</Text>
-            </TouchableOpacity>
+            </Pressable>
           )}
           
           {/* Help Button */}
@@ -1134,6 +1240,92 @@ export default function SessionScreen({ navigation, route }) {
             setSelectedCapabilityId(null);
           }}
         />
+      </Modal>
+
+      {/* Volume Control Modal - appears on long-press of mute button */}
+      <Modal
+        visible={showVolumeModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowVolumeModal(false)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.7)",
+          justifyContent: "center",
+          alignItems: "center",
+        }}>
+          <View style={{
+            backgroundColor: "#2d232e",
+            borderRadius: 16,
+            padding: 24,
+            width: 300,
+            shadowColor: "#000",
+            shadowOpacity: 0.5,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 10,
+          }}>
+            <Text style={{
+              color: "#FFD700",
+              fontSize: 18,
+              fontWeight: "bold",
+              marginBottom: 20,
+              textAlign: "center",
+            }}>
+              🔊 Volume Controls
+            </Text>
+
+            {/* Metronome Volume */}
+            <View style={{ marginBottom: 20 }}>
+              <Text style={{ color: "#9C27B0", fontSize: 14, fontWeight: "600", marginBottom: 8 }}>
+                🎵 Metronome: {Math.round(metronomeVolume * 100)}%
+              </Text>
+              <Slider
+                style={{ width: "100%", height: 40 }}
+                minimumValue={0}
+                maximumValue={1}
+                value={metronomeVolume}
+                onValueChange={setMetronomeVolume}
+                minimumTrackTintColor="#9C27B0"
+                maximumTrackTintColor="#444"
+                thumbTintColor="#9C27B0"
+              />
+            </View>
+
+            {/* Drone Volume */}
+            <View style={{ marginBottom: 24 }}>
+              <Text style={{ color: "#00BCD4", fontSize: 14, fontWeight: "600", marginBottom: 8 }}>
+                🎶 Drone: {Math.round(droneVolume * 100)}%
+              </Text>
+              <Slider
+                style={{ width: "100%", height: 40 }}
+                minimumValue={0}
+                maximumValue={1}
+                value={droneVolume}
+                onValueChange={setDroneVolume}
+                minimumTrackTintColor="#00BCD4"
+                maximumTrackTintColor="#444"
+                thumbTintColor="#00BCD4"
+              />
+            </View>
+
+            {/* Close Button */}
+            <TouchableOpacity
+              onPress={() => setShowVolumeModal(false)}
+              style={{
+                backgroundColor: "#FFD700",
+                borderRadius: 8,
+                paddingVertical: 12,
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: "#1a1a2e", fontWeight: "bold", fontSize: 16 }}>
+                Done
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </ScrollView>
   );

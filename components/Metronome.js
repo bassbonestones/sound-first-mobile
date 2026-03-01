@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { View, Text, TouchableOpacity, Platform, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, Pressable, Platform, ScrollView, Modal } from "react-native";
+import Slider from "@react-native-community/slider";
 
 /**
  * Metronome Component
@@ -166,6 +167,11 @@ export default function Metronome({
   showTimeSignature = true,
   showSubdivision = true,
   muted = false,
+  volume = 1.0, // Master volume multiplier (0-1)
+  // Volume controls for cross-component modal
+  droneVolume = 0.5,
+  onVolumeChange,
+  onDroneVolumeChange,
 }) {
   const [bpm, setBpm] = useState(initialBpm);
   const [isPlaying, setIsPlaying] = useState(autoStart);
@@ -181,6 +187,9 @@ export default function Metronome({
   const [subdivision, setSubdivision] = useState("none");
   const [showSubdivisionPicker, setShowSubdivisionPicker] = useState(false);
   
+  // Volume modal state
+  const [showVolumeModal, setShowVolumeModal] = useState(false);
+  
   // Reset subdivision to "none" if swing is selected but noteValue changes from 4
   useEffect(() => {
     if (subdivision === "swing" && noteValue !== 4) {
@@ -194,11 +203,17 @@ export default function Metronome({
   const nextBeatTimeRef = useRef(0);
   const schedulerRef = useRef(null);
   const mutedRef = useRef(muted);
+  const volumeRef = useRef(volume);
 
   // Keep mutedRef in sync with prop (avoids restart on mute toggle)
   useEffect(() => {
     mutedRef.current = muted;
   }, [muted]);
+
+  // Keep volumeRef in sync
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
 
   // Initialize AudioContext (web only)
   useEffect(() => {
@@ -265,10 +280,11 @@ export default function Metronome({
           const isBeatAccent = isFirstBeat && index === 0 && accentFirst;
           const subAccent = accents[index] || 0.5;
           const frequency = isBeatAccent ? 1200 : (index === 0 ? 900 : 700);
-          const volume = isBeatAccent ? 0.6 : subAccent * 0.5;
+          const baseVolume = isBeatAccent ? 0.6 : subAccent * 0.5;
+          const finalVolume = baseVolume * volumeRef.current; // Apply master volume
           
-          console.log(`[Metronome] Beat ${beatCounter + 1}/${beatsPerMeasure}, sub=${index + 1}/${pattern.length}, freq=${frequency}Hz, vol=${volume.toFixed(2)}`);
-          createClickSound(audioContextRef.current, frequency, 0.04, volume);
+          console.log(`[Metronome] Beat ${beatCounter + 1}/${beatsPerMeasure}, sub=${index + 1}/${pattern.length}, freq=${frequency}Hz, vol=${finalVolume.toFixed(2)}`);
+          createClickSound(audioContextRef.current, frequency, 0.04, finalVolume);
         }
         setCurrentSubClick(index);
       }, delayMs);
@@ -392,22 +408,25 @@ export default function Metronome({
   return (
     <View style={{ alignItems: "center", padding: 16, position: "relative" }}>
       {/* Mute Button - top right corner, only when playing */}
+      {/* Tap to mute, long-press for volume controls */}
       {isPlaying && (
-        <TouchableOpacity
+        <Pressable
           onPress={toggleMute}
-          style={{
+          onLongPress={() => setShowVolumeModal(true)}
+          delayLongPress={400}
+          style={({ pressed }) => ({
             position: "absolute",
             top: 8,
             right: 8,
-            backgroundColor: muted ? "#555" : "#333",
+            backgroundColor: muted ? "#555" : (pressed ? "#444" : "#333"),
             paddingVertical: 8,
             paddingHorizontal: 12,
             borderRadius: 20,
             zIndex: 10,
-          }}
+          })}
         >
           <Text style={{ fontSize: 18 }}>{muted ? "🔇" : "🔊"}</Text>
-        </TouchableOpacity>
+        </Pressable>
       )}
 
       {/* BPM Display */}
@@ -909,6 +928,92 @@ export default function Metronome({
           Audio requires expo-av on mobile
         </Text>
       )}
+
+      {/* Volume Control Modal - appears on long-press of mute button */}
+      <Modal
+        visible={showVolumeModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowVolumeModal(false)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.7)",
+          justifyContent: "center",
+          alignItems: "center",
+        }}>
+          <View style={{
+            backgroundColor: "#2d232e",
+            borderRadius: 16,
+            padding: 24,
+            width: 300,
+            shadowColor: "#000",
+            shadowOpacity: 0.5,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 10,
+          }}>
+            <Text style={{
+              color: "#FFD700",
+              fontSize: 18,
+              fontWeight: "bold",
+              marginBottom: 20,
+              textAlign: "center",
+            }}>
+              🔊 Volume Controls
+            </Text>
+
+            {/* Metronome Volume */}
+            <View style={{ marginBottom: 20 }}>
+              <Text style={{ color: "#9C27B0", fontSize: 14, fontWeight: "600", marginBottom: 8 }}>
+                🎵 Metronome: {Math.round(volume * 100)}%
+              </Text>
+              <Slider
+                style={{ width: "100%", height: 40 }}
+                minimumValue={0}
+                maximumValue={1}
+                value={volume}
+                onValueChange={(val) => onVolumeChange && onVolumeChange(val)}
+                minimumTrackTintColor="#9C27B0"
+                maximumTrackTintColor="#444"
+                thumbTintColor="#9C27B0"
+              />
+            </View>
+
+            {/* Drone Volume */}
+            <View style={{ marginBottom: 24 }}>
+              <Text style={{ color: "#00BCD4", fontSize: 14, fontWeight: "600", marginBottom: 8 }}>
+                🎶 Drone: {Math.round(droneVolume * 100)}%
+              </Text>
+              <Slider
+                style={{ width: "100%", height: 40 }}
+                minimumValue={0}
+                maximumValue={1}
+                value={droneVolume}
+                onValueChange={(val) => onDroneVolumeChange && onDroneVolumeChange(val)}
+                minimumTrackTintColor="#00BCD4"
+                maximumTrackTintColor="#444"
+                thumbTintColor="#00BCD4"
+              />
+            </View>
+
+            {/* Close Button */}
+            <TouchableOpacity
+              onPress={() => setShowVolumeModal(false)}
+              style={{
+                backgroundColor: "#FFD700",
+                borderRadius: 8,
+                paddingVertical: 12,
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: "#1a1a2e", fontWeight: "bold", fontSize: 16 }}>
+                Done
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
