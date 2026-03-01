@@ -76,6 +76,13 @@ jest.mock('react-native', () => {
     stop: jest.fn(),
   });
   
+  // Mock Platform for web environment in tests
+  RN.Platform = {
+    ...RN.Platform,
+    OS: 'web',
+    select: (obj) => obj.web || obj.default,
+  };
+  
   return RN;
 });
 

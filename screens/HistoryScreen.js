@@ -8,6 +8,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native";
+import ResetButton from "../components/ResetButton";
 
 function getBackendUrl(endpoint) {
   const LOCAL_IP = "192.168.1.118";
@@ -76,6 +77,7 @@ export default function HistoryScreen() {
   );
 
   return (
+    <View style={{ flex: 1, backgroundColor: "#1a1410" }}>
     <ScrollView
       contentContainerStyle={{
         flexGrow: 1,
@@ -268,6 +270,8 @@ export default function HistoryScreen() {
         </View>
       )}
     </ScrollView>
+    <ResetButton />
+    </View>
   );
 }
 

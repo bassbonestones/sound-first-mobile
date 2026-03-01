@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native";
+import ResetButton from "../components/ResetButton";
 
 export default function RatingScreen({ navigation, route }) {
   const [rating, setRating] = useState(null);
@@ -50,6 +51,7 @@ export default function RatingScreen({ navigation, route }) {
   };
 
   return (
+    <View style={{ flex: 1, backgroundColor: "#1a1410" }}>
     <ScrollView
       contentContainerStyle={{
         flexGrow: 1,
@@ -114,5 +116,7 @@ export default function RatingScreen({ navigation, route }) {
         </TouchableOpacity>
       )}
     </ScrollView>
+    <ResetButton />
+    </View>
   );
 }

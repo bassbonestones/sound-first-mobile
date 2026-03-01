@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, Platform, ScrollView, TouchableOpacity, Modal, Alert } from "react-native";
+import ResetButton from "../components/ResetButton";
 
 // Fatigue level descriptions
 const FATIGUE_LABELS = {
@@ -71,6 +72,7 @@ export default function StartPracticeScreen({ navigation }) {
   };
 
   return (
+    <View style={{ flex: 1, backgroundColor: "#1a1410" }}>
     <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#1a1410", padding: 32 }}>
       <Text style={{ fontSize: 32, fontWeight: "bold", color: "#FFD700", marginBottom: 20, fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif" }}>
         Sound First Practice
@@ -260,5 +262,7 @@ export default function StartPracticeScreen({ navigation }) {
         </View>
       </Modal>
     </ScrollView>
+    <ResetButton />
+    </View>
   );
 }

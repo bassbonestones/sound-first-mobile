@@ -58,12 +58,12 @@ export default function NotationDisplay({
       try {
         const { OpenSheetMusicDisplay } = window.opensheetmusicdisplay;
         
-        // Clear previous instance
-        if (osmdRef.current) {
-          containerRef.current.innerHTML = "";
-        }
+        // ALWAYS clear the container before creating a new instance
+        // (This prevents concatenation of multiple staves on re-render)
+        containerRef.current.innerHTML = "";
+        osmdRef.current = null;
 
-        // Create OSMD instance
+        // Create OSMD instance with fixed sizing
         osmdRef.current = new OpenSheetMusicDisplay(containerRef.current, {
           autoResize: false,
           drawTitle: showTitle,
@@ -74,16 +74,43 @@ export default function NotationDisplay({
           drawPartNames: false,
           drawPartAbbreviations: false,
           drawMeasureNumbers: false,
+          drawTimeSignatures: false,
           renderSingleHorizontalStaffline: true,
+          fixedMeasureWidth: true,
         });
 
         // Set rendering options for dark theme
         osmdRef.current.EngravingRules.PageBackgroundColor = "transparent";
+        // Fix the staff size to prevent jumping
+        osmdRef.current.EngravingRules.PageLeftMargin = 0;
+        osmdRef.current.EngravingRules.PageRightMargin = 0;
+        osmdRef.current.EngravingRules.PageTopMargin = 0;
+        osmdRef.current.EngravingRules.PageBottomMargin = 0;
+        osmdRef.current.EngravingRules.SheetMinimumDistanceBetweenSystems = 0;
+        osmdRef.current.EngravingRules.MinimumDistanceBetweenSystems = 0;
         
-        // Load and render
+        // Load and render with fixed width
         if (musicxml) {
           await osmdRef.current.load(musicxml);
+          // Set a fixed zoom to stabilize rendering
+          osmdRef.current.zoom = 0.7;
           osmdRef.current.render();
+          
+          // Force consistent positioning by fixing the SVG
+          const svgElement = containerRef.current.querySelector('svg');
+          if (svgElement) {
+            // Fix size
+            svgElement.style.width = `${width - 20}px`;
+            svgElement.style.height = `${height}px`;
+            svgElement.style.maxWidth = `${width - 20}px`;
+            svgElement.style.maxHeight = `${height}px`;
+            // Fix position at top-left
+            svgElement.style.position = 'absolute';
+            svgElement.style.top = '10px';
+            svgElement.style.left = '10px';
+            // Ensure no overflow creates sizing issues
+            svgElement.style.overflow = 'hidden';
+          }
         }
         
         setLoading(false);
@@ -144,7 +171,12 @@ export default function NotationDisplay({
   }
 
   return (
-    <View style={{ width, minHeight: height }}>
+    <View style={{ 
+      width, 
+      height, 
+      overflow: 'hidden',
+      position: 'relative',
+    }}>
       {loading && (
         <View style={{
           position: "absolute",
@@ -156,7 +188,7 @@ export default function NotationDisplay({
           borderRadius: 12,
           justifyContent: "center",
           alignItems: "center",
-          zIndex: 1,
+          zIndex: 10,
         }}>
           <ActivityIndicator color="#FFD700" />
           <Text style={{ color: "#bfa76a", fontSize: 12, marginTop: 8 }}>
@@ -167,8 +199,11 @@ export default function NotationDisplay({
       <View
         ref={containerRef}
         style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
           width,
-          minHeight: height,
+          height,
           backgroundColor: "#fffbe6",
           borderRadius: 8,
           overflow: "hidden",

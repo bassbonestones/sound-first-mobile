@@ -1,9 +1,11 @@
 import React from "react";
 import { View, Text, Platform, ScrollView } from "react-native";
+import ResetButton from "../components/ResetButton";
 
 export default function FocusCardScreen({ route }) {
   const { focusCard } = route.params;
   return (
+    <View style={{ flex: 1, backgroundColor: "#1a1410" }}>
     <ScrollView
       contentContainerStyle={{
         flexGrow: 1,
@@ -50,5 +52,7 @@ export default function FocusCardScreen({ route }) {
         </Text>
       </View>
     </ScrollView>
+    <ResetButton />
+    </View>
   );
 }

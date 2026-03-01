@@ -73,12 +73,15 @@ import RatingScreen from "./screens/RatingScreen";
 import OnboardingScreen from "./screens/OnboardingScreen";
 import SelfDirectedScreen from "./screens/SelfDirectedScreen";
 import HistoryScreen from "./screens/HistoryScreen";
+import CapabilityPath from "./screens/CapabilityPath";
+import FirstNoteScreen from "./screens/FirstNoteScreen";
 
 const Stack = createNativeStackNavigator();
 
 
 export default function App() {
   const [initialRoute, setInitialRoute] = useState(null);
+  const [firstNoteParams, setFirstNoteParams] = useState(null);
 
   useEffect(() => {
       // ============= APP STARTUP TIMING =============
@@ -111,15 +114,34 @@ export default function App() {
           console.log("[Onboarding] Response data:", data);
           
           if (data.instrument && data.resonant_note) {
-            // ============= RETURNING USER SCENARIO =============
-            logTiming('RETURNING USER (instrument selected)', {
-              expoStartupMs,
-              fetchMs: fetchDurationMs,
-              appStartupMs,
-              totalMs,
-              breakdown: `Expo=${expoStartupMs}ms + App=${appStartupMs}ms`
-            });
-            setInitialRoute("StartPractice");
+            // User has completed basic onboarding
+            if (data.day0_completed === false) {
+              // ============= NEED DAY 0 =============
+              logTiming('USER NEEDS DAY 0', {
+                expoStartupMs,
+                fetchMs: fetchDurationMs,
+                appStartupMs,
+                totalMs,
+                breakdown: `Expo=${expoStartupMs}ms + App=${appStartupMs}ms`
+              });
+              // Store params so FirstNote gets the correct note
+              setFirstNoteParams({
+                userId: 1,
+                resonantNote: data.resonant_note,
+                instrument: data.instrument
+              });
+              setInitialRoute("FirstNote");
+            } else {
+              // ============= RETURNING USER SCENARIO =============
+              logTiming('RETURNING USER (day0 complete)', {
+                expoStartupMs,
+                fetchMs: fetchDurationMs,
+                appStartupMs,
+                totalMs,
+                breakdown: `Expo=${expoStartupMs}ms + App=${appStartupMs}ms`
+              });
+              setInitialRoute("StartPractice");
+            }
           } else {
             // ============= NEW USER SCENARIO =============
             logTiming('NEW USER (no instrument)', {
@@ -171,6 +193,12 @@ export default function App() {
             options={{ title: "Welcome" }}
           />
           <Stack.Screen
+            name="FirstNote"
+            component={FirstNoteScreen}
+            options={{ title: "Your First Note", headerShown: false }}
+            initialParams={firstNoteParams}
+          />
+          <Stack.Screen
             name="StartPractice"
             component={StartPracticeScreen}
             options={{ title: "Sound First Mobile" }}
@@ -199,6 +227,11 @@ export default function App() {
             name="History"
             component={HistoryScreen}
             options={{ title: "Practice History" }}
+          />
+          <Stack.Screen
+            name="CapabilityPath"
+            component={CapabilityPath}
+            options={{ title: "Curriculum Planning", headerShown: false }}
           />
         </Stack.Navigator>
       </NavigationContainer>

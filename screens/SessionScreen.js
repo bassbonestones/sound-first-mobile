@@ -18,6 +18,7 @@ import NotationDisplay, { NotationPlaceholder } from "../components/NotationDisp
 import HelpMenu from "../components/HelpMenu";
 import MiniLesson from "../components/MiniLesson";
 import AudioPlayer from "../components/AudioPlayer";
+import ResetButton from "../components/ResetButton";
 
 function getBackendUrl(selfDirected = false) {
   // Set to your actual local IP address
@@ -375,6 +376,7 @@ export default function SessionScreen({ navigation, route }) {
   };
 
   return (
+    <View style={{ flex: 1, backgroundColor: "#1a1410" }}>
     <ScrollView
       contentContainerStyle={{
         flexGrow: 1,
@@ -384,18 +386,31 @@ export default function SessionScreen({ navigation, route }) {
         padding: 32,
       }}
     >
-      {/* Practice Session Header */}
-      <Text
-        style={{
-          fontSize: 28,
-          fontWeight: "bold",
-          color: "#FFD700",
-          marginBottom: 8,
-          fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
-        }}
-      >
-        Practice Session {current + 1} / {session.mini_sessions.length}
-      </Text>
+      {/* Practice Session Header + Dev Tools */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', marginBottom: 8 }}>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('CapabilityPath')}
+          style={{
+            backgroundColor: '#2a2a4a',
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            borderRadius: 8,
+            marginRight: 12,
+          }}
+        >
+          <Text style={{ color: '#4facfe', fontSize: 12, fontWeight: 'bold' }}>📋 Path</Text>
+        </TouchableOpacity>
+        <Text
+          style={{
+            fontSize: 28,
+            fontWeight: "bold",
+            color: "#FFD700",
+            fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
+          }}
+        >
+          Practice Session {current + 1} / {session.mini_sessions.length}
+        </Text>
+      </View>
 
       {/* Mode Indicator Banner */}
       {(cooldownMode || earOnlyMode) && (
@@ -1328,5 +1343,7 @@ export default function SessionScreen({ navigation, route }) {
         </View>
       </Modal>
     </ScrollView>
+    <ResetButton />
+    </View>
   );
 }
