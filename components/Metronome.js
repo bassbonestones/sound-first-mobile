@@ -156,6 +156,8 @@ export default function Metronome({
   minBpm = 40,
   maxBpm = 350,
   onBpmChange,
+  onPlayingChange,
+  onMuteChange,
   beatsPerMeasure: initialBeats = 4,
   initialNoteValue = 4,
   accentFirst = true,
@@ -163,6 +165,7 @@ export default function Metronome({
   autoStart = false,
   showTimeSignature = true,
   showSubdivision = true,
+  muted = false,
 }) {
   const [bpm, setBpm] = useState(initialBpm);
   const [isPlaying, setIsPlaying] = useState(autoStart);
@@ -190,6 +193,12 @@ export default function Metronome({
   const subIntervalRef = useRef(null);
   const nextBeatTimeRef = useRef(0);
   const schedulerRef = useRef(null);
+  const mutedRef = useRef(muted);
+
+  // Keep mutedRef in sync with prop (avoids restart on mute toggle)
+  useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
 
   // Initialize AudioContext (web only)
   useEffect(() => {
@@ -251,7 +260,7 @@ export default function Metronome({
     pattern.forEach((timing, index) => {
       const delayMs = timing * msPerBeat;
       const timeout = setTimeout(() => {
-        if (audioContextRef.current && Platform.OS === "web") {
+        if (audioContextRef.current && Platform.OS === "web" && !mutedRef.current) {
           // Beat 1 gets strongest accent, subdivisions get their pattern accents
           const isBeatAccent = isFirstBeat && index === 0 && accentFirst;
           const subAccent = accents[index] || 0.5;
@@ -334,7 +343,17 @@ export default function Metronome({
   };
 
   const togglePlay = () => {
-    setIsPlaying(!isPlaying);
+    const newPlaying = !isPlaying;
+    setIsPlaying(newPlaying);
+    if (onPlayingChange) {
+      onPlayingChange(newPlaying);
+    }
+  };
+
+  const toggleMute = () => {
+    if (onMuteChange) {
+      onMuteChange(!muted);
+    }
   };
 
   // Tap tempo feature
@@ -371,7 +390,26 @@ export default function Metronome({
   const currentSubdivision = SUBDIVISIONS[subdivision];
 
   return (
-    <View style={{ alignItems: "center", padding: 16 }}>
+    <View style={{ alignItems: "center", padding: 16, position: "relative" }}>
+      {/* Mute Button - top right corner, only when playing */}
+      {isPlaying && (
+        <TouchableOpacity
+          onPress={toggleMute}
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            backgroundColor: muted ? "#555" : "#333",
+            paddingVertical: 8,
+            paddingHorizontal: 12,
+            borderRadius: 20,
+            zIndex: 10,
+          }}
+        >
+          <Text style={{ fontSize: 18 }}>{muted ? "🔇" : "🔊"}</Text>
+        </TouchableOpacity>
+      )}
+
       {/* BPM Display */}
       <View style={{ marginBottom: 16 }}>
         <Text style={{ 

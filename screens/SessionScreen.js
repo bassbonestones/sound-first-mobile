@@ -82,7 +82,22 @@ export default function SessionScreen({ navigation, route }) {
   const [selectedCapabilityId, setSelectedCapabilityId] = useState(null);
   
   // Metronome state - available as optional tool for all materials
-  const [showMetronome, setShowMetronome] = useState(false);
+  // metronomeEnabled = whether the metronome component is mounted
+  // metronomeVisible = whether the UI panel is shown
+  // metronomeIsPlaying = whether the metronome is actually ticking
+  // audioMuted = whether audio is muted (visual keeps running)
+  const [metronomeEnabled, setMetronomeEnabled] = useState(false);
+  const [metronomeVisible, setMetronomeVisible] = useState(false);
+  const [metronomeIsPlaying, setMetronomeIsPlaying] = useState(false);
+  const [audioMuted, setAudioMuted] = useState(false);
+  
+  // Reset metronome when mini-session changes
+  useEffect(() => {
+    setMetronomeEnabled(false);
+    setMetronomeVisible(false);
+    setMetronomeIsPlaying(false);
+    setAudioMuted(false);
+  }, [current]);
 
   // Variable assignments after hooks
   const duration = route?.params?.duration || 20;
@@ -590,15 +605,26 @@ export default function SessionScreen({ navigation, route }) {
       </View>
 
       {/* Metronome - shows for tempo_build goals OR when user toggles it on */}
-      {(mini.goal_type === "tempo_build" || showMetronome) && (
+      {/* Keep mounted when enabled so audio continues; hide by positioning offscreen */}
+      {(mini.goal_type === "tempo_build" || metronomeEnabled) && (
         <View style={{
           backgroundColor: "#2d232e",
           borderRadius: 14,
           padding: 14,
-          marginBottom: 14,
+          marginBottom: (mini.goal_type === "tempo_build" || metronomeVisible) ? 14 : 0,
           width: 320,
           borderWidth: 2,
           borderColor: mini.goal_type === "tempo_build" ? "#FF9800" : "#9C27B0",
+          // Hide by making it invisible and collapsing height when not visible
+          // This keeps the component mounted and audio playing
+          ...(!(mini.goal_type === "tempo_build" || metronomeVisible) && {
+            height: 0,
+            overflow: "hidden",
+            opacity: 0,
+            padding: 0,
+            margin: 0,
+            borderWidth: 0,
+          }),
         }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <Text style={{
@@ -609,7 +635,7 @@ export default function SessionScreen({ navigation, route }) {
               {mini.goal_type === "tempo_build" ? "⏱️ Tempo Build Mode" : "🎵 Metronome"}
             </Text>
             {mini.goal_type !== "tempo_build" && (
-              <TouchableOpacity onPress={() => setShowMetronome(false)}>
+              <TouchableOpacity onPress={() => setMetronomeVisible(false)}>
                 <Text style={{ color: "#888", fontSize: 18 }}>✕</Text>
               </TouchableOpacity>
             )}
@@ -620,6 +646,9 @@ export default function SessionScreen({ navigation, route }) {
             maxBpm={350}
             beatsPerMeasure={4}
             showControls={true}
+            muted={audioMuted}
+            onPlayingChange={setMetronomeIsPlaying}
+            onMuteChange={setAudioMuted}
           />
         </View>
       )}
@@ -1000,14 +1029,21 @@ export default function SessionScreen({ navigation, route }) {
           {mini.goal_type !== "tempo_build" && (
             <TouchableOpacity
               onPress={() => {
-                console.log("[SessionScreen] Metronome toggle pressed, current:", showMetronome, "-> new:", !showMetronome);
-                setShowMetronome(!showMetronome);
+                console.log("[SessionScreen] Metronome toggle pressed, enabled:", metronomeEnabled, "visible:", metronomeVisible);
+                if (!metronomeVisible) {
+                  // Showing the metronome - also enable it if not already
+                  setMetronomeVisible(true);
+                  setMetronomeEnabled(true);
+                } else {
+                  // Hiding the metronome UI - but it keeps playing
+                  setMetronomeVisible(false);
+                }
               }}
               accessibilityLabel="Toggle Metronome"
               accessibilityHint="Show or hide the metronome tool"
-              {...(Platform.OS === "web" ? { title: "Toggle Metronome" } : {})}
+              {...(Platform.OS === "web" ? { title: metronomeIsPlaying ? "Metronome running (tap to show/hide)" : "Toggle Metronome" } : {})}
               style={{
-                backgroundColor: showMetronome ? "#9C27B0" : "#333",
+                backgroundColor: metronomeIsPlaying ? "#9C27B0" : "#333",
                 borderRadius: 24,
                 padding: 12,
                 marginRight: 8,
@@ -1020,6 +1056,30 @@ export default function SessionScreen({ navigation, route }) {
               }}
             >
               <Text style={{ fontSize: 18 }}>🎵</Text>
+            </TouchableOpacity>
+          )}
+          
+          {/* Mute Button - only show when metronome (or later drone) is playing */}
+          {metronomeIsPlaying && (
+            <TouchableOpacity
+              onPress={() => setAudioMuted(!audioMuted)}
+              accessibilityLabel={audioMuted ? "Unmute" : "Mute"}
+              accessibilityHint="Toggle audio mute"
+              {...(Platform.OS === "web" ? { title: audioMuted ? "Unmute audio" : "Mute audio" } : {})}
+              style={{
+                backgroundColor: audioMuted ? "#c0392b" : "#333",
+                borderRadius: 24,
+                padding: 12,
+                marginRight: 8,
+                flexDirection: "row",
+                alignItems: "center",
+                shadowColor: "#000",
+                shadowOpacity: 0.3,
+                shadowRadius: 4,
+                shadowOffset: { width: 0, height: 2 },
+              }}
+            >
+              <Text style={{ fontSize: 18 }}>{audioMuted ? "🔇" : "🔊"}</Text>
             </TouchableOpacity>
           )}
           
