@@ -111,14 +111,18 @@ function getBackendUrl() {
   return `http://${LOCAL_IP}:8000`;
 }
 
-function OnboardingScreen({ navigation }) {
-  const [selectedFamily, setSelectedFamily] = useState("");
+function OnboardingScreen({ navigation, route }) {
+  // Get initial step from route params (for dev navigation)
+  const initialStep = route?.params?.step || 1;
+  const clearFamily = route?.params?.clearFamily || false;
+  
+  const [selectedFamily, setSelectedFamily] = useState(clearFamily ? "" : "");
   const [instrument, setInstrument] = useState("");
   const [startingNote, setStartingNote] = useState("");
   const [playToSelectMode, setPlayToSelectMode] = useState(false);
   const [detectedPitch, setDetectedPitch] = useState(null);
   const [isSounding, setIsSounding] = useState(false); // Track if currently making sound
-  const [step, setStep] = useState(1); // Multi-step onboarding
+  const [step, setStep] = useState(initialStep); // Multi-step onboarding
   
   // Get clef for selected instrument
   const getClef = useCallback(() => {
@@ -457,7 +461,9 @@ function OnboardingScreen({ navigation }) {
                 />
               ))}
             </View>
-          </View>        <ResetButton />        </View>
+          </View>
+          <ResetButton />
+        </View>
       );
     }
     

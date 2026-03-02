@@ -1,11 +1,22 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { View, Text, Platform, ActivityIndicator } from "react-native";
+
+// Conditionally import WebView for native platforms
+let WebView = null;
+if (Platform?.OS && Platform.OS !== "web") {
+  try {
+    const RNWebView = require("react-native-webview");
+    WebView = RNWebView?.WebView || null;
+  } catch (e) {
+    // WebView not available, that's OK
+  }
+}
 
 /**
  * NotationDisplay Component
  * 
- * Renders MusicXML notation using OpenSheetMusicDisplay (OSMD) on web.
- * On mobile, displays a placeholder since WebView integration is needed.
+ * Renders MusicXML notation using OpenSheetMusicDisplay (OSMD).
+ * Uses WebView on mobile, direct DOM on web.
  */
 
 export default function NotationDisplay({ 
@@ -130,29 +141,147 @@ export default function NotationDisplay({
     };
   }, [musicxml, showTitle]);
 
-  // Mobile fallback
+  // Generate HTML for WebView (mobile)
+  const webviewHtml = useMemo(() => {
+    if (Platform.OS === "web" || !musicxml) return "";
+    
+    // Escape the MusicXML for embedding in JavaScript
+    const escapedXml = musicxml
+      .replace(/\\/g, "\\\\")
+      .replace(/`/g, "\\`")
+      .replace(/\$/g, "\\$");
+    
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      background: transparent; 
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    #osmd-container { 
+      width: 100%; 
+      max-width: ${width - 20}px;
+    }
+    #osmd-container svg {
+      width: 100% !important;
+      height: auto !important;
+    }
+    #loading {
+      color: #bfa76a;
+      font-family: sans-serif;
+      font-size: 14px;
+      text-align: center;
+    }
+    #error {
+      color: #c0392b;
+      font-family: sans-serif;
+      font-size: 12px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="osmd-container">
+    <div id="loading">Loading notation...</div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.6/build/opensheetmusicdisplay.min.js"></script>
+  <script>
+    (async function() {
+      try {
+        const container = document.getElementById('osmd-container');
+        const loadingDiv = document.getElementById('loading');
+        
+        const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(container, {
+          autoResize: false,
+          drawTitle: ${showTitle},
+          drawSubtitle: false,
+          drawComposer: false,
+          drawLyricist: false,
+          drawCredits: false,
+          drawPartNames: false,
+          drawPartAbbreviations: false,
+          drawMeasureNumbers: false,
+          drawTimeSignatures: false,
+          renderSingleHorizontalStaffline: true,
+        });
+        
+        osmd.EngravingRules.PageBackgroundColor = "transparent";
+        osmd.EngravingRules.PageLeftMargin = 0;
+        osmd.EngravingRules.PageRightMargin = 0;
+        osmd.EngravingRules.PageTopMargin = 0;
+        osmd.EngravingRules.PageBottomMargin = 0;
+        
+        const musicxml = \`${escapedXml}\`;
+        await osmd.load(musicxml);
+        osmd.zoom = 0.8;
+        osmd.render();
+        
+        if (loadingDiv) loadingDiv.remove();
+      } catch (e) {
+        document.getElementById('osmd-container').innerHTML = 
+          '<div id="error">Failed to render: ' + e.message + '</div>';
+      }
+    })();
+  </script>
+</body>
+</html>`;
+  }, [musicxml, width, showTitle]);
+
+  // Mobile: use WebView
   if (Platform.OS !== "web") {
+    if (!musicxml) {
+      return (
+        <View style={{
+          width,
+          height,
+          backgroundColor: "#2d232e",
+          borderRadius: 12,
+          justifyContent: "center",
+          alignItems: "center",
+          borderWidth: 1,
+          borderColor: "#5a4a3a",
+        }}>
+          <Text style={{ color: "#666", fontSize: 12 }}>No notation data</Text>
+        </View>
+      );
+    }
+    
     return (
-      <View style={{
-        width,
-        height: 80,
-        backgroundColor: "#2d232e",
-        borderRadius: 12,
-        justifyContent: "center",
-        alignItems: "center",
-        borderWidth: 1,
-        borderColor: "#5a4a3a",
+      <View style={{ 
+        width, 
+        height, 
+        borderRadius: 12, 
+        overflow: "hidden",
+        backgroundColor: "transparent",
       }}>
-        <Text style={{ color: "#bfa76a", fontSize: 12, textAlign: "center" }}>
-          🎼 Notation available on web
-        </Text>
-        <Text style={{ color: "#666", fontSize: 10, marginTop: 4 }}>
-          WebView integration needed for mobile
-        </Text>
+        <WebView
+          source={{ html: webviewHtml }}
+          style={{ 
+            width, 
+            height, 
+            backgroundColor: "transparent",
+          }}
+          scrollEnabled={false}
+          showsHorizontalScrollIndicator={false}
+          showsVerticalScrollIndicator={false}
+          originWhitelist={["*"]}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          mixedContentMode="always"
+        />
       </View>
     );
   }
 
+  // Web: use direct DOM (existing code)
   if (error) {
     return (
       <View style={{

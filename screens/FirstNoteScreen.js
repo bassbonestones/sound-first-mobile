@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,7 +12,349 @@ import {
 import AudioInput from "../components/AudioInput";
 import VolumeBar, { CircularVolumeIndicator } from "../components/VolumeBar";
 import EDMVisualizer from "../components/EDMVisualizer";
-import ResetButton from "../components/ResetButton";
+import NotationDisplay from "../components/NotationDisplay";
+import { CommonActions } from "@react-navigation/native";
+
+// Dev Navigation Menu for testing - jump to any stage/substep
+function DevNavMenu({ stage, setStage, setSubStep, setFocusCardIndex, setFocusStepsDone, setFocusCardRatings, setPitchAccuracy, userId, navigation }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [expandedStage, setExpandedStage] = useState(null);
+  const [isResetting, setIsResetting] = useState(false);
+  
+  const performReset = async () => {
+    setIsResetting(true);
+    try {
+      const response = await fetch(`${getBackendUrl()}/users/${userId}/reset`, {
+        method: "POST",
+      });
+      if (!response.ok) throw new Error("Failed to reset");
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: "Onboarding" }],
+        })
+      );
+    } catch (err) {
+      console.error("Reset error:", err);
+      if (Platform.OS === "web") {
+        alert("Failed to reset: " + err.message);
+      }
+    } finally {
+      setIsResetting(false);
+    }
+  };
+  
+  const handleReset = () => {
+    if (Platform.OS === "web") {
+      if (window.confirm("Reset all progress and start over?")) {
+        performReset();
+      }
+    }
+  };
+  
+  const STAGE_TREE = [
+    {
+      id: -1,
+      name: "Settings",
+      isSettings: true,
+      subSteps: [
+        { id: 0, name: "a) Instrument Class", screen: "Onboarding", params: { step: 1, clearFamily: true } },
+        { id: 1, name: "b) Instrument", screen: "Onboarding", params: { step: 1 } },
+        { id: 2, name: "c) First Note Picker", screen: "Onboarding", params: { step: 2 } },
+      ]
+    },
+    { 
+      id: 0, 
+      name: "Listen & Sing", 
+      subSteps: [
+        { id: 0, name: "a) Listen" },
+        { id: 1, name: "b) Sing" },
+        { id: 2, name: "c) Imagine" },
+      ]
+    },
+    { 
+      id: 1, 
+      name: "Play Your Note", 
+      subSteps: [
+        { id: 0, name: "a) Imagine intro" },
+        { id: 1, name: "b) Ready to play" },
+        { id: 2, name: "c) Playing" },
+        { id: 3, name: "d) Rating" },
+      ]
+    },
+    { 
+      id: 2, 
+      name: "Refine Your Sound", 
+      subSteps: [
+        { id: 0, name: "a) Focus Card 1/3", focusCardIndex: 0 },
+        { id: 1, name: "b) Focus Card 2/3", focusCardIndex: 1 },
+        { id: 2, name: "c) Focus Card 3/3", focusCardIndex: 2 },
+        { id: 3, name: "d) All Complete", focusCardIndex: 0, ratings: [4, 4, 4] },
+      ]
+    },
+    { 
+      id: 3, 
+      name: "The Musical Staff", 
+      subSteps: [
+        { id: 0, name: "a) Staff intro" },
+        { id: 1, name: "b) Fun fact" },
+      ]
+    },
+    { 
+      id: 4, 
+      name: "Your Clef", 
+      subSteps: [
+        { id: 0, name: "a) Clef intro" },
+        { id: 1, name: "b) Clef details" },
+      ]
+    },
+    { 
+      id: 5, 
+      name: "Sharps & Flats", 
+      subSteps: [
+        { id: 0, name: "a) Intro" },
+        { id: 1, name: "b) Your note" },
+      ]
+    },
+    { 
+      id: 6, 
+      name: "Note on Staff", 
+      subSteps: []
+    },
+  ];
+  
+  const navigateTo = (stageId, subStepData) => {
+    // Handle Settings items - navigate to Onboarding screen
+    if (subStepData.screen) {
+      setIsOpen(false);
+      setExpandedStage(null);
+      navigation.replace(subStepData.screen, subStepData.params || {});
+      return;
+    }
+    
+    // Reset common state
+    setPitchAccuracy(null);
+    setFocusStepsDone({ listen: false, sing: false, imagine: false, play: false });
+    
+    // Handle Stage 2 (Focus Cards) specially
+    if (stageId === 2) {
+      if (subStepData.ratings) {
+        // Jump to "All Complete" state
+        setFocusCardRatings(subStepData.ratings);
+        setFocusCardIndex(0);
+      } else {
+        setFocusCardIndex(subStepData.focusCardIndex || 0);
+        setFocusCardRatings([]);
+      }
+      setSubStep(0);
+    } else {
+      // Regular stage navigation
+      setFocusCardIndex(0);
+      setFocusCardRatings([]);
+      setSubStep(subStepData.id);
+    }
+    
+    setStage(stageId);
+    setIsOpen(false);
+    setExpandedStage(null);
+  };
+  
+  if (!isOpen) {
+    return (
+      <TouchableOpacity
+        style={devStyles.menuButton}
+        onPress={() => setIsOpen(true)}
+      >
+        <Text style={devStyles.menuButtonText}>🔧</Text>
+      </TouchableOpacity>
+    );
+  }
+  
+  return (
+    <View style={devStyles.menuOverlay}>
+      <View style={devStyles.menuContainer}>
+        <View style={devStyles.menuHeader}>
+          <Text style={devStyles.menuTitle}>Dev Navigation</Text>
+          <TouchableOpacity onPress={() => { setIsOpen(false); setExpandedStage(null); }}>
+            <Text style={devStyles.closeButton}>✕</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <ScrollView style={devStyles.menuScroll}>
+          {STAGE_TREE.map((stageItem) => (
+            <View key={stageItem.id}>
+              <TouchableOpacity
+                style={[
+                  devStyles.stageRow,
+                  stageItem.isSettings && devStyles.settingsRow,
+                  stage === stageItem.id && !stageItem.isSettings && devStyles.stageRowActive
+                ]}
+                onPress={() => {
+                  if (stageItem.subSteps.length === 0) {
+                    navigateTo(stageItem.id, { id: 0 });
+                  } else {
+                    setExpandedStage(expandedStage === stageItem.id ? null : stageItem.id);
+                  }
+                }}
+              >
+                <Text style={devStyles.stageIcon}>
+                  {stageItem.subSteps.length > 0 
+                    ? (expandedStage === stageItem.id ? "▼" : "▶") 
+                    : "•"}
+                </Text>
+                <Text style={[
+                  devStyles.stageName,
+                  stageItem.isSettings && devStyles.settingsName,
+                  stage === stageItem.id && !stageItem.isSettings && devStyles.stageNameActive
+                ]}>
+                  {stageItem.isSettings ? `⚙️ ${stageItem.name}` : `${stageItem.id}: ${stageItem.name}`}
+                </Text>
+              </TouchableOpacity>
+              
+              {expandedStage === stageItem.id && stageItem.subSteps.map((subStep) => (
+                <TouchableOpacity
+                  key={subStep.id}
+                  style={[devStyles.subStepRow, stageItem.isSettings && devStyles.settingsSubStep]}
+                  onPress={() => navigateTo(stageItem.id, subStep)}
+                >
+                  <Text style={devStyles.subStepName}>└ {subStep.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ))}
+        </ScrollView>
+        
+        <TouchableOpacity
+          style={[devStyles.resetButton, isResetting && { opacity: 0.6 }]}
+          onPress={handleReset}
+          disabled={isResetting}
+        >
+          <Text style={devStyles.resetButtonText}>
+            {isResetting ? "Resetting..." : "🔄 Reset User Data"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const devStyles = StyleSheet.create({
+  menuButton: {
+    position: "absolute",
+    bottom: 20,
+    left: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#333",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#FFD700",
+    zIndex: 1000,
+  },
+  menuButtonText: {
+    fontSize: 24,
+  },
+  menuOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    top: 0,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "flex-end",
+    zIndex: 1000,
+  },
+  menuContainer: {
+    backgroundColor: "#1a1410",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "70%",
+    borderWidth: 2,
+    borderColor: "#FFD700",
+    borderBottomWidth: 0,
+  },
+  menuHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#3b2c1a",
+  },
+  menuTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#FFD700",
+  },
+  closeButton: {
+    fontSize: 20,
+    color: "#FFD700",
+    padding: 5,
+  },
+  menuScroll: {
+    maxHeight: 350,
+  },
+  stageRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#2a1f15",
+  },
+  stageRowActive: {
+    backgroundColor: "#2a1f15",
+  },
+  stageIcon: {
+    fontSize: 12,
+    color: "#FFD700",
+    width: 20,
+  },
+  stageName: {
+    fontSize: 16,
+    color: "#fffbe6",
+  },
+  stageNameActive: {
+    color: "#FFD700",
+    fontWeight: "bold",
+  },
+  subStepRow: {
+    paddingVertical: 10,
+    paddingLeft: 40,
+    paddingRight: 16,
+    backgroundColor: "#0d0a07",
+  },
+  subStepName: {
+    fontSize: 14,
+    color: "#a09080",
+  },
+  resetButton: {
+    margin: 16,
+    padding: 12,
+    backgroundColor: "#8B0000",
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  resetButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  settingsRow: {
+    borderBottomWidth: 2,
+    borderBottomColor: "#FFD700",
+    backgroundColor: "#1a1410",
+  },
+  settingsName: {
+    color: "#a09080",
+    fontSize: 14,
+  },
+  settingsSubStep: {
+    backgroundColor: "#151210",
+  },
+});
 
 /*
  * FirstNoteScreen - Day 0 First-Note Experience
@@ -99,9 +441,75 @@ function parseNoteName(note) {
   return {
     letter: match[1].toUpperCase(),
     accidental: match[2] === "#" ? "♯" : match[2] === "b" ? "♭" : "",
+    rawAccidental: match[2], // Keep raw 'b' or '#' for MusicXML
     octave: parseInt(match[3], 10),
     hasAccidental: match[2] !== "",
   };
+}
+
+// Convert note name to MusicXML pitch representation
+function noteToMusicXMLPitch(noteName) {
+  const parsed = parseNoteName(noteName);
+  if (!parsed) return { step: 'C', octave: 4, alter: 0 };
+  
+  let alter = 0;
+  if (parsed.rawAccidental === 'b') {
+    alter = -1;
+  } else if (parsed.rawAccidental === '#') {
+    alter = 1;
+  }
+  
+  return { step: parsed.letter, octave: parsed.octave, alter };
+}
+
+// Generate MusicXML for a single note on a staff
+function generateSingleNoteMusicXML(noteName, clef = 'treble') {
+  const pitch = noteToMusicXMLPitch(noteName);
+  const clefSign = clef === 'bass' ? 'F' : 'G';
+  const clefLine = clef === 'bass' ? '4' : '2';
+  
+  const alterXML = pitch.alter !== 0 
+    ? `        <alter>${pitch.alter}</alter>\n` 
+    : '';
+  
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1">
+      <part-name></part-name>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>1</divisions>
+        <key>
+          <fifths>0</fifths>
+        </key>
+        <time symbol="common">
+          <beats>4</beats>
+          <beat-type>4</beat-type>
+        </time>
+        <clef>
+          <sign>${clefSign}</sign>
+          <line>${clefLine}</line>
+        </clef>
+      </attributes>
+      <note>
+        <pitch>
+          <step>${pitch.step}</step>
+${alterXML}          <octave>${pitch.octave}</octave>
+        </pitch>
+        <duration>4</duration>
+        <type>whole</type>
+      </note>
+      <barline location="right">
+        <bar-style>light-light</bar-style>
+      </barline>
+    </measure>
+  </part>
+</score-partwise>`;
 }
 
 export default function FirstNoteScreen({ navigation, route }) {
@@ -121,6 +529,7 @@ export default function FirstNoteScreen({ navigation, route }) {
   const [focusCardIndex, setFocusCardIndex] = useState(0);
   const [focusCardRatings, setFocusCardRatings] = useState([]); // Ratings for each focus card
   const [focusStepsDone, setFocusStepsDone] = useState({ listen: false, sing: false, imagine: false, play: false });
+  const [focusActiveStep, setFocusActiveStep] = useState(0); // 0=Listen, 1=Sing, 2=Imagine, 3=Play
   const [showHeardItButton, setShowHeardItButton] = useState(false);
   const [rating, setRating] = useState(null); // 1-5 rating after playing
   
@@ -141,6 +550,11 @@ export default function FirstNoteScreen({ navigation, route }) {
   
   const noteInfo = parseNoteName(resonantNote);
   const clefType = INSTRUMENT_CLEFS[instrument.toLowerCase()] || "treble";
+  
+  // Generate MusicXML for Stage 6 notation display
+  const stage6MusicXML = useMemo(() => {
+    return generateSingleNoteMusicXML(resonantNote, clefType);
+  }, [resonantNote, clefType]);
   
   // Play the user's resonant note
   const playNote = useCallback(async () => {
@@ -516,8 +930,14 @@ export default function FirstNoteScreen({ navigation, route }) {
   // ========================================
   // STAGE 2: Focus Card Practice
   // ========================================
-  // Single screen: Focus card on top, 4 progressive steps below with icons
-  // Unlocking: Listen -> Sing -> Imagine -> Play -> Rate
+  // Compact single-panel design with tab navigation
+  const FOCUS_STEPS = [
+    { key: 'listen', emoji: '👂', label: 'Listen' },
+    { key: 'sing', emoji: '🎤', label: 'Sing' },
+    { key: 'imagine', emoji: '🧠', label: 'Imagine' },
+    { key: 'play', emoji: '🎺', label: 'Play' },
+  ];
+  
   const renderStage2 = () => {
     const currentCard = DAY0_FOCUS_CARDS[focusCardIndex];
     const allCardsComplete = focusCardRatings.length === DAY0_FOCUS_CARDS.length;
@@ -527,7 +947,88 @@ export default function FirstNoteScreen({ navigation, route }) {
     // Reset steps when moving to a new card
     const resetSteps = () => {
       setFocusStepsDone({ listen: false, sing: false, imagine: false, play: false });
+      setFocusActiveStep(0);
       setPitchAccuracy(null);
+    };
+    
+    // Navigate to next step
+    const nextFocusStep = () => {
+      const stepKey = FOCUS_STEPS[focusActiveStep].key;
+      setFocusStepsDone(prev => ({ ...prev, [stepKey]: true }));
+      if (focusActiveStep < 3) {
+        setFocusActiveStep(focusActiveStep + 1);
+      }
+    };
+    
+    // Navigate to previous step
+    const prevFocusStep = () => {
+      if (focusActiveStep > 0) {
+        setFocusActiveStep(focusActiveStep - 1);
+      }
+    };
+    
+    // Render content based on active step
+    const renderStepContent = () => {
+      switch (focusActiveStep) {
+        case 0: // Listen
+          return (
+            <View style={styles.stepContentArea}>
+              <Text style={styles.stepInstruction}>Listen to your note with the focus in mind</Text>
+              <TouchableOpacity
+                style={[styles.focusActionButton, isPlaying && styles.buttonDisabled]}
+                onPress={() => {
+                  focusListenStartedRef.current = true;
+                  playNote();
+                }}
+                disabled={isPlaying}
+              >
+                <Text style={styles.focusActionButtonText}>
+                  {isPlaying ? "🔊 Playing..." : "▶️ Play Note"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          );
+        case 1: // Sing
+          return (
+            <View style={styles.stepContentArea}>
+              <Text style={styles.stepInstruction}>Sing the note with an "Oh" sound</Text>
+              <EDMVisualizer volume={volume} pitchAccuracy="listening" />
+              <AudioInput
+                enabled={true}
+                onVolumeChange={setVolume}
+                volumeThreshold={0.1}
+              />
+            </View>
+          );
+        case 2: // Imagine
+          return (
+            <View style={styles.stepContentArea}>
+              <Text style={styles.stepInstruction}>Hear the note clearly in your mind</Text>
+              <Text style={styles.focusReminderBold}>Remember the focus above!</Text>
+              <CircularVolumeIndicator volume={0.3} pitchAccuracy="listening" size={100} />
+            </View>
+          );
+        case 3: // Play
+          return (
+            <View style={styles.stepContentArea}>
+              <Text style={styles.stepInstruction}>Play your note on your {instrument}</Text>
+              <EDMVisualizer volume={volume} pitchAccuracy={pitchAccuracy} />
+              <AudioInput
+                enabled={true}
+                targetNote={resonantNote}
+                onVolumeChange={setVolume}
+                onPitchMatch={handlePitchMatch}
+                volumeThreshold={0.03}
+                pitchMargin={50}
+              />
+              {pitchAccuracy === "correct" && (
+                <Text style={styles.successTextSmall}>✓ Correct!</Text>
+              )}
+            </View>
+          );
+        default:
+          return null;
+      }
     };
     
     return (
@@ -540,147 +1041,77 @@ export default function FirstNoteScreen({ navigation, route }) {
           </Text>
         )}
         
-        {/* Main practice screen - show focus card + steps */}
+        {/* Main practice screen - compact panel */}
         {!allCardsComplete && !showRating && (
-          <>
-            {/* Full Focus Card */}
-            <View style={styles.focusCard}>
-              <Text style={styles.focusCardTitle}>Focus: {currentCard.name}</Text>
-              <Text style={styles.focusCardDescription}>{currentCard.description}</Text>
-              <Text style={styles.focusCardCue}>"{currentCard.cue}"</Text>
+          <View style={styles.focusPracticePanel}>
+            {/* Prominent Focus Banner */}
+            <View style={styles.focusBanner}>
+              <Text style={styles.focusBannerLabel}>🎯 FOCUS</Text>
+              <Text style={styles.focusBannerTitle}>{currentCard.name}</Text>
+              <Text style={styles.focusBannerCue}>"{currentCard.cue}"</Text>
             </View>
             
-            {/* Note display */}
-            <Text style={styles.noteDisplaySmall}>
-              {noteInfo.letter}{noteInfo.accidental}{noteInfo.octave}
-            </Text>
-            
-            {/* Four-step flow */}
-            <View style={styles.stepsContainer}>
-              {/* Listen Step */}
-              <View style={styles.stepRow}>
-                <View style={styles.stepIcon}>
-                  <Text style={styles.stepEmoji}>👂</Text>
-                </View>
-                <View style={styles.stepContent}>
-                  <Text style={styles.stepLabel}>Listen</Text>
-                  {!focusStepsDone.listen ? (
-                    <TouchableOpacity
-                      style={[styles.stepButton, isPlaying && styles.buttonDisabled]}
-                      onPress={() => {
-                        focusListenStartedRef.current = true;
-                        playNote();
-                      }}
-                      disabled={isPlaying}
-                    >
-                      <Text style={styles.stepButtonText}>
-                        {isPlaying ? "🔊 Playing..." : "▶️ Play"}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <Text style={styles.stepDone}>✓ Done</Text>
-                  )}
-                </View>
-              </View>
-              
-              {/* Sing Step */}
-              <View style={[styles.stepRow, !focusStepsDone.listen && styles.stepDisabled]}>
-                <View style={styles.stepIcon}>
-                  <Text style={styles.stepEmoji}>🎤</Text>
-                </View>
-                <View style={styles.stepContent}>
-                  <Text style={styles.stepLabel}>Sing</Text>
-                  {focusStepsDone.listen && !focusStepsDone.sing ? (
-                    <>
-                      <EDMVisualizer volume={volume} pitchAccuracy="listening" />
-                      <AudioInput
-                        enabled={true}
-                        onVolumeChange={setVolume}
-                        volumeThreshold={0.1}
-                      />
-                      <TouchableOpacity
-                        style={styles.stepButton}
-                        onPress={() => {
-                          setFocusStepsDone(prev => ({ ...prev, sing: true }));
-                        }}
-                      >
-                        <Text style={styles.stepButtonText}>Done Singing</Text>
-                      </TouchableOpacity>
-                    </>
-                  ) : focusStepsDone.sing ? (
-                    <Text style={styles.stepDone}>✓ Done</Text>
-                  ) : (
-                    <Text style={styles.stepLocked}>Unlock by listening first</Text>
-                  )}
-                </View>
-              </View>
-              
-              {/* Imagine Step */}
-              <View style={[styles.stepRow, !focusStepsDone.sing && styles.stepDisabled]}>
-                <View style={styles.stepIcon}>
-                  <Text style={styles.stepEmoji}>🧠</Text>
-                </View>
-                <View style={styles.stepContent}>
-                  <Text style={styles.stepLabel}>Imagine</Text>
-                  {focusStepsDone.sing && !focusStepsDone.imagine ? (
-                    <>
-                      <Text style={styles.stepHint}>Hear the note in your mind with the focus...</Text>
-                      <TouchableOpacity
-                        style={styles.stepButton}
-                        onPress={() => {
-                          setFocusStepsDone(prev => ({ ...prev, imagine: true }));
-                        }}
-                      >
-                        <Text style={styles.stepButtonText}>I'm Imagining It</Text>
-                      </TouchableOpacity>
-                    </>
-                  ) : focusStepsDone.imagine ? (
-                    <Text style={styles.stepDone}>✓ Done</Text>
-                  ) : (
-                    <Text style={styles.stepLocked}>Unlock by singing first</Text>
-                  )}
-                </View>
-              </View>
-              
-              {/* Play Step */}
-              <View style={[styles.stepRow, !focusStepsDone.imagine && styles.stepDisabled]}>
-                <View style={styles.stepIcon}>
-                  <Text style={styles.stepEmoji}>🎺</Text>
-                </View>
-                <View style={styles.stepContent}>
-                  <Text style={styles.stepLabel}>Play</Text>
-                  {focusStepsDone.imagine && !focusStepsDone.play ? (
-                    <>
-                      <EDMVisualizer volume={volume} pitchAccuracy={pitchAccuracy} />
-                      <AudioInput
-                        enabled={true}
-                        targetNote={resonantNote}
-                        onVolumeChange={setVolume}
-                        onPitchMatch={handlePitchMatch}
-                        volumeThreshold={0.03}
-                        pitchMargin={50}
-                      />
-                      {pitchAccuracy === "correct" && (
-                        <Text style={styles.successTextSmall}>✓ Correct!</Text>
-                      )}
-                      <TouchableOpacity
-                        style={styles.stepButton}
-                        onPress={() => {
-                          setFocusStepsDone(prev => ({ ...prev, play: true }));
-                        }}
-                      >
-                        <Text style={styles.stepButtonText}>Done Playing</Text>
-                      </TouchableOpacity>
-                    </>
-                  ) : focusStepsDone.play ? (
-                    <Text style={styles.stepDone}>✓ Done</Text>
-                  ) : (
-                    <Text style={styles.stepLocked}>Unlock by imagining first</Text>
-                  )}
-                </View>
-              </View>
+            {/* Note Display */}
+            <View style={styles.focusNoteRow}>
+              <Text style={styles.focusNoteLabel}>Playing:</Text>
+              <Text style={styles.focusMiniNote}>
+                {noteInfo.letter}{noteInfo.accidental}{noteInfo.octave}
+              </Text>
             </View>
-          </>
+            
+            {/* Tab Bar */}
+            <View style={styles.focusTabBar}>
+              {FOCUS_STEPS.map((step, idx) => (
+                <TouchableOpacity
+                  key={step.key}
+                  style={[
+                    styles.focusTab,
+                    focusActiveStep === idx && styles.focusTabActive,
+                    focusStepsDone[step.key] && styles.focusTabDone,
+                  ]}
+                  onPress={() => setFocusActiveStep(idx)}
+                >
+                  <Text style={styles.focusTabEmoji}>{step.emoji}</Text>
+                  <Text style={[
+                    styles.focusTabLabel,
+                    focusActiveStep === idx && styles.focusTabLabelActive,
+                  ]}>
+                    {focusStepsDone[step.key] ? '✓' : step.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            {/* Shared Content Area */}
+            {renderStepContent()}
+            
+            {/* Navigation Buttons */}
+            <View style={styles.focusNavBar}>
+              <TouchableOpacity
+                style={[styles.focusNavButton, focusActiveStep === 0 && styles.focusNavButtonDisabled]}
+                onPress={prevFocusStep}
+                disabled={focusActiveStep === 0}
+              >
+                <Text style={styles.focusNavButtonText}>← Back</Text>
+              </TouchableOpacity>
+              
+              {focusActiveStep < 3 ? (
+                <TouchableOpacity
+                  style={styles.focusNavButtonPrimary}
+                  onPress={nextFocusStep}
+                >
+                  <Text style={styles.focusNavButtonPrimaryText}>Next →</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.focusNavButtonPrimary}
+                  onPress={() => setFocusStepsDone(prev => ({ ...prev, play: true }))}
+                >
+                  <Text style={styles.focusNavButtonPrimaryText}>Rate →</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
         )}
         
         {/* Rating screen after completing all 4 steps */}
@@ -793,11 +1224,11 @@ export default function FirstNoteScreen({ navigation, route }) {
       {subStep === 0 && (
         <>
           <View style={styles.staffVisual}>
-            <Text style={styles.staffLines}>━━━━━━━━━━━━━━━━━━━━━</Text>
-            <Text style={styles.staffLines}>━━━━━━━━━━━━━━━━━━━━━</Text>
-            <Text style={styles.staffLines}>━━━━━━━━━━━━━━━━━━━━━</Text>
-            <Text style={styles.staffLines}>━━━━━━━━━━━━━━━━━━━━━</Text>
-            <Text style={styles.staffLines}>━━━━━━━━━━━━━━━━━━━━━</Text>
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
           </View>
           <Text style={styles.instruction}>
             This is a <Text style={styles.bold}>staff</Text> (sometimes called a stave).
@@ -858,7 +1289,13 @@ export default function FirstNoteScreen({ navigation, route }) {
       
       {subStep === 1 && clefType === "bass" && (
         <>
-          <Text style={styles.clefSymbol}>𝄢</Text>
+          <View style={styles.imageWhiteBubble}>
+            <Image
+              source={require('../assets/bass_cleff_f.png')}
+              style={styles.bassClefImage}
+              resizeMode="contain"
+            />
+          </View>
           <Text style={styles.instruction}>
             The bass clef is also called the <Text style={styles.bold}>F clef</Text>.
             {'\n\n'}
@@ -959,24 +1396,13 @@ export default function FirstNoteScreen({ navigation, route }) {
     <View style={styles.stageContainer}>
       <Text style={styles.stageTitle}>Your Note on the Staff</Text>
       
-      <View style={styles.staffWithNote}>
-        <Text style={styles.staffClef}>
-          {clefType === "bass" ? "𝄢" : "𝄞"}
-        </Text>
-        <View style={styles.staffLinesContainer}>
-          <Text style={styles.staffLineNote}>━━━━━━━━━━━━━━━━━━</Text>
-          <Text style={styles.staffLineNote}>━━━━━━━━━━━━━━━━━━</Text>
-          <Text style={styles.staffLineNote}>━━━━━━━━━━━━━━━━━━</Text>
-          <Text style={styles.staffLineNote}>━━━━━━━━━━━━━━━━━━</Text>
-          <Text style={styles.staffLineNote}>━━━━━━━━━━━━━━━━━━</Text>
-          {/* Note head - simplified visual */}
-          <View style={[styles.noteHead, { top: getNotePosition(resonantNote, clefType) }]}>
-            <Text style={styles.noteHeadText}>●</Text>
-            {noteInfo.hasAccidental && (
-              <Text style={styles.noteAccidental}>{noteInfo.accidental}</Text>
-            )}
-          </View>
-        </View>
+      <View style={styles.notationContainer}>
+        <NotationDisplay 
+          musicxml={stage6MusicXML} 
+          width={280} 
+          height={160}
+          showTitle={false}
+        />
       </View>
       
       <Text style={styles.instruction}>
@@ -1076,7 +1502,17 @@ export default function FirstNoteScreen({ navigation, route }) {
       
       {renderStage()}
     </ScrollView>
-    <ResetButton userId={userId} />
+    <DevNavMenu
+      stage={stage}
+      setStage={setStage}
+      setSubStep={setSubStep}
+      setFocusCardIndex={setFocusCardIndex}
+      setFocusStepsDone={setFocusStepsDone}
+      setFocusCardRatings={setFocusCardRatings}
+      setPitchAccuracy={setPitchAccuracy}
+      userId={userId}
+      navigation={navigation}
+    />
     </View>
   );
 }
@@ -1116,6 +1552,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
     width: "100%",
+  },
+  notationContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 10,
+    marginVertical: 16,
+    alignItems: "center",
   },
   stageTitle: {
     fontSize: 28,
@@ -1424,15 +1867,181 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginVertical: 4,
   },
-  staffVisual: {
-    marginVertical: 20,
+  // Compact Focus Practice Panel Styles
+  focusPracticePanel: {
+    backgroundColor: "#2a1f15",
+    borderRadius: 16,
+    padding: 16,
+    width: "100%",
+    maxWidth: 400,
+    borderWidth: 2,
+    borderColor: "#FFD700",
+  },
+  focusBanner: {
+    backgroundColor: "#3b2c1a",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: "#FF6B35",
     alignItems: "center",
   },
-  staffLines: {
-    color: "#FFD700",
-    fontSize: 16,
-    marginVertical: 4,
+  focusBannerLabel: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: "#FF6B35",
     letterSpacing: 2,
+    marginBottom: 4,
+  },
+  focusBannerTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#FFD700",
+    marginBottom: 6,
+  },
+  focusBannerCue: {
+    fontSize: 13,
+    color: "#fffbe6",
+    fontStyle: "italic",
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  focusNoteRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+    gap: 8,
+  },
+  focusNoteLabel: {
+    fontSize: 14,
+    color: "#a09080",
+  },
+  focusMiniNote: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#FFD700",
+  },
+  focusTabBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    gap: 6,
+  },
+  focusTab: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    backgroundColor: "#1a140d",
+    borderWidth: 1,
+    borderColor: "#3b2c1a",
+  },
+  focusTabActive: {
+    backgroundColor: "#3b2c1a",
+    borderColor: "#FFD700",
+  },
+  focusTabDone: {
+    backgroundColor: "#1a2a1a",
+    borderColor: "#4CAF50",
+  },
+  focusTabEmoji: {
+    fontSize: 18,
+    marginBottom: 2,
+  },
+  focusTabLabel: {
+    fontSize: 10,
+    color: "#a09080",
+    textAlign: "center",
+  },
+  focusTabLabelActive: {
+    color: "#FFD700",
+    fontWeight: "600",
+  },
+  stepContentArea: {
+    alignItems: "center",
+    minHeight: 180,
+    justifyContent: "center",
+    paddingVertical: 10,
+  },
+  stepInstruction: {
+    fontSize: 14,
+    color: "#fffbe6",
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  focusReminder: {
+    fontSize: 12,
+    color: "#999",
+    fontStyle: "italic",
+    textAlign: "center",
+    marginBottom: 12,
+    paddingHorizontal: 10,
+  },
+  focusReminderBold: {
+    fontSize: 13,
+    color: "#FF6B35",
+    fontWeight: "600",
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  focusActionButton: {
+    backgroundColor: "#FFD700",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  focusActionButtonText: {
+    color: "#1a140d",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  focusNavBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#3b2c1a",
+  },
+  focusNavButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#a09080",
+  },
+  focusNavButtonDisabled: {
+    opacity: 0.3,
+  },
+  focusNavButtonText: {
+    color: "#a09080",
+    fontSize: 14,
+  },
+  focusNavButtonPrimary: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  focusNavButtonPrimaryText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  staffVisual: {
+    marginVertical: 30,
+    alignItems: "center",
+    width: 280,
+    paddingVertical: 10,
+  },
+  staffLine: {
+    width: "100%",
+    height: 2,
+    backgroundColor: "#FFD700",
+    marginVertical: 8,
   },
   funFact: {
     fontSize: 20,
@@ -1445,6 +2054,16 @@ const styles = StyleSheet.create({
     height: 250,
     marginVertical: 15,
     borderRadius: 10,
+  },
+  bassClefImage: {
+    width: 240,
+    height: 160,
+  },
+  imageWhiteBubble: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+    marginVertical: 20,
   },
   clefSymbol: {
     fontSize: 100,
