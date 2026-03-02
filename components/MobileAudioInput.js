@@ -263,7 +263,12 @@ export default function MobileAudioInput({
         if (result.frequency > 0 && result.confidence > 0.5) {
           const noteInfo = frequencyToNote(result.frequency);
           if (noteInfo) {
-            setCurrentPitch(noteInfo);
+            // Only process and log pitches in a reasonable range (80-1000 Hz)
+            if (noteInfo.frequency >= 80 && noteInfo.frequency <= 1000) {
+              console.log('[Audio Processing]', result, noteInfo);
+              setCurrentPitch(noteInfo);
+              console.log('[Pitch Detected]', noteInfo);
+            }
             pitchBufferRef.current.push({
               midi: noteInfo.midiNote,
               timestamp: Date.now(),
@@ -321,7 +326,8 @@ export default function MobileAudioInput({
             }
             
             pitchBufferRef.current = [];
-            setCurrentPitch(null);
+            // Only clear currentPitch if not sounding
+            if (!isSounding) setCurrentPitch(null);
             onSoundEnd?.();
           }, silenceDuration);
         }
