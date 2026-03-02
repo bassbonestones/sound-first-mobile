@@ -2,6 +2,9 @@
  * Jest setup file for Sound First Mobile tests
  */
 
+// Import jest matchers from react-native testing library
+require('@testing-library/react-native/matchers');
+
 // Mock console.warn/error for cleaner test output
 global.console = {
   ...console,

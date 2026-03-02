@@ -3,7 +3,7 @@ module.exports = {
   transformIgnorePatterns: [
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg)',
   ],
-  setupFilesAfterEnv: ['@testing-library/jest-native/extend-expect', '<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   testMatch: ['**/__tests__/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
   collectCoverageFrom: [
