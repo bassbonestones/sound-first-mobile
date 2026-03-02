@@ -38,7 +38,9 @@
         {
           "microphonePermission": "Sound First needs microphone access to hear you play and detect pitch."
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-web-browser"
     ]
   }
 }
