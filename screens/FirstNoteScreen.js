@@ -618,6 +618,7 @@ export default function FirstNoteScreen({ navigation, route }) {
   const [subStep, setSubStep] = useState(0); // Sub-step within a stage
   const [pitchExplorerIndex, setPitchExplorerIndex] = useState(8); // Start on D3 (middle line)
   const [accidentalExplorer, setAccidentalExplorer] = useState("natural"); // "flat" | "natural" | "sharp"
+  const [showSummary, setShowSummary] = useState(false); // Day 0 summary toggle
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -1206,7 +1207,6 @@ export default function FirstNoteScreen({ navigation, route }) {
       <Text style={styles.noteDisplay}>
         {noteInfo.letter}
         {noteInfo.accidental}
-        {noteInfo.octave}
       </Text>
 
       {subStep === 0 && (
@@ -1332,7 +1332,6 @@ export default function FirstNoteScreen({ navigation, route }) {
       <Text style={styles.noteDisplay}>
         {noteInfo.letter}
         {noteInfo.accidental}
-        {noteInfo.octave}
       </Text>
 
       {subStep === 0 && (
@@ -1646,7 +1645,6 @@ export default function FirstNoteScreen({ navigation, route }) {
               <Text style={styles.focusMiniNote}>
                 {noteInfo.letter}
                 {noteInfo.accidental}
-                {noteInfo.octave}
               </Text>
             </View>
 
@@ -2668,21 +2666,50 @@ export default function FirstNoteScreen({ navigation, route }) {
         <Text style={styles.bold}>
           {noteInfo.letter}
           {noteInfo.accidental}
-          {noteInfo.octave}
         </Text>{" "}
         on the {clefType} clef staff.
         {"\n\n"}
         This is the note you practiced playing!
       </Text>
 
-      <Text style={styles.hint}>
-        Remember: You first <Text style={styles.italic}>heard</Text> it,{" "}
-        <Text style={styles.italic}>sang</Text> it,
-        <Text style={styles.italic}> imagined</Text> it, then{" "}
-        <Text style={styles.italic}>played</Text> it.
-        {"\n"}
-        Sound before symbol. Always. 🎵
-      </Text>
+      {!showSummary && (
+        <TouchableOpacity
+          style={styles.summaryToggleButton}
+          onPress={() => setShowSummary(true)}
+        >
+          <Text style={styles.summaryToggleText}>📋 What I Learned Today</Text>
+        </TouchableOpacity>
+      )}
+
+      {showSummary && (
+        <View style={styles.summaryContainer}>
+          <TouchableOpacity
+            style={styles.summaryCloseButton}
+            onPress={() => setShowSummary(false)}
+          >
+            <Text style={styles.summaryCloseText}>✕</Text>
+          </TouchableOpacity>
+          <Text style={styles.summaryTitle}>What I Learned</Text>
+          <Text style={styles.summaryItem}>✓ The staff has 5 lines and 4 spaces</Text>
+          <Text style={styles.summaryItem}>✓ Ledger lines extend the staff</Text>
+          <Text style={styles.summaryItem}>✓ Notes sit on lines or in spaces</Text>
+          <Text style={styles.summaryItem}>✓ Higher on staff = higher pitch</Text>
+          <Text style={styles.summaryItem}>✓ {clefType === "bass" ? "Bass clef shows us where F is" : "Treble clef shows us where G is"}</Text>
+          <Text style={styles.summaryItem}>✓ ♯ sharp (higher), ♮ natural, ♭ flat (lower)</Text>
+          <Text style={styles.summaryItem}>✓ My note: {noteInfo.letter}{noteInfo.accidental}</Text>
+        </View>
+      )}
+
+      {!showSummary && (
+        <Text style={styles.hint}>
+          Remember: You first <Text style={styles.italic}>heard</Text> it,{" "}
+          <Text style={styles.italic}>sang</Text> it,
+          <Text style={styles.italic}> imagined</Text> it, then{" "}
+          <Text style={styles.italic}>played</Text> it.
+          {"\n"}
+          Sound before symbol. Always. 🎵
+        </Text>
+      )}
     </View>
   );
 
@@ -2692,7 +2719,7 @@ export default function FirstNoteScreen({ navigation, route }) {
       <View style={styles.fixedBottomButtons}>
         <TouchableOpacity
           style={styles.backTextButton}
-          onPress={() => goBackTeaching(6, 1)}
+          onPress={() => goBackTeaching(6, 4)}
         >
           <Text style={styles.backTextButtonText}>← Back</Text>
         </TouchableOpacity>
@@ -2913,6 +2940,53 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 10,
     fontStyle: "italic",
+  },
+  summaryToggleButton: {
+    backgroundColor: "rgba(255, 215, 0, 0.1)",
+    borderWidth: 1,
+    borderColor: "#FFD700",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginTop: 15,
+    alignSelf: "center",
+  },
+  summaryToggleText: {
+    color: "#FFD700",
+    fontSize: 14,
+  },
+  summaryContainer: {
+    backgroundColor: "rgba(255, 215, 0, 0.1)",
+    borderWidth: 1,
+    borderColor: "#FFD700",
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 15,
+    position: "relative",
+  },
+  summaryCloseButton: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    padding: 12,
+    zIndex: 10,
+  },
+  summaryCloseText: {
+    color: "#999",
+    fontSize: 18,
+  },
+  summaryTitle: {
+    color: "#FFD700",
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  summaryItem: {
+    color: "#fffbe6",
+    fontSize: 13,
+    marginVertical: 3,
+    paddingLeft: 8,
   },
   bold: {
     fontWeight: "bold",
