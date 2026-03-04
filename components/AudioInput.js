@@ -26,11 +26,11 @@ let globalMicPermissionState = {
 
 // Check mic permission without prompting (web only)
 async function checkMicPermission() {
-  if (typeof navigator === 'undefined' || !navigator.permissions) {
+  if (typeof navigator === "undefined" || !navigator.permissions) {
     return null; // Can't check, will need to prompt
   }
   try {
-    const result = await navigator.permissions.query({ name: 'microphone' });
+    const result = await navigator.permissions.query({ name: "microphone" });
     return result.state; // 'granted', 'denied', or 'prompt'
   } catch (e) {
     return null; // Browser doesn't support this query
@@ -138,6 +138,7 @@ function generateAudioWebViewHtml(config) {
       silenceDuration: ${silenceDuration},
       targetNote: ${targetNote ? `"${targetNote}"` : "null"},
       pitchMargin: ${pitchMargin},
+      allowOctaveEquivalent: ${allowOctaveEquivalent},
     };
 
     const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -302,7 +303,8 @@ function generateAudioWebViewHtml(config) {
               
               if (targetMidi !== null) {
                 const diff = Math.abs(noteInfo.midiNote - targetMidi);
-                const isMatch = diff === 0 && Math.abs(noteInfo.cents) < CONFIG.pitchMargin;
+                const noteMatches = CONFIG.allowOctaveEquivalent ? diff % 12 === 0 : diff === 0;
+                const isMatch = noteMatches && Math.abs(noteInfo.cents) < CONFIG.pitchMargin;
                 postMessage('pitchMatch', { isMatch, pitch: noteInfo });
               }
             }
@@ -513,6 +515,7 @@ export default function AudioInput({
   volumeThreshold = 0.02,
   silenceDuration = 1500,
   pitchMargin = 100, // cents margin for "correct" pitch
+  allowOctaveEquivalent = false, // allow octave equivalence for voice/singing
   enabled = true,
   showDebug = false,
   compact = false,
@@ -523,8 +526,12 @@ export default function AudioInput({
   const [currentPitch, setCurrentPitch] = useState(null);
   const [isSounding, setIsSounding] = useState(false);
   // Initialize from global state to avoid showing button unnecessarily
-  const [permissionGranted, setPermissionGranted] = useState(globalMicPermissionState.granted);
-  const [permissionChecked, setPermissionChecked] = useState(globalMicPermissionState.checkedOnce);
+  const [permissionGranted, setPermissionGranted] = useState(
+    globalMicPermissionState.granted,
+  );
+  const [permissionChecked, setPermissionChecked] = useState(
+    globalMicPermissionState.checkedOnce,
+  );
 
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
@@ -556,6 +563,7 @@ export default function AudioInput({
   const volumeThresholdRef = useRef(volumeThreshold);
   const silenceDurationRef = useRef(silenceDuration);
   const pitchMarginRef = useRef(pitchMargin);
+  const allowOctaveEquivalentRef = useRef(allowOctaveEquivalent);
 
   // Keep refs in sync with props
   useEffect(() => {
@@ -568,6 +576,7 @@ export default function AudioInput({
     volumeThresholdRef.current = volumeThreshold;
     silenceDurationRef.current = silenceDuration;
     pitchMarginRef.current = pitchMargin;
+    allowOctaveEquivalentRef.current = allowOctaveEquivalent;
   }, [
     onVolumeChange,
     onRealtimePitch,
@@ -578,6 +587,7 @@ export default function AudioInput({
     volumeThreshold,
     silenceDuration,
     pitchMargin,
+    allowOctaveEquivalent,
   ]);
 
   const targetMidi = targetNote ? noteNameToMidi(targetNote) : null;
@@ -656,7 +666,7 @@ export default function AudioInput({
       checkMicPermission().then((state) => {
         globalMicPermissionState.checkedOnce = true;
         setPermissionChecked(true);
-        if (state === 'granted') {
+        if (state === "granted") {
           globalMicPermissionState.granted = true;
           setPermissionGranted(true);
         }
@@ -699,7 +709,7 @@ export default function AudioInput({
 
     try {
       globalMicPermissionState.pending = true;
-      
+
       // Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -846,8 +856,11 @@ export default function AudioInput({
             // Check if matches target (for visual feedback during playing)
             if (targetMidiRef.current !== null && onPitchMatchRef.current) {
               const diff = Math.abs(noteInfo.midiNote - targetMidiRef.current);
+              const noteMatches = allowOctaveEquivalentRef.current
+                ? diff % 12 === 0
+                : diff === 0;
               const isMatch =
-                diff === 0 && Math.abs(noteInfo.cents) < pitchMarginRef.current;
+                noteMatches && Math.abs(noteInfo.cents) < pitchMarginRef.current;
               onPitchMatchRef.current(isMatch, noteInfo);
             }
           }
@@ -1103,6 +1116,7 @@ export default function AudioInput({
           volumeThreshold={volumeThreshold}
           silenceDuration={silenceDuration}
           pitchMargin={pitchMargin}
+          allowOctaveEquivalent={allowOctaveEquivalent}
           enabled={enabled}
           showDebug={showDebug}
           compact={compact}
@@ -1134,12 +1148,13 @@ export default function AudioInput({
   }
 
   // Show loading state while checking permission or waiting for getUserMedia
-  if (!permissionGranted && (globalMicPermissionState.pending || !permissionChecked)) {
+  if (
+    !permissionGranted &&
+    (globalMicPermissionState.pending || !permissionChecked)
+  ) {
     return (
       <View style={styles.container}>
-        <Text style={styles.infoText}>
-          🎤 Connecting to microphone...
-        </Text>
+        <Text style={styles.infoText}>🎤 Connecting to microphone...</Text>
       </View>
     );
   }

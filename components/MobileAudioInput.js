@@ -198,6 +198,7 @@ export default function MobileAudioInput({
   volumeThreshold = 0.02,
   silenceDuration = 1500,
   pitchMargin = 100,
+  allowOctaveEquivalent = false,
   enabled = true,
   showDebug = false,
   compact = false,
@@ -317,8 +318,12 @@ export default function MobileAudioInput({
                 const diff = Math.abs(
                   noteInfo.midiNote - targetMidiRef.current,
                 );
+                // Allow octave equivalence for voice (diff % 12 === 0 means same note class)
+                const noteMatches = allowOctaveEquivalent
+                  ? diff % 12 === 0
+                  : diff === 0;
                 const isMatch =
-                  diff === 0 && Math.abs(noteInfo.cents) < pitchMargin;
+                  noteMatches && Math.abs(noteInfo.cents) < pitchMargin;
                 onPitchMatch?.(isMatch, noteInfo);
               }
             }
@@ -383,6 +388,7 @@ export default function MobileAudioInput({
       volumeThreshold,
       silenceDuration,
       pitchMargin,
+      allowOctaveEquivalent,
     ],
   );
 

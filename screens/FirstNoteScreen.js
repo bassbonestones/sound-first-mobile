@@ -17,7 +17,9 @@ import {
 } from "react-native";
 import AudioInput from "../components/AudioInput";
 import VolumeBar, { CircularVolumeIndicator } from "../components/VolumeBar";
-import EDMVisualizer, { EDMVisualizerMedium } from "../components/EDMVisualizer";
+import EDMVisualizer, {
+  EDMVisualizerMedium,
+} from "../components/EDMVisualizer";
 import NotationDisplay from "../components/NotationDisplay";
 import { CommonActions } from "@react-navigation/native";
 
@@ -670,20 +672,20 @@ export default function FirstNoteScreen({ navigation, route }) {
 
   // Pitch explorer notes for bass clef (extended range with ledger lines)
   const PITCH_EXPLORER_NOTES = [
-    { name: "C2", position: 114.5, ledgerLines: 2 },  // 2 ledgers below (note on 2nd)
-    { name: "D2", position: 105.5, ledgerLines: 2 },  // Space between 2 ledgers
-    { name: "E2", position: 96.5, ledgerLines: 1 },   // 1 ledger below (note on it)
-    { name: "F2", position: 87.5, ledgerLines: 0 },   // Space below staff (no line needed)
-    { name: "G2", position: 78.5, ledgerLines: 0 },   // Bottom line
-    { name: "A2", position: 69.5, ledgerLines: 0 },   // First space
-    { name: "B2", position: 60.5, ledgerLines: 0 },   // Second line
-    { name: "C3", position: 51.5, ledgerLines: 0 },   // Second space
-    { name: "D3", position: 42.5, ledgerLines: 0 },   // Middle line
-    { name: "E3", position: 33.5, ledgerLines: 0 },   // Third space
-    { name: "F3", position: 24.5, ledgerLines: 0 },   // Fourth line
-    { name: "G3", position: 15.5, ledgerLines: 0 },   // Fourth space
-    { name: "A3", position: 6.5, ledgerLines: 0 },    // Top line
-    { name: "B3", position: -2.5, ledgerLines: 0 },   // Space above top
+    { name: "C2", position: 114.5, ledgerLines: 2 }, // 2 ledgers below (note on 2nd)
+    { name: "D2", position: 105.5, ledgerLines: 2 }, // Space between 2 ledgers
+    { name: "E2", position: 96.5, ledgerLines: 1 }, // 1 ledger below (note on it)
+    { name: "F2", position: 87.5, ledgerLines: 0 }, // Space below staff (no line needed)
+    { name: "G2", position: 78.5, ledgerLines: 0 }, // Bottom line
+    { name: "A2", position: 69.5, ledgerLines: 0 }, // First space
+    { name: "B2", position: 60.5, ledgerLines: 0 }, // Second line
+    { name: "C3", position: 51.5, ledgerLines: 0 }, // Second space
+    { name: "D3", position: 42.5, ledgerLines: 0 }, // Middle line
+    { name: "E3", position: 33.5, ledgerLines: 0 }, // Third space
+    { name: "F3", position: 24.5, ledgerLines: 0 }, // Fourth line
+    { name: "G3", position: 15.5, ledgerLines: 0 }, // Fourth space
+    { name: "A3", position: 6.5, ledgerLines: 0 }, // Top line
+    { name: "B3", position: -2.5, ledgerLines: 0 }, // Space above top
     { name: "C4", position: -11.5, ledgerLines: -1 }, // Middle C - 1 ledger above
     { name: "D4", position: -20.5, ledgerLines: -1 }, // Space above middle C ledger
     { name: "E4", position: -29.5, ledgerLines: -2 }, // 2 ledgers above (note on 2nd)
@@ -813,10 +815,13 @@ export default function FirstNoteScreen({ navigation, route }) {
       };
 
       // Fallback timeout for native platforms where onended may not fire
-      playbackTimeoutRef.current = setTimeout(() => {
-        setIsPlaying(false);
-        setShowHeardItButton(true);
-      }, (DURATION + 0.5) * 1000);
+      playbackTimeoutRef.current = setTimeout(
+        () => {
+          setIsPlaying(false);
+          setShowHeardItButton(true);
+        },
+        (DURATION + 0.5) * 1000,
+      );
     } catch (err) {
       setError(`Audio error: ${err.message}`);
       setIsPlaying(false);
@@ -827,252 +832,267 @@ export default function FirstNoteScreen({ navigation, route }) {
   }, [resonantNote, noteToFrequency]);
 
   // Play pitch explorer note with piano-like sound
-  const playPitchExplorer = useCallback(async (noteIndex) => {
-    const DURATION = 1;
-    const ATTACK = 0.01;
-    const DECAY = 0.2;
-    const SUSTAIN = 0.3;
-    const RELEASE = 0.3;
+  const playPitchExplorer = useCallback(
+    async (noteIndex) => {
+      const DURATION = 1;
+      const ATTACK = 0.01;
+      const DECAY = 0.2;
+      const SUSTAIN = 0.3;
+      const RELEASE = 0.3;
 
-    try {
-      // Stop any currently playing note
-      if (oscillatorRef.current) {
-        try {
-          oscillatorRef.current.onended = null;
-          oscillatorRef.current.stop();
-        } catch (e) { /* ignore */ }
+      try {
+        // Stop any currently playing note
+        if (oscillatorRef.current) {
+          try {
+            oscillatorRef.current.onended = null;
+            oscillatorRef.current.stop();
+          } catch (e) {
+            /* ignore */
+          }
+        }
+
+        // Create/resume AudioContext
+        if (Platform.OS === "web" && typeof window !== "undefined") {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (!audioContextRef.current) {
+            audioContextRef.current = new AudioContext();
+          }
+          if (audioContextRef.current.state === "suspended") {
+            await audioContextRef.current.resume();
+          }
+        } else if (NativeAudioContext) {
+          if (!audioContextRef.current) {
+            audioContextRef.current = new NativeAudioContext();
+          }
+        } else {
+          return;
+        }
+
+        const ctx = audioContextRef.current;
+        const now = ctx.currentTime;
+        const noteName = PITCH_EXPLORER_NOTES[noteIndex].name;
+        const freq = noteToFrequency(noteName);
+
+        // Create piano-like sound with multiple oscillators (harmonics)
+        const masterGain = ctx.createGain();
+        masterGain.connect(ctx.destination);
+
+        // Fundamental + harmonics for piano-like timbre
+        const harmonics = [
+          { ratio: 1, gain: 1.0 }, // Fundamental
+          { ratio: 2, gain: 0.5 }, // 2nd harmonic
+          { ratio: 3, gain: 0.25 }, // 3rd harmonic
+          { ratio: 4, gain: 0.125 }, // 4th harmonic
+        ];
+
+        const oscillators = harmonics.map(({ ratio, gain: harmGain }) => {
+          const osc = ctx.createOscillator();
+          const oscGain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq * ratio, now);
+          oscGain.gain.setValueAtTime(harmGain * 0.3, now);
+          osc.connect(oscGain);
+          oscGain.connect(masterGain);
+          return osc;
+        });
+
+        // Piano-like envelope (fast attack, decay to sustain, release)
+        masterGain.gain.setValueAtTime(0, now);
+        masterGain.gain.linearRampToValueAtTime(0.6, now + ATTACK);
+        masterGain.gain.linearRampToValueAtTime(SUSTAIN, now + ATTACK + DECAY);
+        masterGain.gain.setValueAtTime(SUSTAIN, now + DURATION - RELEASE);
+        masterGain.gain.linearRampToValueAtTime(0, now + DURATION);
+
+        // Start and stop all oscillators
+        oscillators.forEach((osc) => {
+          osc.start(now);
+          osc.stop(now + DURATION);
+        });
+
+        oscillatorRef.current = oscillators[0];
+      } catch (err) {
+        console.error("Pitch explorer audio error:", err);
       }
-
-      // Create/resume AudioContext
-      if (Platform.OS === "web" && typeof window !== "undefined") {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!audioContextRef.current) {
-          audioContextRef.current = new AudioContext();
-        }
-        if (audioContextRef.current.state === "suspended") {
-          await audioContextRef.current.resume();
-        }
-      } else if (NativeAudioContext) {
-        if (!audioContextRef.current) {
-          audioContextRef.current = new NativeAudioContext();
-        }
-      } else {
-        return;
-      }
-
-      const ctx = audioContextRef.current;
-      const now = ctx.currentTime;
-      const noteName = PITCH_EXPLORER_NOTES[noteIndex].name;
-      const freq = noteToFrequency(noteName);
-
-      // Create piano-like sound with multiple oscillators (harmonics)
-      const masterGain = ctx.createGain();
-      masterGain.connect(ctx.destination);
-
-      // Fundamental + harmonics for piano-like timbre
-      const harmonics = [
-        { ratio: 1, gain: 1.0 },      // Fundamental
-        { ratio: 2, gain: 0.5 },      // 2nd harmonic
-        { ratio: 3, gain: 0.25 },     // 3rd harmonic
-        { ratio: 4, gain: 0.125 },    // 4th harmonic
-      ];
-
-      const oscillators = harmonics.map(({ ratio, gain: harmGain }) => {
-        const osc = ctx.createOscillator();
-        const oscGain = ctx.createGain();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(freq * ratio, now);
-        oscGain.gain.setValueAtTime(harmGain * 0.3, now);
-        osc.connect(oscGain);
-        oscGain.connect(masterGain);
-        return osc;
-      });
-
-      // Piano-like envelope (fast attack, decay to sustain, release)
-      masterGain.gain.setValueAtTime(0, now);
-      masterGain.gain.linearRampToValueAtTime(0.6, now + ATTACK);
-      masterGain.gain.linearRampToValueAtTime(SUSTAIN, now + ATTACK + DECAY);
-      masterGain.gain.setValueAtTime(SUSTAIN, now + DURATION - RELEASE);
-      masterGain.gain.linearRampToValueAtTime(0, now + DURATION);
-
-      // Start and stop all oscillators
-      oscillators.forEach(osc => {
-        osc.start(now);
-        osc.stop(now + DURATION);
-      });
-
-      oscillatorRef.current = oscillators[0];
-    } catch (err) {
-      console.error("Pitch explorer audio error:", err);
-    }
-  }, [noteToFrequency]);
+    },
+    [noteToFrequency],
+  );
 
   // Play accidental explorer note (D flat, D natural, or D sharp)
-  const playAccidentalExplorer = useCallback(async (accidental) => {
-    const DURATION = 1;
-    const ATTACK = 0.01;
-    const DECAY = 0.2;
-    const SUSTAIN = 0.3;
-    const RELEASE = 0.3;
+  const playAccidentalExplorer = useCallback(
+    async (accidental) => {
+      const DURATION = 1;
+      const ATTACK = 0.01;
+      const DECAY = 0.2;
+      const SUSTAIN = 0.3;
+      const RELEASE = 0.3;
 
-    const noteMap = {
-      flat: "Db3",
-      natural: "D3",
-      sharp: "D#3",
-    };
+      const noteMap = {
+        flat: "Db3",
+        natural: "D3",
+        sharp: "D#3",
+      };
 
-    try {
-      if (oscillatorRef.current) {
-        try {
-          oscillatorRef.current.onended = null;
-          oscillatorRef.current.stop();
-        } catch (e) { /* ignore */ }
+      try {
+        if (oscillatorRef.current) {
+          try {
+            oscillatorRef.current.onended = null;
+            oscillatorRef.current.stop();
+          } catch (e) {
+            /* ignore */
+          }
+        }
+
+        if (Platform.OS === "web" && typeof window !== "undefined") {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (!audioContextRef.current) {
+            audioContextRef.current = new AudioContext();
+          }
+          if (audioContextRef.current.state === "suspended") {
+            await audioContextRef.current.resume();
+          }
+        } else if (NativeAudioContext) {
+          if (!audioContextRef.current) {
+            audioContextRef.current = new NativeAudioContext();
+          }
+        } else {
+          return;
+        }
+
+        const ctx = audioContextRef.current;
+        const now = ctx.currentTime;
+        const freq = noteToFrequency(noteMap[accidental]);
+
+        const masterGain = ctx.createGain();
+        masterGain.connect(ctx.destination);
+
+        const harmonics = [
+          { ratio: 1, gain: 1.0 },
+          { ratio: 2, gain: 0.5 },
+          { ratio: 3, gain: 0.25 },
+          { ratio: 4, gain: 0.125 },
+        ];
+
+        const oscillators = harmonics.map(({ ratio, gain: harmGain }) => {
+          const osc = ctx.createOscillator();
+          const oscGain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq * ratio, now);
+          oscGain.gain.setValueAtTime(harmGain * 0.3, now);
+          osc.connect(oscGain);
+          oscGain.connect(masterGain);
+          return osc;
+        });
+
+        masterGain.gain.setValueAtTime(0, now);
+        masterGain.gain.linearRampToValueAtTime(0.6, now + ATTACK);
+        masterGain.gain.linearRampToValueAtTime(SUSTAIN, now + ATTACK + DECAY);
+        masterGain.gain.setValueAtTime(SUSTAIN, now + DURATION - RELEASE);
+        masterGain.gain.linearRampToValueAtTime(0, now + DURATION);
+
+        oscillators.forEach((osc) => {
+          osc.start(now);
+          osc.stop(now + DURATION);
+        });
+
+        oscillatorRef.current = oscillators[0];
+      } catch (err) {
+        console.error("Accidental explorer audio error:", err);
       }
-
-      if (Platform.OS === "web" && typeof window !== "undefined") {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!audioContextRef.current) {
-          audioContextRef.current = new AudioContext();
-        }
-        if (audioContextRef.current.state === "suspended") {
-          await audioContextRef.current.resume();
-        }
-      } else if (NativeAudioContext) {
-        if (!audioContextRef.current) {
-          audioContextRef.current = new NativeAudioContext();
-        }
-      } else {
-        return;
-      }
-
-      const ctx = audioContextRef.current;
-      const now = ctx.currentTime;
-      const freq = noteToFrequency(noteMap[accidental]);
-
-      const masterGain = ctx.createGain();
-      masterGain.connect(ctx.destination);
-
-      const harmonics = [
-        { ratio: 1, gain: 1.0 },
-        { ratio: 2, gain: 0.5 },
-        { ratio: 3, gain: 0.25 },
-        { ratio: 4, gain: 0.125 },
-      ];
-
-      const oscillators = harmonics.map(({ ratio, gain: harmGain }) => {
-        const osc = ctx.createOscillator();
-        const oscGain = ctx.createGain();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(freq * ratio, now);
-        oscGain.gain.setValueAtTime(harmGain * 0.3, now);
-        osc.connect(oscGain);
-        oscGain.connect(masterGain);
-        return osc;
-      });
-
-      masterGain.gain.setValueAtTime(0, now);
-      masterGain.gain.linearRampToValueAtTime(0.6, now + ATTACK);
-      masterGain.gain.linearRampToValueAtTime(SUSTAIN, now + ATTACK + DECAY);
-      masterGain.gain.setValueAtTime(SUSTAIN, now + DURATION - RELEASE);
-      masterGain.gain.linearRampToValueAtTime(0, now + DURATION);
-
-      oscillators.forEach(osc => {
-        osc.start(now);
-        osc.stop(now + DURATION);
-      });
-
-      oscillatorRef.current = oscillators[0];
-    } catch (err) {
-      console.error("Accidental explorer audio error:", err);
-    }
-  }, [noteToFrequency]);
+    },
+    [noteToFrequency],
+  );
 
   // Play combined explorer note (any position + any accidental)
-  const playCombinedExplorer = useCallback(async (noteIndex, accidental) => {
-    const DURATION = 1;
-    const ATTACK = 0.01;
-    const DECAY = 0.2;
-    const SUSTAIN = 0.3;
-    const RELEASE = 0.3;
+  const playCombinedExplorer = useCallback(
+    async (noteIndex, accidental) => {
+      const DURATION = 1;
+      const ATTACK = 0.01;
+      const DECAY = 0.2;
+      const SUSTAIN = 0.3;
+      const RELEASE = 0.3;
 
-    const baseName = PITCH_EXPLORER_NOTES[noteIndex].name;
-    const letter = baseName.slice(0, 1);
-    const octave = baseName.slice(1);
-    
-    let noteName;
-    if (accidental === "flat") {
-      noteName = `${letter}b${octave}`;
-    } else if (accidental === "sharp") {
-      noteName = `${letter}#${octave}`;
-    } else {
-      noteName = baseName;
-    }
+      const baseName = PITCH_EXPLORER_NOTES[noteIndex].name;
+      const letter = baseName.slice(0, 1);
+      const octave = baseName.slice(1);
 
-    try {
-      if (oscillatorRef.current) {
-        try {
-          oscillatorRef.current.onended = null;
-          oscillatorRef.current.stop();
-        } catch (e) { /* ignore */ }
-      }
-
-      if (Platform.OS === "web" && typeof window !== "undefined") {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!audioContextRef.current) {
-          audioContextRef.current = new AudioContext();
-        }
-        if (audioContextRef.current.state === "suspended") {
-          await audioContextRef.current.resume();
-        }
-      } else if (NativeAudioContext) {
-        if (!audioContextRef.current) {
-          audioContextRef.current = new NativeAudioContext();
-        }
+      let noteName;
+      if (accidental === "flat") {
+        noteName = `${letter}b${octave}`;
+      } else if (accidental === "sharp") {
+        noteName = `${letter}#${octave}`;
       } else {
-        return;
+        noteName = baseName;
       }
 
-      const ctx = audioContextRef.current;
-      const now = ctx.currentTime;
-      const freq = noteToFrequency(noteName);
+      try {
+        if (oscillatorRef.current) {
+          try {
+            oscillatorRef.current.onended = null;
+            oscillatorRef.current.stop();
+          } catch (e) {
+            /* ignore */
+          }
+        }
 
-      const masterGain = ctx.createGain();
-      masterGain.connect(ctx.destination);
+        if (Platform.OS === "web" && typeof window !== "undefined") {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (!audioContextRef.current) {
+            audioContextRef.current = new AudioContext();
+          }
+          if (audioContextRef.current.state === "suspended") {
+            await audioContextRef.current.resume();
+          }
+        } else if (NativeAudioContext) {
+          if (!audioContextRef.current) {
+            audioContextRef.current = new NativeAudioContext();
+          }
+        } else {
+          return;
+        }
 
-      const harmonics = [
-        { ratio: 1, gain: 1.0 },
-        { ratio: 2, gain: 0.5 },
-        { ratio: 3, gain: 0.25 },
-        { ratio: 4, gain: 0.125 },
-      ];
+        const ctx = audioContextRef.current;
+        const now = ctx.currentTime;
+        const freq = noteToFrequency(noteName);
 
-      const oscillators = harmonics.map(({ ratio, gain: harmGain }) => {
-        const osc = ctx.createOscillator();
-        const oscGain = ctx.createGain();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(freq * ratio, now);
-        oscGain.gain.setValueAtTime(harmGain * 0.3, now);
-        osc.connect(oscGain);
-        oscGain.connect(masterGain);
-        return osc;
-      });
+        const masterGain = ctx.createGain();
+        masterGain.connect(ctx.destination);
 
-      masterGain.gain.setValueAtTime(0, now);
-      masterGain.gain.linearRampToValueAtTime(0.6, now + ATTACK);
-      masterGain.gain.linearRampToValueAtTime(SUSTAIN, now + ATTACK + DECAY);
-      masterGain.gain.setValueAtTime(SUSTAIN, now + DURATION - RELEASE);
-      masterGain.gain.linearRampToValueAtTime(0, now + DURATION);
+        const harmonics = [
+          { ratio: 1, gain: 1.0 },
+          { ratio: 2, gain: 0.5 },
+          { ratio: 3, gain: 0.25 },
+          { ratio: 4, gain: 0.125 },
+        ];
 
-      oscillators.forEach(osc => {
-        osc.start(now);
-        osc.stop(now + DURATION);
-      });
+        const oscillators = harmonics.map(({ ratio, gain: harmGain }) => {
+          const osc = ctx.createOscillator();
+          const oscGain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq * ratio, now);
+          oscGain.gain.setValueAtTime(harmGain * 0.3, now);
+          osc.connect(oscGain);
+          oscGain.connect(masterGain);
+          return osc;
+        });
 
-      oscillatorRef.current = oscillators[0];
-    } catch (err) {
-      console.error("Combined explorer audio error:", err);
-    }
-  }, [noteToFrequency]);
+        masterGain.gain.setValueAtTime(0, now);
+        masterGain.gain.linearRampToValueAtTime(0.6, now + ATTACK);
+        masterGain.gain.linearRampToValueAtTime(SUSTAIN, now + ATTACK + DECAY);
+        masterGain.gain.setValueAtTime(SUSTAIN, now + DURATION - RELEASE);
+        masterGain.gain.linearRampToValueAtTime(0, now + DURATION);
+
+        oscillators.forEach((osc) => {
+          osc.start(now);
+          osc.stop(now + DURATION);
+        });
+
+        oscillatorRef.current = oscillators[0];
+      } catch (err) {
+        console.error("Combined explorer audio error:", err);
+      }
+    },
+    [noteToFrequency],
+  );
 
   // Stop any playing audio
   const stopAudio = useCallback(() => {
@@ -1229,9 +1249,7 @@ export default function FirstNoteScreen({ navigation, route }) {
             onVolumeChange={setVolume}
             volumeThreshold={0.1}
           />
-          <Text style={styles.hint}>
-            Sing "Ohhhhh" and hold (like a sigh).
-          </Text>
+          <Text style={styles.hint}>Sing "Ohhhhh" and hold (like a sigh).</Text>
         </>
       )}
 
@@ -1299,7 +1317,10 @@ export default function FirstNoteScreen({ navigation, route }) {
         <View style={styles.fixedBottomButtons}>
           <View style={styles.buttonRow}>
             <TouchableOpacity
-              style={[styles.secondaryButton, isPlaying && styles.buttonDisabled]}
+              style={[
+                styles.secondaryButton,
+                isPlaying && styles.buttonDisabled,
+              ]}
               onPress={playNote}
               disabled={isPlaying}
             >
@@ -1568,13 +1589,21 @@ export default function FirstNoteScreen({ navigation, route }) {
               <Text style={styles.stepInstruction}>
                 Sing the note with an "Oh" sound
               </Text>
-              <EDMVisualizerMedium volume={volume} pitchAccuracy="listening" />
+              <EDMVisualizerMedium
+                volume={volume}
+                pitchAccuracy={pitchAccuracy}
+              />
               <AudioInput
                 enabled={true}
+                targetNote={resonantNote}
                 onVolumeChange={setVolume}
-                volumeThreshold={0.1}
+                onPitchMatch={handlePitchMatch}
+                volumeThreshold={0.05}
+                pitchMargin={100}
+                allowOctaveEquivalent={true}
                 compact={true}
               />
+              <Text style={[styles.successTextSmall, { opacity: pitchAccuracy === "correct" ? 1 : 0 }]}>✓ Correct!</Text>
             </View>
           );
         case 2: // Imagine
@@ -1599,7 +1628,10 @@ export default function FirstNoteScreen({ navigation, route }) {
               <Text style={styles.stepInstruction}>
                 Play your note on your {instrument}
               </Text>
-              <EDMVisualizerMedium volume={volume} pitchAccuracy={pitchAccuracy} />
+              <EDMVisualizerMedium
+                volume={volume}
+                pitchAccuracy={pitchAccuracy}
+              />
               <AudioInput
                 enabled={true}
                 targetNote={resonantNote}
@@ -1609,9 +1641,7 @@ export default function FirstNoteScreen({ navigation, route }) {
                 pitchMargin={50}
                 compact={true}
               />
-              {pitchAccuracy === "correct" && (
-                <Text style={styles.successTextSmall}>✓ Correct!</Text>
-              )}
+              <Text style={[styles.successTextSmall, { opacity: pitchAccuracy === "correct" ? 1 : 0 }]}>✓ Correct!</Text>
             </View>
           );
         default:
@@ -1660,6 +1690,7 @@ export default function FirstNoteScreen({ navigation, route }) {
                   ]}
                   onPress={() => {
                     stopAudio();
+                    setPitchAccuracy(null);
                     setFocusActiveStep(idx);
                   }}
                 >
@@ -1875,9 +1906,7 @@ export default function FirstNoteScreen({ navigation, route }) {
                 });
               }}
             >
-              <Text style={styles.primaryButtonText}>
-                Practice Cards Again
-              </Text>
+              <Text style={styles.primaryButtonText}>Practice Cards Again</Text>
             </TouchableOpacity>
           </View>
         );
@@ -1944,11 +1973,11 @@ export default function FirstNoteScreen({ navigation, route }) {
             <View style={[styles.noteDemoCircle, { bottom: 3 }]} />
           </View>
           <Text style={styles.instruction}>
-            Sometimes notes go <Text style={styles.bold}>beyond</Text> the 5 lines.
+            Sometimes notes go <Text style={styles.bold}>beyond</Text> the 5
+            lines.
             {"\n\n"}
             When they do, we add short extra lines called{" "}
-            <Text style={styles.bold}>ledger lines</Text>.
-            {"\n\n"}
+            <Text style={styles.bold}>ledger lines</Text>.{"\n\n"}
             They're just temporary extensions of the staff!
           </Text>
         </>
@@ -2020,7 +2049,8 @@ export default function FirstNoteScreen({ navigation, route }) {
             <View style={styles.noteCircleHollow} />
           </View>
           <Text style={styles.instruction}>
-            Notes are <Text style={styles.bold}>round circles</Text> that tell us what pitch to play.
+            Notes are <Text style={styles.bold}>round circles</Text> that tell
+            us what pitch to play.
             {"\n\n"}
             The circle is called the <Text style={styles.bold}>note head</Text>.
             {"\n\n"}
@@ -2034,7 +2064,7 @@ export default function FirstNoteScreen({ navigation, route }) {
           <View style={styles.staffWithNoteVisual}>
             <View style={styles.staffLine} />
             <View style={styles.staffLine} />
-            <View style={[styles.noteOnLine, { top: '43%' }]} />
+            <View style={[styles.noteOnLine, { top: "43%" }]} />
             <View style={styles.staffLine} />
             <View style={styles.staffLine} />
             <View style={styles.staffLine} />
@@ -2052,7 +2082,7 @@ export default function FirstNoteScreen({ navigation, route }) {
           <View style={styles.staffWithNoteVisual}>
             <View style={styles.staffLine} />
             <View style={styles.staffLine} />
-            <View style={[styles.noteInSpace, { top: '34%' }]} />
+            <View style={[styles.noteInSpace, { top: "34%" }]} />
             <View style={styles.staffLine} />
             <View style={styles.staffLine} />
             <View style={styles.staffLine} />
@@ -2070,14 +2100,15 @@ export default function FirstNoteScreen({ navigation, route }) {
       {subStep === 3 && (
         <>
           <Text style={styles.instruction}>
-            Try it! Move the note <Text style={styles.bold}>up</Text> or <Text style={styles.bold}>down</Text> to hear different pitches.
+            Try it! Move the note <Text style={styles.bold}>up</Text> or{" "}
+            <Text style={styles.bold}>down</Text> to hear different pitches.
           </Text>
           <View style={styles.pitchExplorerStaff}>
             {PITCH_EXPLORER_NOTES[pitchExplorerIndex].ledgerLines <= -2 && (
-              <View style={[styles.ledgerLineExplorer, { top: '-22.5%' }]} />
+              <View style={[styles.ledgerLineExplorer, { top: "-22.5%" }]} />
             )}
             {PITCH_EXPLORER_NOTES[pitchExplorerIndex].ledgerLines < 0 && (
-              <View style={[styles.ledgerLineExplorer, { top: '-4.5%' }]} />
+              <View style={[styles.ledgerLineExplorer, { top: "-4.5%" }]} />
             )}
             <View style={styles.staffLine} />
             <View style={styles.staffLine} />
@@ -2085,21 +2116,26 @@ export default function FirstNoteScreen({ navigation, route }) {
             <View style={styles.staffLine} />
             <View style={styles.staffLine} />
             {PITCH_EXPLORER_NOTES[pitchExplorerIndex].ledgerLines > 0 && (
-              <View style={[styles.ledgerLineExplorer, { top: '103.5%' }]} />
+              <View style={[styles.ledgerLineExplorer, { top: "103.5%" }]} />
             )}
             {PITCH_EXPLORER_NOTES[pitchExplorerIndex].ledgerLines >= 2 && (
-              <View style={[styles.ledgerLineExplorer, { top: '121.5%' }]} />
+              <View style={[styles.ledgerLineExplorer, { top: "121.5%" }]} />
             )}
-            <View 
+            <View
               style={[
-                styles.pitchExplorerNote, 
-                { top: `${PITCH_EXPLORER_NOTES[pitchExplorerIndex].position}%` }
-              ]} 
+                styles.pitchExplorerNote,
+                {
+                  top: `${PITCH_EXPLORER_NOTES[pitchExplorerIndex].position}%`,
+                },
+              ]}
             />
           </View>
           <View style={styles.pitchExplorerControls}>
             <TouchableOpacity
-              style={[styles.pitchExplorerButton, pitchExplorerIndex === 0 && styles.pitchExplorerButtonDisabled]}
+              style={[
+                styles.pitchExplorerButton,
+                pitchExplorerIndex === 0 && styles.pitchExplorerButtonDisabled,
+              ]}
               onPress={() => {
                 if (pitchExplorerIndex > 0) {
                   const newIndex = pitchExplorerIndex - 1;
@@ -2118,7 +2154,11 @@ export default function FirstNoteScreen({ navigation, route }) {
               <Text style={styles.pitchExplorerPlayButtonText}>▶ Play</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.pitchExplorerButton, pitchExplorerIndex === PITCH_EXPLORER_NOTES.length - 1 && styles.pitchExplorerButtonDisabled]}
+              style={[
+                styles.pitchExplorerButton,
+                pitchExplorerIndex === PITCH_EXPLORER_NOTES.length - 1 &&
+                  styles.pitchExplorerButtonDisabled,
+              ]}
               onPress={() => {
                 if (pitchExplorerIndex < PITCH_EXPLORER_NOTES.length - 1) {
                   const newIndex = pitchExplorerIndex + 1;
@@ -2183,7 +2223,10 @@ export default function FirstNoteScreen({ navigation, route }) {
           >
             <Text style={styles.backTextButtonText}>← Back</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => setSubStep(3)}>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => setSubStep(3)}
+          >
             <Text style={styles.primaryButtonText}>Try it! →</Text>
           </TouchableOpacity>
         </View>
@@ -2346,7 +2389,8 @@ export default function FirstNoteScreen({ navigation, route }) {
           <Text style={styles.instruction}>
             By default, every note is <Text style={styles.bold}>natural</Text>.
             {"\n\n"}
-            We only write the natural symbol (♮) when we need to <Text style={styles.italic}>cancel</Text> a previous sharp or flat.
+            We only write the natural symbol (♮) when we need to{" "}
+            <Text style={styles.italic}>cancel</Text> a previous sharp or flat.
             {"\n\n"}
             Otherwise, no symbol means natural!
           </Text>
@@ -2376,7 +2420,8 @@ export default function FirstNoteScreen({ navigation, route }) {
             <TouchableOpacity
               style={[
                 styles.accidentalExplorerButton,
-                accidentalExplorer === "flat" && styles.accidentalExplorerButtonActive
+                accidentalExplorer === "flat" &&
+                  styles.accidentalExplorerButtonActive,
               ]}
               onPress={() => {
                 setAccidentalExplorer("flat");
@@ -2388,7 +2433,8 @@ export default function FirstNoteScreen({ navigation, route }) {
             <TouchableOpacity
               style={[
                 styles.accidentalExplorerButton,
-                accidentalExplorer === "natural" && styles.accidentalExplorerButtonActive
+                accidentalExplorer === "natural" &&
+                  styles.accidentalExplorerButtonActive,
               ]}
               onPress={() => {
                 setAccidentalExplorer("natural");
@@ -2400,7 +2446,8 @@ export default function FirstNoteScreen({ navigation, route }) {
             <TouchableOpacity
               style={[
                 styles.accidentalExplorerButton,
-                accidentalExplorer === "sharp" && styles.accidentalExplorerButtonActive
+                accidentalExplorer === "sharp" &&
+                  styles.accidentalExplorerButtonActive,
               ]}
               onPress={() => {
                 setAccidentalExplorer("sharp");
@@ -2420,10 +2467,10 @@ export default function FirstNoteScreen({ navigation, route }) {
           </Text>
           <View style={styles.combinedExplorerStaff}>
             {PITCH_EXPLORER_NOTES[pitchExplorerIndex].ledgerLines <= -2 && (
-              <View style={[styles.ledgerLineExplorer, { top: '-22.5%' }]} />
+              <View style={[styles.ledgerLineExplorer, { top: "-22.5%" }]} />
             )}
             {PITCH_EXPLORER_NOTES[pitchExplorerIndex].ledgerLines < 0 && (
-              <View style={[styles.ledgerLineExplorer, { top: '-4.5%' }]} />
+              <View style={[styles.ledgerLineExplorer, { top: "-4.5%" }]} />
             )}
             <View style={styles.staffLine} />
             <View style={styles.staffLine} />
@@ -2431,27 +2478,50 @@ export default function FirstNoteScreen({ navigation, route }) {
             <View style={styles.staffLine} />
             <View style={styles.staffLine} />
             {PITCH_EXPLORER_NOTES[pitchExplorerIndex].ledgerLines > 0 && (
-              <View style={[styles.ledgerLineExplorer, { top: '103.5%' }]} />
+              <View style={[styles.ledgerLineExplorer, { top: "103.5%" }]} />
             )}
             {PITCH_EXPLORER_NOTES[pitchExplorerIndex].ledgerLines >= 2 && (
-              <View style={[styles.ledgerLineExplorer, { top: '121.5%' }]} />
+              <View style={[styles.ledgerLineExplorer, { top: "121.5%" }]} />
             )}
             {accidentalExplorer === "flat" && (
-              <Text style={[styles.flatOnStaff, { top: `${PITCH_EXPLORER_NOTES[pitchExplorerIndex].position - 16}%` }]}>♭</Text>
+              <Text
+                style={[
+                  styles.flatOnStaff,
+                  {
+                    top: `${PITCH_EXPLORER_NOTES[pitchExplorerIndex].position - 16}%`,
+                  },
+                ]}
+              >
+                ♭
+              </Text>
             )}
             {accidentalExplorer === "sharp" && (
-              <Text style={[styles.sharpOnStaff, { top: `${PITCH_EXPLORER_NOTES[pitchExplorerIndex].position - 14}%` }]}>♯</Text>
+              <Text
+                style={[
+                  styles.sharpOnStaff,
+                  {
+                    top: `${PITCH_EXPLORER_NOTES[pitchExplorerIndex].position - 14}%`,
+                  },
+                ]}
+              >
+                ♯
+              </Text>
             )}
-            <View 
+            <View
               style={[
-                styles.pitchExplorerNote, 
-                { top: `${PITCH_EXPLORER_NOTES[pitchExplorerIndex].position}%` }
-              ]} 
+                styles.pitchExplorerNote,
+                {
+                  top: `${PITCH_EXPLORER_NOTES[pitchExplorerIndex].position}%`,
+                },
+              ]}
             />
           </View>
           <View style={styles.combinedExplorerControls}>
             <TouchableOpacity
-              style={[styles.pitchExplorerButton, pitchExplorerIndex === 0 && styles.pitchExplorerButtonDisabled]}
+              style={[
+                styles.pitchExplorerButton,
+                pitchExplorerIndex === 0 && styles.pitchExplorerButtonDisabled,
+              ]}
               onPress={() => {
                 if (pitchExplorerIndex > 0) {
                   const newIndex = pitchExplorerIndex - 1;
@@ -2465,12 +2535,18 @@ export default function FirstNoteScreen({ navigation, route }) {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.pitchExplorerPlayButton}
-              onPress={() => playCombinedExplorer(pitchExplorerIndex, accidentalExplorer)}
+              onPress={() =>
+                playCombinedExplorer(pitchExplorerIndex, accidentalExplorer)
+              }
             >
               <Text style={styles.pitchExplorerPlayButtonText}>▶</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.pitchExplorerButton, pitchExplorerIndex === PITCH_EXPLORER_NOTES.length - 1 && styles.pitchExplorerButtonDisabled]}
+              style={[
+                styles.pitchExplorerButton,
+                pitchExplorerIndex === PITCH_EXPLORER_NOTES.length - 1 &&
+                  styles.pitchExplorerButtonDisabled,
+              ]}
               onPress={() => {
                 if (pitchExplorerIndex < PITCH_EXPLORER_NOTES.length - 1) {
                   const newIndex = pitchExplorerIndex + 1;
@@ -2487,7 +2563,8 @@ export default function FirstNoteScreen({ navigation, route }) {
             <TouchableOpacity
               style={[
                 styles.accidentalExplorerButton,
-                accidentalExplorer === "flat" && styles.accidentalExplorerButtonActive
+                accidentalExplorer === "flat" &&
+                  styles.accidentalExplorerButtonActive,
               ]}
               onPress={() => {
                 setAccidentalExplorer("flat");
@@ -2499,7 +2576,8 @@ export default function FirstNoteScreen({ navigation, route }) {
             <TouchableOpacity
               style={[
                 styles.accidentalExplorerButton,
-                accidentalExplorer === "natural" && styles.accidentalExplorerButtonActive
+                accidentalExplorer === "natural" &&
+                  styles.accidentalExplorerButtonActive,
               ]}
               onPress={() => {
                 setAccidentalExplorer("natural");
@@ -2511,7 +2589,8 @@ export default function FirstNoteScreen({ navigation, route }) {
             <TouchableOpacity
               style={[
                 styles.accidentalExplorerButton,
-                accidentalExplorer === "sharp" && styles.accidentalExplorerButtonActive
+                accidentalExplorer === "sharp" &&
+                  styles.accidentalExplorerButtonActive,
               ]}
               onPress={() => {
                 setAccidentalExplorer("sharp");
@@ -2690,13 +2769,31 @@ export default function FirstNoteScreen({ navigation, route }) {
             <Text style={styles.summaryCloseText}>✕</Text>
           </TouchableOpacity>
           <Text style={styles.summaryTitle}>What I Learned</Text>
-          <Text style={styles.summaryItem}>✓ The staff has 5 lines and 4 spaces</Text>
-          <Text style={styles.summaryItem}>✓ Ledger lines extend the staff</Text>
-          <Text style={styles.summaryItem}>✓ Notes sit on lines or in spaces</Text>
-          <Text style={styles.summaryItem}>✓ Higher on staff = higher pitch</Text>
-          <Text style={styles.summaryItem}>✓ {clefType === "bass" ? "Bass clef shows us where F is" : "Treble clef shows us where G is"}</Text>
-          <Text style={styles.summaryItem}>✓ ♯ sharp (higher), ♮ natural, ♭ flat (lower)</Text>
-          <Text style={styles.summaryItem}>✓ My note: {noteInfo.letter}{noteInfo.accidental}</Text>
+          <Text style={styles.summaryItem}>
+            ✓ The staff has 5 lines and 4 spaces
+          </Text>
+          <Text style={styles.summaryItem}>
+            ✓ Ledger lines extend the staff
+          </Text>
+          <Text style={styles.summaryItem}>
+            ✓ Notes sit on lines or in spaces
+          </Text>
+          <Text style={styles.summaryItem}>
+            ✓ Higher on staff = higher pitch
+          </Text>
+          <Text style={styles.summaryItem}>
+            ✓{" "}
+            {clefType === "bass"
+              ? "Bass clef shows us where F is"
+              : "Treble clef shows us where G is"}
+          </Text>
+          <Text style={styles.summaryItem}>
+            ✓ ♯ sharp (higher), ♮ natural, ♭ flat (lower)
+          </Text>
+          <Text style={styles.summaryItem}>
+            ✓ My note: {noteInfo.letter}
+            {noteInfo.accidental}
+          </Text>
         </View>
       )}
 
@@ -3370,7 +3467,7 @@ const styles = StyleSheet.create({
   },
   stepContentAreaCompact: {
     alignItems: "center",
-    minHeight: 120,
+    height: 175,
     justifyContent: "center",
     paddingVertical: 4,
     gap: 6,
