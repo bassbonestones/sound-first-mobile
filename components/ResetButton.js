@@ -10,7 +10,7 @@ import {
 import { useNavigation, CommonActions } from "@react-navigation/native";
 
 function getBackendUrl() {
-  const LOCAL_IP = "192.168.1.118";
+  const LOCAL_IP = "192.168.1.19";
   if (Platform.OS === "android") {
     return "http://10.0.2.2:8000";
   } else if (Platform.OS === "ios") {
@@ -43,7 +43,7 @@ export default function ResetButton({ userId = 1 }) {
         [
           { text: "Cancel", style: "cancel" },
           { text: "Reset", style: "destructive", onPress: performReset },
-        ]
+        ],
       );
     }
   };
@@ -54,7 +54,7 @@ export default function ResetButton({ userId = 1 }) {
       const response = await fetch(`${getBackendUrl()}/users/${userId}/reset`, {
         method: "POST",
       });
-      
+
       if (!response.ok) {
         throw new Error("Failed to reset user data");
       }
@@ -64,7 +64,7 @@ export default function ResetButton({ userId = 1 }) {
         CommonActions.reset({
           index: 0,
           routes: [{ name: "Onboarding" }],
-        })
+        }),
       );
     } catch (err) {
       console.error("Reset error:", err);

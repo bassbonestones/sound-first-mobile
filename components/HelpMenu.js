@@ -10,7 +10,7 @@ import {
 } from "react-native";
 
 function getBaseUrl() {
-  const LOCAL_IP = "192.168.1.118";
+  const LOCAL_IP = "192.168.1.19";
   if (Platform.OS === "android") {
     return "http://10.0.2.2:8000";
   } else if (Platform.OS === "ios") {
@@ -24,7 +24,7 @@ function getBaseUrl() {
 
 /**
  * HelpMenu - Shows capabilities referenced in a material for quick review
- * 
+ *
  * Allows users to access teaching content for any capability they encounter
  * during practice, even ones they've already learned.
  */
@@ -48,7 +48,9 @@ export default function HelpMenu({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${getBaseUrl()}/materials/${materialId}/help-capabilities`);
+      const res = await fetch(
+        `${getBaseUrl()}/materials/${materialId}/help-capabilities`,
+      );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setCapabilities(data.capabilities || []);
@@ -125,7 +127,10 @@ export default function HelpMenu({
           ) : error ? (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>Error: {error}</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={fetchCapabilities}>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={fetchCapabilities}
+              >
                 <Text style={styles.retryButtonText}>Retry</Text>
               </TouchableOpacity>
             </View>
@@ -140,12 +145,14 @@ export default function HelpMenu({
               {Object.entries(groupedCapabilities).map(([domain, caps]) => (
                 <View key={domain} style={styles.domainSection}>
                   <View style={styles.domainHeader}>
-                    <Text style={styles.domainIcon}>{domainIcons[domain] || "📝"}</Text>
+                    <Text style={styles.domainIcon}>
+                      {domainIcons[domain] || "📝"}
+                    </Text>
                     <Text style={styles.domainTitle}>
                       {domainLabels[domain] || domain}
                     </Text>
                   </View>
-                  
+
                   {caps.map((cap) => (
                     <TouchableOpacity
                       key={cap.id}
@@ -153,7 +160,9 @@ export default function HelpMenu({
                         styles.capabilityItem,
                         !cap.has_lesson && styles.capabilityItemDisabled,
                       ]}
-                      onPress={() => cap.has_lesson && handleSelectCapability(cap)}
+                      onPress={() =>
+                        cap.has_lesson && handleSelectCapability(cap)
+                      }
                       disabled={!cap.has_lesson}
                     >
                       <Text style={styles.capabilityName}>
@@ -162,7 +171,9 @@ export default function HelpMenu({
                       {cap.has_lesson ? (
                         <Text style={styles.capabilityArrow}>→</Text>
                       ) : (
-                        <Text style={styles.capabilityNoLesson}>(coming soon)</Text>
+                        <Text style={styles.capabilityNoLesson}>
+                          (coming soon)
+                        </Text>
                       )}
                     </TouchableOpacity>
                   ))}

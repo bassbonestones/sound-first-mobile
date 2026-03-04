@@ -2,6 +2,18 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { View, Text, TouchableOpacity, Pressable, Platform, TextInput, Modal } from "react-native";
 import Slider from "@react-native-community/slider";
 
+// Cross-platform AudioContext
+// Web: use browser's native AudioContext
+// Native: use react-native-audio-api
+let NativeAudioContext = null;
+if (Platform.OS !== "web") {
+  try {
+    NativeAudioContext = require("react-native-audio-api").AudioContext;
+  } catch (e) {
+    console.warn("react-native-audio-api not available");
+  }
+}
+
 // Note definitions with enharmonic equivalents
 const NOTES = [
   { name: "C", enharmonic: "B♯/C", semitone: 0 },
@@ -137,13 +149,17 @@ export default function PitchDrone({
     });
   }, [vibrato]);
 
-  // Initialize AudioContext
+  // Initialize AudioContext (cross-platform)
   useEffect(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
+      // Web: use browser's native AudioContext
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (AudioContext) {
         audioContextRef.current = new AudioContext();
       }
+    } else if (NativeAudioContext) {
+      // Native: use react-native-audio-api
+      audioContextRef.current = new NativeAudioContext();
     }
     
     return () => {
@@ -222,7 +238,7 @@ export default function PitchDrone({
 
   // Start a drone
   const startDrone = useCallback((semitone, noteOctave) => {
-    if (!audioContextRef.current || Platform.OS !== "web") return;
+    if (!audioContextRef.current) return;
     
     const key = `${NOTES[semitone].name}-${noteOctave}`;
     

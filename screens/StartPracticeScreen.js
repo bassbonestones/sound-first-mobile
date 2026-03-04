@@ -121,25 +121,6 @@ export default function StartPracticeScreen({ navigation }) {
           {FATIGUE_HINTS[fatigue]}
         </Text>
       </View>
-      
-      <TouchableOpacity
-        onPress={handleStartPractice}
-        style={{ backgroundColor: "#FFD700", borderRadius: 28, paddingVertical: 16, paddingHorizontal: 48, marginTop: 12 }}
-      >
-        <Text style={{ color: "#3b2c1a", fontWeight: "bold", fontSize: 20 }}>Start Practice</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => navigation.navigate("SelfDirected")}
-        style={{ backgroundColor: "#bfa76a", borderRadius: 28, paddingVertical: 16, paddingHorizontal: 48, marginTop: 16 }}
-      >
-        <Text style={{ color: "#fffbe6", fontWeight: "bold", fontSize: 20 }}>Self-Directed Mode</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => navigation.navigate("History")}
-        style={{ backgroundColor: "#bfa76a", borderRadius: 28, paddingVertical: 16, paddingHorizontal: 48, marginTop: 16 }}
-      >
-        <Text style={{ color: "#fffbe6", fontWeight: "bold", fontSize: 20 }}>Practice History</Text>
-      </TouchableOpacity>
 
       {/* Fatigue 5 Modal - Exhausted Options */}
       <Modal
@@ -250,18 +231,55 @@ export default function StartPracticeScreen({ navigation }) {
                 setFatigue(4); // Reset to fatigue 4 if they cancel
               }}
               style={{
-                padding: 12,
+                backgroundColor: "#3d3d3d",
+                borderRadius: 12,
+                padding: 16,
                 marginTop: 4,
+                borderWidth: 1,
+                borderColor: "#666",
               }}
             >
-              <Text style={{ color: "#888", fontSize: 14, textAlign: "center" }}>
-                Cancel (set fatigue to 4)
+              <Text style={{ color: "#fff", fontSize: 16, fontWeight: "bold", textAlign: "center" }}>
+                ↩️ Cancel (set fatigue to 4)
+              </Text>
+              <Text style={{ color: "#aaa", fontSize: 12, textAlign: "center", marginTop: 4 }}>
+                Go back and adjust settings
               </Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
     </ScrollView>
+    
+    {/* Fixed bottom buttons */}
+    <View style={{
+      backgroundColor: "#1a1410",
+      paddingHorizontal: 24,
+      paddingTop: 12,
+      paddingBottom: 24,
+      borderTopWidth: 1,
+      borderTopColor: "#3b2c1a",
+    }}>
+      <TouchableOpacity
+        onPress={() => navigation.navigate("History")}
+        style={{ backgroundColor: "#3b2c1a", borderRadius: 28, paddingVertical: 14, paddingHorizontal: 48, marginBottom: 10, alignItems: "center", borderWidth: 1, borderColor: "#bfa76a" }}
+      >
+        <Text style={{ color: "#bfa76a", fontWeight: "bold", fontSize: 18 }}>Practice History</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => navigation.navigate("SelfDirected")}
+        style={{ backgroundColor: "#3b2c1a", borderRadius: 28, paddingVertical: 14, paddingHorizontal: 48, marginBottom: 10, alignItems: "center", borderWidth: 1, borderColor: "#bfa76a" }}
+      >
+        <Text style={{ color: "#bfa76a", fontWeight: "bold", fontSize: 18 }}>Self-Directed Mode</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={handleStartPractice}
+        style={{ backgroundColor: "#4ADE80", borderRadius: 28, paddingVertical: 16, paddingHorizontal: 48, alignItems: "center" }}
+      >
+        <Text style={{ color: "#1a1410", fontWeight: "bold", fontSize: 20 }}>Start Practice</Text>
+      </TouchableOpacity>
+    </View>
+    
     <ResetButton />
     </View>
   );

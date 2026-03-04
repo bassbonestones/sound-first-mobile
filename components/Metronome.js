@@ -2,11 +2,21 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { View, Text, TouchableOpacity, Pressable, Platform, ScrollView, Modal } from "react-native";
 import Slider from "@react-native-community/slider";
 
+// Import AudioContext from react-native-audio-api for native platforms
+let NativeAudioContext = null;
+if (Platform.OS !== "web") {
+  try {
+    NativeAudioContext = require("react-native-audio-api").AudioContext;
+  } catch (e) {
+    console.warn("react-native-audio-api not available:", e);
+  }
+}
+
 /**
  * Metronome Component
  * 
- * Uses Web Audio API (web) or generates ticks via AudioContext.
- * For mobile, falls back to visual-only beat indicator.
+ * Uses Web Audio API (web) or react-native-audio-api (mobile).
+ * Provides audio clicks on all platforms.
  * 
  * Features:
  * - Custom time signature (top: 1-12, bottom: 1, 2, 4, 8, 16, 32)
@@ -215,13 +225,16 @@ export default function Metronome({
     volumeRef.current = volume;
   }, [volume]);
 
-  // Initialize AudioContext (web only)
+  // Initialize AudioContext (all platforms)
   useEffect(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (AudioContext) {
         audioContextRef.current = new AudioContext();
       }
+    } else if (NativeAudioContext) {
+      // Use react-native-audio-api on native platforms
+      audioContextRef.current = new NativeAudioContext();
     }
     
     return () => {
@@ -242,7 +255,7 @@ export default function Metronome({
 
   // Scheduler for precise timing
   const scheduleNote = useCallback((beatNumber, time) => {
-    if (audioContextRef.current && Platform.OS === "web") {
+    if (audioContextRef.current) {
       // Accent on beat 1 if enabled
       const isAccent = accentFirst && beatNumber === 0;
       const frequency = isAccent ? 1200 : 800;
@@ -275,7 +288,7 @@ export default function Metronome({
     pattern.forEach((timing, index) => {
       const delayMs = timing * msPerBeat;
       const timeout = setTimeout(() => {
-        if (audioContextRef.current && Platform.OS === "web" && !mutedRef.current) {
+        if (audioContextRef.current && !mutedRef.current) {
           // Beat 1 gets strongest accent, subdivisions get their pattern accents
           const isBeatAccent = isFirstBeat && index === 0 && accentFirst;
           const subAccent = accents[index] || 0.5;
@@ -918,14 +931,14 @@ export default function Metronome({
         </>
       )}
       
-      {Platform.OS !== "web" && (
+      {Platform.OS !== "web" && !NativeAudioContext && (
         <Text style={{ 
           color: "#666", 
           fontSize: 11, 
           marginTop: 12,
           textAlign: "center",
         }}>
-          Audio requires expo-av on mobile
+          Audio playback unavailable - react-native-audio-api not loaded
         </Text>
       )}
 

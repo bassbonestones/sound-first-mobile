@@ -11,7 +11,7 @@ import {
 } from "react-native";
 
 function getBaseUrl() {
-  const LOCAL_IP = "192.168.1.118";
+  const LOCAL_IP = "192.168.1.19";
   if (Platform.OS === "android") {
     return "http://10.0.2.2:8000";
   } else if (Platform.OS === "ios") {
@@ -42,7 +42,7 @@ const LESSON_STEP_LABELS = {
 
 /**
  * MiniLesson - Teaches a single capability to the user
- * 
+ *
  * Flow: LISTEN → EXPLAIN → VISUAL → TRY_IT → QUIZ
  */
 export default function MiniLesson({
@@ -67,7 +67,9 @@ export default function MiniLesson({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${getBaseUrl()}/capabilities/${capabilityId}/lesson`);
+      const res = await fetch(
+        `${getBaseUrl()}/capabilities/${capabilityId}/lesson`,
+      );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setLesson(data);
@@ -166,7 +168,9 @@ export default function MiniLesson({
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Learning: {lesson.capability_name}</Text>
+        <Text style={styles.headerTitle}>
+          Learning: {lesson.capability_name}
+        </Text>
         <Text style={styles.headerDomain}>{lesson.domain}</Text>
       </View>
 

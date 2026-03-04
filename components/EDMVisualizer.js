@@ -243,6 +243,77 @@ export default function EDMVisualizer({
   );
 }
 
+// Medium version - smaller but keeps pulse rings and orb
+export function EDMVisualizerMedium({
+  volume = 0,
+  pitchAccuracy = null,
+  barCount = 12,
+  style,
+}) {
+  const colorScheme = useMemo(() => {
+    if (volume < 0.02) return NEON_COLORS.inactive;
+    switch (pitchAccuracy) {
+      case "correct": return NEON_COLORS.correct;
+      case "off": return NEON_COLORS.off;
+      default: return NEON_COLORS.listening;
+    }
+  }, [volume, pitchAccuracy]);
+  
+  const bars = useMemo(() => {
+    return Array.from({ length: barCount }, (_, i) => ({
+      index: i,
+      key: i,
+    }));
+  }, [barCount]);
+  
+  const barWidth = 140 / barCount;
+  const maxBarHeight = 50;
+  
+  return (
+    <View style={[styles.mediumContainer, style]}>
+      {/* Background glow */}
+      <View
+        style={[
+          styles.backgroundGlow,
+          { backgroundColor: colorScheme.glow },
+        ]}
+      />
+      
+      {/* Pulse rings - smaller */}
+      <View style={styles.pulseContainer}>
+        <PulseRing volume={volume} colorScheme={colorScheme} size={80} />
+        <PulseRing volume={volume * 0.8} colorScheme={colorScheme} size={100} />
+      </View>
+      
+      {/* Spectrum bars */}
+      <View style={styles.mediumBarsWrapper}>
+        {bars.map((bar) => (
+          <AnimatedBar
+            key={bar.key}
+            index={bar.index}
+            volume={volume}
+            colorScheme={colorScheme}
+            maxHeight={maxBarHeight}
+            width={barWidth}
+          />
+        ))}
+      </View>
+      
+      {/* Center orb - smaller */}
+      <Animated.View
+        style={[
+          styles.mediumOrb,
+          {
+            backgroundColor: colorScheme.primary,
+            shadowColor: colorScheme.primary,
+            transform: [{ scale: 0.8 + volume * 0.4 }],
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
 // Compact version for inline use
 export function EDMVisualizerCompact({
   volume = 0,
@@ -344,6 +415,31 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
     shadowRadius: 15,
+  },
+  mediumContainer: {
+    width: 160,
+    height: 100,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0a0a12",
+    borderRadius: 12,
+    overflow: "hidden",
+    padding: 6,
+  },
+  mediumBarsWrapper: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    height: 55,
+    paddingHorizontal: 5,
+  },
+  mediumOrb: {
+    position: "absolute",
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 10,
   },
   compactContainer: {
     backgroundColor: "#0a0a12",

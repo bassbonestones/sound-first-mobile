@@ -3,18 +3,18 @@ import { Platform, View, ActivityIndicator, Text } from "react-native";
 
 // ============= STARTUP TIMING =============
 const TIMING = {
-  bundleLoaded: Date.now(),  // When JS bundle finished loading (Expo startup complete)
+  bundleLoaded: Date.now(), // When JS bundle finished loading (Expo startup complete)
 };
 
 // Get backend URL for logging
 function getBackendUrl() {
-  const LOCAL_IP = "192.168.1.118";
+  const LOCAL_IP = "192.168.1.19";
   if (Platform.OS === "android") {
     return "http://10.0.2.2:8000";
   } else if (Platform.OS === "ios") {
     return `http://${LOCAL_IP}:8000`;
   } else if (Platform.OS === "web") {
-    return `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:8000`;
+    return `http://${typeof window !== "undefined" ? window.location.hostname : "localhost"}:8000`;
   }
   return `http://${LOCAL_IP}:8000`;
 }
@@ -23,14 +23,14 @@ function getBackendUrl() {
 function logTiming(event, data) {
   const message = `[TIMING] ${event}`;
   const fullData = { ...data, platform: Platform.OS };
-  
+
   // Console log (shows in browser dev tools)
   console.log(message, fullData);
-  
+
   // Server log (shows in uvicorn/Metro terminal)
   fetch(`${getBackendUrl()}/log/client`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       event: `TIMING: ${event}`,
       data: fullData,
@@ -39,7 +39,9 @@ function logTiming(event, data) {
   }).catch(() => {}); // Ignore errors - logging shouldn't break the app
 }
 
-logTiming('Bundle loaded', { timestamp: new Date(TIMING.bundleLoaded).toISOString() });
+logTiming("Bundle loaded", {
+  timestamp: new Date(TIMING.bundleLoaded).toISOString(),
+});
 console.log("[App.js] File loaded");
 // Simple error boundary for debugging
 class ErrorBoundary extends React.Component {
@@ -56,8 +58,12 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <Text style={{ color: 'red' }}>[ErrorBoundary] {String(this.state.error)}</Text>
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
+          <Text style={{ color: "red" }}>
+            [ErrorBoundary] {String(this.state.error)}
+          </Text>
         </View>
       );
     }
@@ -78,110 +84,111 @@ import FirstNoteScreen from "./screens/FirstNoteScreen";
 
 const Stack = createNativeStackNavigator();
 
-
 export default function App() {
   const [initialRoute, setInitialRoute] = useState(null);
   const [firstNoteParams, setFirstNoteParams] = useState(null);
 
   useEffect(() => {
-      // ============= APP STARTUP TIMING =============
-      const appMountTime = Date.now();
-      const expoStartupMs = appMountTime - TIMING.bundleLoaded;
-      
-      logTiming('App mounted', { 
-        expoStartupMs,
-        timestamp: new Date(appMountTime).toISOString()
-      });
-      
-      // Fetch onboarding status
-      const url = `${getBackendUrl()}/onboarding/1`;
-      console.log("[Onboarding] Fetching onboarding info from:", url);
-      
-      const fetchStartTime = Date.now();
-      
-      fetch(url)
-        .then((res) => {
-          console.log("[Onboarding] Response status:", res.status);
-          if (!res.ok) throw new Error("No onboarding");
-          return res.json();
-        })
-        .then((data) => {
-          const fetchEndTime = Date.now();
-          const fetchDurationMs = fetchEndTime - fetchStartTime;
-          const appStartupMs = fetchEndTime - appMountTime;
-          const totalMs = fetchEndTime - TIMING.bundleLoaded;
-          
-          console.log("[Onboarding] Response data:", data);
-          
-          if (data.instrument && data.resonant_note) {
-            // User has completed basic onboarding
-            if (data.day0_completed === false) {
-              // ============= NEED DAY 0 =============
-              logTiming('USER NEEDS DAY 0', {
-                expoStartupMs,
-                fetchMs: fetchDurationMs,
-                appStartupMs,
-                totalMs,
-                breakdown: `Expo=${expoStartupMs}ms + App=${appStartupMs}ms`
-              });
-              // Store params so FirstNote gets the correct note
-              setFirstNoteParams({
-                userId: 1,
-                resonantNote: data.resonant_note,
-                instrument: data.instrument
-              });
-              setInitialRoute("FirstNote");
-            } else {
-              // ============= RETURNING USER SCENARIO =============
-              logTiming('RETURNING USER (day0 complete)', {
-                expoStartupMs,
-                fetchMs: fetchDurationMs,
-                appStartupMs,
-                totalMs,
-                breakdown: `Expo=${expoStartupMs}ms + App=${appStartupMs}ms`
-              });
-              setInitialRoute("StartPractice");
-            }
-          } else {
-            // ============= NEW USER SCENARIO =============
-            logTiming('NEW USER (no instrument)', {
+    // ============= APP STARTUP TIMING =============
+    const appMountTime = Date.now();
+    const expoStartupMs = appMountTime - TIMING.bundleLoaded;
+
+    logTiming("App mounted", {
+      expoStartupMs,
+      timestamp: new Date(appMountTime).toISOString(),
+    });
+
+    // Fetch onboarding status
+    const url = `${getBackendUrl()}/onboarding/1`;
+    console.log("[Onboarding] Fetching onboarding info from:", url);
+
+    const fetchStartTime = Date.now();
+
+    fetch(url)
+      .then((res) => {
+        console.log("[Onboarding] Response status:", res.status);
+        if (!res.ok) throw new Error("No onboarding");
+        return res.json();
+      })
+      .then((data) => {
+        const fetchEndTime = Date.now();
+        const fetchDurationMs = fetchEndTime - fetchStartTime;
+        const appStartupMs = fetchEndTime - appMountTime;
+        const totalMs = fetchEndTime - TIMING.bundleLoaded;
+
+        console.log("[Onboarding] Response data:", data);
+
+        if (data.instrument && data.resonant_note) {
+          // User has completed basic onboarding
+          if (data.day0_completed === false) {
+            // ============= NEED DAY 0 =============
+            logTiming("USER NEEDS DAY 0", {
               expoStartupMs,
               fetchMs: fetchDurationMs,
               appStartupMs,
               totalMs,
-              breakdown: `Expo=${expoStartupMs}ms + App=${appStartupMs}ms`
+              breakdown: `Expo=${expoStartupMs}ms + App=${appStartupMs}ms`,
             });
-            setInitialRoute("Onboarding");
+            // Store params so FirstNote gets the correct note
+            setFirstNoteParams({
+              userId: 1,
+              resonantNote: data.resonant_note,
+              instrument: data.instrument,
+            });
+            setInitialRoute("FirstNote");
+          } else {
+            // ============= RETURNING USER SCENARIO =============
+            logTiming("RETURNING USER (day0 complete)", {
+              expoStartupMs,
+              fetchMs: fetchDurationMs,
+              appStartupMs,
+              totalMs,
+              breakdown: `Expo=${expoStartupMs}ms + App=${appStartupMs}ms`,
+            });
+            setInitialRoute("StartPractice");
           }
-        })
-        .catch((err) => {
-          const fetchEndTime = Date.now();
-          const fetchDurationMs = fetchEndTime - fetchStartTime;
-          const appStartupMs = fetchEndTime - appMountTime;
-          const totalMs = fetchEndTime - TIMING.bundleLoaded;
-          
-          console.log("[Onboarding] Fetch error:", err);
-          logTiming('NEW USER (fetch failed)', {
+        } else {
+          // ============= NEW USER SCENARIO =============
+          logTiming("NEW USER (no instrument)", {
             expoStartupMs,
             fetchMs: fetchDurationMs,
             appStartupMs,
             totalMs,
-            error: String(err),
-            breakdown: `Expo=${expoStartupMs}ms + App=${appStartupMs}ms`
+            breakdown: `Expo=${expoStartupMs}ms + App=${appStartupMs}ms`,
           });
           setInitialRoute("Onboarding");
+        }
+      })
+      .catch((err) => {
+        const fetchEndTime = Date.now();
+        const fetchDurationMs = fetchEndTime - fetchStartTime;
+        const appStartupMs = fetchEndTime - appMountTime;
+        const totalMs = fetchEndTime - TIMING.bundleLoaded;
+
+        console.log("[Onboarding] Fetch error:", err);
+        logTiming("NEW USER (fetch failed)", {
+          expoStartupMs,
+          fetchMs: fetchDurationMs,
+          appStartupMs,
+          totalMs,
+          error: String(err),
+          breakdown: `Expo=${expoStartupMs}ms + App=${appStartupMs}ms`,
         });
+        setInitialRoute("Onboarding");
+      });
   }, []);
 
-    if (!initialRoute) {
-      return (
-        <ErrorBoundary>
-          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-            <ActivityIndicator size="large" color="#000" />
-          </View>
-        </ErrorBoundary>
-      );
-    }
+  if (!initialRoute) {
+    return (
+      <ErrorBoundary>
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
+          <ActivityIndicator size="large" color="#000" />
+        </View>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary>

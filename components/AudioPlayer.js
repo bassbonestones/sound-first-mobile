@@ -1,13 +1,19 @@
 import React, { useState, useRef, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+} from "react-native";
 
 /**
  * AudioPlayer Component for LISTEN steps
- * 
+ *
  * Plays audio model phrases for ear-first learning.
  * Fetches audio from backend which generates from MusicXML.
  * Uses HTML5 Audio on web, shows placeholder on native until expo-av is added.
- * 
+ *
  * Props:
  * - materialId: ID of the material (required)
  * - targetKey: Target key for transposition (e.g., "Bb major")
@@ -20,7 +26,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native
  */
 
 function getBackendUrl() {
-  const LOCAL_IP = "192.168.1.118";
+  const LOCAL_IP = "192.168.1.19";
   if (Platform.OS === "android") {
     return "http://10.0.2.2:8000";
   } else if (Platform.OS === "ios") {
@@ -47,21 +53,24 @@ export default function AudioPlayer({
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(null);
   const [audioStatus, setAudioStatus] = useState(null);
-  
+
   const audioRef = useRef(null);
   const progressIntervalRef = useRef(null);
 
   // Build audio URL from material ID and key
-  const audioUrl = materialId && targetKey
-    ? `${getBackendUrl()}/audio/material/${materialId}?key=${encodeURIComponent(targetKey)}&instrument=${encodeURIComponent(instrument)}`
-    : null;
+  const audioUrl =
+    materialId && targetKey
+      ? `${getBackendUrl()}/audio/material/${materialId}?key=${encodeURIComponent(targetKey)}&instrument=${encodeURIComponent(instrument)}`
+      : null;
 
   // Check audio generation status on mount
   useEffect(() => {
     fetch(`${getBackendUrl()}/audio/status`)
-      .then(res => res.json())
-      .then(data => setAudioStatus(data))
-      .catch(() => setAudioStatus({ can_render_audio: false, can_render_midi: false }));
+      .then((res) => res.json())
+      .then((data) => setAudioStatus(data))
+      .catch(() =>
+        setAudioStatus({ can_render_audio: false, can_render_midi: false }),
+      );
   }, []);
 
   // Initialize audio on web
@@ -69,24 +78,24 @@ export default function AudioPlayer({
     if (Platform.OS === "web" && audioUrl) {
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
-      
+
       audio.addEventListener("loadedmetadata", () => {
         setDuration(audio.duration);
         setIsLoaded(true);
         setError(null);
       });
-      
+
       audio.addEventListener("ended", () => {
         setIsPlaying(false);
         setCurrentTime(0);
         if (onComplete) onComplete();
       });
-      
+
       audio.addEventListener("error", (e) => {
         setError("Audio failed to load");
         setIsLoaded(false);
       });
-      
+
       if (autoPlay) {
         audio.play().catch(() => {
           // Autoplay blocked by browser
@@ -94,7 +103,7 @@ export default function AudioPlayer({
         });
         setIsPlaying(true);
       }
-      
+
       return () => {
         audio.pause();
         audio.src = "";
@@ -116,7 +125,7 @@ export default function AudioPlayer({
     } else if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
     }
-    
+
     return () => {
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
@@ -129,9 +138,9 @@ export default function AudioPlayer({
       // Native: just show placeholder
       return;
     }
-    
+
     if (!audioRef.current || !isLoaded) return;
-    
+
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
@@ -174,9 +183,7 @@ export default function AudioPlayer({
             Close your eyes and imagine the phrase
           </Text>
         </View>
-        <Text style={styles.hint}>
-          💡 Hear it in your mind's ear first
-        </Text>
+        <Text style={styles.hint}>💡 Hear it in your mind's ear first</Text>
       </View>
     );
   }
@@ -220,11 +227,9 @@ export default function AudioPlayer({
               onPress={togglePlayback}
               disabled={!isLoaded}
             >
-              <Text style={styles.playButtonText}>
-                {isPlaying ? "⏸" : "▶"}
-              </Text>
+              <Text style={styles.playButtonText}>{isPlaying ? "⏸" : "▶"}</Text>
             </TouchableOpacity>
-            
+
             <View style={styles.timeContainer}>
               <Text style={styles.timeText}>
                 {formatTime(currentTime)} / {formatTime(duration)}
@@ -238,7 +243,8 @@ export default function AudioPlayer({
               style={styles.progressContainer}
               onPress={(e) => {
                 const { nativeEvent } = e;
-                const percent = (nativeEvent.offsetX / e.target.clientWidth) * 100;
+                const percent =
+                  (nativeEvent.offsetX / e.target.clientWidth) * 100;
                 seekTo(percent);
               }}
               activeOpacity={0.8}
@@ -247,7 +253,10 @@ export default function AudioPlayer({
                 <View
                   style={[
                     styles.progressFill,
-                    { width: `${progressPercent}%`, backgroundColor: accentColor },
+                    {
+                      width: `${progressPercent}%`,
+                      backgroundColor: accentColor,
+                    },
                   ]}
                 />
               </View>

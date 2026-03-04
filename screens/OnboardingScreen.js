@@ -1,12 +1,22 @@
 import React, { useState, useCallback } from "react";
-import { View, Text, TextInput, Alert, ScrollView, TouchableOpacity, Platform, Modal, FlatList } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  Alert,
+  ScrollView,
+  TouchableOpacity,
+  Platform,
+  Modal,
+  FlatList,
+} from "react-native";
 import StaffNotePicker from "../components/StaffNotePicker";
 import AudioInput from "../components/AudioInput";
 import ResetButton from "../components/ResetButton";
 
 // Instrument families with their instruments
 const instrumentFamilies = {
-  "Brass": {
+  Brass: {
     icon: "🎺",
     instruments: [
       { name: "Trumpet", icon: "🎺", clef: "treble" },
@@ -15,9 +25,9 @@ const instrumentFamilies = {
       { name: "Bass Trombone", icon: "🎶", clef: "bass" },
       { name: "Euphonium", icon: "🎵", clef: "bass" },
       { name: "Tuba", icon: "🎵", clef: "bass" },
-    ]
+    ],
   },
-  "Woodwinds": {
+  Woodwinds: {
     icon: "🎷",
     instruments: [
       { name: "Flute", icon: "🪈", clef: "treble" },
@@ -27,26 +37,26 @@ const instrumentFamilies = {
       { name: "Alto Saxophone", icon: "🎷", clef: "treble" },
       { name: "Tenor Saxophone", icon: "🎷", clef: "treble" },
       { name: "Baritone Saxophone", icon: "🎷", clef: "treble" },
-    ]
+    ],
   },
-  "Strings": {
+  Strings: {
     icon: "🎻",
     instruments: [
       { name: "Violin", icon: "🎻", clef: "treble" },
-      { name: "Viola", icon: "🎻", clef: "treble" },  // Actually alto clef but treble works
+      { name: "Viola", icon: "🎻", clef: "treble" }, // Actually alto clef but treble works
       { name: "Cello", icon: "🎻", clef: "bass" },
       { name: "Double Bass", icon: "🎻", clef: "bass" },
       { name: "Guitar", icon: "🎸", clef: "treble" },
-    ]
+    ],
   },
-  "Keyboard": {
+  Keyboard: {
     icon: "🎹",
     instruments: [
       { name: "Piano", icon: "🎹", clef: "treble" },
       { name: "Organ", icon: "🎹", clef: "treble" },
-    ]
+    ],
   },
-  "Voice": {
+  Voice: {
     icon: "🎤",
     instruments: [
       { name: "Soprano", icon: "🎤", clef: "treble" },
@@ -54,53 +64,66 @@ const instrumentFamilies = {
       { name: "Tenor", icon: "🎤", clef: "treble" },
       { name: "Bass Voice", icon: "🎤", clef: "bass" },
       { name: "Voice (General)", icon: "🎤", clef: "treble" },
-    ]
+    ],
   },
-  "Other": {
+  Other: {
     icon: "🎼",
     instruments: [
       { name: "Mallet Percussion", icon: "🥁", clef: "treble" },
       { name: "Other", icon: "🎼", clef: "treble" },
-    ]
-  }
+    ],
+  },
 };
 
 // Note names for reference
-const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const noteNames = [
+  "C",
+  "C#",
+  "D",
+  "D#",
+  "E",
+  "F",
+  "F#",
+  "G",
+  "G#",
+  "A",
+  "A#",
+  "B",
+];
 
 // Default starting notes by instrument (a comfortable, resonant note for that instrument)
 const instrumentDefaults = {
-  "Piano": { startingNote: "C4", clef: "treble" },
-  "Organ": { startingNote: "C4", clef: "treble" },
-  "Violin": { startingNote: "A4", clef: "treble" },
-  "Viola": { startingNote: "D4", clef: "treble" },
-  "Cello": { startingNote: "G3", clef: "bass" },
+  Piano: { startingNote: "C4", clef: "treble" },
+  Organ: { startingNote: "C4", clef: "treble" },
+  Violin: { startingNote: "A4", clef: "treble" },
+  Viola: { startingNote: "D4", clef: "treble" },
+  Cello: { startingNote: "G3", clef: "bass" },
   "Double Bass": { startingNote: "G2", clef: "bass" },
-  "Flute": { startingNote: "D5", clef: "treble" },
-  "Oboe": { startingNote: "A4", clef: "treble" },
-  "Clarinet": { startingNote: "G4", clef: "treble" },
-  "Bassoon": { startingNote: "F3", clef: "bass" },
+  Flute: { startingNote: "D5", clef: "treble" },
+  Oboe: { startingNote: "A4", clef: "treble" },
+  Clarinet: { startingNote: "G4", clef: "treble" },
+  Bassoon: { startingNote: "F3", clef: "bass" },
   "Alto Saxophone": { startingNote: "G4", clef: "treble" },
   "Tenor Saxophone": { startingNote: "D4", clef: "treble" },
   "Baritone Saxophone": { startingNote: "G3", clef: "treble" },
-  "Trumpet": { startingNote: "Bb4", clef: "treble" },
+  Trumpet: { startingNote: "Bb4", clef: "treble" },
   "French Horn": { startingNote: "F4", clef: "treble" },
   "Tenor Trombone": { startingNote: "Bb3", clef: "bass" },
   "Bass Trombone": { startingNote: "F3", clef: "bass" },
-  "Euphonium": { startingNote: "Bb3", clef: "bass" },
-  "Tuba": { startingNote: "F2", clef: "bass" },
-  "Soprano": { startingNote: "A4", clef: "treble" },
-  "Alto": { startingNote: "E4", clef: "treble" },
-  "Tenor": { startingNote: "A3", clef: "treble" },
+  Euphonium: { startingNote: "Bb3", clef: "bass" },
+  Tuba: { startingNote: "F2", clef: "bass" },
+  Soprano: { startingNote: "A4", clef: "treble" },
+  Alto: { startingNote: "E4", clef: "treble" },
+  Tenor: { startingNote: "A3", clef: "treble" },
   "Bass Voice": { startingNote: "E3", clef: "bass" },
   "Voice (General)": { startingNote: "E4", clef: "treble" },
-  "Guitar": { startingNote: "G3", clef: "treble" },
+  Guitar: { startingNote: "G3", clef: "treble" },
   "Mallet Percussion": { startingNote: "C4", clef: "treble" },
-  "Other": { startingNote: "C4", clef: "treble" }
+  Other: { startingNote: "C4", clef: "treble" },
 };
 
 function getBackendUrl() {
-  const LOCAL_IP = "192.168.1.118";
+  const LOCAL_IP = "192.168.1.19";
   if (Platform.OS === "android") {
     return "http://10.0.2.2:8000";
   } else if (Platform.OS === "ios") {
@@ -115,7 +138,7 @@ function OnboardingScreen({ navigation, route }) {
   // Get initial step from route params (for dev navigation)
   const initialStep = route?.params?.step || 1;
   const clearFamily = route?.params?.clearFamily || false;
-  
+
   const [selectedFamily, setSelectedFamily] = useState(clearFamily ? "" : "");
   const [instrument, setInstrument] = useState("");
   const [startingNote, setStartingNote] = useState("");
@@ -123,23 +146,23 @@ function OnboardingScreen({ navigation, route }) {
   const [detectedPitch, setDetectedPitch] = useState(null);
   const [isSounding, setIsSounding] = useState(false); // Track if currently making sound
   const [step, setStep] = useState(initialStep); // Multi-step onboarding
-  
+
   // Get clef for selected instrument
   const getClef = useCallback(() => {
-    if (!selectedFamily || !instrument) return 'treble';
+    if (!selectedFamily || !instrument) return "treble";
     const family = instrumentFamilies[selectedFamily];
-    if (!family) return instrumentDefaults[instrument]?.clef || 'treble';
-    const inst = family.instruments.find(i => i.name === instrument);
-    return inst?.clef || instrumentDefaults[instrument]?.clef || 'treble';
+    if (!family) return instrumentDefaults[instrument]?.clef || "treble";
+    const inst = family.instruments.find((i) => i.name === instrument);
+    return inst?.clef || instrumentDefaults[instrument]?.clef || "treble";
   }, [selectedFamily, instrument]);
 
   // Get icon for selected instrument
   const getInstrumentIcon = useCallback(() => {
-    if (!selectedFamily || !instrument) return '🎵';
+    if (!selectedFamily || !instrument) return "🎵";
     const family = instrumentFamilies[selectedFamily];
-    if (!family) return '🎵';
-    const inst = family.instruments.find(i => i.name === instrument);
-    return inst?.icon || '🎵';
+    if (!family) return "🎵";
+    const inst = family.instruments.find((i) => i.name === instrument);
+    return inst?.icon || "🎵";
   }, [selectedFamily, instrument]);
 
   // Select a family
@@ -152,10 +175,11 @@ function OnboardingScreen({ navigation, route }) {
   // Auto-fill defaults when instrument selected
   const selectInstrument = (instName) => {
     setInstrument(instName);
-    const defaults = instrumentDefaults[instName] || instrumentDefaults["Other"];
+    const defaults =
+      instrumentDefaults[instName] || instrumentDefaults["Other"];
     setStartingNote(defaults.startingNote);
   };
-  
+
   // Handle real-time pitch (during active sound) - show with cents
   const handleRealtimePitch = useCallback((pitchInfo) => {
     if (pitchInfo && pitchInfo.noteName) {
@@ -163,7 +187,7 @@ function OnboardingScreen({ navigation, route }) {
       setIsSounding(true);
     }
   }, []);
-  
+
   // Handle final pitch (after sound stops) - show just note name
   const handleFinalPitch = useCallback((pitchInfo) => {
     if (pitchInfo && pitchInfo.noteName) {
@@ -171,14 +195,14 @@ function OnboardingScreen({ navigation, route }) {
       setIsSounding(false);
     }
   }, []);
-  
+
   // Handle sound end - ensure state is cleared
   const handleSoundEnd = useCallback(() => {
     setIsSounding(false);
     // Force isRealtime to false on current detected pitch
-    setDetectedPitch(prev => prev ? { ...prev, isRealtime: false } : null);
+    setDetectedPitch((prev) => (prev ? { ...prev, isRealtime: false } : null));
   }, []);
-  
+
   // Confirm detected pitch as starting note
   const confirmDetectedPitch = useCallback(() => {
     if (detectedPitch?.noteName) {
@@ -208,12 +232,16 @@ function OnboardingScreen({ navigation, route }) {
           // Range starts as just this single note - will expand as they discover more
           range_low: startingNote,
           range_high: startingNote,
-          comfortable_capabilities: []  // We introduce concepts gradually, not upfront
-        })
+          comfortable_capabilities: [], // We introduce concepts gradually, not upfront
+        }),
       });
       if (!response.ok) throw new Error("Failed to save onboarding info");
       // Navigate to Day 0 First Note Experience for new users
-      navigation.replace("FirstNote", { userId: 1, resonantNote: startingNote, instrument });
+      navigation.replace("FirstNote", {
+        userId: 1,
+        resonantNote: startingNote,
+        instrument,
+      });
     } catch (e) {
       Alert.alert("Error", e.message);
     }
@@ -222,22 +250,58 @@ function OnboardingScreen({ navigation, route }) {
   // Step 1: Instrument Selection
   if (step === 1) {
     const familyNames = Object.keys(instrumentFamilies);
-    const currentFamilyInstruments = selectedFamily ? instrumentFamilies[selectedFamily].instruments : [];
+    const currentFamilyInstruments = selectedFamily
+      ? instrumentFamilies[selectedFamily].instruments
+      : [];
     const canProceed = !!instrument;
-    
+
     return (
       <View style={{ flex: 1, backgroundColor: "#1a1410" }}>
-        <ScrollView contentContainerStyle={{ flexGrow: 1, alignItems: "center", padding: 24, paddingBottom: 180 }}>
-          <Text style={{ fontSize: 32, fontWeight: "bold", color: "#FFD700", marginBottom: 8, fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif", textAlign: "center", marginTop: 40 }}>
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            alignItems: "center",
+            padding: 24,
+            paddingBottom: 180,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 32,
+              fontWeight: "bold",
+              color: "#FFD700",
+              marginBottom: 8,
+              fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
+              textAlign: "center",
+              marginTop: 40,
+            }}
+          >
             Welcome to Sound First
           </Text>
-          <Text style={{ color: "#e6cfa7", fontSize: 18, marginBottom: 24, fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif", textAlign: "center" }}>
-            {!selectedFamily ? "What type of instrument do you play?" : "Select your instrument"}
+          <Text
+            style={{
+              color: "#e6cfa7",
+              fontSize: 18,
+              marginBottom: 24,
+              fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
+              textAlign: "center",
+            }}
+          >
+            {!selectedFamily
+              ? "What type of instrument do you play?"
+              : "Select your instrument"}
           </Text>
 
           {/* Family Selection */}
           {!selectedFamily && (
-            <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", maxWidth: 450 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                justifyContent: "center",
+                maxWidth: 450,
+              }}
+            >
               {familyNames.map((familyName) => (
                 <TouchableOpacity
                   key={familyName}
@@ -253,14 +317,19 @@ function OnboardingScreen({ navigation, route }) {
                     alignItems: "center",
                   }}
                 >
-                  <Text style={{ fontSize: 36, marginBottom: 4 }}>{instrumentFamilies[familyName].icon}</Text>
-                  <Text style={{ 
-                    color: "#FFD700", 
-                    fontWeight: "bold", 
-                    fontSize: 14, 
-                    textAlign: "center",
-                    fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif" 
-                  }}>
+                  <Text style={{ fontSize: 36, marginBottom: 4 }}>
+                    {instrumentFamilies[familyName].icon}
+                  </Text>
+                  <Text
+                    style={{
+                      color: "#FFD700",
+                      fontWeight: "bold",
+                      fontSize: 14,
+                      textAlign: "center",
+                      fontFamily:
+                        Platform.OS === "ios" ? "Baskerville" : "serif",
+                    }}
+                  >
                     {familyName}
                   </Text>
                 </TouchableOpacity>
@@ -271,55 +340,81 @@ function OnboardingScreen({ navigation, route }) {
           {/* Instrument Selection within Family */}
           {selectedFamily && (
             <>
-              <TouchableOpacity 
-                onPress={() => { setSelectedFamily(""); setInstrument(""); }}
+              <TouchableOpacity
+                onPress={() => {
+                  setSelectedFamily("");
+                  setInstrument("");
+                }}
                 style={{ marginBottom: 16 }}
               >
                 <Text style={{ color: "#bfa76a", fontSize: 14 }}>
                   ← Back to families
                 </Text>
               </TouchableOpacity>
-              
-              <View style={{ 
-                backgroundColor: "#2a1f12", 
-                borderRadius: 12, 
-                padding: 8, 
-                marginBottom: 16,
-                flexDirection: "row",
-                alignItems: "center"
-              }}>
-                <Text style={{ fontSize: 24, marginRight: 8 }}>{instrumentFamilies[selectedFamily].icon}</Text>
-                <Text style={{ color: "#FFD700", fontSize: 18, fontWeight: "bold" }}>{selectedFamily}</Text>
+
+              <View
+                style={{
+                  backgroundColor: "#2a1f12",
+                  borderRadius: 12,
+                  padding: 8,
+                  marginBottom: 16,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ fontSize: 24, marginRight: 8 }}>
+                  {instrumentFamilies[selectedFamily].icon}
+                </Text>
+                <Text
+                  style={{ color: "#FFD700", fontSize: 18, fontWeight: "bold" }}
+                >
+                  {selectedFamily}
+                </Text>
               </View>
 
-              <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", maxWidth: 400 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  justifyContent: "center",
+                  maxWidth: 400,
+                }}
+              >
                 {currentFamilyInstruments.map((inst) => (
                   <TouchableOpacity
                     key={inst.name}
                     onPress={() => selectInstrument(inst.name)}
                     style={{
-                      backgroundColor: instrument === inst.name ? "#FFD700" : "#3b2c1a",
+                      backgroundColor:
+                        instrument === inst.name ? "#FFD700" : "#3b2c1a",
                       borderRadius: 16,
                       padding: 16,
                       margin: 8,
                       borderWidth: 2,
-                      borderColor: instrument === inst.name ? "#FFD700" : "#bfa76a",
+                      borderColor:
+                        instrument === inst.name ? "#FFD700" : "#bfa76a",
                       width: 110,
                       alignItems: "center",
-                      shadowColor: instrument === inst.name ? "#FFD700" : "#000",
+                      shadowColor:
+                        instrument === inst.name ? "#FFD700" : "#000",
                       shadowOpacity: instrument === inst.name ? 0.4 : 0.1,
                       shadowRadius: 8,
-                      shadowOffset: { width: 0, height: 2 }
+                      shadowOffset: { width: 0, height: 2 },
                     }}
                   >
-                    <Text style={{ fontSize: 32, marginBottom: 4 }}>{inst.icon}</Text>
-                    <Text style={{ 
-                      color: instrument === inst.name ? "#3b2c1a" : "#FFD700", 
-                      fontWeight: "bold", 
-                      fontSize: 11, 
-                      textAlign: "center",
-                      fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif" 
-                    }}>
+                    <Text style={{ fontSize: 32, marginBottom: 4 }}>
+                      {inst.icon}
+                    </Text>
+                    <Text
+                      style={{
+                        color: instrument === inst.name ? "#3b2c1a" : "#FFD700",
+                        fontWeight: "bold",
+                        fontSize: 11,
+                        textAlign: "center",
+                        fontFamily:
+                          Platform.OS === "ios" ? "Baskerville" : "serif",
+                      }}
+                    >
                       {inst.name}
                     </Text>
                   </TouchableOpacity>
@@ -328,23 +423,42 @@ function OnboardingScreen({ navigation, route }) {
             </>
           )}
         </ScrollView>
-        
+
         {/* Fixed bottom area with button and progress dots */}
-        <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: 24, paddingBottom: 40, alignItems: "center", backgroundColor: "#1a1410" }}>
+        <View
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: 24,
+            paddingBottom: 40,
+            alignItems: "center",
+            backgroundColor: "#1a1410",
+          }}
+        >
           <TouchableOpacity
             disabled={!canProceed}
             onPress={() => setStep(2)}
-            style={{ 
-              backgroundColor: canProceed ? "#FFD700" : "#5a4a2a", 
-              borderRadius: 28, 
-              paddingVertical: 16, 
+            style={{
+              backgroundColor: canProceed ? "#FFD700" : "#5a4a2a",
+              borderRadius: 28,
+              paddingVertical: 16,
               paddingHorizontal: 48,
-              opacity: canProceed ? 1 : 0.5
+              opacity: canProceed ? 1 : 0.5,
             }}
           >
-            <Text style={{ color: canProceed ? "#3b2c1a" : "#8a7a5a", fontWeight: "bold", fontSize: 18 }}>Next →</Text>
+            <Text
+              style={{
+                color: canProceed ? "#3b2c1a" : "#8a7a5a",
+                fontWeight: "bold",
+                fontSize: 18,
+              }}
+            >
+              Next →
+            </Text>
           </TouchableOpacity>
-          
+
           {/* Progress Dots */}
           <View style={{ flexDirection: "row", marginTop: 16 }}>
             {[1, 2].map((s) => (
@@ -357,7 +471,7 @@ function OnboardingScreen({ navigation, route }) {
                   backgroundColor: step === s ? "#FFD700" : "#3b2c1a",
                   marginHorizontal: 4,
                   borderWidth: 1,
-                  borderColor: "#FFD700"
+                  borderColor: "#FFD700",
                 }}
               />
             ))}
@@ -371,24 +485,58 @@ function OnboardingScreen({ navigation, route }) {
   // Step 2: Starting Note Selection
   if (step === 2) {
     const canProceed = !!startingNote;
-    
+
     // Play to Select Mode - use microphone to detect pitch
     if (playToSelectMode) {
       const canConfirm = !!detectedPitch;
-      
+
       return (
         <View style={{ flex: 1, backgroundColor: "#1a1410" }}>
-          <ScrollView contentContainerStyle={{ flexGrow: 1, alignItems: "center", padding: 24, paddingBottom: 180, paddingTop: 60 }}>
-            <TouchableOpacity onPress={() => setPlayToSelectMode(false)} style={{ position: "absolute", top: 50, left: 20 }}>
-              <Text style={{ color: "#FFD700", fontSize: 16 }}>← Back to staff</Text>
+          <ScrollView
+            contentContainerStyle={{
+              flexGrow: 1,
+              alignItems: "center",
+              padding: 24,
+              paddingBottom: 180,
+              paddingTop: 60,
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => setPlayToSelectMode(false)}
+              style={{ position: "absolute", top: 50, left: 20 }}
+            >
+              <Text style={{ color: "#FFD700", fontSize: 16 }}>
+                ← Back to staff
+              </Text>
             </TouchableOpacity>
 
-            <Text style={{ fontSize: 36, marginBottom: 8 }}>{getInstrumentIcon()}</Text>
-            <Text style={{ fontSize: 24, fontWeight: "bold", color: "#FFD700", marginBottom: 8, fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif", textAlign: "center" }}>
+            <Text style={{ fontSize: 36, marginBottom: 8 }}>
+              {getInstrumentIcon()}
+            </Text>
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: "bold",
+                color: "#FFD700",
+                marginBottom: 8,
+                fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
+                textAlign: "center",
+              }}
+            >
               Play a note that feels great
             </Text>
-            <Text style={{ color: "#e6cfa7", fontSize: 16, marginBottom: 24, fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif", textAlign: "center", paddingHorizontal: 20 }}>
-              Play around on your instrument and find a note that feels natural, resonant, and easy to play. When you find it, hold it steady.
+            <Text
+              style={{
+                color: "#e6cfa7",
+                fontSize: 16,
+                marginBottom: 24,
+                fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
+                textAlign: "center",
+                paddingHorizontal: 20,
+              }}
+            >
+              Play around on your instrument and find a note that feels natural,
+              resonant, and easy to play. When you find it, hold it steady.
             </Text>
 
             <AudioInput
@@ -402,48 +550,92 @@ function OnboardingScreen({ navigation, route }) {
 
             {detectedPitch && (
               <View style={{ marginTop: 24, alignItems: "center" }}>
-                <Text style={{ color: "#e6cfa7", fontSize: 16, marginBottom: 8 }}>
+                <Text
+                  style={{ color: "#e6cfa7", fontSize: 16, marginBottom: 8 }}
+                >
                   {isSounding ? "I hear:" : "Detected:"}
                 </Text>
-                <View style={{
-                  backgroundColor: !isSounding ? "#4a2d5a" : (detectedPitch.isInTune ? "#2d5a2d" : "#3b2c1a"),
-                  borderRadius: 16,
-                  paddingVertical: 16,
-                  paddingHorizontal: 32,
-                  borderWidth: 2,
-                  borderColor: "#FFD700",
-                  minHeight: 90,
-                  justifyContent: "center",
-                }}>
-                  <Text style={{ color: "#FFD700", fontSize: 32, fontWeight: "bold", textAlign: "center" }}>
+                <View
+                  style={{
+                    backgroundColor: !isSounding
+                      ? "#4a2d5a"
+                      : detectedPitch.isInTune
+                        ? "#2d5a2d"
+                        : "#3b2c1a",
+                    borderRadius: 16,
+                    paddingVertical: 16,
+                    paddingHorizontal: 32,
+                    borderWidth: 2,
+                    borderColor: "#FFD700",
+                    minHeight: 90,
+                    justifyContent: "center",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#FFD700",
+                      fontSize: 32,
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
                     {detectedPitch.noteName}
                   </Text>
-                  <Text style={{ color: "#e6cfa7", fontSize: 14, textAlign: "center", marginTop: 4, minHeight: 18 }}>
-                    {detectedPitch.isRealtime ? (detectedPitch.isInTune ? "In tune ✓" : `${detectedPitch.cents > 0 ? "+" : ""}${detectedPitch.cents} cents`) : " "}
+                  <Text
+                    style={{
+                      color: "#e6cfa7",
+                      fontSize: 14,
+                      textAlign: "center",
+                      marginTop: 4,
+                      minHeight: 18,
+                    }}
+                  >
+                    {detectedPitch.isRealtime
+                      ? detectedPitch.isInTune
+                        ? "In tune ✓"
+                        : `${detectedPitch.cents > 0 ? "+" : ""}${detectedPitch.cents} cents`
+                      : " "}
                   </Text>
                 </View>
               </View>
             )}
           </ScrollView>
-          
+
           {/* Fixed bottom area with button and progress dots */}
-          <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: 24, paddingBottom: 40, alignItems: "center", backgroundColor: "#1a1410" }}>
+          <View
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              padding: 24,
+              paddingBottom: 40,
+              alignItems: "center",
+              backgroundColor: "#1a1410",
+            }}
+          >
             <TouchableOpacity
               disabled={!canConfirm}
               onPress={confirmDetectedPitch}
-              style={{ 
-                backgroundColor: canConfirm ? "#FFD700" : "#5a4a2a", 
-                borderRadius: 28, 
-                paddingVertical: 16, 
+              style={{
+                backgroundColor: canConfirm ? "#FFD700" : "#5a4a2a",
+                borderRadius: 28,
+                paddingVertical: 16,
                 paddingHorizontal: 32,
-                opacity: canConfirm ? 1 : 0.5
+                opacity: canConfirm ? 1 : 0.5,
               }}
             >
-              <Text style={{ color: canConfirm ? "#3b2c1a" : "#8a7a5a", fontWeight: "bold", fontSize: 18 }}>
+              <Text
+                style={{
+                  color: canConfirm ? "#3b2c1a" : "#8a7a5a",
+                  fontWeight: "bold",
+                  fontSize: 18,
+                }}
+              >
                 Yes, that's my note! ✓
               </Text>
             </TouchableOpacity>
-            
+
             {/* Progress Dots */}
             <View style={{ flexDirection: "row", marginTop: 16 }}>
               {[1, 2].map((s) => (
@@ -456,7 +648,7 @@ function OnboardingScreen({ navigation, route }) {
                     backgroundColor: step === s ? "#FFD700" : "#3b2c1a",
                     marginHorizontal: 4,
                     borderWidth: 1,
-                    borderColor: "#FFD700"
+                    borderColor: "#FFD700",
                   }}
                 />
               ))}
@@ -466,21 +658,53 @@ function OnboardingScreen({ navigation, route }) {
         </View>
       );
     }
-    
+
     // Staff-based note selection mode
     return (
       <View style={{ flex: 1, backgroundColor: "#1a1410" }}>
-        <ScrollView contentContainerStyle={{ flexGrow: 1, alignItems: "center", padding: 24, paddingBottom: 180, paddingTop: 60 }}>
-          <TouchableOpacity onPress={() => setStep(1)} style={{ position: "absolute", top: 50, left: 20 }}>
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            alignItems: "center",
+            padding: 24,
+            paddingBottom: 180,
+            paddingTop: 60,
+          }}
+        >
+          <TouchableOpacity
+            onPress={() => setStep(1)}
+            style={{ position: "absolute", top: 50, left: 20 }}
+          >
             <Text style={{ color: "#FFD700", fontSize: 16 }}>← Back</Text>
           </TouchableOpacity>
 
-          <Text style={{ fontSize: 36, marginBottom: 8 }}>{getInstrumentIcon()}</Text>
-          <Text style={{ fontSize: 24, fontWeight: "bold", color: "#FFD700", marginBottom: 8, fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif", textAlign: "center" }}>
+          <Text style={{ fontSize: 36, marginBottom: 8 }}>
+            {getInstrumentIcon()}
+          </Text>
+          <Text
+            style={{
+              fontSize: 24,
+              fontWeight: "bold",
+              color: "#FFD700",
+              marginBottom: 8,
+              fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
+              textAlign: "center",
+            }}
+          >
             Choose your starting note
           </Text>
-          <Text style={{ color: "#e6cfa7", fontSize: 16, marginBottom: 24, fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif", textAlign: "center", paddingHorizontal: 20 }}>
-            Pick a note that feels great, resonant, and easy to play. This will be your home base.
+          <Text
+            style={{
+              color: "#e6cfa7",
+              fontSize: 16,
+              marginBottom: 24,
+              fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
+              textAlign: "center",
+              paddingHorizontal: 20,
+            }}
+          >
+            Pick a note that feels great, resonant, and easy to play. This will
+            be your home base.
           </Text>
 
           <StaffNotePicker
@@ -491,33 +715,60 @@ function OnboardingScreen({ navigation, route }) {
             instrument={instrument}
           />
 
-          <Text style={{ color: "#bfa76a", fontSize: 14, textAlign: "center", marginTop: 16, paddingHorizontal: 20 }}>
-            Don't worry about picking the "perfect" note — you can always change it later!
+          <Text
+            style={{
+              color: "#bfa76a",
+              fontSize: 14,
+              textAlign: "center",
+              marginTop: 16,
+              paddingHorizontal: 20,
+            }}
+          >
+            Don't worry about picking the "perfect" note — you can always change
+            it later!
           </Text>
         </ScrollView>
-        
+
         {/* Fixed bottom area with button and progress dots */}
-        <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: 24, paddingBottom: 40, alignItems: "center", backgroundColor: "#1a1410" }}>
+        <View
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: 24,
+            paddingBottom: 40,
+            alignItems: "center",
+            backgroundColor: "#1a1410",
+          }}
+        >
           <TouchableOpacity
             disabled={!canProceed}
             onPress={handleSubmit}
-            style={{ 
-              backgroundColor: canProceed ? "#FFD700" : "#5a4a2a", 
-              borderRadius: 28, 
-              paddingVertical: 16, 
+            style={{
+              backgroundColor: canProceed ? "#FFD700" : "#5a4a2a",
+              borderRadius: 28,
+              paddingVertical: 16,
               paddingHorizontal: 48,
               opacity: canProceed ? 1 : 0.5,
-              shadowColor: canProceed ? "#FFD700" : "transparent", 
-              shadowOpacity: 0.4, 
-              shadowRadius: 12, 
-              shadowOffset: { width: 0, height: 4 }
+              shadowColor: canProceed ? "#FFD700" : "transparent",
+              shadowOpacity: 0.4,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 4 },
             }}
           >
-            <Text style={{ color: canProceed ? "#3b2c1a" : "#8a7a5a", fontWeight: "bold", fontSize: 20, fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif" }}>
+            <Text
+              style={{
+                color: canProceed ? "#3b2c1a" : "#8a7a5a",
+                fontWeight: "bold",
+                fontSize: 20,
+                fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
+              }}
+            >
               Start Practicing 🎵
             </Text>
           </TouchableOpacity>
-          
+
           {/* Progress Dots */}
           <View style={{ flexDirection: "row", marginTop: 16 }}>
             {[1, 2].map((s) => (
@@ -530,7 +781,7 @@ function OnboardingScreen({ navigation, route }) {
                   backgroundColor: step === s ? "#FFD700" : "#3b2c1a",
                   marginHorizontal: 4,
                   borderWidth: 1,
-                  borderColor: "#FFD700"
+                  borderColor: "#FFD700",
                 }}
               />
             ))}
