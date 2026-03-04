@@ -17,6 +17,26 @@ if (Platform?.OS && Platform.OS !== "web") {
   }
 }
 
+// Singleton to track mic permission state across component instances (web only)
+let globalMicPermissionState = {
+  granted: false,
+  pending: false,
+  checkedOnce: false,
+};
+
+// Check mic permission without prompting (web only)
+async function checkMicPermission() {
+  if (typeof navigator === 'undefined' || !navigator.permissions) {
+    return null; // Can't check, will need to prompt
+  }
+  try {
+    const result = await navigator.permissions.query({ name: 'microphone' });
+    return result.state; // 'granted', 'denied', or 'prompt'
+  } catch (e) {
+    return null; // Browser doesn't support this query
+  }
+}
+
 // Conditionally import WebView for mobile platforms (not currently used but kept for potential future use)
 let WebView = null;
 if (Platform?.OS && Platform.OS !== "web") {
@@ -502,7 +522,9 @@ export default function AudioInput({
   const [volume, setVolume] = useState(0);
   const [currentPitch, setCurrentPitch] = useState(null);
   const [isSounding, setIsSounding] = useState(false);
-  const [permissionGranted, setPermissionGranted] = useState(false);
+  // Initialize from global state to avoid showing button unnecessarily
+  const [permissionGranted, setPermissionGranted] = useState(globalMicPermissionState.granted);
+  const [permissionChecked, setPermissionChecked] = useState(globalMicPermissionState.checkedOnce);
 
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
@@ -628,10 +650,24 @@ export default function AudioInput({
     };
   }, []);
 
+  // Check permission state on mount (web only)
+  useEffect(() => {
+    if (Platform.OS === "web" && !globalMicPermissionState.checkedOnce) {
+      checkMicPermission().then((state) => {
+        globalMicPermissionState.checkedOnce = true;
+        setPermissionChecked(true);
+        if (state === 'granted') {
+          globalMicPermissionState.granted = true;
+          setPermissionGranted(true);
+        }
+      });
+    }
+  }, []);
+
   // Start/stop based on enabled prop
   useEffect(() => {
     if (Platform.OS === "web") {
-      if (enabled && !isListening) {
+      if (enabled && !isListening && !globalMicPermissionState.pending) {
         startListening();
       } else if (!enabled && isListening) {
         stopListening();
@@ -647,7 +683,23 @@ export default function AudioInput({
       return;
     }
 
+    // Prevent concurrent getUserMedia calls
+    if (globalMicPermissionState.pending) {
+      console.log("AudioInput: getUserMedia already pending, skipping");
+      return;
+    }
+
+    // If already listening with an active stream, don't restart
+    if (mediaStreamRef.current && audioContextRef.current) {
+      console.log("AudioInput: Already have active stream, reusing");
+      setIsListening(true);
+      analyze();
+      return;
+    }
+
     try {
+      globalMicPermissionState.pending = true;
+      
       // Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -657,6 +709,8 @@ export default function AudioInput({
         },
       });
 
+      globalMicPermissionState.pending = false;
+      globalMicPermissionState.granted = true;
       mediaStreamRef.current = stream;
       setPermissionGranted(true);
 
@@ -681,6 +735,7 @@ export default function AudioInput({
       setError(null);
       analyze();
     } catch (err) {
+      globalMicPermissionState.pending = false;
       console.error("Microphone access error:", err);
       if (err.name === "NotAllowedError") {
         setError(
@@ -1074,6 +1129,17 @@ export default function AudioInput({
             <Text style={styles.buttonText}>Grant Permission</Text>
           </TouchableOpacity>
         )}
+      </View>
+    );
+  }
+
+  // Show loading state while checking permission or waiting for getUserMedia
+  if (!permissionGranted && (globalMicPermissionState.pending || !permissionChecked)) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.infoText}>
+          🎤 Connecting to microphone...
+        </Text>
       </View>
     );
   }

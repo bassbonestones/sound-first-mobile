@@ -144,10 +144,21 @@ function DevNavMenu({
       subSteps: [
         { id: 0, name: "a) Staff intro" },
         { id: 1, name: "b) Fun fact" },
+        { id: 2, name: "c) Ledger lines" },
       ],
     },
     {
       id: 4,
+      name: "What is a Note?",
+      subSteps: [
+        { id: 0, name: "a) Note head" },
+        { id: 1, name: "b) Note on line" },
+        { id: 2, name: "c) Note in space" },
+        { id: 3, name: "d) Explore pitch" },
+      ],
+    },
+    {
+      id: 5,
       name: "Your Clef",
       subSteps: [
         { id: 0, name: "a) Clef intro" },
@@ -155,15 +166,18 @@ function DevNavMenu({
       ],
     },
     {
-      id: 5,
+      id: 6,
       name: "Sharps & Flats",
       subSteps: [
-        { id: 0, name: "a) Intro" },
-        { id: 1, name: "b) Your note" },
+        { id: 0, name: "a) Symbols" },
+        { id: 1, name: "b) Naturals default" },
+        { id: 2, name: "c) Try accidentals" },
+        { id: 3, name: "d) Combined explorer" },
+        { id: 4, name: "e) Your note" },
       ],
     },
     {
-      id: 6,
+      id: 7,
       name: "Note on Staff",
       subSteps: [],
     },
@@ -602,6 +616,8 @@ export default function FirstNoteScreen({ navigation, route }) {
   // Core state
   const [stage, setStage] = useState(0);
   const [subStep, setSubStep] = useState(0); // Sub-step within a stage
+  const [pitchExplorerIndex, setPitchExplorerIndex] = useState(8); // Start on D3 (middle line)
+  const [accidentalExplorer, setAccidentalExplorer] = useState("natural"); // "flat" | "natural" | "sharp"
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -650,6 +666,27 @@ export default function FirstNoteScreen({ navigation, route }) {
   const audioContextRef = useRef(null);
   const oscillatorRef = useRef(null);
   const gainNodeRef = useRef(null);
+
+  // Pitch explorer notes for bass clef (extended range with ledger lines)
+  const PITCH_EXPLORER_NOTES = [
+    { name: "C2", position: 114.5, ledgerLines: 2 },  // 2 ledgers below (note on 2nd)
+    { name: "D2", position: 105.5, ledgerLines: 2 },  // Space between 2 ledgers
+    { name: "E2", position: 96.5, ledgerLines: 1 },   // 1 ledger below (note on it)
+    { name: "F2", position: 87.5, ledgerLines: 0 },   // Space below staff (no line needed)
+    { name: "G2", position: 78.5, ledgerLines: 0 },   // Bottom line
+    { name: "A2", position: 69.5, ledgerLines: 0 },   // First space
+    { name: "B2", position: 60.5, ledgerLines: 0 },   // Second line
+    { name: "C3", position: 51.5, ledgerLines: 0 },   // Second space
+    { name: "D3", position: 42.5, ledgerLines: 0 },   // Middle line
+    { name: "E3", position: 33.5, ledgerLines: 0 },   // Third space
+    { name: "F3", position: 24.5, ledgerLines: 0 },   // Fourth line
+    { name: "G3", position: 15.5, ledgerLines: 0 },   // Fourth space
+    { name: "A3", position: 6.5, ledgerLines: 0 },    // Top line
+    { name: "B3", position: -2.5, ledgerLines: 0 },   // Space above top
+    { name: "C4", position: -11.5, ledgerLines: -1 }, // Middle C - 1 ledger above
+    { name: "D4", position: -20.5, ledgerLines: -1 }, // Space above middle C ledger
+    { name: "E4", position: -29.5, ledgerLines: -2 }, // 2 ledgers above (note on 2nd)
+  ];
 
   // Convert note name to frequency (e.g., "Bb3" -> 233.08 Hz)
   const noteToFrequency = useCallback((noteName) => {
@@ -788,6 +825,254 @@ export default function FirstNoteScreen({ navigation, route }) {
     }
   }, [resonantNote, noteToFrequency]);
 
+  // Play pitch explorer note with piano-like sound
+  const playPitchExplorer = useCallback(async (noteIndex) => {
+    const DURATION = 1;
+    const ATTACK = 0.01;
+    const DECAY = 0.2;
+    const SUSTAIN = 0.3;
+    const RELEASE = 0.3;
+
+    try {
+      // Stop any currently playing note
+      if (oscillatorRef.current) {
+        try {
+          oscillatorRef.current.onended = null;
+          oscillatorRef.current.stop();
+        } catch (e) { /* ignore */ }
+      }
+
+      // Create/resume AudioContext
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!audioContextRef.current) {
+          audioContextRef.current = new AudioContext();
+        }
+        if (audioContextRef.current.state === "suspended") {
+          await audioContextRef.current.resume();
+        }
+      } else if (NativeAudioContext) {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new NativeAudioContext();
+        }
+      } else {
+        return;
+      }
+
+      const ctx = audioContextRef.current;
+      const now = ctx.currentTime;
+      const noteName = PITCH_EXPLORER_NOTES[noteIndex].name;
+      const freq = noteToFrequency(noteName);
+
+      // Create piano-like sound with multiple oscillators (harmonics)
+      const masterGain = ctx.createGain();
+      masterGain.connect(ctx.destination);
+
+      // Fundamental + harmonics for piano-like timbre
+      const harmonics = [
+        { ratio: 1, gain: 1.0 },      // Fundamental
+        { ratio: 2, gain: 0.5 },      // 2nd harmonic
+        { ratio: 3, gain: 0.25 },     // 3rd harmonic
+        { ratio: 4, gain: 0.125 },    // 4th harmonic
+      ];
+
+      const oscillators = harmonics.map(({ ratio, gain: harmGain }) => {
+        const osc = ctx.createOscillator();
+        const oscGain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq * ratio, now);
+        oscGain.gain.setValueAtTime(harmGain * 0.3, now);
+        osc.connect(oscGain);
+        oscGain.connect(masterGain);
+        return osc;
+      });
+
+      // Piano-like envelope (fast attack, decay to sustain, release)
+      masterGain.gain.setValueAtTime(0, now);
+      masterGain.gain.linearRampToValueAtTime(0.6, now + ATTACK);
+      masterGain.gain.linearRampToValueAtTime(SUSTAIN, now + ATTACK + DECAY);
+      masterGain.gain.setValueAtTime(SUSTAIN, now + DURATION - RELEASE);
+      masterGain.gain.linearRampToValueAtTime(0, now + DURATION);
+
+      // Start and stop all oscillators
+      oscillators.forEach(osc => {
+        osc.start(now);
+        osc.stop(now + DURATION);
+      });
+
+      oscillatorRef.current = oscillators[0];
+    } catch (err) {
+      console.error("Pitch explorer audio error:", err);
+    }
+  }, [noteToFrequency]);
+
+  // Play accidental explorer note (D flat, D natural, or D sharp)
+  const playAccidentalExplorer = useCallback(async (accidental) => {
+    const DURATION = 1;
+    const ATTACK = 0.01;
+    const DECAY = 0.2;
+    const SUSTAIN = 0.3;
+    const RELEASE = 0.3;
+
+    const noteMap = {
+      flat: "Db3",
+      natural: "D3",
+      sharp: "D#3",
+    };
+
+    try {
+      if (oscillatorRef.current) {
+        try {
+          oscillatorRef.current.onended = null;
+          oscillatorRef.current.stop();
+        } catch (e) { /* ignore */ }
+      }
+
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!audioContextRef.current) {
+          audioContextRef.current = new AudioContext();
+        }
+        if (audioContextRef.current.state === "suspended") {
+          await audioContextRef.current.resume();
+        }
+      } else if (NativeAudioContext) {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new NativeAudioContext();
+        }
+      } else {
+        return;
+      }
+
+      const ctx = audioContextRef.current;
+      const now = ctx.currentTime;
+      const freq = noteToFrequency(noteMap[accidental]);
+
+      const masterGain = ctx.createGain();
+      masterGain.connect(ctx.destination);
+
+      const harmonics = [
+        { ratio: 1, gain: 1.0 },
+        { ratio: 2, gain: 0.5 },
+        { ratio: 3, gain: 0.25 },
+        { ratio: 4, gain: 0.125 },
+      ];
+
+      const oscillators = harmonics.map(({ ratio, gain: harmGain }) => {
+        const osc = ctx.createOscillator();
+        const oscGain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq * ratio, now);
+        oscGain.gain.setValueAtTime(harmGain * 0.3, now);
+        osc.connect(oscGain);
+        oscGain.connect(masterGain);
+        return osc;
+      });
+
+      masterGain.gain.setValueAtTime(0, now);
+      masterGain.gain.linearRampToValueAtTime(0.6, now + ATTACK);
+      masterGain.gain.linearRampToValueAtTime(SUSTAIN, now + ATTACK + DECAY);
+      masterGain.gain.setValueAtTime(SUSTAIN, now + DURATION - RELEASE);
+      masterGain.gain.linearRampToValueAtTime(0, now + DURATION);
+
+      oscillators.forEach(osc => {
+        osc.start(now);
+        osc.stop(now + DURATION);
+      });
+
+      oscillatorRef.current = oscillators[0];
+    } catch (err) {
+      console.error("Accidental explorer audio error:", err);
+    }
+  }, [noteToFrequency]);
+
+  // Play combined explorer note (any position + any accidental)
+  const playCombinedExplorer = useCallback(async (noteIndex, accidental) => {
+    const DURATION = 1;
+    const ATTACK = 0.01;
+    const DECAY = 0.2;
+    const SUSTAIN = 0.3;
+    const RELEASE = 0.3;
+
+    const baseName = PITCH_EXPLORER_NOTES[noteIndex].name;
+    const letter = baseName.slice(0, 1);
+    const octave = baseName.slice(1);
+    
+    let noteName;
+    if (accidental === "flat") {
+      noteName = `${letter}b${octave}`;
+    } else if (accidental === "sharp") {
+      noteName = `${letter}#${octave}`;
+    } else {
+      noteName = baseName;
+    }
+
+    try {
+      if (oscillatorRef.current) {
+        try {
+          oscillatorRef.current.onended = null;
+          oscillatorRef.current.stop();
+        } catch (e) { /* ignore */ }
+      }
+
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!audioContextRef.current) {
+          audioContextRef.current = new AudioContext();
+        }
+        if (audioContextRef.current.state === "suspended") {
+          await audioContextRef.current.resume();
+        }
+      } else if (NativeAudioContext) {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new NativeAudioContext();
+        }
+      } else {
+        return;
+      }
+
+      const ctx = audioContextRef.current;
+      const now = ctx.currentTime;
+      const freq = noteToFrequency(noteName);
+
+      const masterGain = ctx.createGain();
+      masterGain.connect(ctx.destination);
+
+      const harmonics = [
+        { ratio: 1, gain: 1.0 },
+        { ratio: 2, gain: 0.5 },
+        { ratio: 3, gain: 0.25 },
+        { ratio: 4, gain: 0.125 },
+      ];
+
+      const oscillators = harmonics.map(({ ratio, gain: harmGain }) => {
+        const osc = ctx.createOscillator();
+        const oscGain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq * ratio, now);
+        oscGain.gain.setValueAtTime(harmGain * 0.3, now);
+        osc.connect(oscGain);
+        oscGain.connect(masterGain);
+        return osc;
+      });
+
+      masterGain.gain.setValueAtTime(0, now);
+      masterGain.gain.linearRampToValueAtTime(0.6, now + ATTACK);
+      masterGain.gain.linearRampToValueAtTime(SUSTAIN, now + ATTACK + DECAY);
+      masterGain.gain.setValueAtTime(SUSTAIN, now + DURATION - RELEASE);
+      masterGain.gain.linearRampToValueAtTime(0, now + DURATION);
+
+      oscillators.forEach(osc => {
+        osc.start(now);
+        osc.stop(now + DURATION);
+      });
+
+      oscillatorRef.current = oscillators[0];
+    } catch (err) {
+      console.error("Combined explorer audio error:", err);
+    }
+  }, [noteToFrequency]);
+
   // Stop any playing audio
   const stopAudio = useCallback(() => {
     // Stop Web Audio oscillator
@@ -904,6 +1189,12 @@ export default function FirstNoteScreen({ navigation, route }) {
     });
     setPitchAccuracy(null);
     saveProgress(newStage);
+  };
+
+  // Go back within teaching stages (3+)
+  const goBackTeaching = (targetStage, targetSubStep) => {
+    setStage(targetStage);
+    setSubStep(targetSubStep);
   };
 
   // ========================================
@@ -1639,6 +1930,31 @@ export default function FirstNoteScreen({ navigation, route }) {
           </Text>
         </>
       )}
+
+      {subStep === 2 && (
+        <>
+          <View style={styles.ledgerLineDemo}>
+            <View style={styles.ledgerLineSmall} />
+            <View style={[styles.noteDemoCircle, { top: 10 }]} />
+            <View style={styles.ledgerLineSmall} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.ledgerLineSmall} />
+            <View style={[styles.noteDemoCircle, { bottom: 3 }]} />
+          </View>
+          <Text style={styles.instruction}>
+            Sometimes notes go <Text style={styles.bold}>beyond</Text> the 5 lines.
+            {"\n\n"}
+            When they do, we add short extra lines called{" "}
+            <Text style={styles.bold}>ledger lines</Text>.
+            {"\n\n"}
+            They're just temporary extensions of the staff!
+          </Text>
+        </>
+      )}
     </View>
   );
 
@@ -1659,8 +1975,32 @@ export default function FirstNoteScreen({ navigation, route }) {
     if (subStep === 1) {
       return (
         <View style={styles.fixedBottomButtons}>
-          <TouchableOpacity style={styles.primaryButton} onPress={nextStage}>
+          <TouchableOpacity
+            style={styles.backTextButton}
+            onPress={() => setSubStep(0)}
+          >
+            <Text style={styles.backTextButtonText}>← Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => setSubStep(2)}
+          >
             <Text style={styles.primaryButtonText}>Ha! Next →</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (subStep === 2) {
+      return (
+        <View style={styles.fixedBottomButtons}>
+          <TouchableOpacity
+            style={styles.backTextButton}
+            onPress={() => setSubStep(1)}
+          >
+            <Text style={styles.backTextButtonText}>← Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.primaryButton} onPress={nextStage}>
+            <Text style={styles.primaryButtonText}>Got it →</Text>
           </TouchableOpacity>
         </View>
       );
@@ -1669,9 +2009,210 @@ export default function FirstNoteScreen({ navigation, route }) {
   };
 
   // ========================================
-  // STAGE 4: Learn About Clef
+  // STAGE 4: Learn About Notes
   // ========================================
   const renderStage4 = () => (
+    <View style={styles.stageContainer}>
+      <Text style={styles.stageTitle}>What is a Note?</Text>
+
+      {subStep === 0 && (
+        <>
+          <View style={styles.noteVisualContainer}>
+            <View style={styles.noteCircleFilled} />
+            <View style={styles.noteCircleHollow} />
+          </View>
+          <Text style={styles.instruction}>
+            Notes are <Text style={styles.bold}>round circles</Text> that tell us what pitch to play.
+            {"\n\n"}
+            The circle is called the <Text style={styles.bold}>note head</Text>.
+            {"\n\n"}
+            Note heads can be filled (solid) or hollow (open).
+          </Text>
+        </>
+      )}
+
+      {subStep === 1 && (
+        <>
+          <View style={styles.staffWithNoteVisual}>
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={[styles.noteOnLine, { top: '43%' }]} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+          </View>
+          <Text style={styles.instruction}>
+            Notes can sit <Text style={styles.bold}>directly on a line</Text>...
+            {"\n\n"}
+            The line goes right through the middle of the note.
+          </Text>
+        </>
+      )}
+
+      {subStep === 2 && (
+        <>
+          <View style={styles.staffWithNoteVisual}>
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={[styles.noteInSpace, { top: '34%' }]} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+          </View>
+          <Text style={styles.instruction}>
+            ...or <Text style={styles.bold}>in a space</Text> between lines.
+            {"\n\n"}
+            Higher on the staff = higher pitch.
+            {"\n"}
+            Lower on the staff = lower pitch.
+          </Text>
+        </>
+      )}
+
+      {subStep === 3 && (
+        <>
+          <Text style={styles.instruction}>
+            Try it! Move the note <Text style={styles.bold}>up</Text> or <Text style={styles.bold}>down</Text> to hear different pitches.
+          </Text>
+          <View style={styles.pitchExplorerStaff}>
+            {PITCH_EXPLORER_NOTES[pitchExplorerIndex].ledgerLines <= -2 && (
+              <View style={[styles.ledgerLineExplorer, { top: '-22.5%' }]} />
+            )}
+            {PITCH_EXPLORER_NOTES[pitchExplorerIndex].ledgerLines < 0 && (
+              <View style={[styles.ledgerLineExplorer, { top: '-4.5%' }]} />
+            )}
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            {PITCH_EXPLORER_NOTES[pitchExplorerIndex].ledgerLines > 0 && (
+              <View style={[styles.ledgerLineExplorer, { top: '103.5%' }]} />
+            )}
+            {PITCH_EXPLORER_NOTES[pitchExplorerIndex].ledgerLines >= 2 && (
+              <View style={[styles.ledgerLineExplorer, { top: '121.5%' }]} />
+            )}
+            <View 
+              style={[
+                styles.pitchExplorerNote, 
+                { top: `${PITCH_EXPLORER_NOTES[pitchExplorerIndex].position}%` }
+              ]} 
+            />
+          </View>
+          <View style={styles.pitchExplorerControls}>
+            <TouchableOpacity
+              style={[styles.pitchExplorerButton, pitchExplorerIndex === 0 && styles.pitchExplorerButtonDisabled]}
+              onPress={() => {
+                if (pitchExplorerIndex > 0) {
+                  const newIndex = pitchExplorerIndex - 1;
+                  setPitchExplorerIndex(newIndex);
+                  playPitchExplorer(newIndex);
+                }
+              }}
+              disabled={pitchExplorerIndex === 0}
+            >
+              <Text style={styles.pitchExplorerButtonText}>↓ Down</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.pitchExplorerPlayButton}
+              onPress={() => playPitchExplorer(pitchExplorerIndex)}
+            >
+              <Text style={styles.pitchExplorerPlayButtonText}>▶ Play</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.pitchExplorerButton, pitchExplorerIndex === PITCH_EXPLORER_NOTES.length - 1 && styles.pitchExplorerButtonDisabled]}
+              onPress={() => {
+                if (pitchExplorerIndex < PITCH_EXPLORER_NOTES.length - 1) {
+                  const newIndex = pitchExplorerIndex + 1;
+                  setPitchExplorerIndex(newIndex);
+                  playPitchExplorer(newIndex);
+                }
+              }}
+              disabled={pitchExplorerIndex === PITCH_EXPLORER_NOTES.length - 1}
+            >
+              <Text style={styles.pitchExplorerButtonText}>↑ Up</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+    </View>
+  );
+
+  // Bottom buttons for Stage 4
+  const renderStage4Buttons = () => {
+    if (subStep === 0) {
+      return (
+        <View style={styles.fixedBottomButtons}>
+          <TouchableOpacity
+            style={styles.backTextButton}
+            onPress={() => goBackTeaching(3, 2)}
+          >
+            <Text style={styles.backTextButtonText}>← Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => setSubStep(1)}
+          >
+            <Text style={styles.primaryButtonText}>Got it →</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (subStep === 1) {
+      return (
+        <View style={styles.fixedBottomButtons}>
+          <TouchableOpacity
+            style={styles.backTextButton}
+            onPress={() => setSubStep(0)}
+          >
+            <Text style={styles.backTextButtonText}>← Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => setSubStep(2)}
+          >
+            <Text style={styles.primaryButtonText}>What else? →</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (subStep === 2) {
+      return (
+        <View style={styles.fixedBottomButtons}>
+          <TouchableOpacity
+            style={styles.backTextButton}
+            onPress={() => setSubStep(1)}
+          >
+            <Text style={styles.backTextButtonText}>← Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => setSubStep(3)}>
+            <Text style={styles.primaryButtonText}>Try it! →</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (subStep === 3) {
+      return (
+        <View style={styles.fixedBottomButtons}>
+          <TouchableOpacity
+            style={styles.backTextButton}
+            onPress={() => setSubStep(2)}
+          >
+            <Text style={styles.backTextButtonText}>← Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.primaryButton} onPress={nextStage}>
+            <Text style={styles.primaryButtonText}>Next →</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return null;
+  };
+
+  // ========================================
+  // STAGE 5: Learn About Clef
+  // ========================================
+  const renderStage5 = () => (
     <View style={styles.stageContainer}>
       <Text style={styles.stageTitle}>Your Clef</Text>
 
@@ -1731,11 +2272,17 @@ export default function FirstNoteScreen({ navigation, route }) {
     </View>
   );
 
-  // Bottom buttons for Stage 4
-  const renderStage4Buttons = () => {
+  // Bottom buttons for Stage 5
+  const renderStage5Buttons = () => {
     if (subStep === 0) {
       return (
         <View style={styles.fixedBottomButtons}>
+          <TouchableOpacity
+            style={styles.backTextButton}
+            onPress={() => goBackTeaching(4, 3)}
+          >
+            <Text style={styles.backTextButtonText}>← Back</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={() => setSubStep(1)}
@@ -1748,6 +2295,12 @@ export default function FirstNoteScreen({ navigation, route }) {
     if (subStep === 1) {
       return (
         <View style={styles.fixedBottomButtons}>
+          <TouchableOpacity
+            style={styles.backTextButton}
+            onPress={() => setSubStep(0)}
+          >
+            <Text style={styles.backTextButtonText}>← Back</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.primaryButton} onPress={nextStage}>
             <Text style={styles.primaryButtonText}>Got it →</Text>
           </TouchableOpacity>
@@ -1758,38 +2311,222 @@ export default function FirstNoteScreen({ navigation, route }) {
   };
 
   // ========================================
-  // STAGE 5: Learn About Sharps and Flats
+  // STAGE 6: Learn About Sharps and Flats
   // ========================================
-  const renderStage5 = () => (
+  const renderStage6 = () => (
     <View style={styles.stageContainer}>
-      <Text style={styles.stageTitle}>Sharps and Flats</Text>
+      <Text style={styles.stageTitle}>Sharps, Flats & Naturals</Text>
 
       {subStep === 0 && (
         <>
           <View style={styles.accidentalRow}>
             <View style={styles.accidentalBox}>
-              <Text style={styles.accidentalSymbol}>♯</Text>
-              <Text style={styles.accidentalName}>Sharp</Text>
-            </View>
-            <View style={styles.accidentalBox}>
               <Text style={styles.accidentalSymbol}>♭</Text>
               <Text style={styles.accidentalName}>Flat</Text>
             </View>
+            <View style={styles.accidentalBox}>
+              <Text style={styles.accidentalSymbol}>♮</Text>
+              <Text style={styles.accidentalName}>Natural</Text>
+            </View>
+            <View style={styles.accidentalBox}>
+              <Text style={styles.accidentalSymbol}>♯</Text>
+              <Text style={styles.accidentalName}>Sharp</Text>
+            </View>
           </View>
           <Text style={styles.instruction}>
-            Music uses 12 different pitches.
+            These symbols change a note's pitch:
             {"\n\n"}
-            <Text style={styles.bold}>Sharp (♯)</Text> = one step higher{"\n"}
-            <Text style={styles.bold}>Flat (♭)</Text> = one step lower
-            {"\n\n"}
-            For example:{"\n"}
-            C♯ is one step above C{"\n"}
-            B♭ is one step below B
+            <Text style={styles.bold}>Flat (♭)</Text> = one step lower{"\n"}
+            <Text style={styles.bold}>Natural (♮)</Text> = normal pitch{"\n"}
+            <Text style={styles.bold}>Sharp (♯)</Text> = one step higher
           </Text>
         </>
       )}
 
       {subStep === 1 && (
+        <>
+          <Text style={styles.instruction}>
+            By default, every note is <Text style={styles.bold}>natural</Text>.
+            {"\n\n"}
+            We only write the natural symbol (♮) when we need to <Text style={styles.italic}>cancel</Text> a previous sharp or flat.
+            {"\n\n"}
+            Otherwise, no symbol means natural!
+          </Text>
+        </>
+      )}
+
+      {subStep === 2 && (
+        <>
+          <Text style={styles.instruction}>
+            Try it! Tap each symbol to hear the difference:
+          </Text>
+          <View style={styles.accidentalExplorerStaff}>
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            {accidentalExplorer === "flat" && (
+              <Text style={styles.flatOnStaff}>♭</Text>
+            )}
+            {accidentalExplorer === "sharp" && (
+              <Text style={styles.sharpOnStaff}>♯</Text>
+            )}
+            <View style={styles.accidentalExplorerNote} />
+          </View>
+          <View style={styles.accidentalExplorerControls}>
+            <TouchableOpacity
+              style={[
+                styles.accidentalExplorerButton,
+                accidentalExplorer === "flat" && styles.accidentalExplorerButtonActive
+              ]}
+              onPress={() => {
+                setAccidentalExplorer("flat");
+                playAccidentalExplorer("flat");
+              }}
+            >
+              <Text style={styles.accidentalExplorerButtonText}>♭</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.accidentalExplorerButton,
+                accidentalExplorer === "natural" && styles.accidentalExplorerButtonActive
+              ]}
+              onPress={() => {
+                setAccidentalExplorer("natural");
+                playAccidentalExplorer("natural");
+              }}
+            >
+              <Text style={styles.accidentalExplorerButtonText}>♮</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.accidentalExplorerButton,
+                accidentalExplorer === "sharp" && styles.accidentalExplorerButtonActive
+              ]}
+              onPress={() => {
+                setAccidentalExplorer("sharp");
+                playAccidentalExplorer("sharp");
+              }}
+            >
+              <Text style={styles.accidentalExplorerButtonText}>♯</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+
+      {subStep === 3 && (
+        <>
+          <Text style={styles.instruction}>
+            Now try both together! Move the note up/down and add accidentals:
+          </Text>
+          <View style={styles.combinedExplorerStaff}>
+            {PITCH_EXPLORER_NOTES[pitchExplorerIndex].ledgerLines <= -2 && (
+              <View style={[styles.ledgerLineExplorer, { top: '-22.5%' }]} />
+            )}
+            {PITCH_EXPLORER_NOTES[pitchExplorerIndex].ledgerLines < 0 && (
+              <View style={[styles.ledgerLineExplorer, { top: '-4.5%' }]} />
+            )}
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            <View style={styles.staffLine} />
+            {PITCH_EXPLORER_NOTES[pitchExplorerIndex].ledgerLines > 0 && (
+              <View style={[styles.ledgerLineExplorer, { top: '103.5%' }]} />
+            )}
+            {PITCH_EXPLORER_NOTES[pitchExplorerIndex].ledgerLines >= 2 && (
+              <View style={[styles.ledgerLineExplorer, { top: '121.5%' }]} />
+            )}
+            {accidentalExplorer === "flat" && (
+              <Text style={[styles.flatOnStaff, { top: `${PITCH_EXPLORER_NOTES[pitchExplorerIndex].position - 16}%` }]}>♭</Text>
+            )}
+            {accidentalExplorer === "sharp" && (
+              <Text style={[styles.sharpOnStaff, { top: `${PITCH_EXPLORER_NOTES[pitchExplorerIndex].position - 14}%` }]}>♯</Text>
+            )}
+            <View 
+              style={[
+                styles.pitchExplorerNote, 
+                { top: `${PITCH_EXPLORER_NOTES[pitchExplorerIndex].position}%` }
+              ]} 
+            />
+          </View>
+          <View style={styles.combinedExplorerControls}>
+            <TouchableOpacity
+              style={[styles.pitchExplorerButton, pitchExplorerIndex === 0 && styles.pitchExplorerButtonDisabled]}
+              onPress={() => {
+                if (pitchExplorerIndex > 0) {
+                  const newIndex = pitchExplorerIndex - 1;
+                  setPitchExplorerIndex(newIndex);
+                  playCombinedExplorer(newIndex, accidentalExplorer);
+                }
+              }}
+              disabled={pitchExplorerIndex === 0}
+            >
+              <Text style={styles.pitchExplorerButtonText}>↓</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.pitchExplorerPlayButton}
+              onPress={() => playCombinedExplorer(pitchExplorerIndex, accidentalExplorer)}
+            >
+              <Text style={styles.pitchExplorerPlayButtonText}>▶</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.pitchExplorerButton, pitchExplorerIndex === PITCH_EXPLORER_NOTES.length - 1 && styles.pitchExplorerButtonDisabled]}
+              onPress={() => {
+                if (pitchExplorerIndex < PITCH_EXPLORER_NOTES.length - 1) {
+                  const newIndex = pitchExplorerIndex + 1;
+                  setPitchExplorerIndex(newIndex);
+                  playCombinedExplorer(newIndex, accidentalExplorer);
+                }
+              }}
+              disabled={pitchExplorerIndex === PITCH_EXPLORER_NOTES.length - 1}
+            >
+              <Text style={styles.pitchExplorerButtonText}>↑</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.combinedAccidentalButtons}>
+            <TouchableOpacity
+              style={[
+                styles.accidentalExplorerButton,
+                accidentalExplorer === "flat" && styles.accidentalExplorerButtonActive
+              ]}
+              onPress={() => {
+                setAccidentalExplorer("flat");
+                playCombinedExplorer(pitchExplorerIndex, "flat");
+              }}
+            >
+              <Text style={styles.accidentalExplorerButtonText}>♭</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.accidentalExplorerButton,
+                accidentalExplorer === "natural" && styles.accidentalExplorerButtonActive
+              ]}
+              onPress={() => {
+                setAccidentalExplorer("natural");
+                playCombinedExplorer(pitchExplorerIndex, "natural");
+              }}
+            >
+              <Text style={styles.accidentalExplorerButtonText}>♮</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.accidentalExplorerButton,
+                accidentalExplorer === "sharp" && styles.accidentalExplorerButtonActive
+              ]}
+              onPress={() => {
+                setAccidentalExplorer("sharp");
+                playCombinedExplorer(pitchExplorerIndex, "sharp");
+              }}
+            >
+              <Text style={styles.accidentalExplorerButtonText}>♯</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+
+      {subStep === 4 && (
         <>
           <Text style={styles.instruction}>
             Your note is{" "}
@@ -1818,16 +2555,22 @@ export default function FirstNoteScreen({ navigation, route }) {
     </View>
   );
 
-  // Bottom buttons for Stage 5
-  const renderStage5Buttons = () => {
+  // Bottom buttons for Stage 6
+  const renderStage6Buttons = () => {
     if (subStep === 0) {
       return (
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
+            style={styles.backTextButton}
+            onPress={() => goBackTeaching(5, 1)}
+          >
+            <Text style={styles.backTextButtonText}>← Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={styles.primaryButton}
             onPress={() => setSubStep(1)}
           >
-            <Text style={styles.primaryButtonText}>Makes sense →</Text>
+            <Text style={styles.primaryButtonText}>Got it →</Text>
           </TouchableOpacity>
         </View>
       );
@@ -1835,6 +2578,66 @@ export default function FirstNoteScreen({ navigation, route }) {
     if (subStep === 1) {
       return (
         <View style={styles.fixedBottomButtons}>
+          <TouchableOpacity
+            style={styles.backTextButton}
+            onPress={() => setSubStep(0)}
+          >
+            <Text style={styles.backTextButtonText}>← Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => setSubStep(2)}
+          >
+            <Text style={styles.primaryButtonText}>Try it! →</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (subStep === 2) {
+      return (
+        <View style={styles.fixedBottomButtons}>
+          <TouchableOpacity
+            style={styles.backTextButton}
+            onPress={() => setSubStep(1)}
+          >
+            <Text style={styles.backTextButtonText}>← Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => setSubStep(3)}
+          >
+            <Text style={styles.primaryButtonText}>Next →</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (subStep === 3) {
+      return (
+        <View style={styles.fixedBottomButtons}>
+          <TouchableOpacity
+            style={styles.backTextButton}
+            onPress={() => setSubStep(2)}
+          >
+            <Text style={styles.backTextButtonText}>← Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => setSubStep(4)}
+          >
+            <Text style={styles.primaryButtonText}>Next →</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (subStep === 4) {
+      return (
+        <View style={styles.fixedBottomButtons}>
+          <TouchableOpacity
+            style={styles.backTextButton}
+            onPress={() => setSubStep(3)}
+          >
+            <Text style={styles.backTextButtonText}>← Back</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.primaryButton} onPress={nextStage}>
             <Text style={styles.primaryButtonText}>Show me my note! →</Text>
           </TouchableOpacity>
@@ -1845,9 +2648,9 @@ export default function FirstNoteScreen({ navigation, route }) {
   };
 
   // ========================================
-  // STAGE 6: See Your Note on the Staff
+  // STAGE 7: See Your Note on the Staff
   // ========================================
-  const renderStage6 = () => (
+  const renderStage7 = () => (
     <View style={styles.stageContainer}>
       <Text style={styles.stageTitle}>Your Note on the Staff</Text>
 
@@ -1883,10 +2686,16 @@ export default function FirstNoteScreen({ navigation, route }) {
     </View>
   );
 
-  // Bottom buttons for Stage 6
-  const renderStage6Buttons = () => {
+  // Bottom buttons for Stage 7
+  const renderStage7Buttons = () => {
     return (
       <View style={styles.fixedBottomButtons}>
+        <TouchableOpacity
+          style={styles.backTextButton}
+          onPress={() => goBackTeaching(6, 1)}
+        >
+          <Text style={styles.backTextButtonText}>← Back</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.secondaryButton, isPlaying && styles.buttonDisabled]}
           onPress={playNote}
@@ -1930,6 +2739,8 @@ export default function FirstNoteScreen({ navigation, route }) {
         return renderStage5();
       case 6:
         return renderStage6();
+      case 7:
+        return renderStage7();
       default:
         return renderStage0();
     }
@@ -1958,6 +2769,9 @@ export default function FirstNoteScreen({ navigation, route }) {
     if (stage === 6) {
       return renderStage6Buttons();
     }
+    if (stage === 7) {
+      return renderStage7Buttons();
+    }
     return null;
   };
 
@@ -1972,7 +2786,7 @@ export default function FirstNoteScreen({ navigation, route }) {
       >
         {/* Progress indicator */}
         <View style={styles.progressBar}>
-          {[0, 1, 2, 3, 4, 5, 6].map((s) => (
+          {[0, 1, 2, 3, 4, 5, 6, 7].map((s) => (
             <View
               key={s}
               style={[
@@ -2132,6 +2946,15 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: "#FFD700",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  backTextButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  backTextButtonText: {
+    color: "#888",
     fontSize: 16,
     fontWeight: "500",
   },
@@ -2550,11 +3373,172 @@ const styles = StyleSheet.create({
     width: 280,
     paddingVertical: 10,
   },
+  ledgerLineDemo: {
+    marginVertical: 20,
+    alignItems: "center",
+    width: 280,
+    paddingVertical: 10,
+    position: "relative",
+  },
+  ledgerLineSmall: {
+    width: 50,
+    height: 2,
+    backgroundColor: "#FFD700",
+    marginVertical: 8,
+  },
+  noteDemoCircle: {
+    position: "absolute",
+    width: 24,
+    height: 16,
+    borderRadius: 12,
+    backgroundColor: "#FFD700",
+    transform: [{ rotate: "-15deg" }],
+    left: "45%",
+    zIndex: 10,
+  },
+  ledgerLineExplorer: {
+    position: "absolute",
+    width: 50,
+    height: 2,
+    backgroundColor: "#FFD700",
+    left: "40%",
+    zIndex: 5,
+  },
   staffLine: {
     width: "100%",
     height: 2,
     backgroundColor: "#FFD700",
     marginVertical: 8,
+  },
+  noteVisualContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 40,
+    marginVertical: 30,
+  },
+  noteCircleFilled: {
+    width: 40,
+    height: 32,
+    borderRadius: 20,
+    backgroundColor: "#FFD700",
+    transform: [{ rotate: "-15deg" }],
+  },
+  noteCircleHollow: {
+    width: 40,
+    height: 32,
+    borderRadius: 20,
+    borderWidth: 3,
+    borderColor: "#FFD700",
+    backgroundColor: "transparent",
+    transform: [{ rotate: "-15deg" }],
+  },
+  staffWithNoteVisual: {
+    marginVertical: 30,
+    alignItems: "center",
+    width: 280,
+    paddingVertical: 10,
+    position: "relative",
+  },
+  noteOnLine: {
+    position: "absolute",
+    width: 24,
+    height: 16,
+    borderRadius: 12,
+    backgroundColor: "#FFD700",
+    transform: [{ rotate: "-15deg" }],
+    zIndex: 10,
+  },
+  noteInSpace: {
+    position: "absolute",
+    width: 24,
+    height: 16,
+    borderRadius: 12,
+    backgroundColor: "#FFD700",
+    transform: [{ rotate: "-15deg" }],
+    zIndex: 10,
+  },
+  pitchExplorerStaff: {
+    marginTop: 20,
+    marginBottom: 50,
+    alignItems: "center",
+    width: 280,
+    height: 100,
+    position: "relative",
+    justifyContent: "space-between",
+    paddingVertical: 5,
+  },
+  pitchExplorerNote: {
+    position: "absolute",
+    left: "45%",
+    width: 22,
+    height: 15,
+    borderRadius: 11,
+    backgroundColor: "#FFD700",
+    transform: [{ rotate: "-15deg" }],
+    zIndex: 10,
+  },
+  pitchExplorerNoteName: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#FFD700",
+    marginBottom: 20,
+  },
+  pitchExplorerControls: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 15,
+  },
+  pitchExplorerButton: {
+    backgroundColor: "transparent",
+    borderWidth: 2,
+    borderColor: "#FFD700",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  pitchExplorerButtonDisabled: {
+    opacity: 0.3,
+  },
+  pitchExplorerButtonText: {
+    color: "#FFD700",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  pitchExplorerPlayButton: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  pitchExplorerPlayButtonText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  combinedExplorerStaff: {
+    marginTop: 20,
+    marginBottom: 50,
+    alignItems: "center",
+    width: 280,
+    height: 100,
+    position: "relative",
+    justifyContent: "space-between",
+    paddingVertical: 5,
+  },
+  combinedExplorerControls: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 15,
+    marginBottom: 15,
+  },
+  combinedAccidentalButtons: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
   },
   funFact: {
     fontSize: 20,
@@ -2599,6 +3583,78 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#fffbe6",
     marginTop: 5,
+  },
+  accidentalExplorerStaff: {
+    marginVertical: 20,
+    alignItems: "center",
+    width: 280,
+    height: 100,
+    position: "relative",
+    justifyContent: "space-between",
+    paddingVertical: 5,
+  },
+  accidentalExplorerNote: {
+    position: "absolute",
+    left: "50%",
+    marginLeft: -11,
+    top: "42.5%",
+    width: 22,
+    height: 15,
+    borderRadius: 11,
+    backgroundColor: "#FFD700",
+    transform: [{ rotate: "-15deg" }],
+    zIndex: 10,
+  },
+  accidentalOnStaff: {
+    position: "absolute",
+    left: "50%",
+    marginLeft: -38,
+    top: "28%",
+    fontSize: 40,
+    color: "#FFD700",
+    zIndex: 10,
+  },
+  flatOnStaff: {
+    position: "absolute",
+    left: "50%",
+    marginLeft: -38,
+    top: "26%",
+    fontSize: 40,
+    color: "#FFD700",
+    zIndex: 10,
+  },
+  sharpOnStaff: {
+    position: "absolute",
+    left: "50%",
+    marginLeft: -38,
+    top: "28%",
+    fontSize: 40,
+    color: "#FFD700",
+    zIndex: 10,
+  },
+  accidentalExplorerControls: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 20,
+    marginTop: 20,
+  },
+  accidentalExplorerButton: {
+    backgroundColor: "transparent",
+    borderWidth: 2,
+    borderColor: "#FFD700",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  accidentalExplorerButtonActive: {
+    backgroundColor: "rgba(255, 215, 0, 0.3)",
+  },
+  accidentalExplorerButtonText: {
+    color: "#FFD700",
+    fontSize: 32,
   },
   staffWithNote: {
     flexDirection: "row",
