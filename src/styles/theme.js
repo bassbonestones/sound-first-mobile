@@ -12,31 +12,76 @@ export { colors, spacing, fontSizes, borderRadius } from "../constants/colors";
 import { colors, spacing, fontSizes, borderRadius } from "../constants/colors";
 
 /**
- * Common shadow styles
+ * Common shadow styles - platform-aware
+ * On web: uses boxShadow CSS property
+ * On native: uses shadow* props for iOS and elevation for Android
  */
 export const shadows = {
-  small: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  medium: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  large: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
-  },
+  small: Platform.select({
+    web: {
+      boxShadow: "0px 1px 2px rgba(0, 0, 0, 0.1)",
+    },
+    default: {
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+  }),
+  medium: Platform.select({
+    web: {
+      boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.15)",
+    },
+    default: {
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 4,
+    },
+  }),
+  large: Platform.select({
+    web: {
+      boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.2)",
+    },
+    default: {
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+  }),
 };
+
+/**
+ * Create a custom shadow with platform-appropriate styles
+ * @param {string} color - Shadow color (hex)
+ * @param {number} offsetX - Horizontal offset
+ * @param {number} offsetY - Vertical offset  
+ * @param {number} opacity - Shadow opacity (0-1)
+ * @param {number} radius - Blur radius
+ * @returns Platform-appropriate shadow style object
+ */
+export function createShadow(color = "#000", offsetX = 0, offsetY = 4, opacity = 0.2, radius = 8) {
+  if (Platform.OS === 'web') {
+    // Convert hex color + opacity to rgba for boxShadow
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+    return {
+      boxShadow: `${offsetX}px ${offsetY}px ${radius}px rgba(${r}, ${g}, ${b}, ${opacity})`,
+    };
+  }
+  return {
+    shadowColor: color,
+    shadowOffset: { width: offsetX, height: offsetY },
+    shadowOpacity: opacity,
+    shadowRadius: radius,
+    elevation: Math.max(1, Math.round(radius / 2)),
+  };
+}
 
 /**
  * Platform-specific header padding

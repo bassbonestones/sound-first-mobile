@@ -1,5 +1,24 @@
 import React, { useEffect, useState } from "react";
-import { View, ActivityIndicator, Text, Platform } from "react-native";
+import { View, ActivityIndicator, Text, Platform, LogBox } from "react-native";
+
+// Suppress warnings from dependencies we can't fix
+LogBox.ignoreLogs(['props.pointerEvents is deprecated']);
+
+// For web: filter console warnings that come from dependencies we can't fix
+if (Platform.OS === 'web') {
+  const originalWarn = console.warn;
+  const suppressedWarnings = [
+    'props.pointerEvents is deprecated', // from react-native-webview
+    '"shadow*" style props are deprecated', // from RN dependencies using shadow* instead of boxShadow
+  ];
+  console.warn = (...args) => {
+    const message = args[0];
+    if (typeof message === 'string' && suppressedWarnings.some(w => message.includes(w))) {
+      return; // Suppress this warning
+    }
+    originalWarn.apply(console, args);
+  };
+}
 
 // Centralized API client
 import { getBackendUrl } from "./src/api/client";
@@ -62,15 +81,15 @@ class ErrorBoundary extends React.Component {
 }
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import StartPracticeScreen from "./screens/StartPracticeScreen";
-import SessionScreen from "./screens/SessionScreen";
-import FocusCardScreen from "./screens/FocusCardScreen";
-import RatingScreen from "./screens/RatingScreen";
-import OnboardingScreen from "./screens/OnboardingScreen";
-import SelfDirectedScreen from "./screens/SelfDirectedScreen";
-import HistoryScreen from "./screens/HistoryScreen";
-import AdminScreen from "./screens/AdminScreen";
-import FirstNoteScreen from "./screens/FirstNoteScreen";
+import StartPracticeScreen from "./src/screens/StartPracticeScreen";
+import SessionScreen from "./src/screens/SessionScreen";
+import FocusCardScreen from "./src/screens/FocusCardScreen";
+import RatingScreen from "./src/screens/RatingScreen";
+import OnboardingScreen from "./src/screens/OnboardingScreen";
+import SelfDirectedScreen from "./src/screens/SelfDirectedScreen";
+import HistoryScreen from "./src/screens/HistoryScreen";
+import AdminScreen from "./src/screens/AdminScreen";
+import FirstNoteScreen from "./src/screens/FirstNoteScreen";
 
 const Stack = createNativeStackNavigator();
 

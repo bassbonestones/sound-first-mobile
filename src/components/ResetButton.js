@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useNavigation, CommonActions } from "@react-navigation/native";
-import { getBackendUrl } from "../src/api/client";
+import { getBackendUrl } from "../api/client";
 
 /**
  * Small reset button for bottom-left corner of screens.

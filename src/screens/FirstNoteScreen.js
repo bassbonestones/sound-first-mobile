@@ -22,7 +22,7 @@ import EDMVisualizer, {
 } from "../components/EDMVisualizer";
 import NotationDisplay from "../components/NotationDisplay";
 import { CommonActions } from "@react-navigation/native";
-import { getBackendUrl } from "../src/api/client";
+import { getBackendUrl } from "../api/client";
 
 // Cross-platform AudioContext
 let NativeAudioContext = null;
@@ -1964,7 +1964,7 @@ export default function FirstNoteScreen({ navigation, route }) {
         <>
           <Text style={styles.funFact}>🏥 Fun Memory Trick</Text>
           <Image
-            source={require("../assets/staff_infection.jpg")}
+            source={require("../../assets/staff_infection.jpg")}
             style={styles.staffInfectionImage}
             resizeMode="contain"
           />
@@ -2299,7 +2299,7 @@ export default function FirstNoteScreen({ navigation, route }) {
         <>
           <View style={styles.imageWhiteBubble}>
             <Image
-              source={require("../assets/bass_cleff_f.png")}
+              source={require("../../assets/bass_cleff_f.png")}
               style={styles.bassClefImage}
               resizeMode="contain"
             />

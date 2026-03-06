@@ -540,6 +540,10 @@ export default function AudioInput({
   const animationFrameRef = useRef(null);
   const silenceTimerRef = useRef(null);
   const soundStartedRef = useRef(false);
+  
+  // Throttle volume updates to prevent excessive re-renders (max ~10 updates/sec)
+  const lastVolumeUpdateRef = useRef(0);
+  const VOLUME_UPDATE_INTERVAL_MS = 100;
 
   // WebView ref for mobile audio
   const webViewRef = useRef(null);
@@ -612,8 +616,13 @@ export default function AudioInput({
             setError(data.message);
             break;
           case "volumeChange":
-            setVolume(data.volume);
-            if (onVolumeChange) onVolumeChange(data.volume);
+            // Throttle volume updates to prevent excessive re-renders
+            const now = Date.now();
+            if (now - lastVolumeUpdateRef.current >= VOLUME_UPDATE_INTERVAL_MS) {
+              lastVolumeUpdateRef.current = now;
+              setVolume(data.volume);
+              if (onVolumeChange) onVolumeChange(data.volume);
+            }
             break;
           case "soundStart":
             setIsSounding(true);
@@ -809,9 +818,15 @@ export default function AudioInput({
 
       // Normalize volume (0-1 scale)
       const normalizedVolume = Math.min(1, rms * 10);
-      setVolume(normalizedVolume);
-      if (onVolumeChangeRef.current) {
-        onVolumeChangeRef.current(normalizedVolume);
+      
+      // Throttle volume state updates to prevent excessive re-renders
+      const now = Date.now();
+      if (now - lastVolumeUpdateRef.current >= VOLUME_UPDATE_INTERVAL_MS) {
+        lastVolumeUpdateRef.current = now;
+        setVolume(normalizedVolume);
+        if (onVolumeChangeRef.current) {
+          onVolumeChangeRef.current(normalizedVolume);
+        }
       }
 
       // Check if sound is above threshold (use ref for latest value)
@@ -1013,9 +1028,14 @@ export default function AudioInput({
           const dB = status.metering;
           const normalizedVolume = Math.max(0, Math.min(1, (dB + 60) / 60));
 
-          setVolume(normalizedVolume);
-          if (onVolumeChange) {
-            onVolumeChange(normalizedVolume);
+          // Throttle volume state updates to prevent excessive re-renders
+          const now = Date.now();
+          if (now - lastVolumeUpdateRef.current >= VOLUME_UPDATE_INTERVAL_MS) {
+            lastVolumeUpdateRef.current = now;
+            setVolume(normalizedVolume);
+            if (onVolumeChange) {
+              onVolumeChange(normalizedVolume);
+            }
           }
 
           // Check if sound is above threshold

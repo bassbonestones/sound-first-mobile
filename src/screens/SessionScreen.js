@@ -21,7 +21,8 @@ import HelpMenu from "../components/HelpMenu";
 import MiniLesson from "../components/MiniLesson";
 import AudioPlayer from "../components/AudioPlayer";
 import ResetButton from "../components/ResetButton";
-import { baseUrl } from "../src/api/client";
+import { baseUrl } from "../api/client";
+import { createShadow } from "../styles/theme";
 
 function getBackendUrl(selfDirected = false) {
   const endpoint = selfDirected
@@ -513,10 +514,7 @@ export default function SessionScreen({ navigation, route }) {
             width: 320,
             borderWidth: 2,
             borderColor: "#FFD700",
-            shadowColor: "#000",
-            shadowOpacity: 0.2,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 4 },
+            ...createShadow("#000", 0, 4, 0.2, 8),
           }}
         >
           {/* Category Badge */}
@@ -1114,10 +1112,7 @@ export default function SessionScreen({ navigation, route }) {
                     paddingVertical: 14,
                     paddingHorizontal: 32,
                     marginHorizontal: 8,
-                    shadowColor: "#000",
-                    shadowOpacity: 0.15,
-                    shadowRadius: 6,
-                    shadowOffset: { width: 0, height: 2 },
+                    ...createShadow("#000", 0, 2, 0.15, 6),
                   }}
                 >
                   <Text
@@ -1141,10 +1136,7 @@ export default function SessionScreen({ navigation, route }) {
                     paddingVertical: 14,
                     paddingHorizontal: 32,
                     marginHorizontal: 8,
-                    shadowColor: "#000",
-                    shadowOpacity: 0.15,
-                    shadowRadius: 6,
-                    shadowOffset: { width: 0, height: 2 },
+                    ...createShadow("#000", 0, 2, 0.15, 6),
                   }}
                 >
                   <Text
@@ -1388,10 +1380,7 @@ export default function SessionScreen({ navigation, route }) {
                   marginRight: 8,
                   flexDirection: "row",
                   alignItems: "center",
-                  shadowColor: "#000",
-                  shadowOpacity: 0.3,
-                  shadowRadius: 4,
-                  shadowOffset: { width: 0, height: 2 },
+                  ...createShadow("#000", 0, 2, 0.3, 4),
                   opacity: droneVisible ? 0.4 : 1,
                 }}
               >
@@ -1439,10 +1428,7 @@ export default function SessionScreen({ navigation, route }) {
                 marginRight: 8,
                 flexDirection: "row",
                 alignItems: "center",
-                shadowColor: "#000",
-                shadowOpacity: 0.3,
-                shadowRadius: 4,
-                shadowOffset: { width: 0, height: 2 },
+                ...createShadow("#000", 0, 2, 0.3, 4),
                 opacity: metronomeVisible ? 0.4 : 1,
               }}
             >
@@ -1472,10 +1458,7 @@ export default function SessionScreen({ navigation, route }) {
                   marginRight: 8,
                   flexDirection: "row",
                   alignItems: "center",
-                  shadowColor: "#000",
-                  shadowOpacity: 0.3,
-                  shadowRadius: 4,
-                  shadowOffset: { width: 0, height: 2 },
+                  ...createShadow("#000", 0, 2, 0.3, 4),
                 })}
               >
                 <Text style={{ fontSize: 18 }}>{audioMuted ? "🔇" : "🔊"}</Text>
@@ -1491,10 +1474,7 @@ export default function SessionScreen({ navigation, route }) {
                 padding: 12,
                 flexDirection: "row",
                 alignItems: "center",
-                shadowColor: "#000",
-                shadowOpacity: 0.3,
-                shadowRadius: 4,
-                shadowOffset: { width: 0, height: 2 },
+                ...createShadow("#000", 0, 2, 0.3, 4),
               }}
             >
               <Text style={{ fontSize: 18, marginRight: 4 }}>📚</Text>
@@ -1558,10 +1538,7 @@ export default function SessionScreen({ navigation, route }) {
                 borderRadius: 16,
                 padding: 24,
                 width: 300,
-                shadowColor: "#000",
-                shadowOpacity: 0.5,
-                shadowRadius: 10,
-                shadowOffset: { width: 0, height: 4 },
+                ...createShadow("#000", 0, 4, 0.5, 10),
                 elevation: 10,
               }}
             >

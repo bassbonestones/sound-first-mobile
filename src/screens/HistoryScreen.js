@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import ResetButton from "../components/ResetButton";
-import { baseUrl } from "../src/api/client";
+import { baseUrl } from "../api/client";
 
 function getBackendUrl(endpoint) {
   return `${baseUrl}/${endpoint}`;

@@ -960,11 +960,16 @@ export default function Metronome({
             borderRadius: 16,
             padding: 24,
             width: 300,
-            shadowColor: "#000",
-            shadowOpacity: 0.5,
-            shadowRadius: 10,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 10,
+            ...(Platform.OS === 'web' 
+              ? { boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.5)" }
+              : {
+                  shadowColor: "#000",
+                  shadowOpacity: 0.5,
+                  shadowRadius: 10,
+                  shadowOffset: { width: 0, height: 4 },
+                  elevation: 10,
+                }
+            ),
           }}>
             <Text style={{
               color: "#FFD700",

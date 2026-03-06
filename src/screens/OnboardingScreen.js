@@ -13,7 +13,8 @@ import {
 import StaffNotePicker from "../components/StaffNotePicker";
 import AudioInput from "../components/AudioInput";
 import ResetButton from "../components/ResetButton";
-import { getBackendUrl } from "../src/api/client";
+import { getBackendUrl } from "../api/client";
+import { createShadow } from "../styles/theme";
 
 // Instrument families with their instruments
 const instrumentFamilies = {
@@ -280,7 +281,6 @@ function OnboardingScreen({ navigation, route }) {
               ? "What type of instrument do you play?"
               : "Select your instrument"}
           </Text>
-
           {/* Family Selection */}
           {!selectedFamily && (
             <View
@@ -384,11 +384,13 @@ function OnboardingScreen({ navigation, route }) {
                         instrument === inst.name ? "#FFD700" : "#bfa76a",
                       width: 110,
                       alignItems: "center",
-                      shadowColor:
+                      ...createShadow(
                         instrument === inst.name ? "#FFD700" : "#000",
-                      shadowOpacity: instrument === inst.name ? 0.4 : 0.1,
-                      shadowRadius: 8,
-                      shadowOffset: { width: 0, height: 2 },
+                        0,
+                        2,
+                        instrument === inst.name ? 0.4 : 0.1,
+                        8,
+                      ),
                     }}
                   >
                     <Text style={{ fontSize: 32, marginBottom: 4 }}>
@@ -757,10 +759,13 @@ function OnboardingScreen({ navigation, route }) {
               paddingVertical: 16,
               paddingHorizontal: 48,
               opacity: canProceed ? 1 : 0.5,
-              shadowColor: canProceed ? "#FFD700" : "transparent",
-              shadowOpacity: 0.4,
-              shadowRadius: 12,
-              shadowOffset: { width: 0, height: 4 },
+              ...createShadow(
+                canProceed ? "#FFD700" : "#000",
+                0,
+                4,
+                canProceed ? 0.4 : 0,
+                12,
+              ),
             }}
           >
             <Text

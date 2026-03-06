@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, Platform, ScrollView } from "react-native";
 import ResetButton from "../components/ResetButton";
+import { createShadow } from "../styles/theme";
 
 export default function FocusCardScreen({ route }) {
   const { focusCard } = route.params;
@@ -24,10 +25,7 @@ export default function FocusCardScreen({ route }) {
           width: 320,
           borderWidth: 2,
           borderColor: "#FFD700",
-          shadowColor: "#000",
-          shadowOpacity: 0.2,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 4 },
+          ...createShadow("#000", 0, 4, 0.2, 8),
         }}
       >
         <Text

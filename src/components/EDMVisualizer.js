@@ -90,11 +90,13 @@ function AnimatedBar({ index, volume, colorScheme, maxHeight, width }) {
             height: barHeight,
             backgroundColor: colorScheme.primary,
             width: width - 2,
-            // Glow effect via shadow
-            shadowColor: colorScheme.primary,
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: glowAnim,
-            shadowRadius: 8,
+            // Glow effect via shadow (native only - web uses CSS)
+            ...(Platform.OS !== 'web' ? {
+              shadowColor: colorScheme.primary,
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: glowAnim,
+              shadowRadius: 8,
+            } : {}),
             // Additional glow layers
             borderColor: colorScheme.glow,
             borderWidth: 1,
@@ -129,12 +131,12 @@ function PulseRing({ volume, colorScheme, size }) {
         Animated.timing(scaleAnim, {
           toValue: 1.2 + volume * 0.5,
           duration: 150,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(opacityAnim, {
           toValue: 0.8,
           duration: 100,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start(() => {
         // Shrink back
@@ -142,12 +144,12 @@ function PulseRing({ volume, colorScheme, size }) {
           Animated.timing(scaleAnim, {
             toValue: 0.8,
             duration: 300,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
           Animated.timing(opacityAnim, {
             toValue: 0.3,
             duration: 300,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
         ]).start();
       });
@@ -234,7 +236,7 @@ export default function EDMVisualizer({
           styles.centerOrb,
           {
             backgroundColor: colorScheme.primary,
-            shadowColor: colorScheme.primary,
+            ...(Platform.OS !== 'web' ? { shadowColor: colorScheme.primary } : {}),
             transform: [{ scale: 0.8 + volume * 0.4 }],
           },
         ]}
@@ -305,7 +307,7 @@ export function EDMVisualizerMedium({
           styles.mediumOrb,
           {
             backgroundColor: colorScheme.primary,
-            shadowColor: colorScheme.primary,
+            ...(Platform.OS !== 'web' ? { shadowColor: colorScheme.primary } : {}),
             transform: [{ scale: 0.8 + volume * 0.4 }],
           },
         ]}
@@ -412,9 +414,14 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 15,
+    ...Platform.select({
+      web: {},
+      default: {
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.9,
+        shadowRadius: 15,
+      },
+    }),
   },
   mediumContainer: {
     width: 160,
@@ -437,9 +444,14 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 10,
+    ...Platform.select({
+      web: {},
+      default: {
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.9,
+        shadowRadius: 10,
+      },
+    }),
   },
   compactContainer: {
     backgroundColor: "#0a0a12",

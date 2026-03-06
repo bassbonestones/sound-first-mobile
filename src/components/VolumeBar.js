@@ -160,7 +160,7 @@ export function CircularVolumeIndicator({
       toValue: targetScale,
       friction: 5,
       tension: 100,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [volume]);
   

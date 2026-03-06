@@ -8,9 +8,11 @@ import {
   Alert,
   ScrollView,
   TouchableOpacity,
+  Platform,
 } from "react-native";
 import ResetButton from "../components/ResetButton";
-import { baseUrl } from "../src/api/client";
+import { baseUrl } from "../api/client";
+import { createShadow } from "../styles/theme";
 
 function getBackendUrl(endpoint) {
   return `${baseUrl}/${endpoint}`;
@@ -195,10 +197,7 @@ export default function SelfDirectedScreen({ navigation }) {
             paddingVertical: 16,
             paddingHorizontal: 48,
             marginTop: 12,
-            shadowColor: "#000",
-            shadowOpacity: 0.2,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 4 },
+            ...createShadow("#000", 0, 4, 0.2, 8),
           }}
         >
           <Text
