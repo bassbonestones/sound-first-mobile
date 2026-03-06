@@ -193,14 +193,31 @@ function CapabilityExplorer() {
     setShowEditModal(true);
   };
 
-  const handleCapabilitySaved = (updatedCapability) => {
-    // Update in local state
-    setCapabilities((prev) =>
-      prev.map((c) =>
-        c.id === updatedCapability.id ? { ...c, ...updatedCapability } : c,
-      ),
-    );
-    setSelectedCapability(updatedCapability);
+  const handleCapabilitySaved = async (updatedCapability) => {
+    const capId = updatedCapability.id;
+    // Reload capabilities from server to get fresh data
+    try {
+      const response = await fetch(`${baseUrl}/admin/capabilities`);
+      if (response.ok) {
+        const data = await response.json();
+        const freshCapabilities = data.capabilities || [];
+        setCapabilities(freshCapabilities);
+        
+        // Extract unique domains
+        const uniqueDomains = [
+          ...new Set(freshCapabilities.map((c) => c.domain)),
+        ].sort();
+        setDomains(uniqueDomains);
+        
+        // Find and set the fresh capability for detail view
+        const freshCap = freshCapabilities.find((c) => c.id === capId);
+        if (freshCap) {
+          setSelectedCapability(freshCap);
+        }
+      }
+    } catch (err) {
+      console.error("[AdminScreen] Failed to reload capabilities:", err);
+    }
     setShowEditModal(false);
     setShowDetailModal(true);
   };
@@ -944,14 +961,8 @@ function CapabilityEditModal({ capability, allCapabilities, onClose, onSave }) {
 
   // Prerequisites state - track by ID
   const [selectedPrereqIds, setSelectedPrereqIds] = useState(() => {
-    // Initialize from capability's prerequisite_names by looking up IDs
-    const prereqNames = capability?.prerequisite_names || [];
-    const ids = [];
-    for (const name of prereqNames) {
-      const found = allCapabilities.find((c) => c.name === name);
-      if (found) ids.push(found.id);
-    }
-    return ids;
+    // Initialize from capability's prerequisite_ids directly
+    return capability?.prerequisite_ids || [];
   });
 
   // Prerequisite selector state
@@ -1026,11 +1037,6 @@ function CapabilityEditModal({ capability, allCapabilities, onClose, onSave }) {
 
       setSaveSuccess(true);
 
-      // Build updated prerequisite_names from IDs
-      const updatedPrereqNames = selectedPrereqIds
-        .map((id) => allCapabilities.find((c) => c.id === id)?.name)
-        .filter(Boolean);
-
       // Call onSave with the updated capability after a brief delay
       setTimeout(() => {
         onSave({
@@ -1043,7 +1049,7 @@ function CapabilityEditModal({ capability, allCapabilities, onClose, onSave }) {
             formData.evidence_acceptance_threshold,
           ),
           difficulty_weight: Number(formData.difficulty_weight),
-          prerequisite_names: updatedPrereqNames,
+          prerequisite_ids: selectedPrereqIds,
         });
       }, 500);
     } catch (err) {
