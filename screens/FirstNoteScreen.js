@@ -323,7 +323,10 @@ function DevNavMenu({
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[devStyles.resetButton, { backgroundColor: "#3b2c1a", marginTop: 8 }]}
+          style={[
+            devStyles.resetButton,
+            { backgroundColor: "#3b2c1a", marginTop: 8 },
+          ]}
           onPress={() => {
             setIsOpen(false);
             navigation.navigate("Admin");
@@ -1613,7 +1616,14 @@ export default function FirstNoteScreen({ navigation, route }) {
                 allowOctaveEquivalent={true}
                 compact={true}
               />
-              <Text style={[styles.successTextSmall, { opacity: pitchAccuracy === "correct" ? 1 : 0 }]}>✓ Correct!</Text>
+              <Text
+                style={[
+                  styles.successTextSmall,
+                  { opacity: pitchAccuracy === "correct" ? 1 : 0 },
+                ]}
+              >
+                ✓ Correct!
+              </Text>
             </View>
           );
         case 2: // Imagine
@@ -1651,7 +1661,14 @@ export default function FirstNoteScreen({ navigation, route }) {
                 pitchMargin={50}
                 compact={true}
               />
-              <Text style={[styles.successTextSmall, { opacity: pitchAccuracy === "correct" ? 1 : 0 }]}>✓ Correct!</Text>
+              <Text
+                style={[
+                  styles.successTextSmall,
+                  { opacity: pitchAccuracy === "correct" ? 1 : 0 },
+                ]}
+              >
+                ✓ Correct!
+              </Text>
             </View>
           );
         default:

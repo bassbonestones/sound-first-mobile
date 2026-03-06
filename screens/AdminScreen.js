@@ -101,6 +101,8 @@ function CapabilityExplorer() {
   const [selectedCapability, setSelectedCapability] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showDomainManageModal, setShowDomainManageModal] = useState(false);
   const [dependencyGraph, setDependencyGraph] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [exportStatus, setExportStatus] = useState(null);
@@ -161,6 +163,9 @@ function CapabilityExplorer() {
       filtered = filtered.filter((c) => c.domain === domainFilter);
     }
 
+    // Sort by bit_index to maintain proper order
+    filtered.sort((a, b) => (a.bit_index ?? 0) - (b.bit_index ?? 0));
+
     setFilteredCapabilities(filtered);
   };
 
@@ -204,12 +209,12 @@ function CapabilityExplorer() {
     try {
       const response = await fetch(
         `${baseUrl}/admin/capabilities/${capability.id}/archive`,
-        { method: "POST" }
+        { method: "POST" },
       );
       if (response.ok) {
         const updated = { ...capability, is_active: false };
         setCapabilities((prev) =>
-          prev.map((c) => (c.id === capability.id ? updated : c))
+          prev.map((c) => (c.id === capability.id ? updated : c)),
         );
         setSelectedCapability(updated);
       }
@@ -222,17 +227,135 @@ function CapabilityExplorer() {
     try {
       const response = await fetch(
         `${baseUrl}/admin/capabilities/${capability.id}/restore`,
-        { method: "POST" }
+        { method: "POST" },
       );
       if (response.ok) {
         const updated = { ...capability, is_active: true };
         setCapabilities((prev) =>
-          prev.map((c) => (c.id === capability.id ? updated : c))
+          prev.map((c) => (c.id === capability.id ? updated : c)),
         );
         setSelectedCapability(updated);
       }
     } catch (err) {
       console.log("[AdminScreen] Could not restore capability", err);
+    }
+  };
+
+  const handleDeleteCapability = async (capability) => {
+    try {
+      const response = await fetch(
+        `${baseUrl}/admin/capabilities/${capability.id}`,
+        { method: "DELETE" },
+      );
+      if (response.ok) {
+        const data = await response.json();
+        // Reload capabilities to get updated bit_indexes
+        await loadCapabilities();
+        setShowDetailModal(false);
+        setSelectedCapability(null);
+      }
+    } catch (err) {
+      console.log("[AdminScreen] Could not delete capability", err);
+    }
+  };
+
+  const handleCreateCapability = async (createData) => {
+    try {
+      const response = await fetch(`${baseUrl}/admin/capabilities`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(createData),
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        // Reload capabilities to get the new one with all fields
+        await loadCapabilities();
+        setShowCreateModal(false);
+        return { success: true };
+      } else {
+        return {
+          success: false,
+          error: data.detail || "Failed to create capability",
+        };
+      }
+    } catch (err) {
+      console.log("[AdminScreen] Could not create capability", err);
+      return { success: false, error: "Network error" };
+    }
+  };
+
+  const handleMoveCapability = async (capability, direction) => {
+    // Only works when viewing a specific domain
+    if (domainFilter === "all") return;
+
+    // Get capabilities in this domain sorted by bit_index
+    const domainCaps = capabilities
+      .filter((c) => c.domain === domainFilter)
+      .sort((a, b) => (a.bit_index ?? 0) - (b.bit_index ?? 0));
+
+    const currentIndex = domainCaps.findIndex((c) => c.id === capability.id);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= domainCaps.length) return;
+
+    // Swap positions
+    const newOrder = [...domainCaps];
+    [newOrder[currentIndex], newOrder[newIndex]] = [
+      newOrder[newIndex],
+      newOrder[currentIndex],
+    ];
+
+    // Send reorder request
+    try {
+      const response = await fetch(`${baseUrl}/admin/capabilities/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          domain: domainFilter,
+          capability_ids: newOrder.map((c) => c.id),
+        }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        // Update local state with new bit_indexes
+        const newBitIndexes = {};
+        data.new_order.forEach((item) => {
+          newBitIndexes[item.id] = item.bit_index;
+        });
+        setCapabilities((prev) =>
+          prev.map((c) => ({
+            ...c,
+            bit_index: newBitIndexes[c.id] ?? c.bit_index,
+          })),
+        );
+      }
+    } catch (err) {
+      console.log("[AdminScreen] Could not reorder capabilities", err);
+    }
+  };
+
+  const handleRenameDomain = async (oldName, newName) => {
+    try {
+      const response = await fetch(`${baseUrl}/admin/domains/rename`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ old_name: oldName, new_name: newName }),
+      });
+      if (response.ok) {
+        // Reload capabilities to get updated domains
+        await loadCapabilities();
+        return { success: true };
+      } else {
+        const data = await response.json();
+        return {
+          success: false,
+          error: data.detail || "Failed to rename domain",
+        };
+      }
+    } catch (err) {
+      console.log("[AdminScreen] Could not rename domain", err);
+      return { success: false, error: "Network error" };
     }
   };
 
@@ -267,43 +390,83 @@ function CapabilityExplorer() {
     setTimeout(() => setExportStatus(null), 5000);
   };
 
-  const renderCapabilityItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.listItem}
-      onPress={() => viewCapabilityDetail(item)}
-    >
-      <View style={styles.listItemHeader}>
-        <Text style={styles.listItemTitle}>
-          {item.display_name || item.name}
-        </Text>
-        <Text style={styles.listItemBadge}>{item.domain}</Text>
-      </View>
-      <View style={styles.listItemDetails}>
-        <Text style={styles.listItemDetail}>
-          Bit: {item.bit_index ?? "N/A"}
-        </Text>
-        <Text style={styles.listItemDetail}>
-          Tier: {item.difficulty_tier || 1}
-        </Text>
-        <Text style={styles.listItemDetail}>
-          Type: {item.requirement_type || "required"}
-        </Text>
-        <Text
-          style={[
-            styles.listItemDetail,
-            { color: item.is_active !== false ? "#4CAF50" : "#f44336" },
-          ]}
+  const renderCapabilityItem = ({ item, index }) => {
+    // Get domain capabilities sorted by bit_index for determining if up/down is possible
+    const domainCaps =
+      domainFilter !== "all"
+        ? capabilities
+            .filter((c) => c.domain === domainFilter)
+            .sort((a, b) => (a.bit_index ?? 0) - (b.bit_index ?? 0))
+        : [];
+    const itemIndex = domainCaps.findIndex((c) => c.id === item.id);
+    const canMoveUp = domainFilter !== "all" && itemIndex > 0;
+    const canMoveDown =
+      domainFilter !== "all" && itemIndex < domainCaps.length - 1;
+
+    return (
+      <View style={styles.listItem}>
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          onPress={() => viewCapabilityDetail(item)}
         >
-          {item.is_active !== false ? "Active" : "Inactive"}
-        </Text>
+          <View style={styles.listItemHeader}>
+            <Text style={styles.listItemTitle}>
+              {item.display_name || item.name}
+            </Text>
+            <Text style={styles.listItemBadge}>{item.domain}</Text>
+          </View>
+          <View style={styles.listItemDetails}>
+            <Text style={styles.listItemDetail}>
+              Bit: {item.bit_index ?? "N/A"}
+            </Text>
+            <Text style={styles.listItemDetail}>
+              Tier: {item.difficulty_tier || 1}
+            </Text>
+            <Text style={styles.listItemDetail}>
+              Type: {item.requirement_type || "required"}
+            </Text>
+            <Text
+              style={[
+                styles.listItemDetail,
+                { color: item.is_active !== false ? "#4CAF50" : "#f44336" },
+              ]}
+            >
+              {item.is_active !== false ? "Active" : "Inactive"}
+            </Text>
+          </View>
+          {item.prerequisite_names?.length > 0 && (
+            <Text style={styles.listItemSubtext}>
+              Prerequisites: {item.prerequisite_names.join(", ")}
+            </Text>
+          )}
+        </TouchableOpacity>
+        {domainFilter !== "all" && (
+          <View style={styles.reorderButtons}>
+            <TouchableOpacity
+              style={[
+                styles.reorderButton,
+                !canMoveUp && styles.reorderButtonDisabled,
+              ]}
+              onPress={() => canMoveUp && handleMoveCapability(item, "up")}
+              disabled={!canMoveUp}
+            >
+              <Text style={styles.reorderButtonText}>▲</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.reorderButton,
+                !canMoveDown && styles.reorderButtonDisabled,
+              ]}
+              onPress={() => canMoveDown && handleMoveCapability(item, "down")}
+              disabled={!canMoveDown}
+            >
+              <Text style={styles.reorderButtonText}>▼</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
-      {item.prerequisite_names?.length > 0 && (
-        <Text style={styles.listItemSubtext}>
-          Prerequisites: {item.prerequisite_names.join(", ")}
-        </Text>
-      )}
-    </TouchableOpacity>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -324,6 +487,18 @@ function CapabilityExplorer() {
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
+        <TouchableOpacity
+          style={styles.addCapButton}
+          onPress={() => setShowCreateModal(true)}
+        >
+          <Text style={styles.addCapButtonText}>+ Add</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.domainManageButton}
+          onPress={() => setShowDomainManageModal(true)}
+        >
+          <Text style={styles.domainManageButtonText}>✎ Domains</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[
             styles.exportButton,
@@ -426,6 +601,7 @@ function CapabilityExplorer() {
           onEdit={handleEditCapability}
           onArchive={handleArchiveCapability}
           onRestore={handleRestoreCapability}
+          onDelete={handleDeleteCapability}
         />
       </Modal>
 
@@ -445,6 +621,35 @@ function CapabilityExplorer() {
           onSave={handleCapabilitySaved}
         />
       </Modal>
+
+      {/* Create Modal */}
+      <Modal
+        visible={showCreateModal}
+        animationType="slide"
+        onRequestClose={() => setShowCreateModal(false)}
+      >
+        <CapabilityCreateModal
+          domains={domains}
+          allCapabilities={capabilities}
+          onClose={() => setShowCreateModal(false)}
+          onCreate={handleCreateCapability}
+          initialDomain={domainFilter !== "all" ? domainFilter : null}
+        />
+      </Modal>
+
+      {/* Domain Manage Modal */}
+      <Modal
+        visible={showDomainManageModal}
+        animationType="slide"
+        onRequestClose={() => setShowDomainManageModal(false)}
+      >
+        <DomainManageModal
+          domains={domains}
+          capabilities={capabilities}
+          onClose={() => setShowDomainManageModal(false)}
+          onRename={handleRenameDomain}
+        />
+      </Modal>
     </View>
   );
 }
@@ -456,10 +661,22 @@ function CapabilityDetailView({
   onEdit,
   onArchive,
   onRestore,
+  onDelete,
 }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   if (!capability) return null;
 
   const isActive = capability.is_active !== false;
+
+  const handleDeletePress = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    setShowDeleteConfirm(false);
+    onDelete(capability);
+  };
 
   return (
     <ScrollView style={styles.detailContainer}>
@@ -489,11 +706,46 @@ function CapabilityDetailView({
           >
             <Text style={styles.editButtonText}>Edit</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.editButton, { backgroundColor: "#dc2626" }]}
+            onPress={handleDeletePress}
+          >
+            <Text style={styles.editButtonText}>Delete</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Delete Confirmation */}
+      {showDeleteConfirm && (
+        <View style={styles.deleteConfirmContainer}>
+          <Text style={styles.deleteConfirmText}>
+            Are you sure you want to permanently delete "{capability.name}"?
+          </Text>
+          <View style={styles.deleteConfirmButtons}>
+            <TouchableOpacity
+              style={[
+                styles.deleteConfirmButton,
+                { backgroundColor: "#6b7280" },
+              ]}
+              onPress={() => setShowDeleteConfirm(false)}
+            >
+              <Text style={styles.deleteConfirmButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.deleteConfirmButton,
+                { backgroundColor: "#dc2626" },
+              ]}
+              onPress={confirmDelete}
+            >
+              <Text style={styles.deleteConfirmButtonText}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       <View style={styles.detailSection}>
         <Text style={styles.detailSectionTitle}>Basic Info</Text>
@@ -524,10 +776,6 @@ function CapabilityDetailView({
         <DetailRow
           label="Requirement Type"
           value={capability.requirement_type || "required"}
-        />
-        <DetailRow
-          label="Sequence Order"
-          value={String(capability.sequence_order || "N/A")}
         />
       </View>
 
@@ -630,14 +878,6 @@ function validateCapabilityForm(formData) {
     errors.domain = "Domain is required";
   }
 
-  // Numeric validations
-  if (formData.sequence_order !== null && formData.sequence_order !== "") {
-    const seqOrder = Number(formData.sequence_order);
-    if (isNaN(seqOrder) || seqOrder < 0) {
-      errors.sequence_order = "Sequence order must be a non-negative number";
-    }
-  }
-
   const diffTier = Number(formData.difficulty_tier);
   if (isNaN(diffTier) || diffTier < 1 || diffTier > 5) {
     errors.difficulty_tier = "Difficulty tier must be 1-5";
@@ -691,7 +931,6 @@ function CapabilityEditModal({ capability, allCapabilities, onClose, onSave }) {
     domain: capability?.domain || "",
     subdomain: capability?.subdomain || "",
     requirement_type: capability?.requirement_type || "required",
-    sequence_order: capability?.sequence_order ?? "",
     difficulty_tier: capability?.difficulty_tier || 1,
     mastery_type: capability?.mastery_type || "single",
     mastery_count: capability?.mastery_count || 1,
@@ -763,10 +1002,6 @@ function CapabilityEditModal({ capability, allCapabilities, onClose, onSave }) {
             domain: formData.domain.trim(),
             subdomain: formData.subdomain?.trim() || null,
             requirement_type: formData.requirement_type,
-            sequence_order:
-              formData.sequence_order !== ""
-                ? Number(formData.sequence_order)
-                : null,
             difficulty_tier: Number(formData.difficulty_tier),
             mastery_type: formData.mastery_type,
             mastery_count: Number(formData.mastery_count),
@@ -801,10 +1036,6 @@ function CapabilityEditModal({ capability, allCapabilities, onClose, onSave }) {
         onSave({
           ...capability,
           ...formData,
-          sequence_order:
-            formData.sequence_order !== ""
-              ? Number(formData.sequence_order)
-              : null,
           difficulty_tier: Number(formData.difficulty_tier),
           mastery_count: Number(formData.mastery_count),
           evidence_required_count: Number(formData.evidence_required_count),
@@ -910,16 +1141,6 @@ function CapabilityEditModal({ capability, allCapabilities, onClose, onSave }) {
             <Text style={styles.formFieldError}>{errors.requirement_type}</Text>
           )}
         </View>
-
-        {/* Sequence Order */}
-        <FormField
-          label="Sequence Order"
-          value={String(formData.sequence_order)}
-          onChangeText={(v) => updateField("sequence_order", v)}
-          error={errors.sequence_order}
-          placeholder="e.g., 10"
-          keyboardType="numeric"
-        />
 
         {/* Difficulty Tier */}
         <FormField
@@ -1328,6 +1549,494 @@ function PrerequisiteSelector({
             </Text>
           }
         />
+      </View>
+    </View>
+  );
+}
+
+// =============================================================================
+// CAPABILITY CREATE MODAL
+// =============================================================================
+
+function CapabilityCreateModal({
+  domains,
+  allCapabilities,
+  onClose,
+  onCreate,
+  initialDomain,
+}) {
+  const [formData, setFormData] = useState({
+    name: "",
+    display_name: "",
+    domain: initialDomain || "",
+    subdomain: "",
+    requirement_type: "required",
+    difficulty_tier: 1,
+    mastery_type: "single",
+    mastery_count: 1,
+    evidence_required_count: 1,
+    evidence_distinct_materials: false,
+    evidence_acceptance_threshold: 4,
+    difficulty_weight: 1.0,
+  });
+  const [newDomain, setNewDomain] = useState("");
+  const [useNewDomain, setUseNewDomain] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [selectedPrereqIds, setSelectedPrereqIds] = useState([]);
+  const [showPrereqSelector, setShowPrereqSelector] = useState(false);
+  const [prereqDomainFilter, setPrereqDomainFilter] = useState("all");
+  const [prereqSearchQuery, setPrereqSearchQuery] = useState("");
+
+  const updateField = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors((prev) => {
+        const { [field]: _, ...rest } = prev;
+        return rest;
+      });
+    }
+    setSaveError(null);
+  };
+
+  const handleCreate = async () => {
+    const finalDomain = useNewDomain ? newDomain.trim() : formData.domain;
+    const finalFormData = { ...formData, domain: finalDomain };
+
+    const validation = validateCapabilityForm(finalFormData);
+    if (!validation.isValid) {
+      setErrors(validation.errors);
+      return;
+    }
+
+    setSaving(true);
+    setSaveError(null);
+
+    const result = await onCreate({
+      name: formData.name.trim(),
+      display_name: formData.display_name?.trim() || null,
+      domain: finalDomain,
+      subdomain: formData.subdomain?.trim() || null,
+      requirement_type: formData.requirement_type,
+      difficulty_tier: Number(formData.difficulty_tier),
+      mastery_type: formData.mastery_type,
+      mastery_count: Number(formData.mastery_count),
+      evidence_required_count: Number(formData.evidence_required_count),
+      evidence_distinct_materials: formData.evidence_distinct_materials,
+      evidence_acceptance_threshold: Number(
+        formData.evidence_acceptance_threshold,
+      ),
+      difficulty_weight: Number(formData.difficulty_weight),
+      prerequisite_ids: selectedPrereqIds,
+    });
+
+    setSaving(false);
+    if (!result.success) {
+      setSaveError(result.error);
+    }
+  };
+
+  return (
+    <View style={styles.editModalContainer}>
+      <View style={styles.editModalHeader}>
+        <Text style={styles.editModalTitle}>Create Capability</Text>
+        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <Text style={styles.closeButtonText}>✕</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.editModalContent}>
+        {/* Name */}
+        <FormField
+          label="Name (lowercase_with_underscores)"
+          value={formData.name}
+          onChangeText={(v) =>
+            updateField("name", v.toLowerCase().replace(/[^a-z0-9_]/g, "_"))
+          }
+          error={errors.name}
+          placeholder="e.g., my_new_capability"
+        />
+
+        {/* Display Name */}
+        <FormField
+          label="Display Name"
+          value={formData.display_name}
+          onChangeText={(v) => updateField("display_name", v)}
+          placeholder="e.g., My New Capability"
+        />
+
+        {/* Domain Selection */}
+        <View style={styles.formFieldContainer}>
+          <Text style={styles.formFieldLabel}>Domain</Text>
+
+          <View style={styles.domainToggleContainer}>
+            <TouchableOpacity
+              style={[
+                styles.domainToggleButton,
+                !useNewDomain && styles.domainToggleButtonActive,
+              ]}
+              onPress={() => setUseNewDomain(false)}
+            >
+              <Text
+                style={[
+                  styles.domainToggleText,
+                  !useNewDomain && styles.domainToggleTextActive,
+                ]}
+              >
+                Existing Domain
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.domainToggleButton,
+                useNewDomain && styles.domainToggleButtonActive,
+              ]}
+              onPress={() => setUseNewDomain(true)}
+            >
+              <Text
+                style={[
+                  styles.domainToggleText,
+                  useNewDomain && styles.domainToggleTextActive,
+                ]}
+              >
+                + New Domain
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {!useNewDomain ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {domains.map((d) => (
+                <TouchableOpacity
+                  key={d}
+                  style={[
+                    styles.domainChip,
+                    formData.domain === d && styles.domainChipActive,
+                  ]}
+                  onPress={() => updateField("domain", d)}
+                >
+                  <Text
+                    style={[
+                      styles.domainChipText,
+                      formData.domain === d && styles.domainChipTextActive,
+                    ]}
+                  >
+                    {d}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : (
+            <TextInput
+              style={styles.formFieldInput}
+              value={newDomain}
+              onChangeText={setNewDomain}
+              placeholder="Enter new domain name"
+            />
+          )}
+          {errors.domain && (
+            <Text style={styles.formFieldError}>{errors.domain}</Text>
+          )}
+        </View>
+
+        {/* Subdomain */}
+        <FormField
+          label="Subdomain (optional)"
+          value={formData.subdomain}
+          onChangeText={(v) => updateField("subdomain", v)}
+          placeholder="e.g., basics"
+        />
+
+        {/* Requirement Type */}
+        <View style={styles.formFieldContainer}>
+          <Text style={styles.formFieldLabel}>Requirement Type</Text>
+          <View style={styles.requirementTypeContainer}>
+            {VALID_REQUIREMENT_TYPES.map((type) => (
+              <TouchableOpacity
+                key={type}
+                style={[
+                  styles.requirementOption,
+                  formData.requirement_type === type &&
+                    styles.requirementOptionActive,
+                ]}
+                onPress={() => updateField("requirement_type", type)}
+              >
+                <Text
+                  style={[
+                    styles.requirementOptionText,
+                    formData.requirement_type === type &&
+                      styles.requirementOptionTextActive,
+                  ]}
+                >
+                  {type}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Difficulty Tier */}
+        <FormField
+          label="Difficulty Tier (1-5)"
+          value={String(formData.difficulty_tier)}
+          onChangeText={(v) => updateField("difficulty_tier", v)}
+          error={errors.difficulty_tier}
+          keyboardType="numeric"
+        />
+
+        {/* Prerequisites */}
+        <View style={styles.formFieldContainer}>
+          <Text style={styles.formFieldLabel}>Prerequisites</Text>
+          <Text style={styles.prereqHint}>
+            Capabilities that must be mastered before this one can be introduced.
+          </Text>
+
+          {/* Current prerequisites list */}
+          <View style={styles.prereqList}>
+            {selectedPrereqIds.length === 0 ? (
+              <Text style={styles.prereqEmptyText}>
+                No prerequisites selected
+              </Text>
+            ) : (
+              selectedPrereqIds.map((prereqId) => {
+                const prereq = allCapabilities.find((c) => c.id === prereqId);
+                if (!prereq) return null;
+                return (
+                  <View key={prereqId} style={styles.prereqChip}>
+                    <View style={styles.prereqChipContent}>
+                      <Text style={styles.prereqChipText}>
+                        {prereq.display_name || prereq.name}
+                      </Text>
+                      <Text style={styles.prereqChipDomain}>
+                        {prereq.domain}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.prereqChipRemove}
+                      onPress={() => {
+                        setSelectedPrereqIds((prev) =>
+                          prev.filter((id) => id !== prereqId),
+                        );
+                        setSaveError(null);
+                      }}
+                    >
+                      <Text style={styles.prereqChipRemoveText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })
+            )}
+          </View>
+
+          {/* Add prerequisite button */}
+          <TouchableOpacity
+            style={styles.addPrereqButton}
+            onPress={() => setShowPrereqSelector(true)}
+          >
+            <Text style={styles.addPrereqButtonText}>+ Add Prerequisite</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Prerequisite Selector Modal */}
+        <Modal
+          visible={showPrereqSelector}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowPrereqSelector(false)}
+        >
+          <PrerequisiteSelector
+            currentCapabilityId={null}
+            allCapabilities={allCapabilities}
+            selectedIds={selectedPrereqIds}
+            onSelect={(id) => {
+              if (!selectedPrereqIds.includes(id)) {
+                setSelectedPrereqIds((prev) => [...prev, id]);
+                setSaveError(null);
+              }
+            }}
+            onClose={() => setShowPrereqSelector(false)}
+            prereqDomainFilter={prereqDomainFilter}
+            setPrereqDomainFilter={setPrereqDomainFilter}
+            prereqSearchQuery={prereqSearchQuery}
+            setPrereqSearchQuery={setPrereqSearchQuery}
+          />
+        </Modal>
+
+        {/* Save Error */}
+        {saveError && (
+          <View style={styles.saveErrorContainer}>
+            <Text style={styles.saveErrorText}>{saveError}</Text>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Action Buttons */}
+      <View style={styles.editModalFooter}>
+        <TouchableOpacity
+          style={[styles.editModalButton, styles.cancelButton]}
+          onPress={onClose}
+          disabled={saving}
+        >
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.editModalButton,
+            styles.saveButton,
+            saving && styles.saveButtonDisabled,
+          ]}
+          onPress={handleCreate}
+          disabled={saving}
+        >
+          <Text style={styles.saveButtonText}>
+            {saving ? "Creating..." : "Create"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// =============================================================================
+// DOMAIN MANAGE MODAL
+// =============================================================================
+
+function DomainManageModal({ domains, capabilities, onClose, onRename }) {
+  const [editingDomain, setEditingDomain] = useState(null);
+  const [editValue, setEditValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+
+  // Count capabilities per domain
+  const domainCounts = {};
+  capabilities.forEach((c) => {
+    domainCounts[c.domain] = (domainCounts[c.domain] || 0) + 1;
+  });
+
+  const startEditing = (domain) => {
+    setEditingDomain(domain);
+    setEditValue(domain);
+    setSaveError(null);
+  };
+
+  const cancelEditing = () => {
+    setEditingDomain(null);
+    setEditValue("");
+    setSaveError(null);
+  };
+
+  const handleSaveRename = async () => {
+    if (!editValue.trim()) {
+      setSaveError("Domain name cannot be empty");
+      return;
+    }
+    if (editValue.trim() === editingDomain) {
+      cancelEditing();
+      return;
+    }
+
+    setSaving(true);
+    setSaveError(null);
+
+    const result = await onRename(editingDomain, editValue.trim());
+
+    setSaving(false);
+    if (result.success) {
+      setEditingDomain(null);
+      setEditValue("");
+    } else {
+      setSaveError(result.error);
+    }
+  };
+
+  return (
+    <View style={styles.editModalContainer}>
+      <View style={styles.editModalHeader}>
+        <Text style={styles.editModalTitle}>Manage Domains</Text>
+        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <Text style={styles.closeButtonText}>✕</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={{ padding: 16, backgroundColor: "#f0f0f0" }}>
+        <Text style={{ color: "#666", fontSize: 12 }}>
+          Domains are sorted alphabetically. Renaming a domain will update all
+          capabilities in that domain and re-sort bit_indexes.
+        </Text>
+      </View>
+
+      <ScrollView style={styles.editModalContent}>
+        {domains.map((domain) => (
+          <View key={domain} style={styles.domainReorderItem}>
+            {editingDomain === domain ? (
+              <View style={{ flex: 1 }}>
+                <TextInput
+                  style={styles.domainEditInput}
+                  value={editValue}
+                  onChangeText={setEditValue}
+                  autoFocus
+                  placeholder="Domain name"
+                />
+                {saveError && (
+                  <Text
+                    style={{ color: "#dc2626", fontSize: 12, marginTop: 4 }}
+                  >
+                    {saveError}
+                  </Text>
+                )}
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.domainEditActionButton,
+                      { backgroundColor: "#6b7280" },
+                    ]}
+                    onPress={cancelEditing}
+                    disabled={saving}
+                  >
+                    <Text style={{ color: "#fff", fontSize: 12 }}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.domainEditActionButton,
+                      { backgroundColor: "#3b82f6" },
+                    ]}
+                    onPress={handleSaveRename}
+                    disabled={saving}
+                  >
+                    <Text style={{ color: "#fff", fontSize: 12 }}>
+                      {saving ? "Saving..." : "Save"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.domainReorderName}>{domain}</Text>
+                  <Text style={styles.domainReorderCount}>
+                    {domainCounts[domain] || 0} capabilities
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.domainEditButton}
+                  onPress={() => startEditing(domain)}
+                >
+                  <Text style={styles.domainEditButtonText}>Edit</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        ))}
+      </ScrollView>
+
+      <View style={styles.editModalFooter}>
+        <TouchableOpacity
+          style={[styles.editModalButton, styles.cancelButton]}
+          onPress={onClose}
+        >
+          <Text style={styles.cancelButtonText}>Close</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -2440,6 +3149,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+    flexDirection: "row",
+    alignItems: "center",
   },
   listItemHeader: {
     flexDirection: "row",
@@ -2514,6 +3225,36 @@ const styles = StyleSheet.create({
     marginTop: 12,
     padding: 14,
     borderRadius: 8,
+  },
+  deleteConfirmContainer: {
+    backgroundColor: "#fef2f2",
+    marginHorizontal: 12,
+    marginTop: 12,
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#fca5a5",
+  },
+  deleteConfirmText: {
+    fontSize: 14,
+    color: "#991b1b",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  deleteConfirmButtons: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 12,
+  },
+  deleteConfirmButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 6,
+  },
+  deleteConfirmButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
   },
   detailSectionTitle: {
     fontSize: 14,
@@ -2931,6 +3672,14 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
   // Save / Cancel buttons
+  editModalFooter: {
+    flexDirection: "row",
+    gap: 12,
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#e0e0e0",
+    backgroundColor: "#fff",
+  },
   editModalActions: {
     flexDirection: "row",
     gap: 12,
@@ -3161,5 +3910,129 @@ const styles = StyleSheet.create({
   prereqSelectItemId: {
     fontSize: 11,
     color: "#999",
+  },
+  // Reorder buttons
+  reorderButtons: {
+    flexDirection: "column",
+    marginLeft: 8,
+  },
+  reorderButton: {
+    width: 32,
+    height: 28,
+    backgroundColor: "#e0e0e0",
+    borderRadius: 4,
+    justifyContent: "center",
+    alignItems: "center",
+    marginVertical: 2,
+  },
+  reorderButtonDisabled: {
+    backgroundColor: "#f5f5f5",
+    opacity: 0.5,
+  },
+  reorderButtonText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  // Add capability button
+  addCapButton: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  addCapButtonText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  // Domain manage button
+  domainManageButton: {
+    backgroundColor: "#FF9800",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  domainManageButtonText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  // Domain reorder item
+  domainReorderItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    padding: 14,
+    marginHorizontal: 12,
+    marginVertical: 4,
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  domainReorderName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+  },
+  domainReorderCount: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 2,
+  },
+  domainEditInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 6,
+    padding: 10,
+    fontSize: 14,
+    backgroundColor: "#fff",
+  },
+  domainEditButton: {
+    backgroundColor: "#3b82f6",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  domainEditButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  domainEditActionButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  // Domain toggle buttons (Existing vs New)
+  domainToggleContainer: {
+    flexDirection: "row",
+    marginBottom: 12,
+    gap: 10,
+  },
+  domainToggleButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "#e0e0e0",
+    alignItems: "center",
+  },
+  domainToggleButtonActive: {
+    backgroundColor: "#e3f2fd",
+    borderColor: "#2196F3",
+  },
+  domainToggleText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#666",
+  },
+  domainToggleTextActive: {
+    color: "#1976D2",
+    fontWeight: "600",
   },
 });
