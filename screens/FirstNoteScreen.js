@@ -321,6 +321,16 @@ function DevNavMenu({
             {isResetting ? "Resetting..." : "🔄 Reset User Data"}
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[devStyles.resetButton, { backgroundColor: "#3b2c1a", marginTop: 8 }]}
+          onPress={() => {
+            setIsOpen(false);
+            navigation.navigate("Admin");
+          }}
+        >
+          <Text style={devStyles.resetButtonText}>⚙️ Admin Panel</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );

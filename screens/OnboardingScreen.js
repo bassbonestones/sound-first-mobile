@@ -478,6 +478,23 @@ function OnboardingScreen({ navigation, route }) {
           </View>
         </View>
         <ResetButton />
+        {/* Admin Button */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate("Admin")}
+          style={{
+            position: "absolute",
+            bottom: 20,
+            right: 20,
+            backgroundColor: "#3b2c1a",
+            borderRadius: 8,
+            paddingVertical: 8,
+            paddingHorizontal: 12,
+            borderWidth: 1,
+            borderColor: "#FFD700",
+          }}
+        >
+          <Text style={{ color: "#FFD700", fontSize: 12 }}>Admin</Text>
+        </TouchableOpacity>
       </View>
     );
   }

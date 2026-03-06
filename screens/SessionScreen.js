@@ -430,7 +430,7 @@ export default function SessionScreen({ navigation, route }) {
           }}
         >
           <TouchableOpacity
-            onPress={() => navigation.navigate("CapabilityPath")}
+            onPress={() => navigation.navigate("Admin")}
             style={{
               backgroundColor: "#2a2a4a",
               paddingHorizontal: 10,
@@ -442,7 +442,7 @@ export default function SessionScreen({ navigation, route }) {
             <Text
               style={{ color: "#4facfe", fontSize: 12, fontWeight: "bold" }}
             >
-              📋 Path
+              🛠️ Admin
             </Text>
           </TouchableOpacity>
           <Text

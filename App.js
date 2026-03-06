@@ -79,7 +79,7 @@ import RatingScreen from "./screens/RatingScreen";
 import OnboardingScreen from "./screens/OnboardingScreen";
 import SelfDirectedScreen from "./screens/SelfDirectedScreen";
 import HistoryScreen from "./screens/HistoryScreen";
-import CapabilityPath from "./screens/CapabilityPath";
+import AdminScreen from "./screens/AdminScreen";
 import FirstNoteScreen from "./screens/FirstNoteScreen";
 
 const Stack = createNativeStackNavigator();
@@ -236,9 +236,9 @@ export default function App() {
             options={{ title: "Practice History" }}
           />
           <Stack.Screen
-            name="CapabilityPath"
-            component={CapabilityPath}
-            options={{ title: "Curriculum Planning", headerShown: false }}
+            name="Admin"
+            component={AdminScreen}
+            options={{ title: "Admin Console", headerShown: false }}
           />
         </Stack.Navigator>
       </NavigationContainer>
