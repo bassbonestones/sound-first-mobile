@@ -202,13 +202,13 @@ function CapabilityExplorer() {
         const data = await response.json();
         const freshCapabilities = data.capabilities || [];
         setCapabilities(freshCapabilities);
-        
+
         // Extract unique domains
         const uniqueDomains = [
           ...new Set(freshCapabilities.map((c) => c.domain)),
         ].sort();
         setDomains(uniqueDomains);
-        
+
         // Find and set the fresh capability for detail view
         const freshCap = freshCapabilities.find((c) => c.id === capId);
         if (freshCap) {
@@ -456,6 +456,15 @@ function CapabilityExplorer() {
               Prerequisites: {item.prerequisite_names.join(", ")}
             </Text>
           )}
+          {item.soft_gate_requirements &&
+            Object.keys(item.soft_gate_requirements).length > 0 && (
+              <Text style={[styles.listItemSubtext, { color: "#9C27B0" }]}>
+                Soft Gates:{" "}
+                {Object.entries(item.soft_gate_requirements)
+                  .map(([k, v]) => `${k}: ${v}`)
+                  .join(", ")}
+              </Text>
+            )}
         </TouchableOpacity>
         {domainFilter !== "all" && (
           <View style={styles.reorderButtons}>
@@ -957,6 +966,9 @@ function CapabilityEditModal({ capability, allCapabilities, onClose, onSave }) {
     evidence_acceptance_threshold:
       capability?.evidence_acceptance_threshold || 4,
     difficulty_weight: capability?.difficulty_weight || 1.0,
+    soft_gate_requirements: capability?.soft_gate_requirements
+      ? JSON.stringify(capability.soft_gate_requirements)
+      : "",
   });
 
   // Prerequisites state - track by ID
@@ -1023,6 +1035,9 @@ function CapabilityEditModal({ capability, allCapabilities, onClose, onSave }) {
             ),
             difficulty_weight: Number(formData.difficulty_weight),
             prerequisite_ids: selectedPrereqIds,
+            soft_gate_requirements: formData.soft_gate_requirements?.trim()
+              ? JSON.parse(formData.soft_gate_requirements)
+              : null,
           }),
         },
       );
@@ -1246,6 +1261,20 @@ function CapabilityEditModal({ capability, allCapabilities, onClose, onSave }) {
           error={errors.evidence_acceptance_threshold}
           keyboardType="numeric"
         />
+
+        {/* Soft Gate Requirements */}
+        <FormField
+          label="Soft Gate Requirements (JSON)"
+          value={formData.soft_gate_requirements}
+          onChangeText={(v) => updateField("soft_gate_requirements", v)}
+          error={errors.soft_gate_requirements}
+          placeholder='{"interval_velocity_score": 0.5}'
+          multiline={true}
+        />
+        <Text style={styles.prereqHint}>
+          Optional JSON object specifying soft gate thresholds. User must reach
+          comfortable_value for each dimension before mastering this capability.
+        </Text>
 
         {/* Prerequisites Section */}
         <View style={styles.formFieldContainer}>
@@ -1584,6 +1613,7 @@ function CapabilityCreateModal({
     evidence_distinct_materials: false,
     evidence_acceptance_threshold: 4,
     difficulty_weight: 1.0,
+    soft_gate_requirements: "",
   });
   const [newDomain, setNewDomain] = useState("");
   const [useNewDomain, setUseNewDomain] = useState(false);
@@ -1635,6 +1665,9 @@ function CapabilityCreateModal({
       ),
       difficulty_weight: Number(formData.difficulty_weight),
       prerequisite_ids: selectedPrereqIds,
+      soft_gate_requirements: formData.soft_gate_requirements?.trim()
+        ? JSON.parse(formData.soft_gate_requirements)
+        : null,
     });
 
     setSaving(false);
@@ -1795,7 +1828,8 @@ function CapabilityCreateModal({
         <View style={styles.formFieldContainer}>
           <Text style={styles.formFieldLabel}>Prerequisites</Text>
           <Text style={styles.prereqHint}>
-            Capabilities that must be mastered before this one can be introduced.
+            Capabilities that must be mastered before this one can be
+            introduced.
           </Text>
 
           {/* Current prerequisites list */}
