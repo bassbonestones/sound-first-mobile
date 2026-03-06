@@ -1,23 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { Platform, View, ActivityIndicator, Text } from "react-native";
+import { View, ActivityIndicator, Text, Platform } from "react-native";
+
+// Centralized API client
+import { getBackendUrl } from "./src/api/client";
 
 // ============= STARTUP TIMING =============
 const TIMING = {
   bundleLoaded: Date.now(), // When JS bundle finished loading (Expo startup complete)
 };
-
-// Get backend URL for logging
-function getBackendUrl() {
-  const LOCAL_IP = "192.168.1.19";
-  if (Platform.OS === "android") {
-    return "http://10.0.2.2:8000";
-  } else if (Platform.OS === "ios") {
-    return `http://${LOCAL_IP}:8000`;
-  } else if (Platform.OS === "web") {
-    return `http://${typeof window !== "undefined" ? window.location.hostname : "localhost"}:8000`;
-  }
-  return `http://${LOCAL_IP}:8000`;
-}
 
 // Log to both console and server
 function logTiming(event, data) {

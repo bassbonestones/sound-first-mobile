@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Platform,
 } from "react-native";
+import { getBackendUrl } from "../src/api/client";
 
 /**
  * AudioPlayer Component for LISTEN steps
@@ -24,18 +25,6 @@ import {
  * - showProgress: Show progress bar
  * - accentColor: Theme accent color
  */
-
-function getBackendUrl() {
-  const LOCAL_IP = "192.168.1.19";
-  if (Platform.OS === "android") {
-    return "http://10.0.2.2:8000";
-  } else if (Platform.OS === "ios") {
-    return `http://${LOCAL_IP}:8000`;
-  } else if (Platform.OS === "web") {
-    return `http://${window.location.hostname}:8000`;
-  }
-  return `http://${LOCAL_IP}:8000`;
-}
 
 export default function AudioPlayer({
   materialId,

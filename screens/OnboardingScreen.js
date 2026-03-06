@@ -13,6 +13,7 @@ import {
 import StaffNotePicker from "../components/StaffNotePicker";
 import AudioInput from "../components/AudioInput";
 import ResetButton from "../components/ResetButton";
+import { getBackendUrl } from "../src/api/client";
 
 // Instrument families with their instruments
 const instrumentFamilies = {
@@ -121,18 +122,6 @@ const instrumentDefaults = {
   "Mallet Percussion": { startingNote: "C4", clef: "treble" },
   Other: { startingNote: "C4", clef: "treble" },
 };
-
-function getBackendUrl() {
-  const LOCAL_IP = "192.168.1.19";
-  if (Platform.OS === "android") {
-    return "http://10.0.2.2:8000";
-  } else if (Platform.OS === "ios") {
-    return `http://${LOCAL_IP}:8000`;
-  } else if (Platform.OS === "web") {
-    return `http://${window.location.hostname}:8000`;
-  }
-  return `http://${LOCAL_IP}:8000`;
-}
 
 function OnboardingScreen({ navigation, route }) {
   // Get initial step from route params (for dev navigation)

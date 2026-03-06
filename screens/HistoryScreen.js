@@ -4,18 +4,14 @@ import {
   Text,
   FlatList,
   ActivityIndicator,
-  Platform,
   ScrollView,
   TouchableOpacity,
 } from "react-native";
 import ResetButton from "../components/ResetButton";
+import { baseUrl } from "../src/api/client";
 
 function getBackendUrl(endpoint) {
-  const LOCAL_IP = "192.168.1.19";
-  if (Platform.OS === "web") {
-    return `http://${window.location.hostname}:8000/${endpoint}`;
-  }
-  return `http://${LOCAL_IP}:8000/${endpoint}`;
+  return `${baseUrl}/${endpoint}`;
 }
 
 // Mastery level colors

@@ -22,6 +22,7 @@ import EDMVisualizer, {
 } from "../components/EDMVisualizer";
 import NotationDisplay from "../components/NotationDisplay";
 import { CommonActions } from "@react-navigation/native";
+import { getBackendUrl } from "../src/api/client";
 
 // Cross-platform AudioContext
 let NativeAudioContext = null;
@@ -530,18 +531,6 @@ const BASS_CLEF_INSTRUMENTS = [
   "Bassoon",
   "Bass Guitar",
 ];
-
-function getBackendUrl() {
-  const LOCAL_IP = "192.168.1.19";
-  if (Platform.OS === "android") {
-    return "http://10.0.2.2:8000";
-  } else if (Platform.OS === "ios") {
-    return `http://${LOCAL_IP}:8000`;
-  } else if (Platform.OS === "web") {
-    return `http://${window.location.hostname}:8000`;
-  }
-  return `http://${LOCAL_IP}:8000`;
-}
 
 // Parse note name to get components
 function parseNoteName(note) {

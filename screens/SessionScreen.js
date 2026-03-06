@@ -21,24 +21,13 @@ import HelpMenu from "../components/HelpMenu";
 import MiniLesson from "../components/MiniLesson";
 import AudioPlayer from "../components/AudioPlayer";
 import ResetButton from "../components/ResetButton";
+import { baseUrl } from "../src/api/client";
 
 function getBackendUrl(selfDirected = false) {
-  // Set to your actual local IP address
-  const LOCAL_IP = "192.168.1.19";
   const endpoint = selfDirected
     ? "generate-self-directed-session"
     : "generate-session";
-  if (Platform.OS === "android") {
-    return `http://10.0.2.2:8000/${endpoint}`;
-  } else if (Platform.OS === "ios") {
-    return `http://${LOCAL_IP}:8000/${endpoint}`;
-  } else if (Platform.OS === "web") {
-    // Use window.location.hostname for web to avoid CORS/network issues
-    return `http://${window.location.hostname}:8000/${endpoint}`;
-  } else {
-    // fallback for other
-    return `http://${LOCAL_IP}:8000/${endpoint}`;
-  }
+  return `${baseUrl}/${endpoint}`;
 }
 
 // Step type icons for curriculum display
@@ -156,9 +145,21 @@ export default function SessionScreen({ navigation, route }) {
       headers: { "Content-Type": "application/json" },
       body,
     })
-      .then((res) => {
+      .then(async (res) => {
         console.log("[SessionScreen] Fetch response status:", res.status);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          // Try to get error detail from response
+          let errorDetail = `HTTP ${res.status}`;
+          try {
+            const errorData = await res.json();
+            if (errorData.detail) {
+              errorDetail = errorData.detail;
+            }
+          } catch (e) {
+            // Couldn't parse error JSON, use status code
+          }
+          throw new Error(errorDetail);
+        }
         return res.json();
       })
       .then((data) => {
@@ -307,8 +308,25 @@ export default function SessionScreen({ navigation, route }) {
   };
 
   if (loading) return <ActivityIndicator size="large" style={{ flex: 1 }} />;
-  if (error)
-    return <Text style={{ color: "red" }}>Error loading session: {error}</Text>;
+  if (error) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
+        <Text style={{ fontSize: 48, marginBottom: 16 }}>😕</Text>
+        <Text style={{ fontSize: 18, fontWeight: "600", color: "#333", textAlign: "center", marginBottom: 12 }}>
+          Couldn't start session
+        </Text>
+        <Text style={{ fontSize: 14, color: "#666", textAlign: "center", marginBottom: 24, lineHeight: 20 }}>
+          {error}
+        </Text>
+        <TouchableOpacity
+          style={{ backgroundColor: "#2196F3", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={{ color: "#fff", fontWeight: "600", fontSize: 16 }}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (!session) return <Text>Error loading session (no data)</Text>;
 

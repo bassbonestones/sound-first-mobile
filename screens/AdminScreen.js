@@ -23,24 +23,14 @@ import {
   Switch,
 } from "react-native";
 import ResetButton from "../components/ResetButton";
-
-// Backend URL helper
-function getBackendUrl() {
-  const LOCAL_IP = "192.168.1.19";
-  if (Platform.OS === "android") return "http://10.0.2.2:8000";
-  if (Platform.OS === "ios") return `http://${LOCAL_IP}:8000`;
-  if (Platform.OS === "web") {
-    return `http://${typeof window !== "undefined" ? window.location.hostname : "localhost"}:8000`;
-  }
-  return `http://${LOCAL_IP}:8000`;
-}
-
-const baseUrl = getBackendUrl();
+import { getBackendUrl, baseUrl } from "../src/api/client";
 
 // Tab navigation
 const TABS = [
   { id: "capabilities", label: "Capabilities" },
   { id: "materials", label: "Materials" },
+  { id: "focus_cards", label: "Focus Cards" },
+  { id: "soft_gates", label: "Soft Gates" },
   { id: "users", label: "User Progress" },
   { id: "sessions", label: "Session Diag" },
 ];
@@ -80,6 +70,8 @@ export default function AdminScreen({ navigation }) {
       <View style={styles.content}>
         {activeTab === "capabilities" && <CapabilityExplorer />}
         {activeTab === "materials" && <MaterialExplorer />}
+        {activeTab === "focus_cards" && <FocusCardExplorer />}
+        {activeTab === "soft_gates" && <SoftGateExplorer />}
         {activeTab === "users" && <UserProgressionInspector />}
         {activeTab === "sessions" && <SessionDiagnostics />}
       </View>
@@ -1584,6 +1576,14 @@ function PrerequisiteSelector({
             </Text>
           }
         />
+
+        {/* Cancel Button */}
+        <TouchableOpacity
+          style={styles.prereqSelectorCancelButton}
+          onPress={onClose}
+        >
+          <Text style={styles.prereqSelectorCancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -1790,22 +1790,22 @@ function CapabilityCreateModal({
         {/* Requirement Type */}
         <View style={styles.formFieldContainer}>
           <Text style={styles.formFieldLabel}>Requirement Type</Text>
-          <View style={styles.requirementTypeContainer}>
+          <View style={styles.pickerContainer}>
             {VALID_REQUIREMENT_TYPES.map((type) => (
               <TouchableOpacity
                 key={type}
                 style={[
-                  styles.requirementOption,
+                  styles.pickerOption,
                   formData.requirement_type === type &&
-                    styles.requirementOptionActive,
+                    styles.pickerOptionSelected,
                 ]}
                 onPress={() => updateField("requirement_type", type)}
               >
                 <Text
                   style={[
-                    styles.requirementOptionText,
+                    styles.pickerOptionText,
                     formData.requirement_type === type &&
-                      styles.requirementOptionTextActive,
+                      styles.pickerOptionTextSelected,
                   ]}
                 >
                   {type}
@@ -3029,6 +3029,1650 @@ function DetailRow({ label, value, valueStyle }) {
 }
 
 // =============================================================================
+// SECTION 5: FOCUS CARD EXPLORER
+// =============================================================================
+
+function FocusCardExplorer() {
+  const [focusCards, setFocusCards] = useState([]);
+  const [filteredFocusCards, setFilteredFocusCards] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [categories, setCategories] = useState([]);
+  const [selectedFocusCard, setSelectedFocusCard] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Fetch focus cards
+  const fetchFocusCards = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${baseUrl}/focus-cards`);
+      if (response.ok) {
+        const data = await response.json();
+        setFocusCards(data);
+        setFilteredFocusCards(data);
+        // Extract unique categories
+        const uniqueCategories = [...new Set(data.map((fc) => fc.category).filter(Boolean))].sort();
+        setCategories(uniqueCategories);
+      }
+    } catch (error) {
+      console.error("Failed to fetch focus cards:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFocusCards();
+  }, [fetchFocusCards]);
+
+  // Filter effect
+  useEffect(() => {
+    let filtered = focusCards;
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter((fc) => fc.category === categoryFilter);
+    }
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (fc) =>
+          fc.name.toLowerCase().includes(query) ||
+          fc.description?.toLowerCase().includes(query) ||
+          fc.attention_cue?.toLowerCase().includes(query)
+      );
+    }
+    setFilteredFocusCards(filtered);
+  }, [focusCards, categoryFilter, searchQuery]);
+
+  const handleDelete = async (focusCardId) => {
+    try {
+      const response = await fetch(`${baseUrl}/admin/focus-cards/${focusCardId}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        await fetchFocusCards();
+        setShowDetailModal(false);
+        setSelectedFocusCard(null);
+      } else {
+        const error = await response.json();
+        alert(error.detail || "Failed to delete focus card");
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert("Failed to delete focus card");
+    }
+  };
+
+  const handleCreate = async (createData) => {
+    try {
+      const response = await fetch(`${baseUrl}/admin/focus-cards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(createData),
+      });
+      if (response.ok) {
+        await fetchFocusCards();
+        setShowCreateModal(false);
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || "Failed to create focus card");
+      }
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const renderFocusCardItem = ({ item }) => (
+    <View style={styles.listItem}>
+      <TouchableOpacity
+        style={{ flex: 1 }}
+        onPress={() => {
+          setSelectedFocusCard(item);
+          setShowDetailModal(true);
+        }}
+      >
+        <View style={styles.listItemHeader}>
+          <Text style={styles.listItemTitle}>{item.name}</Text>
+          <Text style={styles.listItemBadge}>{item.category || "Uncategorized"}</Text>
+        </View>
+        <View style={styles.listItemDetails}>
+          <Text style={styles.listItemDetail}>
+            {item.micro_cues?.length || 0} micro cues
+          </Text>
+          <Text style={styles.listItemDetail}>
+            {Object.keys(item.prompts || {}).length} prompts
+          </Text>
+        </View>
+        {item.description && (
+          <Text style={styles.listItemSubtext} numberOfLines={2}>
+            {item.description}
+          </Text>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#2196F3" />
+        <Text style={styles.loadingText}>Loading focus cards...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.section}>
+      {/* Search and Filters */}
+      <View style={styles.filterBar}>
+        <TextInput
+          style={[styles.searchInput, { flex: 1 }]}
+          placeholder="Search focus cards..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        <TouchableOpacity
+          style={styles.addCapButton}
+          onPress={() => setShowCreateModal(true)}
+        >
+          <Text style={styles.addCapButtonText}>+ Add</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Category Filter */}
+      <ScrollView
+        horizontal
+        style={styles.domainScroll}
+        showsHorizontalScrollIndicator={false}
+      >
+        <TouchableOpacity
+          style={[
+            styles.domainChip,
+            categoryFilter === "all" && styles.domainChipActive,
+          ]}
+          onPress={() => setCategoryFilter("all")}
+        >
+          <Text
+            style={[
+              styles.domainChipText,
+              categoryFilter === "all" && styles.domainChipTextActive,
+            ]}
+          >
+            All ({focusCards.length})
+          </Text>
+        </TouchableOpacity>
+        {categories.map((cat) => (
+          <TouchableOpacity
+            key={cat}
+            style={[
+              styles.domainChip,
+              categoryFilter === cat && styles.domainChipActive,
+            ]}
+            onPress={() => setCategoryFilter(cat)}
+          >
+            <Text
+              style={[
+                styles.domainChipText,
+                categoryFilter === cat && styles.domainChipTextActive,
+              ]}
+            >
+              {cat} ({focusCards.filter((fc) => fc.category === cat).length})
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Result count */}
+      <Text style={styles.resultCount}>
+        {filteredFocusCards.length} focus card{filteredFocusCards.length !== 1 ? "s" : ""}
+      </Text>
+
+      {/* Focus Cards List */}
+      <FlatList
+        data={filteredFocusCards}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={renderFocusCardItem}
+        style={styles.list}
+        ListEmptyComponent={
+          <Text style={styles.noDataText}>No focus cards found</Text>
+        }
+      />
+
+      {/* Detail Modal */}
+      <Modal
+        visible={showDetailModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowDetailModal(false)}
+      >
+        {selectedFocusCard && (
+          <FocusCardDetailView
+            focusCard={selectedFocusCard}
+            onClose={() => {
+              setShowDetailModal(false);
+              setSelectedFocusCard(null);
+            }}
+            onEdit={() => {
+              setShowDetailModal(false);
+              setShowEditModal(true);
+            }}
+            onDelete={() => handleDelete(selectedFocusCard.id)}
+          />
+        )}
+      </Modal>
+
+      {/* Edit Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        {selectedFocusCard && (
+          <FocusCardEditModal
+            focusCard={selectedFocusCard}
+            categories={categories}
+            onClose={() => {
+              setShowEditModal(false);
+              setSelectedFocusCard(null);
+            }}
+            onSave={async () => {
+              await fetchFocusCards();
+              setShowEditModal(false);
+              setSelectedFocusCard(null);
+            }}
+          />
+        )}
+      </Modal>
+
+      {/* Create Modal */}
+      <Modal
+        visible={showCreateModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCreateModal(false)}
+      >
+        <FocusCardCreateModal
+          categories={categories}
+          onClose={() => setShowCreateModal(false)}
+          onCreate={handleCreate}
+        />
+      </Modal>
+    </View>
+  );
+}
+
+function FocusCardDetailView({ focusCard, onClose, onEdit, onDelete }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  return (
+    <View style={styles.modalOverlay}>
+      <View style={styles.detailModal}>
+        <View style={styles.detailModalHeader}>
+          <Text style={styles.detailModalTitle}>{focusCard.name}</Text>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Text style={styles.closeButtonText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.detailModalContent}>
+          <DetailRow label="ID" value={focusCard.id} />
+          <DetailRow label="Category" value={focusCard.category || "None"} />
+          <DetailRow label="Description" value={focusCard.description || "None"} />
+          <DetailRow label="Attention Cue" value={focusCard.attention_cue || "None"} />
+
+          <Text style={styles.detailSectionTitle}>Micro Cues</Text>
+          {focusCard.micro_cues?.length > 0 ? (
+            focusCard.micro_cues.map((cue, index) => (
+              <Text key={index} style={styles.listItemText}>• {cue}</Text>
+            ))
+          ) : (
+            <Text style={styles.listItemSubtext}>No micro cues defined</Text>
+          )}
+
+          <Text style={styles.detailSectionTitle}>Prompts</Text>
+          {Object.keys(focusCard.prompts || {}).length > 0 ? (
+            Object.entries(focusCard.prompts).map(([key, value]) => (
+              <View key={key} style={styles.promptItem}>
+                <Text style={styles.promptKey}>{key}:</Text>
+                <Text style={styles.promptValue}>{value}</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.listItemSubtext}>No prompts defined</Text>
+          )}
+        </ScrollView>
+
+        <View style={styles.detailModalActions}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.editButton]}
+            onPress={onEdit}
+          >
+            <Text style={styles.actionButtonText}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deleteButton]}
+            onPress={() => setShowDeleteConfirm(true)}
+          >
+            <Text style={styles.actionButtonText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Delete Confirmation */}
+        {showDeleteConfirm && (
+          <View style={styles.confirmOverlay}>
+            <View style={styles.confirmBox}>
+              <Text style={styles.confirmText}>
+                Delete "{focusCard.name}"?
+              </Text>
+              <View style={styles.confirmButtons}>
+                <TouchableOpacity
+                  style={[styles.confirmButton, styles.cancelConfirmButton]}
+                  onPress={() => setShowDeleteConfirm(false)}
+                >
+                  <Text style={styles.confirmButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.confirmButton, styles.deleteConfirmButton]}
+                  onPress={onDelete}
+                >
+                  <Text style={[styles.confirmButtonText, { color: "#fff" }]}>
+                    Delete
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function FocusCardEditModal({ focusCard, categories, onClose, onSave }) {
+  const [formData, setFormData] = useState({
+    name: focusCard.name,
+    category: focusCard.category || "",
+    description: focusCard.description || "",
+    attention_cue: focusCard.attention_cue || "",
+    micro_cues: JSON.stringify(focusCard.micro_cues || [], null, 2),
+    prompts: JSON.stringify(focusCard.prompts || {}, null, 2),
+  });
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
+
+  const updateField = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) => ({ ...prev, [field]: null }));
+    setSaveError(null);
+  };
+
+  const validateJSON = (str, fieldName) => {
+    try {
+      JSON.parse(str);
+      return null;
+    } catch (e) {
+      return `Invalid JSON for ${fieldName}`;
+    }
+  };
+
+  const handleSave = async () => {
+    const newErrors = {};
+    if (!formData.name.trim()) {
+      newErrors.name = "Name is required";
+    }
+    const microCuesError = validateJSON(formData.micro_cues, "micro_cues");
+    if (microCuesError) newErrors.micro_cues = microCuesError;
+    const promptsError = validateJSON(formData.prompts, "prompts");
+    if (promptsError) newErrors.prompts = promptsError;
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const finalCategory = showNewCategory ? newCategory : formData.category;
+      const response = await fetch(`${baseUrl}/admin/focus-cards/${focusCard.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          category: finalCategory,
+          description: formData.description,
+          attention_cue: formData.attention_cue,
+          micro_cues: JSON.parse(formData.micro_cues),
+          prompts: JSON.parse(formData.prompts),
+        }),
+      });
+
+      if (response.ok) {
+        await onSave();
+      } else {
+        const error = await response.json();
+        setSaveError(error.detail || "Failed to save");
+      }
+    } catch (error) {
+      setSaveError(error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <View style={styles.modalOverlay}>
+      <View style={styles.editModalPopup}>
+        <View style={styles.detailModalHeader}>
+          <Text style={styles.detailModalTitle}>Edit Focus Card</Text>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Text style={[styles.closeButtonText, { color: "#fff" }]}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.editModalPopupContent}>
+          <FormField
+            label="Name"
+            value={formData.name}
+            onChangeText={(v) => updateField("name", v)}
+            error={errors.name}
+          />
+
+          {/* Category Picker */}
+          <View style={styles.formFieldContainer}>
+            <Text style={styles.formFieldLabel}>Category</Text>
+            {!showNewCategory ? (
+              <View>
+                <View style={styles.pickerContainer}>
+                  {categories.map((cat) => (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[
+                        styles.pickerOption,
+                        formData.category === cat && styles.pickerOptionSelected,
+                      ]}
+                      onPress={() => updateField("category", cat)}
+                    >
+                      <Text
+                        style={[
+                          styles.pickerOptionText,
+                          formData.category === cat && styles.pickerOptionTextSelected,
+                        ]}
+                      >
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity
+                    style={styles.pickerOption}
+                    onPress={() => setShowNewCategory(true)}
+                  >
+                    <Text style={styles.pickerOptionText}>+ New</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View>
+                <TextInput
+                  style={styles.formFieldInput}
+                  value={newCategory}
+                  onChangeText={setNewCategory}
+                  placeholder="Enter new category"
+                />
+                <TouchableOpacity
+                  style={styles.cancelNewButton}
+                  onPress={() => {
+                    setShowNewCategory(false);
+                    setNewCategory("");
+                  }}
+                >
+                  <Text style={styles.cancelNewButtonText}>Cancel new category</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          <FormField
+            label="Description"
+            value={formData.description}
+            onChangeText={(v) => updateField("description", v)}
+            multiline
+          />
+
+          <FormField
+            label="Attention Cue"
+            value={formData.attention_cue}
+            onChangeText={(v) => updateField("attention_cue", v)}
+            multiline
+          />
+
+          <View style={styles.formFieldContainer}>
+            <Text style={styles.formFieldLabel}>Micro Cues (JSON Array)</Text>
+            <TextInput
+              style={[styles.formFieldInput, styles.jsonInput, errors.micro_cues && styles.formFieldInputError]}
+              value={formData.micro_cues}
+              onChangeText={(v) => updateField("micro_cues", v)}
+              multiline
+              numberOfLines={4}
+            />
+            {errors.micro_cues && (
+              <Text style={styles.formFieldError}>{errors.micro_cues}</Text>
+            )}
+          </View>
+
+          <View style={styles.formFieldContainer}>
+            <Text style={styles.formFieldLabel}>Prompts (JSON Object)</Text>
+            <TextInput
+              style={[styles.formFieldInput, styles.jsonInput, errors.prompts && styles.formFieldInputError]}
+              value={formData.prompts}
+              onChangeText={(v) => updateField("prompts", v)}
+              multiline
+              numberOfLines={6}
+            />
+            {errors.prompts && (
+              <Text style={styles.formFieldError}>{errors.prompts}</Text>
+            )}
+          </View>
+
+          {saveError && (
+            <View style={styles.saveErrorContainer}>
+              <Text style={styles.saveErrorText}>{saveError}</Text>
+            </View>
+          )}
+        </ScrollView>
+
+        <View style={styles.editModalFooter}>
+          <TouchableOpacity
+            style={[styles.editModalButton, styles.cancelButton]}
+            onPress={onClose}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.editModalButton, styles.saveButton, saving && styles.saveButtonDisabled]}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function FocusCardCreateModal({ categories, onClose, onCreate }) {
+  const [formData, setFormData] = useState({
+    name: "",
+    category: categories[0] || "",
+    description: "",
+    attention_cue: "",
+    micro_cues: "[]",
+    prompts: "{}",
+  });
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
+
+  const updateField = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) => ({ ...prev, [field]: null }));
+    setSaveError(null);
+  };
+
+  const validateJSON = (str, fieldName) => {
+    try {
+      JSON.parse(str);
+      return null;
+    } catch (e) {
+      return `Invalid JSON for ${fieldName}`;
+    }
+  };
+
+  const handleCreate = async () => {
+    const newErrors = {};
+    if (!formData.name.trim()) {
+      newErrors.name = "Name is required";
+    }
+    const microCuesError = validateJSON(formData.micro_cues, "micro_cues");
+    if (microCuesError) newErrors.micro_cues = microCuesError;
+    const promptsError = validateJSON(formData.prompts, "prompts");
+    if (promptsError) newErrors.prompts = promptsError;
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const finalCategory = showNewCategory ? newCategory : formData.category;
+      await onCreate({
+        name: formData.name,
+        category: finalCategory,
+        description: formData.description,
+        attention_cue: formData.attention_cue,
+        micro_cues: JSON.parse(formData.micro_cues),
+        prompts: JSON.parse(formData.prompts),
+      });
+    } catch (error) {
+      setSaveError(error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <View style={styles.modalOverlay}>
+      <View style={styles.editModalPopup}>
+        <View style={styles.detailModalHeader}>
+          <Text style={styles.detailModalTitle}>Create Focus Card</Text>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Text style={[styles.closeButtonText, { color: "#fff" }]}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.editModalPopupContent}>
+          <FormField
+            label="Name"
+            value={formData.name}
+            onChangeText={(v) => updateField("name", v)}
+            error={errors.name}
+            placeholder="e.g., Pitch Center"
+          />
+
+          {/* Category Picker */}
+          <View style={styles.formFieldContainer}>
+            <Text style={styles.formFieldLabel}>Category</Text>
+            {!showNewCategory ? (
+              <View>
+                <View style={styles.pickerContainer}>
+                  {categories.map((cat) => (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[
+                        styles.pickerOption,
+                        formData.category === cat && styles.pickerOptionSelected,
+                      ]}
+                      onPress={() => updateField("category", cat)}
+                    >
+                      <Text
+                        style={[
+                          styles.pickerOptionText,
+                          formData.category === cat && styles.pickerOptionTextSelected,
+                        ]}
+                      >
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity
+                    style={styles.pickerOption}
+                    onPress={() => setShowNewCategory(true)}
+                  >
+                    <Text style={styles.pickerOptionText}>+ New</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View>
+                <TextInput
+                  style={styles.formFieldInput}
+                  value={newCategory}
+                  onChangeText={setNewCategory}
+                  placeholder="Enter new category"
+                />
+                <TouchableOpacity
+                  style={styles.cancelNewButton}
+                  onPress={() => {
+                    setShowNewCategory(false);
+                    setNewCategory("");
+                  }}
+                >
+                  <Text style={styles.cancelNewButtonText}>Cancel new category</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          <FormField
+            label="Description"
+            value={formData.description}
+            onChangeText={(v) => updateField("description", v)}
+            multiline
+            placeholder="Brief description of the focus card"
+          />
+
+          <FormField
+            label="Attention Cue"
+            value={formData.attention_cue}
+            onChangeText={(v) => updateField("attention_cue", v)}
+            multiline
+            placeholder="Main attention cue for the student"
+          />
+
+          <View style={styles.formFieldContainer}>
+            <Text style={styles.formFieldLabel}>Micro Cues (JSON Array)</Text>
+            <TextInput
+              style={[styles.formFieldInput, styles.jsonInput, errors.micro_cues && styles.formFieldInputError]}
+              value={formData.micro_cues}
+              onChangeText={(v) => updateField("micro_cues", v)}
+              multiline
+              numberOfLines={4}
+              placeholder='["Cue 1", "Cue 2", "Cue 3"]'
+            />
+            {errors.micro_cues && (
+              <Text style={styles.formFieldError}>{errors.micro_cues}</Text>
+            )}
+          </View>
+
+          <View style={styles.formFieldContainer}>
+            <Text style={styles.formFieldLabel}>Prompts (JSON Object)</Text>
+            <TextInput
+              style={[styles.formFieldInput, styles.jsonInput, errors.prompts && styles.formFieldInputError]}
+              value={formData.prompts}
+              onChangeText={(v) => updateField("prompts", v)}
+              multiline
+              numberOfLines={6}
+              placeholder='{"listen": "...", "sing": "...", "imagine_instrument": "..."}'
+            />
+            {errors.prompts && (
+              <Text style={styles.formFieldError}>{errors.prompts}</Text>
+            )}
+          </View>
+
+          {saveError && (
+            <View style={styles.saveErrorContainer}>
+              <Text style={styles.saveErrorText}>{saveError}</Text>
+            </View>
+          )}
+        </ScrollView>
+
+        <View style={styles.editModalFooter}>
+          <TouchableOpacity
+            style={[styles.editModalButton, styles.cancelButton]}
+            onPress={onClose}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.editModalButton, styles.saveButton, saving && styles.saveButtonDisabled]}
+            onPress={handleCreate}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.saveButtonText}>Create</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// =============================================================================
+// SECTION 6: SOFT GATE EXPLORER
+// =============================================================================
+
+function SoftGateExplorer() {
+  const [activeSection, setActiveSection] = useState("rules");
+
+  return (
+    <View style={styles.section}>
+      {/* Sub-tabs */}
+      <View style={styles.subTabBar}>
+        <TouchableOpacity
+          style={[styles.subTab, activeSection === "rules" && styles.subTabActive]}
+          onPress={() => setActiveSection("rules")}
+        >
+          <Text style={[styles.subTabText, activeSection === "rules" && styles.subTabTextActive]}>
+            Rules
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.subTab, activeSection === "user_state" && styles.subTabActive]}
+          onPress={() => setActiveSection("user_state")}
+        >
+          <Text style={[styles.subTabText, activeSection === "user_state" && styles.subTabTextActive]}>
+            User State
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {activeSection === "rules" && <SoftGateRulesList />}
+      {activeSection === "user_state" && <UserSoftGateStateView />}
+    </View>
+  );
+}
+
+function SoftGateRulesList() {
+  const [rules, setRules] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedRule, setSelectedRule] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const fetchRules = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${baseUrl}/admin/soft-gate-rules`);
+      if (response.ok) {
+        const data = await response.json();
+        setRules(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch rules:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRules();
+  }, [fetchRules]);
+
+  const handleDelete = async (ruleId) => {
+    try {
+      const response = await fetch(`${baseUrl}/admin/soft-gate-rules/${ruleId}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        await fetchRules();
+      } else {
+        const error = await response.json();
+        alert(error.detail || "Failed to delete rule");
+      }
+    } catch (error) {
+      alert("Failed to delete rule");
+    }
+  };
+
+  const renderRuleItem = ({ item }) => (
+    <View style={styles.listItem}>
+      <TouchableOpacity
+        style={{ flex: 1 }}
+        onPress={() => {
+          setSelectedRule(item);
+          setShowEditModal(true);
+        }}
+      >
+        <View style={styles.listItemHeader}>
+          <Text style={styles.listItemTitle}>{item.dimension_name}</Text>
+        </View>
+        <View style={styles.listItemDetails}>
+          <Text style={styles.listItemDetail}>
+            Buffer: {item.frontier_buffer}
+          </Text>
+          <Text style={styles.listItemDetail}>
+            Step: {item.promotion_step}
+          </Text>
+          <Text style={styles.listItemDetail}>
+            Min: {item.min_attempts}
+          </Text>
+        </View>
+        <Text style={styles.listItemSubtext}>
+          Success: {item.success_required_count}/{item.success_window_count || "∞"} @ rating ≥{item.success_rating_threshold}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#2196F3" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.softGateContent}>
+      <View style={styles.filterBar}>
+        <Text style={styles.sectionHeader}>Soft Gate Rules ({rules.length})</Text>
+        <TouchableOpacity
+          style={styles.addCapButton}
+          onPress={() => setShowCreateModal(true)}
+        >
+          <Text style={styles.addCapButtonText}>+ Add</Text>
+        </TouchableOpacity>
+      </View>
+
+      <FlatList
+        data={rules}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={renderRuleItem}
+        style={styles.list}
+        ListEmptyComponent={
+          <Text style={styles.noDataText}>No soft gate rules defined</Text>
+        }
+      />
+
+      {/* Edit Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        {selectedRule && (
+          <SoftGateRuleEditModal
+            rule={selectedRule}
+            onClose={() => {
+              setShowEditModal(false);
+              setSelectedRule(null);
+            }}
+            onSave={async () => {
+              await fetchRules();
+              setShowEditModal(false);
+              setSelectedRule(null);
+            }}
+            onDelete={() => {
+              handleDelete(selectedRule.id);
+              setShowEditModal(false);
+              setSelectedRule(null);
+            }}
+          />
+        )}
+      </Modal>
+
+      {/* Create Modal */}
+      <Modal
+        visible={showCreateModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCreateModal(false)}
+      >
+        <SoftGateRuleCreateModal
+          onClose={() => setShowCreateModal(false)}
+          onCreate={async () => {
+            await fetchRules();
+            setShowCreateModal(false);
+          }}
+        />
+      </Modal>
+    </View>
+  );
+}
+
+function SoftGateRuleEditModal({ rule, onClose, onSave, onDelete }) {
+  const [formData, setFormData] = useState({
+    dimension_name: rule.dimension_name,
+    frontier_buffer: String(rule.frontier_buffer),
+    promotion_step: String(rule.promotion_step),
+    min_attempts: String(rule.min_attempts),
+    success_rating_threshold: String(rule.success_rating_threshold),
+    success_required_count: String(rule.success_required_count),
+    success_window_count: rule.success_window_count ? String(rule.success_window_count) : "",
+    decay_halflife_days: rule.decay_halflife_days ? String(rule.decay_halflife_days) : "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const updateField = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setSaveError(null);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch(`${baseUrl}/admin/soft-gate-rules/${rule.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dimension_name: formData.dimension_name,
+          frontier_buffer: parseFloat(formData.frontier_buffer),
+          promotion_step: parseFloat(formData.promotion_step),
+          min_attempts: parseInt(formData.min_attempts),
+          success_rating_threshold: parseInt(formData.success_rating_threshold),
+          success_required_count: parseInt(formData.success_required_count),
+          success_window_count: formData.success_window_count ? parseInt(formData.success_window_count) : null,
+          decay_halflife_days: formData.decay_halflife_days ? parseFloat(formData.decay_halflife_days) : null,
+        }),
+      });
+
+      if (response.ok) {
+        await onSave();
+      } else {
+        const error = await response.json();
+        setSaveError(error.detail || "Failed to save");
+      }
+    } catch (error) {
+      setSaveError(error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <View style={styles.modalOverlay}>
+      <View style={styles.editModalPopup}>
+        <View style={styles.detailModalHeader}>
+          <Text style={styles.detailModalTitle}>Edit Rule</Text>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Text style={[styles.closeButtonText, { color: "#fff" }]}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.editModalPopupContent}>
+          <FormField
+            label="Dimension Name"
+            value={formData.dimension_name}
+            onChangeText={(v) => updateField("dimension_name", v)}
+          />
+          <FormField
+            label="Frontier Buffer"
+            value={formData.frontier_buffer}
+            onChangeText={(v) => updateField("frontier_buffer", v)}
+            keyboardType="numeric"
+          />
+          <FormField
+            label="Promotion Step"
+            value={formData.promotion_step}
+            onChangeText={(v) => updateField("promotion_step", v)}
+            keyboardType="numeric"
+          />
+          <FormField
+            label="Min Attempts"
+            value={formData.min_attempts}
+            onChangeText={(v) => updateField("min_attempts", v)}
+            keyboardType="numeric"
+          />
+          <FormField
+            label="Success Rating Threshold (1-5)"
+            value={formData.success_rating_threshold}
+            onChangeText={(v) => updateField("success_rating_threshold", v)}
+            keyboardType="numeric"
+          />
+          <FormField
+            label="Success Required Count"
+            value={formData.success_required_count}
+            onChangeText={(v) => updateField("success_required_count", v)}
+            keyboardType="numeric"
+          />
+          <FormField
+            label="Success Window Count (optional)"
+            value={formData.success_window_count}
+            onChangeText={(v) => updateField("success_window_count", v)}
+            keyboardType="numeric"
+            placeholder="Leave empty for unlimited"
+          />
+          <FormField
+            label="Decay Halflife Days (optional)"
+            value={formData.decay_halflife_days}
+            onChangeText={(v) => updateField("decay_halflife_days", v)}
+            keyboardType="numeric"
+            placeholder="Leave empty for none"
+          />
+
+          {saveError && (
+            <View style={styles.saveErrorContainer}>
+              <Text style={styles.saveErrorText}>{saveError}</Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[styles.deleteRuleButton]}
+            onPress={() => setShowDeleteConfirm(true)}
+          >
+            <Text style={styles.deleteRuleButtonText}>Delete Rule</Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        <View style={styles.editModalFooter}>
+          <TouchableOpacity
+            style={[styles.editModalButton, styles.cancelButton]}
+            onPress={onClose}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.editModalButton, styles.saveButton, saving && styles.saveButtonDisabled]}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Delete Confirmation */}
+        {showDeleteConfirm && (
+          <View style={styles.confirmOverlay}>
+            <View style={styles.confirmBox}>
+              <Text style={styles.confirmText}>
+                Delete rule "{rule.dimension_name}"?
+              </Text>
+              <View style={styles.confirmButtons}>
+                <TouchableOpacity
+                  style={[styles.confirmButton, styles.cancelConfirmButton]}
+                  onPress={() => setShowDeleteConfirm(false)}
+                >
+                  <Text style={styles.confirmButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.confirmButton, styles.deleteConfirmButton]}
+                  onPress={onDelete}
+                >
+                  <Text style={[styles.confirmButtonText, { color: "#fff" }]}>
+                    Delete
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function SoftGateRuleCreateModal({ onClose, onCreate }) {
+  const [formData, setFormData] = useState({
+    dimension_name: "",
+    frontier_buffer: "1.0",
+    promotion_step: "1.0",
+    min_attempts: "10",
+    success_rating_threshold: "4",
+    success_required_count: "8",
+    success_window_count: "",
+    decay_halflife_days: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+
+  const updateField = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setSaveError(null);
+  };
+
+  const handleCreate = async () => {
+    if (!formData.dimension_name.trim()) {
+      setSaveError("Dimension name is required");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch(`${baseUrl}/admin/soft-gate-rules`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dimension_name: formData.dimension_name,
+          frontier_buffer: parseFloat(formData.frontier_buffer),
+          promotion_step: parseFloat(formData.promotion_step),
+          min_attempts: parseInt(formData.min_attempts),
+          success_rating_threshold: parseInt(formData.success_rating_threshold),
+          success_required_count: parseInt(formData.success_required_count),
+          success_window_count: formData.success_window_count ? parseInt(formData.success_window_count) : null,
+          decay_halflife_days: formData.decay_halflife_days ? parseFloat(formData.decay_halflife_days) : null,
+        }),
+      });
+
+      if (response.ok) {
+        await onCreate();
+      } else {
+        const error = await response.json();
+        setSaveError(error.detail || "Failed to create rule");
+      }
+    } catch (error) {
+      setSaveError(error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <View style={styles.modalOverlay}>
+      <View style={styles.editModalPopup}>
+        <View style={styles.detailModalHeader}>
+          <Text style={styles.detailModalTitle}>Create Rule</Text>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Text style={[styles.closeButtonText, { color: "#fff" }]}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.editModalPopupContent}>
+          <FormField
+            label="Dimension Name"
+            value={formData.dimension_name}
+            onChangeText={(v) => updateField("dimension_name", v)}
+            placeholder="e.g., tonal_complexity_stage"
+          />
+          <FormField
+            label="Frontier Buffer"
+            value={formData.frontier_buffer}
+            onChangeText={(v) => updateField("frontier_buffer", v)}
+            keyboardType="numeric"
+          />
+          <FormField
+            label="Promotion Step"
+            value={formData.promotion_step}
+            onChangeText={(v) => updateField("promotion_step", v)}
+            keyboardType="numeric"
+          />
+          <FormField
+            label="Min Attempts"
+            value={formData.min_attempts}
+            onChangeText={(v) => updateField("min_attempts", v)}
+            keyboardType="numeric"
+          />
+          <FormField
+            label="Success Rating Threshold (1-5)"
+            value={formData.success_rating_threshold}
+            onChangeText={(v) => updateField("success_rating_threshold", v)}
+            keyboardType="numeric"
+          />
+          <FormField
+            label="Success Required Count"
+            value={formData.success_required_count}
+            onChangeText={(v) => updateField("success_required_count", v)}
+            keyboardType="numeric"
+          />
+          <FormField
+            label="Success Window Count (optional)"
+            value={formData.success_window_count}
+            onChangeText={(v) => updateField("success_window_count", v)}
+            keyboardType="numeric"
+            placeholder="Leave empty for unlimited"
+          />
+          <FormField
+            label="Decay Halflife Days (optional)"
+            value={formData.decay_halflife_days}
+            onChangeText={(v) => updateField("decay_halflife_days", v)}
+            keyboardType="numeric"
+            placeholder="Leave empty for none"
+          />
+
+          {saveError && (
+            <View style={styles.saveErrorContainer}>
+              <Text style={styles.saveErrorText}>{saveError}</Text>
+            </View>
+          )}
+        </ScrollView>
+
+        <View style={styles.editModalFooter}>
+          <TouchableOpacity
+            style={[styles.editModalButton, styles.cancelButton]}
+            onPress={onClose}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.editModalButton, styles.saveButton, saving && styles.saveButtonDisabled]}
+            onPress={handleCreate}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.saveButtonText}>Create</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function UserSoftGateStateView() {
+  const [users, setUsers] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [states, setStates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedState, setSelectedState] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showUserPicker, setShowUserPicker] = useState(false);
+
+  // Fetch users for dropdown
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch(`${baseUrl}/admin/users`);
+        if (response.ok) {
+          const data = await response.json();
+          setUsers(data);
+          if (data.length > 0 && !selectedUserId) {
+            setSelectedUserId(data[0].id);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch users:", error);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  // Fetch states when user changes
+  const fetchStates = useCallback(async () => {
+    if (!selectedUserId) return;
+    try {
+      setLoading(true);
+      const response = await fetch(`${baseUrl}/admin/user-soft-gate-state?user_id=${selectedUserId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setStates(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch states:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedUserId]);
+
+  useEffect(() => {
+    fetchStates();
+  }, [fetchStates]);
+
+  const handleReset = async (dimensionNames = null) => {
+    try {
+      const response = await fetch(`${baseUrl}/admin/user-soft-gate-state/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: selectedUserId,
+          dimension_names: dimensionNames,
+        }),
+      });
+      if (response.ok) {
+        await fetchStates();
+      } else {
+        const error = await response.json();
+        alert(error.detail || "Failed to reset");
+      }
+    } catch (error) {
+      alert("Failed to reset");
+    }
+  };
+
+  const selectedUser = users.find((u) => u.id === selectedUserId);
+
+  const renderStateItem = ({ item }) => (
+    <View style={styles.listItem}>
+      <TouchableOpacity
+        style={{ flex: 1 }}
+        onPress={() => {
+          setSelectedState(item);
+          setShowEditModal(true);
+        }}
+      >
+        <View style={styles.listItemHeader}>
+          <Text style={styles.listItemTitle}>{item.dimension_name}</Text>
+        </View>
+        <View style={styles.softGateStateGrid}>
+          <View style={styles.softGateStatCell}>
+            <Text style={styles.softGateStatLabel}>Comfort</Text>
+            <Text style={styles.softGateStatValue}>{item.comfortable_value.toFixed(2)}</Text>
+          </View>
+          <View style={styles.softGateStatCell}>
+            <Text style={styles.softGateStatLabel}>Max Demo</Text>
+            <Text style={styles.softGateStatValue}>{item.max_demonstrated_value.toFixed(2)}</Text>
+          </View>
+          <View style={styles.softGateStatCell}>
+            <Text style={styles.softGateStatLabel}>EMA</Text>
+            <Text style={styles.softGateStatValue}>{item.frontier_success_ema.toFixed(3)}</Text>
+          </View>
+          <View style={styles.softGateStatCell}>
+            <Text style={styles.softGateStatLabel}>Attempts</Text>
+            <Text style={styles.softGateStatValue}>{item.frontier_attempt_count_since_last_promo}</Text>
+          </View>
+        </View>
+        {item.updated_at && (
+          <Text style={styles.listItemSubtext}>
+            Updated: {new Date(item.updated_at).toLocaleDateString()}
+          </Text>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+
+  return (
+    <View style={styles.softGateContent}>
+      {/* User Picker */}
+      <View style={styles.userPickerContainer}>
+        <Text style={styles.userPickerLabel}>User:</Text>
+        <TouchableOpacity
+          style={styles.userPickerButton}
+          onPress={() => setShowUserPicker(true)}
+        >
+          <Text style={styles.userPickerButtonText}>
+            {selectedUser ? `${selectedUser.email} (ID: ${selectedUser.id})` : "Select user..."}
+          </Text>
+          <Text style={styles.userPickerArrow}>▼</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Reset All Button */}
+      <TouchableOpacity
+        style={styles.resetAllButton}
+        onPress={() => handleReset(null)}
+      >
+        <Text style={styles.resetAllButtonText}>Reset All Dimensions</Text>
+      </TouchableOpacity>
+
+      {loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#2196F3" />
+        </View>
+      ) : (
+        <FlatList
+          data={states}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={renderStateItem}
+          style={styles.list}
+          ListEmptyComponent={
+            <Text style={styles.noDataText}>No soft gate state for this user</Text>
+          }
+        />
+      )}
+
+      {/* User Picker Modal */}
+      <Modal
+        visible={showUserPicker}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowUserPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.pickerModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowUserPicker(false)}
+        >
+          <View style={styles.pickerModalContent}>
+            <Text style={styles.pickerModalTitle}>Select User</Text>
+            <FlatList
+              data={users}
+              keyExtractor={(item) => String(item.id)}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.pickerModalItem,
+                    item.id === selectedUserId && styles.pickerModalItemSelected,
+                  ]}
+                  onPress={() => {
+                    setSelectedUserId(item.id);
+                    setShowUserPicker(false);
+                  }}
+                >
+                  <Text style={styles.pickerModalItemText}>
+                    {item.email || `User ${item.id}`}
+                  </Text>
+                  <Text style={styles.pickerModalItemSubtext}>
+                    ID: {item.id} {item.instrument ? `• ${item.instrument}` : ""}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              style={styles.pickerModalList}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Edit Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        {selectedState && (
+          <UserSoftGateStateEditModal
+            state={selectedState}
+            onClose={() => {
+              setShowEditModal(false);
+              setSelectedState(null);
+            }}
+            onSave={async () => {
+              await fetchStates();
+              setShowEditModal(false);
+              setSelectedState(null);
+            }}
+            onReset={async () => {
+              await handleReset([selectedState.dimension_name]);
+              setShowEditModal(false);
+              setSelectedState(null);
+            }}
+          />
+        )}
+      </Modal>
+    </View>
+  );
+}
+
+function UserSoftGateStateEditModal({ state, onClose, onSave, onReset }) {
+  const [formData, setFormData] = useState({
+    comfortable_value: String(state.comfortable_value),
+    max_demonstrated_value: String(state.max_demonstrated_value),
+    frontier_success_ema: String(state.frontier_success_ema),
+    frontier_attempt_count_since_last_promo: String(state.frontier_attempt_count_since_last_promo),
+  });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+
+  const updateField = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setSaveError(null);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch(`${baseUrl}/admin/user-soft-gate-state/${state.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          comfortable_value: parseFloat(formData.comfortable_value),
+          max_demonstrated_value: parseFloat(formData.max_demonstrated_value),
+          frontier_success_ema: parseFloat(formData.frontier_success_ema),
+          frontier_attempt_count_since_last_promo: parseInt(formData.frontier_attempt_count_since_last_promo),
+        }),
+      });
+
+      if (response.ok) {
+        await onSave();
+      } else {
+        const error = await response.json();
+        setSaveError(error.detail || "Failed to save");
+      }
+    } catch (error) {
+      setSaveError(error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <View style={styles.modalOverlay}>
+      <View style={styles.editModalPopup}>
+        <View style={styles.detailModalHeader}>
+          <Text style={styles.detailModalTitle}>{state.dimension_name}</Text>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Text style={[styles.closeButtonText, { color: "#fff" }]}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.editModalPopupContent}>
+          <FormField
+            label="Comfortable Value"
+            value={formData.comfortable_value}
+            onChangeText={(v) => updateField("comfortable_value", v)}
+            keyboardType="numeric"
+          />
+          <FormField
+            label="Max Demonstrated Value"
+            value={formData.max_demonstrated_value}
+            onChangeText={(v) => updateField("max_demonstrated_value", v)}
+            keyboardType="numeric"
+          />
+          <FormField
+            label="Frontier Success EMA"
+            value={formData.frontier_success_ema}
+            onChangeText={(v) => updateField("frontier_success_ema", v)}
+            keyboardType="numeric"
+          />
+          <FormField
+            label="Frontier Attempts Since Promotion"
+            value={formData.frontier_attempt_count_since_last_promo}
+            onChangeText={(v) => updateField("frontier_attempt_count_since_last_promo", v)}
+            keyboardType="numeric"
+          />
+
+          {saveError && (
+            <View style={styles.saveErrorContainer}>
+              <Text style={styles.saveErrorText}>{saveError}</Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={styles.resetDimensionButton}
+            onPress={onReset}
+          >
+            <Text style={styles.resetDimensionButtonText}>Reset This Dimension</Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        <View style={styles.editModalFooter}>
+          <TouchableOpacity
+            style={[styles.editModalButton, styles.cancelButton]}
+            onPress={onClose}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.editModalButton, styles.saveButton, saving && styles.saveButtonDisabled]}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// =============================================================================
 // STYLES
 // =============================================================================
 
@@ -3608,7 +5252,135 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 14,
   },
-  // Edit Modal Styles
+  // Modal Overlay
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  // Detail Modal Styles
+  detailModal: {
+    width: "90%",
+    maxHeight: "85%",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  detailModalHeader: {
+    backgroundColor: "#1a237e",
+    padding: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  detailModalTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+    flex: 1,
+  },
+  detailModalContent: {
+    padding: 16,
+    maxHeight: 400,
+  },
+  detailModalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#e0e0e0",
+    gap: 12,
+  },
+  actionButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 6,
+  },
+  editButton: {
+    backgroundColor: "#2196F3",
+  },
+  deleteButton: {
+    backgroundColor: "#f44336",
+  },
+  actionButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  confirmOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  confirmBox: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 12,
+    width: "80%",
+  },
+  confirmText: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  confirmButtons: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 12,
+  },
+  confirmButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 6,
+  },
+  cancelConfirmButton: {
+    backgroundColor: "#e0e0e0",
+  },
+  deleteConfirmButton: {
+    backgroundColor: "#f44336",
+  },
+  confirmButtonText: {
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  promptItem: {
+    marginBottom: 8,
+  },
+  promptKey: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#333",
+  },
+  promptValue: {
+    fontSize: 13,
+    color: "#666",
+    marginTop: 2,
+  },
+  listItemText: {
+    fontSize: 13,
+    color: "#333",
+    marginBottom: 4,
+    marginLeft: 8,
+  },
+  // Edit Modal Popup (for overlay-style modals)
+  editModalPopup: {
+    width: "90%",
+    maxHeight: "90%",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  editModalPopupContent: {
+    padding: 16,
+    maxHeight: 450,
+  },
+  // Edit Modal Styles (for full-screen modals)
   editModalContainer: {
     flex: 1,
     backgroundColor: "#f5f5f5",
@@ -3951,6 +5723,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#999",
   },
+  prereqSelectorCancelButton: {
+    backgroundColor: "#f5f5f5",
+    paddingVertical: 14,
+    borderRadius: 8,
+    marginTop: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  prereqSelectorCancelButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#666",
+  },
   // Reorder buttons
   reorderButtons: {
     flexDirection: "column",
@@ -4074,5 +5860,234 @@ const styles = StyleSheet.create({
   domainToggleTextActive: {
     color: "#1976D2",
     fontWeight: "600",
+  },
+  // Sub-tabs for Soft Gates
+  subTabBar: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+  },
+  subTab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  subTabActive: {
+    borderBottomColor: "#2196F3",
+  },
+  subTabText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  subTabTextActive: {
+    color: "#2196F3",
+    fontWeight: "600",
+  },
+  // Soft Gate Content
+  softGateContent: {
+    flex: 1,
+  },
+  sectionHeader: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+  },
+  // Soft Gate State Grid
+  softGateStateGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 8,
+    gap: 8,
+  },
+  softGateStatCell: {
+    width: "48%",
+    backgroundColor: "#f8f9fa",
+    padding: 8,
+    borderRadius: 6,
+  },
+  softGateStatLabel: {
+    fontSize: 11,
+    color: "#666",
+    marginBottom: 2,
+  },
+  softGateStatValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+  },
+  // User Picker
+  userPickerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+  },
+  userPickerLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#333",
+    marginRight: 8,
+  },
+  userPickerButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#f5f5f5",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  userPickerButtonText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  userPickerArrow: {
+    fontSize: 10,
+    color: "#666",
+  },
+  // Picker Modal
+  pickerModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  pickerModalContent: {
+    width: "85%",
+    maxHeight: "70%",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  pickerModalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+  },
+  pickerModalList: {
+    maxHeight: 400,
+  },
+  pickerModalItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  pickerModalItemSelected: {
+    backgroundColor: "#e3f2fd",
+  },
+  pickerModalItemText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#333",
+  },
+  pickerModalItemSubtext: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 2,
+  },
+  // Reset Buttons
+  resetAllButton: {
+    marginHorizontal: 12,
+    marginVertical: 8,
+    paddingVertical: 12,
+    backgroundColor: "#fff3e0",
+    borderRadius: 8,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ff9800",
+  },
+  resetAllButtonText: {
+    color: "#e65100",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  resetDimensionButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    backgroundColor: "#fff3e0",
+    borderRadius: 8,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ff9800",
+  },
+  resetDimensionButtonText: {
+    color: "#e65100",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  // Delete Rule Button
+  deleteRuleButton: {
+    marginTop: 24,
+    paddingVertical: 12,
+    backgroundColor: "#ffebee",
+    borderRadius: 8,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#f44336",
+  },
+  deleteRuleButtonText: {
+    color: "#c62828",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  // JSON Input
+  jsonInput: {
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontSize: 12,
+    minHeight: 100,
+  },
+  // Cancel new category button
+  cancelNewButton: {
+    marginTop: 8,
+    padding: 8,
+    alignItems: "center",
+  },
+  cancelNewButtonText: {
+    color: "#666",
+    fontSize: 13,
+  },
+  // Prompt display
+  promptItem: {
+    marginBottom: 12,
+    paddingLeft: 8,
+    borderLeftWidth: 2,
+    borderLeftColor: "#e0e0e0",
+  },
+  promptKey: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#1976d2",
+    marginBottom: 2,
+  },
+  promptValue: {
+    fontSize: 13,
+    color: "#333",
+    lineHeight: 18,
+  },
+  // Detail section title
+  detailSectionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  // List item text
+  listItemText: {
+    fontSize: 13,
+    color: "#333",
+    marginLeft: 8,
+    marginBottom: 4,
   },
 });

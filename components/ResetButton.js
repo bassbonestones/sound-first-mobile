@@ -8,18 +8,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useNavigation, CommonActions } from "@react-navigation/native";
-
-function getBackendUrl() {
-  const LOCAL_IP = "192.168.1.19";
-  if (Platform.OS === "android") {
-    return "http://10.0.2.2:8000";
-  } else if (Platform.OS === "ios") {
-    return `http://${LOCAL_IP}:8000`;
-  } else if (Platform.OS === "web") {
-    return `http://${window.location.hostname}:8000`;
-  }
-  return `http://${LOCAL_IP}:8000`;
-}
+import { getBackendUrl } from "../src/api/client";
 
 /**
  * Small reset button for bottom-left corner of screens.
