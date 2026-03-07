@@ -9,8 +9,16 @@ import React, {
 } from "react";
 import { Platform } from "react-native";
 import { getBackendUrl } from "../../../api/client";
-import { parseNoteName, noteToFrequency, generateSingleNoteMusicXML } from "../utils";
-import { INSTRUMENT_CLEFS, PITCH_EXPLORER_NOTES, DEFAULT_PITCH_EXPLORER_INDEX } from "../data";
+import {
+  parseNoteName,
+  noteToFrequency,
+  generateSingleNoteMusicXML,
+} from "../utils";
+import {
+  INSTRUMENT_CLEFS,
+  PITCH_EXPLORER_NOTES,
+  DEFAULT_PITCH_EXPLORER_INDEX,
+} from "../data";
 
 // Cross-platform AudioContext
 let NativeAudioContext = null;
@@ -35,7 +43,9 @@ export function FirstNoteProvider({ children, navigation, route }) {
   // Core state
   const [stage, setStage] = useState(0);
   const [subStep, setSubStep] = useState(0);
-  const [pitchExplorerIndex, setPitchExplorerIndex] = useState(DEFAULT_PITCH_EXPLORER_INDEX);
+  const [pitchExplorerIndex, setPitchExplorerIndex] = useState(
+    DEFAULT_PITCH_EXPLORER_INDEX,
+  );
   const [accidentalExplorer, setAccidentalExplorer] = useState("natural");
   const [showSummary, setShowSummary] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -72,11 +82,11 @@ export function FirstNoteProvider({ children, navigation, route }) {
   const noteInfo = useMemo(() => parseNoteName(resonantNote), [resonantNote]);
   const clefType = useMemo(
     () => INSTRUMENT_CLEFS[instrument.toLowerCase()] || "treble",
-    [instrument]
+    [instrument],
   );
   const stage6MusicXML = useMemo(
     () => generateSingleNoteMusicXML(resonantNote, clefType),
-    [resonantNote, clefType]
+    [resonantNote, clefType],
   );
 
   // Play the user's resonant note using Web Audio (pure sine wave)
@@ -172,7 +182,7 @@ export function FirstNoteProvider({ children, navigation, route }) {
           setIsPlaying(false);
           setShowHeardItButton(true);
         },
-        (DURATION + 0.5) * 1000
+        (DURATION + 0.5) * 1000,
       );
     } catch (err) {
       setError(`Audio error: ${err.message}`);
@@ -510,7 +520,7 @@ export function FirstNoteProvider({ children, navigation, route }) {
         console.error("Failed to save progress:", err);
       }
     },
-    [userId]
+    [userId],
   );
 
   // Complete Day 0

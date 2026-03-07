@@ -2,11 +2,11 @@
  * Stage6.js - Sharps, Flats & Naturals teaching
  * Part of FirstNoteScreen modularization
  */
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { useFirstNote } from '../context/FirstNoteContext';
-import { PITCH_EXPLORER_NOTES } from '../data';
-import styles from '../styles';
+import React from "react";
+import { View, Text, TouchableOpacity } from "react-native";
+import { useFirstNote } from "../context/FirstNoteContext";
+import { PITCH_EXPLORER_NOTES } from "../data";
+import styles from "../styles";
 
 /**
  * Stage 6 Content - Sharps, Flats & Naturals teaching

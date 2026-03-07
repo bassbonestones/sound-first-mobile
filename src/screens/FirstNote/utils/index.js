@@ -3,4 +3,4 @@ export {
   noteToMusicXMLPitch,
   generateSingleNoteMusicXML,
   noteToFrequency,
-} from './noteHelpers';
+} from "./noteHelpers";

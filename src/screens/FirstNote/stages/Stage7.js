@@ -2,23 +2,18 @@
  * Stage7.js - Your Note on the Staff (final stage)
  * Part of FirstNoteScreen modularization
  */
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import NotationDisplay from '../../../components/NotationDisplay';
-import { useFirstNote } from '../context/FirstNoteContext';
-import styles from '../styles';
+import React from "react";
+import { View, Text, TouchableOpacity } from "react-native";
+import NotationDisplay from "../../../components/NotationDisplay";
+import { useFirstNote } from "../context/FirstNoteContext";
+import styles from "../styles";
 
 /**
  * Stage 7 Content - Show the note on the staff
  */
 export const Stage7Content = () => {
-  const {
-    noteInfo,
-    clefType,
-    stage6MusicXML,
-    showSummary,
-    setShowSummary,
-  } = useFirstNote();
+  const { noteInfo, clefType, stage6MusicXML, showSummary, setShowSummary } =
+    useFirstNote();
 
   return (
     <View style={styles.stageContainer}>

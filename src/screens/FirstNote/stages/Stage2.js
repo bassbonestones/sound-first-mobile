@@ -95,7 +95,10 @@ export function Stage2Content() {
             <Text style={styles.stepInstruction}>
               Sing the note with an "Oh" sound
             </Text>
-            <EDMVisualizerMedium volume={volume} pitchAccuracy={pitchAccuracy} />
+            <EDMVisualizerMedium
+              volume={volume}
+              pitchAccuracy={pitchAccuracy}
+            />
             <AudioInput
               enabled={true}
               targetNote={resonantNote}
@@ -138,7 +141,10 @@ export function Stage2Content() {
             <Text style={styles.stepInstruction}>
               Play your note on your {instrument}
             </Text>
-            <EDMVisualizerMedium volume={volume} pitchAccuracy={pitchAccuracy} />
+            <EDMVisualizerMedium
+              volume={volume}
+              pitchAccuracy={pitchAccuracy}
+            />
             <AudioInput
               enabled={true}
               targetNote={resonantNote}
@@ -414,7 +420,9 @@ export function Stage2Buttons() {
               navigation.goBack();
             }}
           >
-            <Text style={styles.secondaryButtonText}>Pick a Different Note</Text>
+            <Text style={styles.secondaryButtonText}>
+              Pick a Different Note
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.primaryButton, { marginTop: 12 }]}

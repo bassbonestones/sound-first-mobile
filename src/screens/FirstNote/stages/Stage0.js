@@ -124,10 +124,7 @@ export function Stage0Buttons() {
       <View style={styles.fixedBottomButtons}>
         <View style={styles.buttonRow}>
           <TouchableOpacity
-            style={[
-              styles.secondaryButton,
-              isPlaying && styles.buttonDisabled,
-            ]}
+            style={[styles.secondaryButton, isPlaying && styles.buttonDisabled]}
             onPress={playNote}
             disabled={isPlaying}
           >

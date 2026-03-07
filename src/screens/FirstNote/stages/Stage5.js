@@ -2,11 +2,11 @@
  * Stage5.js - Your Clef teaching
  * Part of FirstNoteScreen modularization
  */
-import React from 'react';
-import { View, Text, Image, TouchableOpacity } from 'react-native';
-import { useFirstNote } from '../context/FirstNoteContext';
-import { BASS_CLEF_INSTRUMENTS } from '../data';
-import styles from '../styles';
+import React from "react";
+import { View, Text, Image, TouchableOpacity } from "react-native";
+import { useFirstNote } from "../context/FirstNoteContext";
+import { BASS_CLEF_INSTRUMENTS } from "../data";
+import styles from "../styles";
 
 /**
  * Stage 5 Content - Clef teaching

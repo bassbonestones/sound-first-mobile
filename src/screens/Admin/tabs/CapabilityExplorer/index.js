@@ -2544,5 +2544,4 @@ function DetailRow({ label, value, valueStyle }) {
 // SECTION 2: MATERIAL EXPLORER
 // =============================================================================
 
-
 export default CapabilityExplorer;

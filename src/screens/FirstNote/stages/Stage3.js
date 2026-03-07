@@ -53,16 +53,36 @@ export function Stage3Content() {
         <>
           <View style={styles.ledgerLineDemo}>
             {/* High note with 2 ledger lines - right side */}
-            <View style={[styles.ledgerLineSmall, { alignSelf: "flex-end", marginRight: 40 }]} />
-            <View style={[styles.noteDemoCircle, { top: 10, right: 53, left: "auto" }]} />
-            <View style={[styles.ledgerLineSmall, { alignSelf: "flex-end", marginRight: 40 }]} />
+            <View
+              style={[
+                styles.ledgerLineSmall,
+                { alignSelf: "flex-end", marginRight: 40 },
+              ]}
+            />
+            <View
+              style={[
+                styles.noteDemoCircle,
+                { top: 10, right: 53, left: "auto" },
+              ]}
+            />
+            <View
+              style={[
+                styles.ledgerLineSmall,
+                { alignSelf: "flex-end", marginRight: 40 },
+              ]}
+            />
             <View style={styles.staffLine} />
             <View style={styles.staffLine} />
             <View style={styles.staffLine} />
             <View style={styles.staffLine} />
             <View style={styles.staffLine} />
             {/* Low note ledger line - left side */}
-            <View style={[styles.ledgerLineSmall, { alignSelf: "flex-start", marginLeft: 40 }]} />
+            <View
+              style={[
+                styles.ledgerLineSmall,
+                { alignSelf: "flex-start", marginLeft: 40 },
+              ]}
+            />
             <View style={[styles.noteDemoCircle, { bottom: 3, left: 50 }]} />
           </View>
           <Text style={styles.instruction}>

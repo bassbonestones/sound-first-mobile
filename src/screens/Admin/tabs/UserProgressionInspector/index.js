@@ -359,5 +359,4 @@ function DetailRow({ label, value, valueStyle }) {
 // SECTION 4: SESSION DIAGNOSTICS
 // =============================================================================
 
-
 export default UserProgressionInspector;

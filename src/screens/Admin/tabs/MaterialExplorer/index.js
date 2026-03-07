@@ -1672,5 +1672,4 @@ function DetailRow({ label, value, valueStyle }) {
 // SECTION 3: USER PROGRESSION INSPECTOR
 // =============================================================================
 
-
 export default MaterialExplorer;

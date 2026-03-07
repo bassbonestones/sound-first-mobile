@@ -47,7 +47,8 @@ function OnboardingScreen({ navigation, route }) {
 
   const selectInstrument = useCallback((instName) => {
     setInstrument(instName);
-    const defaults = instrumentDefaults[instName] || instrumentDefaults["Other"];
+    const defaults =
+      instrumentDefaults[instName] || instrumentDefaults["Other"];
     setStartingNote(defaults.startingNote);
   }, []);
 
