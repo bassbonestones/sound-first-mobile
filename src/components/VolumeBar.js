@@ -3,10 +3,10 @@ import { View, Text, StyleSheet, Animated, Platform } from "react-native";
 
 /**
  * VolumeBar Component - Visual volume indicator
- * 
+ *
  * Shows a horizontal bar that grows/shrinks based on volume level.
  * Can change color to indicate pitch accuracy (green = correct, orange = off).
- * 
+ *
  * Props:
  * - volume: Volume level 0-1 (required)
  * - pitchAccuracy: "correct" | "off" | "listening" | null
@@ -18,12 +18,12 @@ import { View, Text, StyleSheet, Animated, Platform } from "react-native";
  */
 
 const COLORS = {
-  correct: "#4CAF50",      // Green - playing correct pitch
-  off: "#FF9800",          // Orange - playing wrong pitch
-  listening: "#4A90D9",    // Blue - just listening/singing
-  inactive: "#E0E0E0",     // Grey - no sound
-  background: "#F5F5F5",   // Background color
-  peak: "#FFC107",         // Yellow - peak indicator
+  correct: "#4CAF50", // Green - playing correct pitch
+  off: "#FF9800", // Orange - playing wrong pitch
+  listening: "#4A90D9", // Blue - just listening/singing
+  inactive: "#E0E0E0", // Grey - no sound
+  background: "#F5F5F5", // Background color
+  peak: "#FFC107", // Yellow - peak indicator
 };
 
 export default function VolumeBar({
@@ -38,7 +38,7 @@ export default function VolumeBar({
   const animatedWidth = useRef(new Animated.Value(0)).current;
   const peakRef = useRef(0);
   const peakDecayRef = useRef(null);
-  
+
   // Animated volume bar
   useEffect(() => {
     if (animated) {
@@ -50,7 +50,7 @@ export default function VolumeBar({
     } else {
       animatedWidth.setValue(volume);
     }
-    
+
     // Track peak
     if (showPeakHold && volume > peakRef.current) {
       peakRef.current = volume;
@@ -63,11 +63,11 @@ export default function VolumeBar({
       }, 500);
     }
   }, [volume, animated, showPeakHold]);
-  
+
   // Determine bar color
   const getBarColor = () => {
     if (volume < 0.02) return COLORS.inactive;
-    
+
     switch (pitchAccuracy) {
       case "correct":
         return COLORS.correct;
@@ -78,21 +78,19 @@ export default function VolumeBar({
         return COLORS.listening;
     }
   };
-  
+
   const barColor = getBarColor();
-  
+
   // Interpolate width percentage
   const widthPercent = animatedWidth.interpolate({
     inputRange: [0, 1],
     outputRange: ["0%", "100%"],
     extrapolate: "clamp",
   });
-  
+
   return (
     <View style={[styles.container, style]}>
-      {label && (
-        <Text style={styles.label}>{label}</Text>
-      )}
+      {label && <Text style={styles.label}>{label}</Text>}
       <View style={[styles.barBackground, { height }]}>
         <Animated.View
           style={[
@@ -115,13 +113,13 @@ export default function VolumeBar({
             ]}
           />
         )}
-        
+
         {/* Segment markers for visual reference */}
         <View style={[styles.segmentMarker, { left: "25%" }]} />
         <View style={[styles.segmentMarker, { left: "50%" }]} />
         <View style={[styles.segmentMarker, { left: "75%" }]} />
       </View>
-      
+
       {/* Status indicator text */}
       {pitchAccuracy === "correct" && volume > 0.02 && (
         <Text style={[styles.statusText, { color: COLORS.correct }]}>
@@ -139,7 +137,7 @@ export default function VolumeBar({
 
 /**
  * CircularVolumeIndicator - Alternative circular volume display
- * 
+ *
  * Shows volume as a pulsing circle that changes color with pitch accuracy.
  */
 export function CircularVolumeIndicator({
@@ -149,32 +147,37 @@ export function CircularVolumeIndicator({
   style,
 }) {
   const animatedScale = useRef(new Animated.Value(0.5)).current;
-  
+
   useEffect(() => {
     // Pulse animation based on volume
     const baseScale = 0.5;
     const maxScale = 1.0;
-    const targetScale = baseScale + (volume * (maxScale - baseScale));
-    
+    const targetScale = baseScale + volume * (maxScale - baseScale);
+
     Animated.spring(animatedScale, {
       toValue: targetScale,
       friction: 5,
       tension: 100,
-      useNativeDriver: Platform.OS !== 'web',
+      useNativeDriver: Platform.OS !== "web",
     }).start();
   }, [volume]);
-  
+
   const getColor = () => {
     if (volume < 0.02) return COLORS.inactive;
     switch (pitchAccuracy) {
-      case "correct": return COLORS.correct;
-      case "off": return COLORS.off;
-      default: return COLORS.listening;
+      case "correct":
+        return COLORS.correct;
+      case "off":
+        return COLORS.off;
+      default:
+        return COLORS.listening;
     }
   };
-  
+
   return (
-    <View style={[styles.circularContainer, { width: size, height: size }, style]}>
+    <View
+      style={[styles.circularContainer, { width: size, height: size }, style]}
+    >
       <Animated.View
         style={[
           styles.circularIndicator,

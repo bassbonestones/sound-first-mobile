@@ -23,7 +23,7 @@ import {
   Switch,
 } from "react-native";
 import ResetButton from "../components/ResetButton";
-import { getBackendUrl, baseUrl } from "../api/client";
+import { getBackendUrl, baseUrl } from "../src/api/client";
 
 // Tab navigation
 const TABS = [
@@ -3363,7 +3363,7 @@ function FocusCardDetailView({ focusCard, onClose, onEdit, onDelete }) {
 
         <View style={styles.detailModalActions}>
           <TouchableOpacity
-            style={[styles.actionButton, styles.modalEditButton]}
+            style={[styles.actionButton, styles.editButton]}
             onPress={onEdit}
           >
             <Text style={styles.actionButtonText}>Edit</Text>
@@ -4955,16 +4955,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginVertical: 4,
     borderRadius: 8,
-    ...Platform.select({
-      web: { boxShadow: "0px 1px 2px rgba(0, 0, 0, 0.1)" },
-      default: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-      },
-    }),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
     flexDirection: "row",
     alignItems: "center",
   },
@@ -5028,18 +5023,12 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   closeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: 8,
-    minWidth: 40,
-    alignItems: "center",
+    padding: 5,
   },
   closeButtonText: {
     color: "#fff",
-    fontSize: 18,
-    fontWeight: "500",
-    lineHeight: 18,
+    fontSize: 24,
+    fontWeight: "300",
   },
   detailSection: {
     backgroundColor: "#fff",
@@ -5377,16 +5366,13 @@ const styles = StyleSheet.create({
   detailHeaderButtons: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
   },
   editButton: {
     backgroundColor: "#4CAF50",
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    minWidth: 70,
-    alignItems: "center",
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginRight: 12,
   },
   editButtonText: {
     color: "#fff",
@@ -5438,10 +5424,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 6,
   },
-  modalEditButton: {
+  editButton: {
     backgroundColor: "#2196F3",
   },
-  modalDeleteButton: {
+  deleteButton: {
     backgroundColor: "#f44336",
   },
   actionButtonText: {
@@ -5933,16 +5919,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginVertical: 4,
     borderRadius: 8,
-    ...Platform.select({
-      web: { boxShadow: "0px 1px 2px rgba(0, 0, 0, 0.1)" },
-      default: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-      },
-    }),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   domainReorderName: {
     fontSize: 16,

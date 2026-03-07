@@ -2,18 +2,21 @@ import React, { useEffect, useState } from "react";
 import { View, ActivityIndicator, Text, Platform, LogBox } from "react-native";
 
 // Suppress warnings from dependencies we can't fix
-LogBox.ignoreLogs(['props.pointerEvents is deprecated']);
+LogBox.ignoreLogs(["props.pointerEvents is deprecated"]);
 
 // For web: filter console warnings that come from dependencies we can't fix
-if (Platform.OS === 'web') {
+if (Platform.OS === "web") {
   const originalWarn = console.warn;
   const suppressedWarnings = [
-    'props.pointerEvents is deprecated', // from react-native-webview
+    "props.pointerEvents is deprecated", // from react-native-webview
     '"shadow*" style props are deprecated', // from RN dependencies using shadow* instead of boxShadow
   ];
   console.warn = (...args) => {
     const message = args[0];
-    if (typeof message === 'string' && suppressedWarnings.some(w => message.includes(w))) {
+    if (
+      typeof message === "string" &&
+      suppressedWarnings.some((w) => message.includes(w))
+    ) {
       return; // Suppress this warning
     }
     originalWarn.apply(console, args);

@@ -1,6 +1,6 @@
 /**
  * API Client - Centralized backend communication
- * 
+ *
  * Provides:
  * - getBackendUrl() - Platform-aware base URL
  * - api object with get/post/put/delete methods
@@ -21,7 +21,8 @@ export function getBackendUrl() {
   } else if (Platform.OS === "ios") {
     return `http://${LOCAL_IP}:8000`;
   } else if (Platform.OS === "web") {
-    const hostname = typeof window !== "undefined" ? window.location.hostname : "localhost";
+    const hostname =
+      typeof window !== "undefined" ? window.location.hostname : "localhost";
     return `http://${hostname}:8000`;
   }
   return `http://${LOCAL_IP}:8000`;
@@ -41,7 +42,9 @@ export const api = {
   async get(endpoint) {
     const response = await fetch(`${baseUrl}${endpoint}`);
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: response.statusText }));
+      const error = await response
+        .json()
+        .catch(() => ({ detail: response.statusText }));
       throw new Error(error.detail || `HTTP ${response.status}`);
     }
     return response.json();
@@ -60,7 +63,9 @@ export const api = {
       body: JSON.stringify(data),
     });
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: response.statusText }));
+      const error = await response
+        .json()
+        .catch(() => ({ detail: response.statusText }));
       throw new Error(error.detail || `HTTP ${response.status}`);
     }
     return response.json();
@@ -79,7 +84,9 @@ export const api = {
       body: JSON.stringify(data),
     });
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: response.statusText }));
+      const error = await response
+        .json()
+        .catch(() => ({ detail: response.statusText }));
       throw new Error(error.detail || `HTTP ${response.status}`);
     }
     return response.json();
@@ -95,7 +102,9 @@ export const api = {
       method: "DELETE",
     });
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: response.statusText }));
+      const error = await response
+        .json()
+        .catch(() => ({ detail: response.statusText }));
       throw new Error(error.detail || `HTTP ${response.status}`);
     }
     return response.json();

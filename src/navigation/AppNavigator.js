@@ -1,6 +1,6 @@
 /**
  * App Navigator
- * 
+ *
  * Centralized navigation configuration for the app.
  */
 
@@ -65,7 +65,7 @@ export const screenConfig = {
 
 /**
  * Main App Navigator Component
- * 
+ *
  * @param {string} initialRoute - The initial route to display
  * @param {object} initialParams - Initial params for FirstNote screen
  */

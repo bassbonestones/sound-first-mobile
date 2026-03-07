@@ -1,12 +1,23 @@
 /**
  * Note Constants
- * 
+ *
  * Musical note names, frequencies, and pitch detection helpers.
  */
 
 // Standard note names (12-tone equal temperament)
 export const noteNames = [
-  "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
+  "C",
+  "C#",
+  "D",
+  "D#",
+  "E",
+  "F",
+  "F#",
+  "G",
+  "G#",
+  "A",
+  "A#",
+  "B",
 ];
 
 // Alternative enharmonic names
@@ -28,15 +39,15 @@ export const A4_FREQUENCY = 440;
  */
 export function frequencyToNote(frequency) {
   if (!frequency || frequency <= 0) return null;
-  
+
   // Calculate semitones from A4
   const semitones = 12 * Math.log2(frequency / A4_FREQUENCY);
   const semitonesRounded = Math.round(semitones);
-  
+
   // A4 is index 9 (A) in octave 4
   const noteIndex = ((semitonesRounded % 12) + 12 + 9) % 12;
   const octave = 4 + Math.floor((semitonesRounded + 9) / 12);
-  
+
   return `${noteNames[noteIndex]}${octave}`;
 }
 
@@ -47,29 +58,29 @@ export function frequencyToNote(frequency) {
  */
 export function noteToFrequency(noteName) {
   if (!noteName) return null;
-  
+
   // Parse note name (e.g., "A4", "Bb3", "C#5")
   const match = noteName.match(/^([A-G])([#b]?)(\d+)$/);
   if (!match) return null;
-  
+
   let [, letter, accidental, octaveStr] = match;
   const octave = parseInt(octaveStr, 10);
-  
+
   // Find base note index
   let noteIndex = noteNames.indexOf(letter);
   if (noteIndex === -1) return null;
-  
+
   // Apply accidental
   if (accidental === "#") noteIndex += 1;
   else if (accidental === "b") noteIndex -= 1;
-  
+
   // Normalize index
   noteIndex = ((noteIndex % 12) + 12) % 12;
-  
+
   // Calculate semitones from A4
   // A is index 9, so we need to offset
-  const semitonesFromA4 = (noteIndex - 9) + (octave - 4) * 12;
-  
+  const semitonesFromA4 = noteIndex - 9 + (octave - 4) * 12;
+
   return A4_FREQUENCY * Math.pow(2, semitonesFromA4 / 12);
 }
 
@@ -122,12 +133,12 @@ export function parseNoteName(noteName) {
  */
 export function formatNoteName(noteName, style = "sharp") {
   if (!noteName) return "";
-  
+
   const parsed = parseNoteName(noteName);
   if (!parsed) return noteName;
-  
+
   let { letter, accidental, octave } = parsed;
-  
+
   if (style === "flat" && accidental === "#") {
     // Convert sharps to flats
     const sharpNote = `${letter}#`;
@@ -137,12 +148,14 @@ export function formatNoteName(noteName, style = "sharp") {
   } else if (style === "sharp" && accidental === "b") {
     // Convert flats to sharps
     const flatNote = `${letter}b`;
-    const sharpEquiv = Object.entries(enharmonicNames).find(([, v]) => v === flatNote);
+    const sharpEquiv = Object.entries(enharmonicNames).find(
+      ([, v]) => v === flatNote,
+    );
     if (sharpEquiv) {
       return `${sharpEquiv[0].replace("#", "")}#${octave}`;
     }
   }
-  
+
   return noteName;
 }
 

@@ -1,7 +1,7 @@
 /**
  * AdminScreen/index.js - Admin Console with tabbed navigation
- * 
- * This is the main entry point for the Admin screen. 
+ *
+ * This is the main entry point for the Admin screen.
  * Each tab section is now in its own file for maintainability.
  */
 

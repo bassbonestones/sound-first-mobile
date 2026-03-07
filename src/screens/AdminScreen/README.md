@@ -27,7 +27,7 @@ AdminScreen/
 ## Migration Status
 
 - [ ] CapabilityExplorer - ~1000 lines
-- [ ] MaterialExplorer - ~400 lines  
+- [ ] MaterialExplorer - ~400 lines
 - [ ] FocusCardExplorer - ~800 lines
 - [ ] SoftGateExplorer - ~900 lines
 - [ ] UserProgressInspector - ~330 lines
@@ -37,6 +37,7 @@ AdminScreen/
 ## Shared Resources
 
 All admin components import from:
+
 - `src/styles/admin.styles.js` - Shared styles
 - `src/api/client.js` - API client with baseUrl
 - `src/constants/` - Colors, instruments, notes

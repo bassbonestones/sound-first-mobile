@@ -1,6 +1,6 @@
 /**
  * Instrument Constants
- * 
+ *
  * Instrument families, individual instruments, and their default settings.
  */
 
@@ -70,14 +70,14 @@ export const instrumentDefaults = {
   // Keyboard
   Piano: { startingNote: "C4", clef: "treble" },
   Organ: { startingNote: "C4", clef: "treble" },
-  
+
   // Strings
   Violin: { startingNote: "A4", clef: "treble" },
   Viola: { startingNote: "D4", clef: "treble" },
   Cello: { startingNote: "G3", clef: "bass" },
   "Double Bass": { startingNote: "G2", clef: "bass" },
   Guitar: { startingNote: "G3", clef: "treble" },
-  
+
   // Woodwinds
   Flute: { startingNote: "D5", clef: "treble" },
   Oboe: { startingNote: "A4", clef: "treble" },
@@ -86,7 +86,7 @@ export const instrumentDefaults = {
   "Alto Saxophone": { startingNote: "G4", clef: "treble" },
   "Tenor Saxophone": { startingNote: "D4", clef: "treble" },
   "Baritone Saxophone": { startingNote: "G3", clef: "treble" },
-  
+
   // Brass
   Trumpet: { startingNote: "Bb4", clef: "treble" },
   "French Horn": { startingNote: "F4", clef: "treble" },
@@ -94,14 +94,14 @@ export const instrumentDefaults = {
   "Bass Trombone": { startingNote: "F3", clef: "bass" },
   Euphonium: { startingNote: "Bb3", clef: "bass" },
   Tuba: { startingNote: "F2", clef: "bass" },
-  
+
   // Voice
   Soprano: { startingNote: "A4", clef: "treble" },
   Alto: { startingNote: "E4", clef: "treble" },
   Tenor: { startingNote: "A3", clef: "treble" },
   "Bass Voice": { startingNote: "E3", clef: "bass" },
   "Voice (General)": { startingNote: "E4", clef: "treble" },
-  
+
   // Other
   "Mallet Percussion": { startingNote: "C4", clef: "treble" },
   Other: { startingNote: "C4", clef: "treble" },
@@ -112,7 +112,7 @@ export const instrumentDefaults = {
  */
 export function getAllInstruments() {
   const instruments = [];
-  Object.values(instrumentFamilies).forEach(family => {
+  Object.values(instrumentFamilies).forEach((family) => {
     instruments.push(...family.instruments);
   });
   return instruments;
@@ -123,7 +123,7 @@ export function getAllInstruments() {
  */
 export function getInstrument(name) {
   for (const family of Object.values(instrumentFamilies)) {
-    const instrument = family.instruments.find(i => i.name === name);
+    const instrument = family.instruments.find((i) => i.name === name);
     if (instrument) return instrument;
   }
   return null;
@@ -134,7 +134,7 @@ export function getInstrument(name) {
  */
 export function getInstrumentFamily(instrumentName) {
   for (const [familyName, family] of Object.entries(instrumentFamilies)) {
-    if (family.instruments.some(i => i.name === instrumentName)) {
+    if (family.instruments.some((i) => i.name === instrumentName)) {
       return familyName;
     }
   }

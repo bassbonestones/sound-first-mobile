@@ -1,6 +1,6 @@
 /**
  * DetailRow - Label/value pair display component
- * 
+ *
  * Used in detail views to display information.
  */
 
@@ -10,7 +10,7 @@ import { colors, spacing, fontSizes } from "../../styles/theme";
 
 /**
  * DetailRow Component
- * 
+ *
  * @param {string} label - Field label
  * @param {any} value - Field value
  * @param {object} valueStyle - Additional style for value text

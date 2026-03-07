@@ -540,7 +540,7 @@ export default function AudioInput({
   const animationFrameRef = useRef(null);
   const silenceTimerRef = useRef(null);
   const soundStartedRef = useRef(false);
-  
+
   // Throttle volume updates to prevent excessive re-renders (max ~10 updates/sec)
   const lastVolumeUpdateRef = useRef(0);
   const VOLUME_UPDATE_INTERVAL_MS = 100;
@@ -618,7 +618,10 @@ export default function AudioInput({
           case "volumeChange":
             // Throttle volume updates to prevent excessive re-renders
             const now = Date.now();
-            if (now - lastVolumeUpdateRef.current >= VOLUME_UPDATE_INTERVAL_MS) {
+            if (
+              now - lastVolumeUpdateRef.current >=
+              VOLUME_UPDATE_INTERVAL_MS
+            ) {
               lastVolumeUpdateRef.current = now;
               setVolume(data.volume);
               if (onVolumeChange) onVolumeChange(data.volume);
@@ -818,7 +821,7 @@ export default function AudioInput({
 
       // Normalize volume (0-1 scale)
       const normalizedVolume = Math.min(1, rms * 10);
-      
+
       // Throttle volume state updates to prevent excessive re-renders
       const now = Date.now();
       if (now - lastVolumeUpdateRef.current >= VOLUME_UPDATE_INTERVAL_MS) {
@@ -875,7 +878,8 @@ export default function AudioInput({
                 ? diff % 12 === 0
                 : diff === 0;
               const isMatch =
-                noteMatches && Math.abs(noteInfo.cents) < pitchMarginRef.current;
+                noteMatches &&
+                Math.abs(noteInfo.cents) < pitchMarginRef.current;
               onPitchMatchRef.current(isMatch, noteInfo);
             }
           }

@@ -1,6 +1,6 @@
 /**
  * Admin Components
- * 
+ *
  * Shared UI components for admin screens.
  */
 

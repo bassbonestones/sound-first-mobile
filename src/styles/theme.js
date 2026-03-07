@@ -1,6 +1,6 @@
 /**
  * Theme - Shared styling constants and utilities
- * 
+ *
  * Usage:
  *   import { colors, spacing, fontSizes } from '../styles/theme';
  */
@@ -59,13 +59,19 @@ export const shadows = {
  * Create a custom shadow with platform-appropriate styles
  * @param {string} color - Shadow color (hex)
  * @param {number} offsetX - Horizontal offset
- * @param {number} offsetY - Vertical offset  
+ * @param {number} offsetY - Vertical offset
  * @param {number} opacity - Shadow opacity (0-1)
  * @param {number} radius - Blur radius
  * @returns Platform-appropriate shadow style object
  */
-export function createShadow(color = "#000", offsetX = 0, offsetY = 4, opacity = 0.2, radius = 8) {
-  if (Platform.OS === 'web') {
+export function createShadow(
+  color = "#000",
+  offsetX = 0,
+  offsetY = 4,
+  opacity = 0.2,
+  radius = 8,
+) {
+  if (Platform.OS === "web") {
     // Convert hex color + opacity to rgba for boxShadow
     const r = parseInt(color.slice(1, 3), 16);
     const g = parseInt(color.slice(3, 5), 16);
@@ -101,13 +107,13 @@ export const commonStyles = {
     flex: 1,
     backgroundColor: colors.background,
   },
-  
+
   centeredContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  
+
   // Card/Surface styles
   card: {
     backgroundColor: colors.surface,
@@ -115,7 +121,7 @@ export const commonStyles = {
     padding: spacing.lg,
     ...shadows.small,
   },
-  
+
   // Header styles (admin/light theme)
   header: {
     backgroundColor: colors.headerBg,
@@ -124,13 +130,13 @@ export const commonStyles = {
     justifyContent: "space-between",
     alignItems: "center",
   },
-  
+
   headerTitle: {
     color: colors.textLight,
     fontSize: fontSizes.header,
     fontWeight: "bold",
   },
-  
+
   // List item styles
   listItem: {
     backgroundColor: colors.surface,
@@ -142,7 +148,7 @@ export const commonStyles = {
     flexDirection: "row",
     alignItems: "center",
   },
-  
+
   // Button styles
   primaryButton: {
     backgroundColor: colors.primary,
@@ -151,13 +157,13 @@ export const commonStyles = {
     borderRadius: borderRadius.lg,
     alignItems: "center",
   },
-  
+
   primaryButtonText: {
     color: colors.textLight,
     fontSize: fontSizes.base,
     fontWeight: "600",
   },
-  
+
   secondaryButton: {
     backgroundColor: colors.chipBg,
     paddingHorizontal: spacing.lg,
@@ -165,13 +171,13 @@ export const commonStyles = {
     borderRadius: borderRadius.lg,
     alignItems: "center",
   },
-  
+
   secondaryButtonText: {
     color: colors.textPrimary,
     fontSize: fontSizes.base,
     fontWeight: "600",
   },
-  
+
   dangerButton: {
     backgroundColor: colors.error,
     paddingHorizontal: spacing.lg,
@@ -179,13 +185,13 @@ export const commonStyles = {
     borderRadius: borderRadius.lg,
     alignItems: "center",
   },
-  
+
   dangerButtonText: {
     color: colors.textLight,
     fontSize: fontSizes.base,
     fontWeight: "600",
   },
-  
+
   // Input styles
   textInput: {
     backgroundColor: colors.inputBg,
@@ -195,7 +201,7 @@ export const commonStyles = {
     fontSize: fontSizes.lg,
     color: colors.textPrimary,
   },
-  
+
   // Modal styles
   modalOverlay: {
     flex: 1,
@@ -203,7 +209,7 @@ export const commonStyles = {
     justifyContent: "center",
     alignItems: "center",
   },
-  
+
   modalContent: {
     width: "90%",
     maxHeight: "85%",
@@ -211,7 +217,7 @@ export const commonStyles = {
     borderRadius: borderRadius.xl,
     overflow: "hidden",
   },
-  
+
   modalHeader: {
     backgroundColor: colors.headerBg,
     padding: spacing.lg,
@@ -219,31 +225,31 @@ export const commonStyles = {
     justifyContent: "space-between",
     alignItems: "center",
   },
-  
+
   modalTitle: {
     color: colors.textLight,
     fontSize: fontSizes.xxl,
     fontWeight: "bold",
     flex: 1,
   },
-  
+
   // Text styles
   title: {
     fontSize: fontSizes.xl,
     fontWeight: "600",
     color: colors.textPrimary,
   },
-  
+
   subtitle: {
     fontSize: fontSizes.base,
     color: colors.textSecondary,
   },
-  
+
   caption: {
     fontSize: fontSizes.sm,
     color: colors.textTertiary,
   },
-  
+
   // Chip/Badge styles
   chip: {
     paddingHorizontal: spacing.md,
@@ -251,20 +257,20 @@ export const commonStyles = {
     backgroundColor: colors.chipBg,
     borderRadius: borderRadius.round,
   },
-  
+
   chipActive: {
     backgroundColor: colors.chipActiveBg,
   },
-  
+
   chipText: {
     fontSize: fontSizes.md,
     color: colors.textSecondary,
   },
-  
+
   chipTextActive: {
     color: colors.textLight,
   },
-  
+
   // Badge (small, inline)
   badge: {
     backgroundColor: colors.primaryLight,
@@ -278,4 +284,12 @@ export const commonStyles = {
   },
 };
 
-export default { colors, spacing, fontSizes, borderRadius, shadows, commonStyles, headerPadding };
+export default {
+  colors,
+  spacing,
+  fontSizes,
+  borderRadius,
+  shadows,
+  commonStyles,
+  headerPadding,
+};

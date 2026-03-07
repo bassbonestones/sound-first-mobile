@@ -1,6 +1,6 @@
 /**
  * FormField - Reusable form input component
- * 
+ *
  * Used across admin screens for consistent form styling.
  */
 
@@ -10,7 +10,7 @@ import { colors, spacing, fontSizes, borderRadius } from "../../styles/theme";
 
 /**
  * FormField Component
- * 
+ *
  * @param {string} label - Field label
  * @param {string} value - Current value
  * @param {function} onChangeText - Change handler
