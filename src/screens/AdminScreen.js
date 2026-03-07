@@ -2111,6 +2111,7 @@ function MaterialExplorer() {
   const [showAllCapabilities, setShowAllCapabilities] = useState(false);
   const [allCapabilities, setAllCapabilities] = useState([]);
   const [expandedDomains, setExpandedDomains] = useState({});
+  const [expandedProfiles, setExpandedProfiles] = useState({});
   const [softGateHelpVisible, setSoftGateHelpVisible] = useState(null);
 
   // Soft gate explanations
@@ -2118,44 +2119,57 @@ function MaterialExplorer() {
     d1_tonal: {
       title: "D1 - Tonal Complexity",
       description:
-        "Measures chromatic complexity based on pitch class count and accidentals.",
+        "Measures chromatic complexity based on unique pitch classes and accidental rate (accidentals / total notes). Each stage requires meeting its conditions.",
       stages: [
-        "Stage 0: 1-3 pitch classes, no accidentals (e.g., C-D-E)",
-        "Stage 1: 4-5 pitch classes, minimal accidentals",
-        "Stage 2: 5-6 pitch classes, some accidentals",
-        "Stage 3: 6-8 pitch classes, moderate chromaticism",
-        "Stage 4: 9-11 pitch classes, significant chromaticism",
-        "Stage 5: All 12 pitch classes or heavy accidental use",
+        "Stage 0: Unison — only 1 unique pitch class",
+        "Stage 1: Two-note neighbor — ≤2 pitch classes, accidental rate ≤10%",
+        "Stage 2: Diatonic small — ≤5 pitch classes, accidental rate ≤10%",
+        "Stage 3: Diatonic broad — ≤7 pitch classes, accidental rate ≤10%",
+        "Stage 4: Light chromatic — accidental rate 10-30%",
+        "Stage 5: Chromatic — accidental rate >30% or high pitch class count",
       ],
       calculation:
-        "Based on unique pitch classes (0-12) and accidental ratio (accidentals/total notes)",
+        "pitch_class_count (unique pitch classes 0-12) and accidental_rate (accidentals / total notes)",
     },
     d2_interval: {
-      title: "D2 - Interval Size",
-      description: "Measures the largest melodic interval in the piece.",
+      title: "D2 - Interval Demand Profile",
+      description:
+        "Two-number system: SUSTAINED (p75, for material assignment) and HAZARD (max, for warnings). Sustained shows the typical challenge level. Hazard detects dangerous spikes even if rare.",
       stages: [
-        "Stage 0: Unison only (repeated notes)",
-        "Stage 1: Minor 2nd (1 semitone)",
-        "Stage 2: Major 2nd - Minor 3rd (2-3 semitones)",
-        "Stage 3: Major 3rd - Perfect 4th (4-5 semitones)",
-        "Stage 4: Tritone - Perfect 5th (6-7 semitones)",
-        "Stage 5: Minor 6th - Octave (8-12 semitones)",
-        "Stage 6: Greater than octave (13+ semitones)",
+        "Sustained Stage (p75-based):",
+        "  0: Unison — p75 ≤ 0",
+        "  1: Half step — p75 ≤ 1",
+        "  2: Whole step — p75 ≤ 2",
+        "  3: Thirds — p75 ≤ 4",
+        "  4: Fourths/Fifths — p75 ≤ 7",
+        "  5: Sixths — p75 ≤ 9",
+        "  6: Sevenths+ — p75 ≥ 10",
+        "  +1 bump if large_leap_ratio > 15%",
+        "",
+        "Hazard Stage (max-based):",
+        "  Same thresholds but using max interval",
+        "  +1 bump if ≥2 extreme leaps in any 16-beat window",
       ],
-      calculation: "Largest interval in semitones between consecutive notes",
+      calculation:
+        "Buckets: step(0-2st), skip(3-5st), leap(6-11st), large_leap(12-17st), extreme(18+st). Warning shown if hazard > sustained + 1.",
     },
     d3_rhythm: {
       title: "D3 - Rhythm Complexity",
-      description: "Weighted score of rhythmic elements present.",
+      description:
+        "Weighted composite of 5 factors. Fast notes alone don't mean high complexity—irregular patterns (ties, dots, tuplets) and frequent rhythm switching are equally important.",
       stages: [
-        "0-20%: Simple (whole, half notes)",
-        "20-40%: Easy (quarter notes, simple rests)",
-        "40-60%: Moderate (eighth notes, dotted rhythms)",
-        "60-80%: Complex (16ths, syncopation, ties)",
-        "80-100%: Advanced (32nds, tuplets, complex patterns)",
+        "0-20%: Simple — uniform note values, no irregularity",
+        "20-40%: Easy — some variety, mostly regular patterns",
+        "40-60%: Moderate — mixed values (even 16ths), some ties/dots, moderate switching",
+        "60-80%: Complex — frequent switching + ties/dots/tuplets + fast intervals",
+        "80-100%: Advanced — all factors high: 32nds, tuplets, syncopation, fast leaps",
       ],
       calculation:
-        "Weighted sum of: note types (whole→32nd), dots, ties, tuplets, syncopation",
+        "F1 Subdivision (30%): fastest note type + fast-note density | " +
+        "F2 Variety (15%): Shannon entropy of rhythm types | " +
+        "F3 Switching (20%): rate of rhythm type changes | " +
+        "F4 Irregular (15%): ties 30% + dots 30% + tuplets 40% | " +
+        "F5 Motion (20%): rhythm × pitch-change coupling (p75)",
     },
     d4_range: {
       title: "D4 - Range Usage",
@@ -2174,15 +2188,18 @@ function MaterialExplorer() {
     ivs: {
       title: "IVS - Interval Velocity Score",
       description:
-        "Measures how quickly large intervals occur relative to note density.",
+        "Big leaps at fast speeds = higher score. A P5 in 16ths is harder than a P5 in whole notes. Combines mean + p90 for robustness.",
       stages: [
-        "0-25%: Low velocity (slow, stepwise motion)",
-        "25-50%: Moderate velocity",
-        "50-75%: High velocity (frequent leaps)",
-        "75-100%: Very high (rapid large intervals)",
+        "0-15%: Mostly stepwise, slow (easy sight-reading)",
+        "15-35%: Moderate motion and/or speed",
+        "35-60%: Frequent leaps at speed (challenging)",
+        "60-100%: Large leaps with short gaps repeatedly (virtuosic)",
       ],
       calculation:
-        "(Sum of interval sizes / Note count) × Tempo factor. Higher = more challenging sight-reading.",
+        "Per interval: contrib = (size_norm)^1.0 × (speed_norm)^1.5 | " +
+        "size_norm = min(semitones, 12)/12 | " +
+        "speed_norm = 1/(1 + dt_quarterLengths) | " +
+        "IVS = 70% mean + 30% p90",
     },
     tempo_diff: {
       title: "Tempo Difficulty",
@@ -2465,6 +2482,7 @@ function MaterialExplorer() {
       }
 
       const preview = await response.json();
+      console.log('[AdminScreen] Preview response:', JSON.stringify(preview.unified_scores, null, 2));
       setUploadPreview(preview);
       if (preview.title && !uploadTitle) {
         setUploadTitle(preview.title);
@@ -2814,7 +2832,7 @@ function MaterialExplorer() {
                         <View style={styles.softGateCell}>
                           <View style={styles.softGateLabelRow}>
                             <Text style={styles.softGateCellLabel}>
-                              D2 - Interval Size
+                              D2 - Interval Demand
                             </Text>
                             <TouchableOpacity
                               onPress={() =>
@@ -2826,10 +2844,30 @@ function MaterialExplorer() {
                             </TouchableOpacity>
                           </View>
                           <Text style={styles.softGateCellValue}>
-                            Stage{" "}
-                            {uploadPreview.soft_gates.interval_size_stage ??
+                            Sustained:{" "}
+                            {uploadPreview.soft_gates
+                              .interval_sustained_stage ?? "N/A"}{" "}
+                            | Hazard:{" "}
+                            {uploadPreview.soft_gates.interval_hazard_stage ??
                               "N/A"}
                           </Text>
+                          {uploadPreview.soft_gates.interval_hazard_stage !=
+                            null &&
+                            uploadPreview.soft_gates.interval_sustained_stage !=
+                              null &&
+                            uploadPreview.soft_gates.interval_hazard_stage >
+                              uploadPreview.soft_gates
+                                .interval_sustained_stage +
+                                1 && (
+                              <Text
+                                style={[
+                                  styles.softGateCellValue,
+                                  { color: "#e74c3c", fontSize: 10 },
+                                ]}
+                              >
+                                Warning: Large interval spike
+                              </Text>
+                            )}
                         </View>
                         <View style={styles.softGateCell}>
                           <View style={styles.softGateLabelRow}>
@@ -2850,6 +2888,10 @@ function MaterialExplorer() {
                             null
                               ? `${(uploadPreview.soft_gates.rhythm_complexity_score * 100).toFixed(0)}%`
                               : "N/A"}
+                            {uploadPreview.soft_gates.rhythm_complexity_peak !=
+                            null
+                              ? ` (peak: ${(uploadPreview.soft_gates.rhythm_complexity_peak * 100).toFixed(0)}%)`
+                              : ""}
                           </Text>
                         </View>
                         <View style={styles.softGateCell}>
@@ -2887,6 +2929,10 @@ function MaterialExplorer() {
                             null
                               ? `${(uploadPreview.soft_gates.interval_velocity_score * 100).toFixed(0)}%`
                               : "N/A"}
+                            {uploadPreview.soft_gates.interval_velocity_peak !=
+                            null
+                              ? ` (peak: ${(uploadPreview.soft_gates.interval_velocity_peak * 100).toFixed(0)}%)`
+                              : ""}
                           </Text>
                         </View>
                         <View style={styles.softGateCell}>
@@ -2958,6 +3004,149 @@ function MaterialExplorer() {
                             </Text>
                           </View>
                         )}
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {/* Unified Scores (Facet-Aware) */}
+                {uploadPreview.unified_scores && !uploadPreview.unified_scores.error && (
+                  <View style={styles.previewSection}>
+                    <Text style={styles.previewSectionTitle}>
+                      Unified Scores (Facet Analysis)
+                    </Text>
+                    
+                    {/* Composite Score */}
+                    {uploadPreview.unified_scores.composite && (
+                      <View style={[styles.softGateGrid, { marginBottom: 12 }]}>
+                        <View style={[styles.softGateCell, { backgroundColor: '#e8f5e9' }]}>
+                          <Text style={[styles.softGateCellLabel, { fontWeight: 'bold' }]}>
+                            Overall Difficulty
+                          </Text>
+                          <Text style={[styles.softGateCellValue, { fontSize: 18 }]}>
+                            {(uploadPreview.unified_scores.composite.overall * 100).toFixed(0)}%
+                            {uploadPreview.unified_scores.composite.interaction_bonus > 0 && (
+                              <Text style={{ fontSize: 10, color: '#e74c3c' }}>
+                                {' '}(+{(uploadPreview.unified_scores.composite.interaction_bonus * 100).toFixed(0)}% interaction)
+                              </Text>
+                            )}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                    
+                    {/* Domain Breakdown */}
+                    {['interval', 'rhythm', 'tonal', 'tempo', 'range', 'throughput'].map((domain) => {
+                      const domainData = uploadPreview.unified_scores[domain];
+                      if (!domainData) return null;
+                      
+                      const domainLabels = {
+                        interval: 'Interval',
+                        rhythm: 'Rhythm', 
+                        tonal: 'Tonal',
+                        tempo: 'Tempo',
+                        range: 'Range',
+                        throughput: 'Throughput'
+                      };
+                      
+                      return (
+                        <View key={domain} style={styles.unifiedScoreDomain}>
+                          <View style={styles.unifiedScoreDomainHeader}>
+                            <Text style={styles.unifiedScoreDomainName}>
+                              {domainLabels[domain]}
+                            </Text>
+                            <View style={styles.unifiedScoreSummary}>
+                              <Text style={styles.unifiedScoreLabel}>P:</Text>
+                              <Text style={styles.unifiedScoreValue}>
+                                {(domainData.scores.primary * 100).toFixed(0)}%
+                              </Text>
+                              <Text style={styles.unifiedScoreLabel}>H:</Text>
+                              <Text style={[styles.unifiedScoreValue, 
+                                domainData.scores.hazard > domainData.scores.primary + 0.15 && { color: '#e74c3c' }
+                              ]}>
+                                {(domainData.scores.hazard * 100).toFixed(0)}%
+                              </Text>
+                              <Text style={styles.unifiedScoreLabel}>O:</Text>
+                              <Text style={styles.unifiedScoreValue}>
+                                {(domainData.scores.overall * 100).toFixed(0)}%
+                              </Text>
+                              <Text style={styles.unifiedScoreStage}>
+                                Stage {domainData.bands.overall_stage}
+                              </Text>
+                            </View>
+                          </View>
+                          
+                          {/* Facet Scores */}
+                          <View style={styles.unifiedScoreFacets}>
+                            {Object.entries(domainData.facet_scores).map(([facet, value]) => (
+                              <View key={facet} style={styles.unifiedScoreFacet}>
+                                <Text style={styles.unifiedScoreFacetName}>
+                                  {facet.replace(/_/g, ' ')}
+                                </Text>
+                                <View style={styles.unifiedScoreFacetBar}>
+                                  <View style={[styles.unifiedScoreFacetFill, { width: `${value * 100}%` }]} />
+                                </View>
+                                <Text style={styles.unifiedScoreFacetValue}>
+                                  {(value * 100).toFixed(0)}%
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                          
+                          {/* Flags */}
+                          {domainData.flags && domainData.flags.length > 0 && (
+                            <View style={styles.unifiedScoreFlags}>
+                              {domainData.flags.map((flag, idx) => (
+                                <Text key={idx} style={styles.unifiedScoreFlag}>
+                                  ⚠️ {flag.replace(/_/g, ' ')}
+                                </Text>
+                              ))}
+                            </View>
+                          )}
+                          
+                          {/* Profile Details (expandable) */}
+                          {domainData.profile && (
+                            <TouchableOpacity
+                              style={styles.profileToggle}
+                              onPress={() => setExpandedProfiles(prev => ({
+                                ...prev,
+                                [domain]: !prev[domain]
+                              }))}
+                            >
+                              <Text style={styles.profileToggleText}>
+                                {expandedProfiles[domain] ? '▼' : '▶'} Profile Details
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                          {expandedProfiles[domain] && domainData.profile && (
+                            <View style={styles.profileDetails}>
+                              {Object.entries(domainData.profile).map(([key, value]) => (
+                                <View key={key} style={styles.profileRow}>
+                                  <Text style={styles.profileKey}>
+                                    {key.replace(/_/g, ' ')}:
+                                  </Text>
+                                  <Text style={styles.profileValue}>
+                                    {typeof value === 'number' 
+                                      ? (Number.isInteger(value) ? value : value.toFixed(4))
+                                      : (value ?? 'null')}
+                                  </Text>
+                                </View>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })}
+                    
+                    {/* Interaction Flags */}
+                    {uploadPreview.unified_scores.composite?.flags?.length > 0 && (
+                      <View style={styles.unifiedScoreInteractionFlags}>
+                        <Text style={styles.unifiedScoreInteractionTitle}>Interaction Effects:</Text>
+                        {uploadPreview.unified_scores.composite.flags.map((flag, idx) => (
+                          <Text key={idx} style={styles.unifiedScoreInteractionFlag}>
+                            • {flag.replace(/_/g, ' ')}
+                          </Text>
+                        ))}
                       </View>
                     )}
                   </View>
@@ -3267,8 +3456,12 @@ function MaterialDetailView({ material, userId, onClose, onTriggerAnalysis }) {
           value={String(analysis.tonal_complexity_stage ?? "N/A")}
         />
         <DetailRow
-          label="Interval Stage"
-          value={String(analysis.interval_size_stage ?? "N/A")}
+          label="Interval Sustained"
+          value={String(analysis.interval_sustained_stage ?? "N/A")}
+        />
+        <DetailRow
+          label="Interval Hazard"
+          value={String(analysis.interval_hazard_stage ?? "N/A")}
         />
         <DetailRow
           label="Rhythm Stage"
@@ -7410,6 +7603,137 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: "#666",
+  },
+  // Unified Score Styles
+  unifiedScoreDomain: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  unifiedScoreDomainHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  unifiedScoreDomainName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+  },
+  unifiedScoreSummary: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  unifiedScoreLabel: {
+    fontSize: 10,
+    color: "#666",
+  },
+  unifiedScoreValue: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#333",
+    minWidth: 28,
+  },
+  unifiedScoreStage: {
+    fontSize: 10,
+    color: "#1976D2",
+    fontWeight: "600",
+    marginLeft: 6,
+    backgroundColor: "#e3f2fd",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  unifiedScoreFacets: {
+    gap: 4,
+  },
+  unifiedScoreFacet: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  unifiedScoreFacetName: {
+    fontSize: 10,
+    color: "#666",
+    width: 120,
+    textTransform: "capitalize",
+  },
+  unifiedScoreFacetBar: {
+    flex: 1,
+    height: 6,
+    backgroundColor: "#e0e0e0",
+    borderRadius: 3,
+  },
+  unifiedScoreFacetFill: {
+    height: "100%",
+    backgroundColor: "#1976D2",
+    borderRadius: 3,
+  },
+  unifiedScoreFacetValue: {
+    fontSize: 10,
+    color: "#666",
+    width: 30,
+    textAlign: "right",
+  },
+  unifiedScoreFlags: {
+    marginTop: 6,
+    gap: 2,
+  },
+  unifiedScoreFlag: {
+    fontSize: 10,
+    color: "#e74c3c",
+  },
+  profileToggle: {
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  profileToggleText: {
+    fontSize: 10,
+    color: "#666",
+    fontStyle: "italic",
+  },
+  profileDetails: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: 4,
+    padding: 8,
+    marginTop: 4,
+  },
+  profileRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 2,
+  },
+  profileKey: {
+    fontSize: 10,
+    color: "#666",
+    flex: 1,
+  },
+  profileValue: {
+    fontSize: 10,
+    color: "#333",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    textAlign: "right",
+  },
+  unifiedScoreInteractionFlags: {
+    backgroundColor: "#fff3e0",
+    padding: 10,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  unifiedScoreInteractionTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#ef6c00",
+    marginBottom: 4,
+  },
+  unifiedScoreInteractionFlag: {
+    fontSize: 11,
+    color: "#333",
   },
   helpModalOverlay: {
     flex: 1,
