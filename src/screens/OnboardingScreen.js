@@ -327,8 +327,8 @@ function OnboardingScreen({ navigation, route }) {
           )}
 
           {/* Instrument Selection within Family */}
-          {selectedFamily && (
-            <>
+          {selectedFamily ? (
+            <View style={{ alignItems: "center" }}>
               <TouchableOpacity
                 onPress={() => {
                   setSelectedFamily("");
@@ -337,7 +337,7 @@ function OnboardingScreen({ navigation, route }) {
                 style={{ marginBottom: 16 }}
               >
                 <Text style={{ color: "#bfa76a", fontSize: 14 }}>
-                  ← Back to families
+                  {"← Back to families"}
                 </Text>
               </TouchableOpacity>
               <View
@@ -367,50 +367,51 @@ function OnboardingScreen({ navigation, route }) {
                   maxWidth: 400,
                 }}
               >
-                {currentFamilyInstruments.map((inst) => (
-                  <TouchableOpacity
-                    key={inst.name}
-                    onPress={() => selectInstrument(inst.name)}
-                    style={{
-                      backgroundColor:
-                        instrument === inst.name ? "#FFD700" : "#3b2c1a",
-                      borderRadius: 16,
-                      padding: 16,
-                      margin: 8,
-                      borderWidth: 2,
-                      borderColor:
-                        instrument === inst.name ? "#FFD700" : "#bfa76a",
-                      width: 110,
-                      alignItems: "center",
-                      ...createShadow(
-                        instrument === inst.name ? "#FFD700" : "#000",
-                        0,
-                        2,
-                        instrument === inst.name ? 0.4 : 0.1,
-                        8,
-                      ),
-                    }}
-                  >
-                    <Text style={{ fontSize: 32, marginBottom: 4 }}>
-                      {inst.icon}
-                    </Text>
-                    <Text
+                {currentFamilyInstruments.map((inst) => {
+                  const isSelected = instrument === inst.name;
+                  return (
+                    <TouchableOpacity
+                      key={inst.name}
+                      onPress={() => selectInstrument(inst.name)}
                       style={{
-                        color: instrument === inst.name ? "#3b2c1a" : "#FFD700",
-                        fontWeight: "bold",
-                        fontSize: 11,
-                        textAlign: "center",
-                        fontFamily:
-                          Platform.OS === "ios" ? "Baskerville" : "serif",
+                        backgroundColor: isSelected ? "#FFD700" : "#3b2c1a",
+                        borderRadius: 16,
+                        padding: 16,
+                        margin: 8,
+                        borderWidth: 2,
+                        borderColor: isSelected ? "#FFD700" : "#bfa76a",
+                        width: 110,
+                        alignItems: "center",
+                        ...createShadow(
+                          isSelected ? "#FFD700" : "#000",
+                          0,
+                          2,
+                          isSelected ? 0.4 : 0.1,
+                          8,
+                        ),
                       }}
                     >
-                      {inst.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                      <Text style={{ fontSize: 32, marginBottom: 4 }}>
+                        {inst.icon}
+                      </Text>
+                      <Text
+                        style={{
+                          color: isSelected ? "#3b2c1a" : "#FFD700",
+                          fontWeight: "bold",
+                          fontSize: 11,
+                          textAlign: "center",
+                          fontFamily:
+                            Platform.OS === "ios" ? "Baskerville" : "serif",
+                        }}
+                      >
+                        {inst.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-            </>
-          )}
+            </View>
+          ) : null}
         </ScrollView>
 
         {/* Fixed bottom area with button and progress dots */}
