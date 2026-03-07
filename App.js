@@ -88,11 +88,11 @@ import StartPracticeScreen from "./src/screens/StartPracticeScreen";
 import SessionScreen from "./src/screens/SessionScreen";
 import FocusCardScreen from "./src/screens/FocusCardScreen";
 import RatingScreen from "./src/screens/RatingScreen";
-import OnboardingScreen from "./src/screens/OnboardingScreen";
+import OnboardingScreen from "./src/screens/Onboarding";
 import SelfDirectedScreen from "./src/screens/SelfDirectedScreen";
 import HistoryScreen from "./src/screens/HistoryScreen";
-import AdminScreen from "./src/screens/AdminScreen";
-import FirstNoteScreen from "./src/screens/FirstNoteScreen";
+import AdminScreen from "./src/screens/Admin";
+import FirstNoteScreen from "./src/screens/FirstNote";
 
 const Stack = createNativeStackNavigator();
 

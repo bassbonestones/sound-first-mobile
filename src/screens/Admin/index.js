@@ -1,23 +1,29 @@
 /**
- * AdminScreen/index.js - Admin Console with tabbed navigation
+ * AdminScreen - Internal Admin Surface for Sound First
  *
- * This is the main entry point for the Admin screen.
- * Each tab section is now in its own file for maintainability.
+ * Six sections:
+ * 1. Capability Explorer - Browse/filter/inspect capabilities
+ * 2. Material Explorer - Browse materials with analysis data
+ * 3. Focus Card Explorer - Manage focus cards
+ * 4. Soft Gate Explorer - Manage soft gate rules
+ * 5. User Progression Inspector - View user mastery state
+ * 6. Session Diagnostics - Debug session generation
  */
 
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
-import { adminStyles as styles } from "../../styles/admin.styles";
 import ResetButton from "../../components/ResetButton";
+import {
+  CapabilityExplorer,
+  MaterialExplorer,
+  FocusCardExplorer,
+  SoftGateExplorer,
+  UserProgressionInspector,
+  SessionDiagnostics,
+} from "./tabs";
+import styles from "./styles";
 
-// Tab content components
-import CapabilityExplorer from "./explorers/CapabilityExplorer";
-import MaterialExplorer from "./explorers/MaterialExplorer";
-import FocusCardExplorer from "./explorers/FocusCardExplorer";
-import SoftGateExplorer from "./explorers/SoftGateExplorer";
-import UserProgressInspector from "./explorers/UserProgressInspector";
-import SessionDiagnostics from "./explorers/SessionDiagnostics";
-
+// Tab navigation
 const TABS = [
   { id: "capabilities", label: "Capabilities" },
   { id: "materials", label: "Materials" },
@@ -43,13 +49,13 @@ export default function AdminScreen({ navigation }) {
         {TABS.map((tab) => (
           <TouchableOpacity
             key={tab.id}
-            style={[styles.tab, activeTab === tab.id && styles.tabActive]}
+            style={[styles.tab, activeTab === tab.id && styles.activeTab]}
             onPress={() => setActiveTab(tab.id)}
           >
             <Text
               style={[
                 styles.tabText,
-                activeTab === tab.id && styles.tabTextActive,
+                activeTab === tab.id && styles.activeTabText,
               ]}
             >
               {tab.label}
@@ -59,12 +65,12 @@ export default function AdminScreen({ navigation }) {
       </View>
 
       {/* Content */}
-      <View style={{ flex: 1 }}>
+      <View style={styles.content}>
         {activeTab === "capabilities" && <CapabilityExplorer />}
         {activeTab === "materials" && <MaterialExplorer />}
         {activeTab === "focus_cards" && <FocusCardExplorer />}
         {activeTab === "soft_gates" && <SoftGateExplorer />}
-        {activeTab === "users" && <UserProgressInspector />}
+        {activeTab === "users" && <UserProgressionInspector />}
         {activeTab === "sessions" && <SessionDiagnostics />}
       </View>
     </View>

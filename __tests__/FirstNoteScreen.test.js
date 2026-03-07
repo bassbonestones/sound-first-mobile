@@ -1,6 +1,6 @@
 import React from "react";
 import { render, fireEvent, waitFor } from "@testing-library/react-native";
-import FirstNoteScreen from "../src/screens/FirstNoteScreen";
+import FirstNoteScreen from "../src/screens/FirstNote";
 
 // Mock navigation
 const mockNavigate = jest.fn();
