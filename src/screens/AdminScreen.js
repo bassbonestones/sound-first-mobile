@@ -963,6 +963,18 @@ function CapabilityEditModal({ capability, allCapabilities, onClose, onSave }) {
       : "",
   });
 
+  // Detection rule state - separate from form to handle complex structure
+  const [detectionRule, setDetectionRule] = useState(capability?.detection_rule || null);
+  const [detectionRuleOptions, setDetectionRuleOptions] = useState(null);
+
+  // Fetch detection rule options on mount
+  useEffect(() => {
+    fetch(`${baseUrl}/admin/detection-rule-options`)
+      .then(res => res.json())
+      .then(data => setDetectionRuleOptions(data))
+      .catch(err => console.error("Failed to fetch detection rule options:", err));
+  }, []);
+
   // Prerequisites state - track by ID
   const [selectedPrereqIds, setSelectedPrereqIds] = useState(() => {
     // Initialize from capability's prerequisite_ids directly
@@ -1030,6 +1042,7 @@ function CapabilityEditModal({ capability, allCapabilities, onClose, onSave }) {
             soft_gate_requirements: formData.soft_gate_requirements?.trim()
               ? JSON.parse(formData.soft_gate_requirements)
               : null,
+            detection_rule: detectionRule,
           }),
         },
       );
@@ -1057,6 +1070,7 @@ function CapabilityEditModal({ capability, allCapabilities, onClose, onSave }) {
           ),
           difficulty_weight: Number(formData.difficulty_weight),
           prerequisite_ids: selectedPrereqIds,
+          detection_rule: detectionRule,
         });
       }, 500);
     } catch (err) {
@@ -1352,6 +1366,17 @@ function CapabilityEditModal({ capability, allCapabilities, onClose, onSave }) {
           />
         </Modal>
 
+        {/* Detection Rule Section */}
+        <DetectionRuleEditor
+          rule={detectionRule}
+          options={detectionRuleOptions}
+          onChange={(newRule) => {
+            setDetectionRule(newRule);
+            setSaveError(null);
+            setSaveSuccess(false);
+          }}
+        />
+
         {/* Save Error */}
         {saveError && (
           <View style={styles.saveErrorContainer}>
@@ -1585,6 +1610,429 @@ function PrerequisiteSelector({
           <Text style={styles.prereqSelectorCancelButtonText}>Cancel</Text>
         </TouchableOpacity>
       </View>
+    </View>
+  );
+}
+
+/**
+ * Detection Rule Editor Component
+ *
+ * Allows editing detection rules using dropdowns and buttons
+ * instead of raw JSON.
+ */
+function DetectionRuleEditor({ rule, options, onChange }) {
+  if (!options) {
+    return (
+      <View style={styles.formFieldContainer}>
+        <Text style={styles.formFieldLabel}>Detection Rule</Text>
+        <ActivityIndicator size="small" color="#2196F3" />
+        <Text style={styles.prereqHint}>Loading detection options...</Text>
+      </View>
+    );
+  }
+
+  const { types, sources, custom_functions } = options;
+
+  const createEmptyRule = () => ({
+    type: "element",
+    source: "notes",
+    threshold: 1,
+  });
+
+  const updateRule = (field, value) => {
+    if (!rule) return;
+    const newRule = { ...rule, [field]: value };
+    // Clear fields that don't apply to the current type
+    if (field === "type") {
+      // Reset type-specific fields when type changes
+      delete newRule.value;
+      delete newRule.semitones;
+      delete newRule.direction;
+      delete newRule.pattern;
+      delete newRule.match_type;
+      delete newRule.numerator;
+      delete newRule.denominator;
+      delete newRule.min;
+      delete newRule.max;
+      delete newRule.custom_function;
+      delete newRule.rules;
+      delete newRule.element_type;
+    }
+    onChange(newRule);
+  };
+
+  const addRule = () => {
+    onChange(createEmptyRule());
+  };
+
+  const removeRule = () => {
+    onChange(null);
+  };
+
+  // Add a sub-rule for compound type
+  const addSubRule = () => {
+    if (!rule) return;
+    const currentRules = rule.rules || [];
+    onChange({
+      ...rule,
+      rules: [...currentRules, { type: "element", source: "notes", threshold: 1 }],
+    });
+  };
+
+  const updateSubRule = (index, field, value) => {
+    if (!rule || !rule.rules) return;
+    const newRules = [...rule.rules];
+    newRules[index] = { ...newRules[index], [field]: value };
+    onChange({ ...rule, rules: newRules });
+  };
+
+  const removeSubRule = (index) => {
+    if (!rule || !rule.rules) return;
+    const newRules = rule.rules.filter((_, i) => i !== index);
+    onChange({ ...rule, rules: newRules.length > 0 ? newRules : undefined });
+  };
+
+  // Render type-specific fields
+  const renderTypeFields = (currentRule, onUpdate, isSubRule = false, subIndex = null) => {
+    if (!currentRule) return null;
+    const ruleType = currentRule.type;
+
+    const handleUpdate = (field, value) => {
+      if (isSubRule && subIndex !== null) {
+        updateSubRule(subIndex, field, value);
+      } else {
+        onUpdate(field, value);
+      }
+    };
+
+    return (
+      <>
+        {/* Source - used by most types */}
+        {["element", "value_match", "interval", "text_match", "range"].includes(ruleType) && (
+          <View style={styles.detectionFieldRow}>
+            <Text style={styles.detectionFieldLabel}>Source:</Text>
+            <View style={styles.detectionPickerContainer}>
+              {sources.map((src) => (
+                <TouchableOpacity
+                  key={src}
+                  style={[
+                    styles.detectionPickerOption,
+                    currentRule.source === src && styles.detectionPickerOptionSelected,
+                  ]}
+                  onPress={() => handleUpdate("source", src)}
+                >
+                  <Text
+                    style={[
+                      styles.detectionPickerOptionText,
+                      currentRule.source === src && styles.detectionPickerOptionTextSelected,
+                    ]}
+                  >
+                    {src.replace(/_/g, " ")}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Element type - for element type */}
+        {ruleType === "element" && (
+          <View style={styles.detectionFieldRow}>
+            <Text style={styles.detectionFieldLabel}>Element Type (optional):</Text>
+            <TextInput
+              style={styles.detectionFieldInput}
+              value={currentRule.element_type || ""}
+              onChangeText={(v) => handleUpdate("element_type", v || undefined)}
+              placeholder="e.g., Staccato"
+            />
+          </View>
+        )}
+
+        {/* Value - for value_match */}
+        {ruleType === "value_match" && (
+          <View style={styles.detectionFieldRow}>
+            <Text style={styles.detectionFieldLabel}>Value:</Text>
+            <TextInput
+              style={styles.detectionFieldInput}
+              value={currentRule.value || ""}
+              onChangeText={(v) => handleUpdate("value", v)}
+              placeholder="Value to match"
+            />
+          </View>
+        )}
+
+        {/* Semitones - for interval */}
+        {ruleType === "interval" && (
+          <>
+            <View style={styles.detectionFieldRow}>
+              <Text style={styles.detectionFieldLabel}>Semitones:</Text>
+              <TextInput
+                style={styles.detectionFieldInput}
+                value={String(currentRule.semitones || "")}
+                onChangeText={(v) => handleUpdate("semitones", v ? Number(v) : undefined)}
+                keyboardType="numeric"
+                placeholder="e.g., 7 for perfect fifth"
+              />
+            </View>
+            <View style={styles.detectionFieldRow}>
+              <Text style={styles.detectionFieldLabel}>Direction:</Text>
+              <View style={styles.detectionPickerContainer}>
+                {["ascending", "descending", "any"].map((dir) => (
+                  <TouchableOpacity
+                    key={dir}
+                    style={[
+                      styles.detectionPickerOption,
+                      (currentRule.direction || "any") === dir && styles.detectionPickerOptionSelected,
+                    ]}
+                    onPress={() => handleUpdate("direction", dir)}
+                  >
+                    <Text
+                      style={[
+                        styles.detectionPickerOptionText,
+                        (currentRule.direction || "any") === dir && styles.detectionPickerOptionTextSelected,
+                      ]}
+                    >
+                      {dir}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </>
+        )}
+
+        {/* Pattern - for text_match */}
+        {ruleType === "text_match" && (
+          <>
+            <View style={styles.detectionFieldRow}>
+              <Text style={styles.detectionFieldLabel}>Pattern:</Text>
+              <TextInput
+                style={styles.detectionFieldInput}
+                value={currentRule.pattern || ""}
+                onChangeText={(v) => handleUpdate("pattern", v)}
+                placeholder="Text pattern or regex"
+              />
+            </View>
+            <View style={styles.detectionFieldRow}>
+              <Text style={styles.detectionFieldLabel}>Match Type:</Text>
+              <View style={styles.detectionPickerContainer}>
+                {["contains", "exact", "regex"].map((mt) => (
+                  <TouchableOpacity
+                    key={mt}
+                    style={[
+                      styles.detectionPickerOption,
+                      (currentRule.match_type || "contains") === mt && styles.detectionPickerOptionSelected,
+                    ]}
+                    onPress={() => handleUpdate("match_type", mt)}
+                  >
+                    <Text
+                      style={[
+                        styles.detectionPickerOptionText,
+                        (currentRule.match_type || "contains") === mt && styles.detectionPickerOptionTextSelected,
+                      ]}
+                    >
+                      {mt}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </>
+        )}
+
+        {/* Time signature fields */}
+        {ruleType === "time_signature" && (
+          <View style={styles.detectionFieldRow}>
+            <Text style={styles.detectionFieldLabel}>Time Signature:</Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <TextInput
+                style={[styles.detectionFieldInput, { width: 50, marginRight: 8 }]}
+                value={String(currentRule.numerator || "")}
+                onChangeText={(v) => handleUpdate("numerator", v ? Number(v) : undefined)}
+                keyboardType="numeric"
+                placeholder="4"
+              />
+              <Text style={styles.detectionFieldLabel}>/</Text>
+              <TextInput
+                style={[styles.detectionFieldInput, { width: 50, marginLeft: 8 }]}
+                value={String(currentRule.denominator || "")}
+                onChangeText={(v) => handleUpdate("denominator", v ? Number(v) : undefined)}
+                keyboardType="numeric"
+                placeholder="4"
+              />
+            </View>
+          </View>
+        )}
+
+        {/* Range fields */}
+        {ruleType === "range" && (
+          <View style={styles.detectionFieldRow}>
+            <Text style={styles.detectionFieldLabel}>Range:</Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <TextInput
+                style={[styles.detectionFieldInput, { width: 60, marginRight: 8 }]}
+                value={String(currentRule.min || "")}
+                onChangeText={(v) => handleUpdate("min", v ? Number(v) : undefined)}
+                keyboardType="numeric"
+                placeholder="Min"
+              />
+              <Text style={styles.detectionFieldLabel}>to</Text>
+              <TextInput
+                style={[styles.detectionFieldInput, { width: 60, marginLeft: 8 }]}
+                value={String(currentRule.max || "")}
+                onChangeText={(v) => handleUpdate("max", v ? Number(v) : undefined)}
+                keyboardType="numeric"
+                placeholder="Max"
+              />
+            </View>
+          </View>
+        )}
+
+        {/* Custom function */}
+        {ruleType === "custom" && (
+          <View style={styles.detectionFieldRow}>
+            <Text style={styles.detectionFieldLabel}>Custom Function:</Text>
+            <View style={styles.detectionPickerContainer}>
+              {custom_functions.map((fn) => (
+                <TouchableOpacity
+                  key={fn}
+                  style={[
+                    styles.detectionPickerOption,
+                    currentRule.custom_function === fn && styles.detectionPickerOptionSelected,
+                  ]}
+                  onPress={() => handleUpdate("custom_function", fn)}
+                >
+                  <Text
+                    style={[
+                      styles.detectionPickerOptionText,
+                      currentRule.custom_function === fn && styles.detectionPickerOptionTextSelected,
+                    ]}
+                  >
+                    {fn}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Threshold - for most types */}
+        {ruleType !== "compound" && (
+          <View style={styles.detectionFieldRow}>
+            <Text style={styles.detectionFieldLabel}>Threshold:</Text>
+            <TextInput
+              style={[styles.detectionFieldInput, { width: 60 }]}
+              value={String(currentRule.threshold || 1)}
+              onChangeText={(v) => handleUpdate("threshold", v ? Number(v) : 1)}
+              keyboardType="numeric"
+              placeholder="1"
+            />
+          </View>
+        )}
+      </>
+    );
+  };
+
+  return (
+    <View style={styles.formFieldContainer}>
+      <Text style={styles.formFieldLabel}>Detection Rule</Text>
+      <Text style={styles.prereqHint}>
+        Configure how this capability is detected in MusicXML files.
+      </Text>
+
+      {!rule ? (
+        <TouchableOpacity style={styles.addPrereqButton} onPress={addRule}>
+          <Text style={styles.addPrereqButtonText}>+ Add Detection Rule</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.detectionRuleContainer}>
+          {/* Type selector */}
+          <View style={styles.detectionFieldRow}>
+            <Text style={styles.detectionFieldLabel}>Type:</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.detectionPickerContainer}>
+                {types.map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.detectionPickerOption,
+                      rule.type === type && styles.detectionPickerOptionSelected,
+                    ]}
+                    onPress={() => updateRule("type", type)}
+                  >
+                    <Text
+                      style={[
+                        styles.detectionPickerOptionText,
+                        rule.type === type && styles.detectionPickerOptionTextSelected,
+                      ]}
+                    >
+                      {type.replace(/_/g, " ")}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+
+          {/* Type-specific fields */}
+          {renderTypeFields(rule, updateRule)}
+
+          {/* Compound rules */}
+          {rule.type === "compound" && (
+            <View style={styles.compoundRulesContainer}>
+              <Text style={styles.compoundRulesLabel}>Sub-rules:</Text>
+              {(rule.rules || []).map((subRule, index) => (
+                <View key={index} style={styles.subRuleContainer}>
+                  <View style={styles.subRuleHeader}>
+                    <Text style={styles.subRuleIndex}>Rule {index + 1}</Text>
+                    <TouchableOpacity
+                      style={styles.subRuleRemove}
+                      onPress={() => removeSubRule(index)}
+                    >
+                      <Text style={styles.subRuleRemoveText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.detectionFieldRow}>
+                    <Text style={styles.detectionFieldLabel}>Type:</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      <View style={styles.detectionPickerContainer}>
+                        {types.filter(t => t !== "compound").map((type) => (
+                          <TouchableOpacity
+                            key={type}
+                            style={[
+                              styles.detectionPickerOption,
+                              subRule.type === type && styles.detectionPickerOptionSelected,
+                            ]}
+                            onPress={() => updateSubRule(index, "type", type)}
+                          >
+                            <Text
+                              style={[
+                                styles.detectionPickerOptionText,
+                                subRule.type === type && styles.detectionPickerOptionTextSelected,
+                              ]}
+                            >
+                              {type.replace(/_/g, " ")}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  </View>
+                  {renderTypeFields(subRule, null, true, index)}
+                </View>
+              ))}
+              <TouchableOpacity style={styles.addSubRuleButton} onPress={addSubRule}>
+                <Text style={styles.addSubRuleButtonText}>+ Add Sub-rule</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Remove rule button */}
+          <TouchableOpacity style={styles.removeRuleButton} onPress={removeRule}>
+            <Text style={styles.removeRuleButtonText}>Remove Detection Rule</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -7866,5 +8314,125 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.6,
+  },
+  // Detection Rule Editor styles
+  detectionRuleContainer: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#dee2e6",
+    marginTop: 8,
+  },
+  detectionFieldRow: {
+    marginBottom: 12,
+  },
+  detectionFieldLabel: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#495057",
+    marginBottom: 6,
+  },
+  detectionFieldInput: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ced4da",
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: "#333",
+  },
+  detectionPickerContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  detectionPickerOption: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#e9ecef",
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#dee2e6",
+  },
+  detectionPickerOptionSelected: {
+    backgroundColor: "#2196F3",
+    borderColor: "#1976D2",
+  },
+  detectionPickerOptionText: {
+    fontSize: 12,
+    color: "#495057",
+  },
+  detectionPickerOptionTextSelected: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  compoundRulesContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#dee2e6",
+  },
+  compoundRulesLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 8,
+  },
+  subRuleContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 6,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  subRuleHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  subRuleIndex: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#6c757d",
+  },
+  subRuleRemove: {
+    padding: 4,
+  },
+  subRuleRemoveText: {
+    fontSize: 14,
+    color: "#dc3545",
+    fontWeight: "600",
+  },
+  addSubRuleButton: {
+    backgroundColor: "#e9ecef",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  addSubRuleButtonText: {
+    fontSize: 13,
+    color: "#495057",
+    fontWeight: "500",
+  },
+  removeRuleButton: {
+    backgroundColor: "#fff3cd",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: "center",
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: "#ffc107",
+  },
+  removeRuleButtonText: {
+    fontSize: 13,
+    color: "#856404",
+    fontWeight: "500",
   },
 });
