@@ -340,7 +340,6 @@ function OnboardingScreen({ navigation, route }) {
                   ← Back to families
                 </Text>
               </TouchableOpacity>
-
               <View
                 style={{
                   backgroundColor: "#2a1f12",
@@ -360,7 +359,6 @@ function OnboardingScreen({ navigation, route }) {
                   {selectedFamily}
                 </Text>
               </View>
-
               <View
                 style={{
                   flexDirection: "row",
