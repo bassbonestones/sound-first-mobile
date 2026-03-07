@@ -37,35 +37,35 @@ const mockAudioContext = {
 // Setup global mocks
 beforeEach(() => {
   jest.useFakeTimers();
-  
+
   // Mock AudioContext
   global.AudioContext = jest.fn(() => mockAudioContext);
   global.webkitAudioContext = jest.fn(() => mockAudioContext);
-  
+
   // Mock navigator.mediaDevices
   global.navigator = {
     mediaDevices: {
       getUserMedia: mockGetUserMedia,
     },
   };
-  
+
   // Setup successful getUserMedia by default
   const mockStream = { getTracks: () => [{ stop: jest.fn() }] };
   mockGetUserMedia.mockResolvedValue(mockStream);
-  
+
   // Setup default analyser data (silence)
   mockGetByteTimeDomainData.mockImplementation((array) => {
     for (let i = 0; i < array.length; i++) {
       array[i] = 128; // Silence = mid-point (128)
     }
   });
-  
+
   mockGetFloatTimeDomainData.mockImplementation((array) => {
     for (let i = 0; i < array.length; i++) {
       array[i] = 0; // Silence
     }
   });
-  
+
   jest.clearAllMocks();
 });
 
@@ -101,18 +101,18 @@ describe("AudioInput Component", () => {
   describe("Audio Initialization", () => {
     it("requests microphone permission when enabled", async () => {
       render(<AudioInput enabled={true} />);
-      
+
       await act(async () => {
         jest.advanceTimersByTime(100);
       });
-      
+
       // On mobile, microphone is disabled, so no permission request
       // On web, would try to access microphone
     });
 
     it("handles enabled prop change", async () => {
       const { rerender } = render(<AudioInput enabled={false} />);
-      
+
       rerender(<AudioInput enabled={true} />);
       // Just verify no crash
       expect(true).toBe(true);
@@ -148,7 +148,7 @@ describe("AudioInput Component", () => {
       const onSoundStart = jest.fn();
       const onSoundEnd = jest.fn();
       const onError = jest.fn();
-      
+
       render(
         <AudioInput
           enabled={false}
@@ -158,7 +158,7 @@ describe("AudioInput Component", () => {
           onSoundStart={onSoundStart}
           onSoundEnd={onSoundEnd}
           onError={onError}
-        />
+        />,
       );
       expect(true).toBe(true);
     });
@@ -182,10 +182,10 @@ describe("AudioInput Component", () => {
 
     it("handles various octaves", () => {
       const notes = ["C2", "G3", "A4", "D5", "E6"];
-      
+
       notes.forEach((note) => {
         const { unmount } = render(
-          <AudioInput enabled={false} targetNote={note} />
+          <AudioInput enabled={false} targetNote={note} />,
         );
         // Just verify no crash
         unmount();
@@ -197,11 +197,11 @@ describe("AudioInput Component", () => {
   describe("Cleanup", () => {
     it("cleans up on unmount", async () => {
       const { unmount } = render(<AudioInput enabled={true} />);
-      
+
       await act(async () => {
         jest.advanceTimersByTime(100);
       });
-      
+
       unmount();
       // Should not throw or cause memory leaks
       expect(true).toBe(true);
@@ -209,14 +209,14 @@ describe("AudioInput Component", () => {
 
     it("handles rapid enable/disable toggle", async () => {
       const { rerender } = render(<AudioInput enabled={false} />);
-      
+
       for (let i = 0; i < 5; i++) {
         rerender(<AudioInput enabled={i % 2 === 0} />);
         await act(async () => {
           jest.advanceTimersByTime(50);
         });
       }
-      
+
       expect(true).toBe(true);
     });
   });

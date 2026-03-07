@@ -2,9 +2,9 @@
  * Tests for AudioPlayer component
  */
 
-import React from 'react';
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
-import AudioPlayer from '../src/components/AudioPlayer';
+import React from "react";
+import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
+import AudioPlayer from "../src/components/AudioPlayer";
 
 // Mock fetch
 global.fetch = jest.fn();
@@ -18,162 +18,151 @@ const mockAudio = {
   removeEventListener: jest.fn(),
   duration: 30,
   currentTime: 0,
-  src: '',
+  src: "",
 };
 
 beforeAll(() => {
   global.Audio = jest.fn(() => mockAudio);
 });
 
-describe('AudioPlayer', () => {
+describe("AudioPlayer", () => {
   beforeEach(() => {
     fetch.mockClear();
     mockAudio.play.mockClear();
     mockAudio.pause.mockClear();
     mockAudio.addEventListener.mockClear();
     mockAudio.removeEventListener.mockClear();
-    
+
     // Default mock for audio status endpoint
     fetch.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({
-        can_render_audio: true,
-        can_render_midi: true,
-        music21_available: true,
-      }),
+      json: () =>
+        Promise.resolve({
+          can_render_audio: true,
+          can_render_midi: true,
+          music21_available: true,
+        }),
     });
   });
 
-  describe('Rendering', () => {
-    it('renders with title', () => {
+  describe("Rendering", () => {
+    it("renders with title", () => {
       const { getByText } = render(
-        <AudioPlayer
-          materialId={1}
-          targetKey="C major"
-          title="Test Audio"
-        />
+        <AudioPlayer materialId={1} targetKey="C major" title="Test Audio" />,
       );
 
-      expect(getByText('Test Audio')).toBeTruthy();
+      expect(getByText("Test Audio")).toBeTruthy();
     });
 
-    it('renders default title when not provided', () => {
+    it("renders default title when not provided", () => {
       const { getByText } = render(
-        <AudioPlayer materialId={1} targetKey="C major" />
+        <AudioPlayer materialId={1} targetKey="C major" />,
       );
 
-      expect(getByText('Listen to the model')).toBeTruthy();
+      expect(getByText("Listen to the model")).toBeTruthy();
     });
 
-    it('renders native placeholder on mobile platform', () => {
+    it("renders native placeholder on mobile platform", () => {
       // By default jest-expo runs with Platform.OS = 'ios'
       const { getByText } = render(
-        <AudioPlayer materialId={1} targetKey="C major" />
+        <AudioPlayer materialId={1} targetKey="C major" />,
       );
 
       // On native, should show placeholder message (audio feature not available)
-      expect(getByText('Native audio coming soon')).toBeTruthy();
+      expect(getByText("Native audio coming soon")).toBeTruthy();
     });
   });
 
-  describe('Audio loading', () => {
-    it('checks audio status on mount', async () => {
+  describe("Audio loading", () => {
+    it("checks audio status on mount", async () => {
       render(<AudioPlayer materialId={1} targetKey="C major" />);
 
       await waitFor(() => {
         expect(fetch).toHaveBeenCalledWith(
-          expect.stringContaining('/audio/status')
+          expect.stringContaining("/audio/status"),
         );
       });
     });
 
-    it('handles fetch error gracefully', async () => {
-      fetch.mockRejectedValueOnce(new Error('Network error'));
+    it("handles fetch error gracefully", async () => {
+      fetch.mockRejectedValueOnce(new Error("Network error"));
 
       const { getByText } = render(
-        <AudioPlayer materialId={1} targetKey="C major" />
+        <AudioPlayer materialId={1} targetKey="C major" />,
       );
 
       // Should still render without crashing
-      expect(getByText('Listen to the model')).toBeTruthy();
+      expect(getByText("Listen to the model")).toBeTruthy();
     });
   });
 
-  describe('Props handling', () => {
-    it('accepts materialId prop', () => {
+  describe("Props handling", () => {
+    it("accepts materialId prop", () => {
       const { getByText } = render(
-        <AudioPlayer materialId={123} targetKey="C major" />
+        <AudioPlayer materialId={123} targetKey="C major" />,
       );
 
-      expect(getByText('Listen to the model')).toBeTruthy();
+      expect(getByText("Listen to the model")).toBeTruthy();
     });
 
-    it('accepts targetKey prop', () => {
+    it("accepts targetKey prop", () => {
       const { getByText } = render(
-        <AudioPlayer materialId={1} targetKey="Bb major" />
+        <AudioPlayer materialId={1} targetKey="Bb major" />,
       );
 
-      expect(getByText('Listen to the model')).toBeTruthy();
+      expect(getByText("Listen to the model")).toBeTruthy();
     });
 
-    it('accepts instrument prop', () => {
+    it("accepts instrument prop", () => {
       const { getByText } = render(
-        <AudioPlayer
-          materialId={1}
-          targetKey="C major"
-          instrument="trumpet"
-        />
+        <AudioPlayer materialId={1} targetKey="C major" instrument="trumpet" />,
       );
 
-      expect(getByText('Listen to the model')).toBeTruthy();
+      expect(getByText("Listen to the model")).toBeTruthy();
     });
 
-    it('accepts onComplete callback', () => {
+    it("accepts onComplete callback", () => {
       const onComplete = jest.fn();
       const { getByText } = render(
         <AudioPlayer
           materialId={1}
           targetKey="C major"
           onComplete={onComplete}
-        />
+        />,
       );
 
-      expect(getByText('Listen to the model')).toBeTruthy();
+      expect(getByText("Listen to the model")).toBeTruthy();
     });
 
-    it('accepts autoPlay prop', () => {
+    it("accepts autoPlay prop", () => {
       const { getByText } = render(
-        <AudioPlayer
-          materialId={1}
-          targetKey="C major"
-          autoPlay={true}
-        />
+        <AudioPlayer materialId={1} targetKey="C major" autoPlay={true} />,
       );
 
-      expect(getByText('Listen to the model')).toBeTruthy();
+      expect(getByText("Listen to the model")).toBeTruthy();
     });
   });
 
-  describe('Error handling', () => {
-    it('shows error when audio status check fails', async () => {
+  describe("Error handling", () => {
+    it("shows error when audio status check fails", async () => {
       fetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
       });
 
       const { getByText } = render(
-        <AudioPlayer materialId={1} targetKey="C major" />
+        <AudioPlayer materialId={1} targetKey="C major" />,
       );
 
       // Should still render the component
-      expect(getByText('Listen to the model')).toBeTruthy();
+      expect(getByText("Listen to the model")).toBeTruthy();
     });
   });
 
-  describe('Cleanup', () => {
-    it('cleans up on unmount without errors', () => {
+  describe("Cleanup", () => {
+    it("cleans up on unmount without errors", () => {
       const { unmount } = render(
-        <AudioPlayer materialId={1} targetKey="C major" />
+        <AudioPlayer materialId={1} targetKey="C major" />,
       );
 
       // Should not throw on unmount

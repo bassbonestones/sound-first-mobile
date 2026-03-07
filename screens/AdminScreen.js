@@ -23,7 +23,7 @@ import {
   Switch,
 } from "react-native";
 import ResetButton from "../components/ResetButton";
-import { getBackendUrl, baseUrl } from "../api/client";
+import { getBackendUrl, baseUrl } from "../src/api/client";
 
 // Tab navigation
 const TABS = [
@@ -2094,9 +2094,6 @@ function MaterialExplorer() {
   const [selectedMaterial, setSelectedMaterial] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("1");
-  const [ingesting, setIngesting] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [actionStatus, setActionStatus] = useState(null);
 
   // Upload modal state
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -2108,168 +2105,10 @@ function MaterialExplorer() {
   const [uploadPreview, setUploadPreview] = useState(null);
   const [uploadError, setUploadError] = useState(null);
   const [uploadSaving, setUploadSaving] = useState(false);
-  const [showAllCapabilities, setShowAllCapabilities] = useState(false);
-  const [allCapabilities, setAllCapabilities] = useState([]);
-  const [expandedDomains, setExpandedDomains] = useState({});
-  const [softGateHelpVisible, setSoftGateHelpVisible] = useState(null);
-
-  // Soft gate explanations
-  const SOFT_GATE_HELP = {
-    d1_tonal: {
-      title: "D1 - Tonal Complexity",
-      description:
-        "Measures chromatic complexity based on pitch class count and accidentals.",
-      stages: [
-        "Stage 0: 1-3 pitch classes, no accidentals (e.g., C-D-E)",
-        "Stage 1: 4-5 pitch classes, minimal accidentals",
-        "Stage 2: 5-6 pitch classes, some accidentals",
-        "Stage 3: 6-8 pitch classes, moderate chromaticism",
-        "Stage 4: 9-11 pitch classes, significant chromaticism",
-        "Stage 5: All 12 pitch classes or heavy accidental use",
-      ],
-      calculation:
-        "Based on unique pitch classes (0-12) and accidental ratio (accidentals/total notes)",
-    },
-    d2_interval: {
-      title: "D2 - Interval Size",
-      description: "Measures the largest melodic interval in the piece.",
-      stages: [
-        "Stage 0: Unison only (repeated notes)",
-        "Stage 1: Minor 2nd (1 semitone)",
-        "Stage 2: Major 2nd - Minor 3rd (2-3 semitones)",
-        "Stage 3: Major 3rd - Perfect 4th (4-5 semitones)",
-        "Stage 4: Tritone - Perfect 5th (6-7 semitones)",
-        "Stage 5: Minor 6th - Octave (8-12 semitones)",
-        "Stage 6: Greater than octave (13+ semitones)",
-      ],
-      calculation: "Largest interval in semitones between consecutive notes",
-    },
-    d3_rhythm: {
-      title: "D3 - Rhythm Complexity",
-      description: "Weighted score of rhythmic elements present.",
-      stages: [
-        "0-20%: Simple (whole, half notes)",
-        "20-40%: Easy (quarter notes, simple rests)",
-        "40-60%: Moderate (eighth notes, dotted rhythms)",
-        "60-80%: Complex (16ths, syncopation, ties)",
-        "80-100%: Advanced (32nds, tuplets, complex patterns)",
-      ],
-      calculation:
-        "Weighted sum of: note types (whole→32nd), dots, ties, tuplets, syncopation",
-    },
-    d4_range: {
-      title: "D4 - Range Usage",
-      description: "The total pitch range of the piece in semitones.",
-      stages: [
-        "Stage 0: 0-2 semitones (very narrow)",
-        "Stage 1: 3-5 semitones (narrow, ~P4)",
-        "Stage 2: 6-7 semitones (P5 range)",
-        "Stage 3: 8-12 semitones (up to octave)",
-        "Stage 4: 13-17 semitones (octave + P5)",
-        "Stage 5: 18-24 semitones (up to 2 octaves)",
-        "Stage 6: 25+ semitones (more than 2 octaves)",
-      ],
-      calculation: "Highest MIDI pitch - Lowest MIDI pitch",
-    },
-    ivs: {
-      title: "IVS - Interval Velocity Score",
-      description:
-        "Measures how quickly large intervals occur relative to note density.",
-      stages: [
-        "0-25%: Low velocity (slow, stepwise motion)",
-        "25-50%: Moderate velocity",
-        "50-75%: High velocity (frequent leaps)",
-        "75-100%: Very high (rapid large intervals)",
-      ],
-      calculation:
-        "(Sum of interval sizes / Note count) × Tempo factor. Higher = more challenging sight-reading.",
-    },
-    tempo_diff: {
-      title: "Tempo Difficulty",
-      description:
-        "Combined tempo speed difficulty based on the piece's tempo profile. Shows N/A if no tempo marking exists in the score.",
-      stages: [
-        "0-25%: Slow tempos (≤80 BPM effective)",
-        "25-50%: Moderate tempos (80-120 BPM effective)",
-        "50-75%: Fast tempos (120-160 BPM effective)",
-        "75-100%: Very fast (160+ BPM effective)",
-      ],
-      calculation:
-        "Based on effective BPM (weighted average across tempo regions) and max BPM. Returns N/A if no tempo specified.",
-    },
-    notes_measure: {
-      title: "Notes per Measure",
-      description: "Average note density per measure.",
-      stages: [
-        "1-4: Sparse (whole/half notes)",
-        "4-8: Moderate density",
-        "8-16: Dense (eighth note passages)",
-        "16+: Very dense (16th note runs)",
-      ],
-      calculation: "Total note count / Measure count",
-    },
-    notes_second: {
-      title: "Notes per Second",
-      description: "Tempo-adjusted note density.",
-      stages: [
-        "0-2: Relaxed pace",
-        "2-4: Moderate pace",
-        "4-8: Fast pace",
-        "8+: Very fast (virtuosic)",
-      ],
-      calculation: "Notes per measure × (Tempo BPM / 60) / Beats per measure",
-    },
-  };
 
   useEffect(() => {
     loadMaterials();
-    loadAllCapabilities();
   }, []);
-
-  const loadAllCapabilities = async () => {
-    try {
-      const response = await fetch(`${baseUrl}/admin/capabilities`);
-      if (response.ok) {
-        const data = await response.json();
-        setAllCapabilities(data.capabilities || []);
-      }
-    } catch (err) {
-      console.log(
-        "[AdminScreen] Could not load capabilities for domain lookup",
-      );
-    }
-  };
-
-  // Group capabilities by domain
-  const groupCapabilitiesByDomain = (capabilityNames) => {
-    const capMap = {};
-    allCapabilities.forEach((cap) => {
-      capMap[cap.name] = cap.domain || "unknown";
-    });
-
-    const grouped = {};
-    (capabilityNames || []).forEach((capName) => {
-      const domain = capMap[capName] || "unknown";
-      if (!grouped[domain]) grouped[domain] = [];
-      grouped[domain].push(capName);
-    });
-
-    // Sort domains alphabetically, but put "unknown" last
-    const sortedDomains = Object.keys(grouped).sort((a, b) => {
-      if (a === "unknown") return 1;
-      if (b === "unknown") return -1;
-      return a.localeCompare(b);
-    });
-
-    return { grouped, sortedDomains };
-  };
-
-  const toggleDomain = (domain) => {
-    setExpandedDomains((prev) => ({
-      ...prev,
-      [domain]: !prev[domain],
-    }));
-  };
 
   useEffect(() => {
     filterMaterials();
@@ -2343,66 +2182,6 @@ function MaterialExplorer() {
     }
   };
 
-  const handleBatchIngest = async (analyzeAll = false) => {
-    setIngesting(true);
-    setActionStatus(null);
-    try {
-      const response = await fetch(`${baseUrl}/materials/ingest-batch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          analyze_missing_only: !analyzeAll,
-          overwrite: analyzeAll,
-        }),
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setActionStatus({
-          type: "success",
-          message: `Analyzed ${data.files_analyzed} files, ${data.orphans_removed} orphans removed`,
-        });
-        loadMaterials();
-      } else {
-        setActionStatus({
-          type: "error",
-          message: data.detail || "Ingestion failed",
-        });
-      }
-    } catch (err) {
-      console.error("[AdminScreen] Batch ingest error:", err);
-      setActionStatus({ type: "error", message: err.message });
-    }
-    setIngesting(false);
-    setTimeout(() => setActionStatus(null), 5000);
-  };
-
-  const handleExportToJson = async () => {
-    setExporting(true);
-    setActionStatus(null);
-    try {
-      const response = await fetch(`${baseUrl}/materials/export-json`, {
-        method: "POST",
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setActionStatus({
-          type: "success",
-          message: `Exported to ${data.path}`,
-        });
-      } else {
-        setActionStatus({
-          type: "error",
-          message: data.detail || "Export failed",
-        });
-      }
-    } catch (err) {
-      console.error("[AdminScreen] Export error:", err);
-      setActionStatus({ type: "error", message: err.message });
-    }
-    setExporting(false);
-    setTimeout(() => setActionStatus(null), 5000);
-  };
-
   // === UPLOAD FUNCTIONS ===
 
   const openUploadModal = () => {
@@ -2414,12 +2193,12 @@ function MaterialExplorer() {
     setUploadKeyCenter("");
     setUploadPreview(null);
     setUploadError(null);
-    setShowAllCapabilities(false);
   };
 
   const handleFilePick = async () => {
-    // For web/desktop, use file input
+    // For web/desktop, use file input; for mobile, use document picker
     if (Platform.OS === "web") {
+      // Create a hidden file input
       const input = document.createElement("input");
       input.type = "file";
       input.accept = ".xml,.musicxml";
@@ -2429,12 +2208,14 @@ function MaterialExplorer() {
           setUploadFileName(file.name);
           const content = await file.text();
           setUploadFileContent(content);
+          // Auto-populate title from filename
           const nameWithoutExt = file.name.replace(/\.(xml|musicxml)$/i, "");
           setUploadTitle(nameWithoutExt);
         }
       };
       input.click();
     } else {
+      // Mobile: prompt for manual paste (or integrate expo-document-picker)
       alert("On mobile, please paste MusicXML content in the text area below.");
     }
   };
@@ -2466,6 +2247,7 @@ function MaterialExplorer() {
 
       const preview = await response.json();
       setUploadPreview(preview);
+      // Update title if extracted from file
       if (preview.title && !uploadTitle) {
         setUploadTitle(preview.title);
       }
@@ -2500,7 +2282,7 @@ function MaterialExplorer() {
       const result = await response.json();
       alert(`Material saved successfully! ID: ${result.material_id}`);
       setShowUploadModal(false);
-      loadMaterials();
+      loadMaterials(); // Refresh the list
     } catch (err) {
       setUploadError(err.message);
     } finally {
@@ -2574,58 +2356,6 @@ function MaterialExplorer() {
       <Text style={styles.resultCount}>
         {filteredMaterials.length} materials
       </Text>
-
-      {/* Batch Actions */}
-      <View style={styles.actionBar}>
-        <TouchableOpacity
-          style={[
-            styles.actionButton,
-            ingesting && styles.actionButtonDisabled,
-          ]}
-          onPress={() => handleBatchIngest(false)}
-          disabled={ingesting || exporting}
-        >
-          <Text style={styles.actionButtonText}>
-            {ingesting ? "Analyzing..." : "Analyze New"}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.actionButton,
-            ingesting && styles.actionButtonDisabled,
-          ]}
-          onPress={() => handleBatchIngest(true)}
-          disabled={ingesting || exporting}
-        >
-          <Text style={styles.actionButtonText}>Re-analyze All</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.actionButton,
-            styles.exportButton,
-            exporting && styles.actionButtonDisabled,
-          ]}
-          onPress={handleExportToJson}
-          disabled={ingesting || exporting}
-        >
-          <Text style={styles.actionButtonText}>
-            {exporting ? "Exporting..." : "Export JSON"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {actionStatus && (
-        <View
-          style={[
-            styles.statusBanner,
-            actionStatus.type === "success"
-              ? styles.statusSuccess
-              : styles.statusError,
-          ]}
-        >
-          <Text style={styles.statusText}>{actionStatus.message}</Text>
-        </View>
-      )}
 
       <FlatList
         data={filteredMaterials}
@@ -2782,310 +2512,95 @@ function MaterialExplorer() {
                 )}
 
                 {/* Soft Gates */}
-                {uploadPreview.soft_gates && (
-                  <View style={styles.previewSection}>
-                    <Text style={styles.previewSectionTitle}>
-                      Soft Gate Scores
-                    </Text>
-                    {uploadPreview.soft_gates.error ? (
-                      <Text style={styles.uploadError}>
-                        Error: {uploadPreview.soft_gates.error}
+                {uploadPreview.soft_gates &&
+                  !uploadPreview.soft_gates.error && (
+                    <View style={styles.previewSection}>
+                      <Text style={styles.previewSectionTitle}>
+                        Soft Gate Metrics
                       </Text>
-                    ) : (
                       <View style={styles.softGateGrid}>
                         <View style={styles.softGateCell}>
-                          <View style={styles.softGateLabelRow}>
-                            <Text style={styles.softGateCellLabel}>
-                              D1 - Tonal Complexity
-                            </Text>
-                            <TouchableOpacity
-                              onPress={() => setSoftGateHelpVisible("d1_tonal")}
-                              style={styles.helpButton}
-                            >
-                              <Text style={styles.helpButtonText}>?</Text>
-                            </TouchableOpacity>
-                          </View>
+                          <Text style={styles.softGateCellLabel}>
+                            Tonal (D1)
+                          </Text>
                           <Text style={styles.softGateCellValue}>
                             Stage{" "}
-                            {uploadPreview.soft_gates.tonal_complexity_stage ??
-                              "N/A"}
+                            {uploadPreview.soft_gates.tonal_complexity_stage}
                           </Text>
                         </View>
                         <View style={styles.softGateCell}>
-                          <View style={styles.softGateLabelRow}>
-                            <Text style={styles.softGateCellLabel}>
-                              D2 - Interval Size
-                            </Text>
-                            <TouchableOpacity
-                              onPress={() =>
-                                setSoftGateHelpVisible("d2_interval")
-                              }
-                              style={styles.helpButton}
-                            >
-                              <Text style={styles.helpButtonText}>?</Text>
-                            </TouchableOpacity>
-                          </View>
+                          <Text style={styles.softGateCellLabel}>
+                            Interval (D2)
+                          </Text>
                           <Text style={styles.softGateCellValue}>
-                            Stage{" "}
-                            {uploadPreview.soft_gates.interval_size_stage ??
-                              "N/A"}
+                            Stage {uploadPreview.soft_gates.interval_size_stage}
                           </Text>
                         </View>
                         <View style={styles.softGateCell}>
-                          <View style={styles.softGateLabelRow}>
-                            <Text style={styles.softGateCellLabel}>
-                              D3 - Rhythm Complexity
-                            </Text>
-                            <TouchableOpacity
-                              onPress={() =>
-                                setSoftGateHelpVisible("d3_rhythm")
-                              }
-                              style={styles.helpButton}
-                            >
-                              <Text style={styles.helpButtonText}>?</Text>
-                            </TouchableOpacity>
-                          </View>
+                          <Text style={styles.softGateCellLabel}>
+                            Rhythm (D3)
+                          </Text>
                           <Text style={styles.softGateCellValue}>
-                            {uploadPreview.soft_gates.rhythm_complexity_score !=
-                            null
-                              ? `${(uploadPreview.soft_gates.rhythm_complexity_score * 100).toFixed(0)}%`
-                              : "N/A"}
+                            {(
+                              uploadPreview.soft_gates.rhythm_complexity_score *
+                              100
+                            ).toFixed(0)}
+                            %
                           </Text>
                         </View>
                         <View style={styles.softGateCell}>
-                          <View style={styles.softGateLabelRow}>
-                            <Text style={styles.softGateCellLabel}>
-                              D4 - Range Usage
-                            </Text>
-                            <TouchableOpacity
-                              onPress={() => setSoftGateHelpVisible("d4_range")}
-                              style={styles.helpButton}
-                            >
-                              <Text style={styles.helpButtonText}>?</Text>
-                            </TouchableOpacity>
-                          </View>
+                          <Text style={styles.softGateCellLabel}>
+                            Range (D4)
+                          </Text>
                           <Text style={styles.softGateCellValue}>
-                            Stage{" "}
-                            {uploadPreview.soft_gates.range_usage_stage ??
-                              "N/A"}
+                            Stage {uploadPreview.soft_gates.range_usage_stage}
                           </Text>
                         </View>
                         <View style={styles.softGateCell}>
-                          <View style={styles.softGateLabelRow}>
-                            <Text style={styles.softGateCellLabel}>
-                              IVS (Interval Velocity)
-                            </Text>
-                            <TouchableOpacity
-                              onPress={() => setSoftGateHelpVisible("ivs")}
-                              style={styles.helpButton}
-                            >
-                              <Text style={styles.helpButtonText}>?</Text>
-                            </TouchableOpacity>
-                          </View>
+                          <Text style={styles.softGateCellLabel}>IVS</Text>
                           <Text style={styles.softGateCellValue}>
-                            {uploadPreview.soft_gates.interval_velocity_score !=
-                            null
-                              ? `${(uploadPreview.soft_gates.interval_velocity_score * 100).toFixed(0)}%`
-                              : "N/A"}
+                            {(
+                              uploadPreview.soft_gates.interval_velocity_score *
+                              100
+                            ).toFixed(0)}
+                            %
                           </Text>
                         </View>
                         <View style={styles.softGateCell}>
-                          <View style={styles.softGateLabelRow}>
-                            <Text style={styles.softGateCellLabel}>
-                              Tempo Difficulty
-                            </Text>
-                            <TouchableOpacity
-                              onPress={() =>
-                                setSoftGateHelpVisible("tempo_diff")
-                              }
-                              style={styles.helpButton}
-                            >
-                              <Text style={styles.helpButtonText}>?</Text>
-                            </TouchableOpacity>
-                          </View>
+                          <Text style={styles.softGateCellLabel}>
+                            Tempo Diff
+                          </Text>
                           <Text style={styles.softGateCellValue}>
-                            {uploadPreview.tempo_bpm == null
-                              ? "N/A"
-                              : uploadPreview.soft_gates
-                                    .tempo_difficulty_score != null
-                                ? `${(uploadPreview.soft_gates.tempo_difficulty_score * 100).toFixed(0)}%`
-                                : "N/A"}
+                            {(
+                              uploadPreview.soft_gates.tempo_difficulty_score *
+                              100
+                            ).toFixed(0)}
+                            %
                           </Text>
                         </View>
-                        {uploadPreview.soft_gates.density_notes_per_measure !=
-                          null && (
-                          <View style={styles.softGateCell}>
-                            <View style={styles.softGateLabelRow}>
-                              <Text style={styles.softGateCellLabel}>
-                                Notes per Measure
-                              </Text>
-                              <TouchableOpacity
-                                onPress={() =>
-                                  setSoftGateHelpVisible("notes_measure")
-                                }
-                                style={styles.helpButton}
-                              >
-                                <Text style={styles.helpButtonText}>?</Text>
-                              </TouchableOpacity>
-                            </View>
-                            <Text style={styles.softGateCellValue}>
-                              {uploadPreview.soft_gates.density_notes_per_measure.toFixed(
-                                1,
-                              )}
-                            </Text>
-                          </View>
-                        )}
-                        {uploadPreview.soft_gates.density_notes_per_second !=
-                          null && (
-                          <View style={styles.softGateCell}>
-                            <View style={styles.softGateLabelRow}>
-                              <Text style={styles.softGateCellLabel}>
-                                Notes per Second
-                              </Text>
-                              <TouchableOpacity
-                                onPress={() =>
-                                  setSoftGateHelpVisible("notes_second")
-                                }
-                                style={styles.helpButton}
-                              >
-                                <Text style={styles.helpButtonText}>?</Text>
-                              </TouchableOpacity>
-                            </View>
-                            <Text style={styles.softGateCellValue}>
-                              {uploadPreview.soft_gates.density_notes_per_second.toFixed(
-                                2,
-                              )}
-                            </Text>
-                          </View>
-                        )}
                       </View>
+                    </View>
+                  )}
+
+                {/* Capabilities */}
+                <View style={styles.previewSection}>
+                  <Text style={styles.previewSectionTitle}>
+                    Detected Capabilities ({uploadPreview.capability_count})
+                  </Text>
+                  <View style={styles.capabilityTagsContainer}>
+                    {(uploadPreview.capabilities || [])
+                      .slice(0, 20)
+                      .map((cap, idx) => (
+                        <View key={idx} style={styles.capabilityTag}>
+                          <Text style={styles.capabilityTagText}>{cap}</Text>
+                        </View>
+                      ))}
+                    {uploadPreview.capability_count > 20 && (
+                      <Text style={styles.moreCapabilities}>
+                        +{uploadPreview.capability_count - 20} more
+                      </Text>
                     )}
                   </View>
-                )}
-
-                {/* Soft Gate Help Modal */}
-                <Modal
-                  visible={softGateHelpVisible !== null}
-                  transparent={true}
-                  animationType="fade"
-                  onRequestClose={() => setSoftGateHelpVisible(null)}
-                >
-                  <TouchableOpacity
-                    style={styles.helpModalOverlay}
-                    activeOpacity={1}
-                    onPress={() => setSoftGateHelpVisible(null)}
-                  >
-                    <View style={styles.helpModalContent}>
-                      {softGateHelpVisible &&
-                        SOFT_GATE_HELP[softGateHelpVisible] && (
-                          <>
-                            <Text style={styles.helpModalTitle}>
-                              {SOFT_GATE_HELP[softGateHelpVisible].title}
-                            </Text>
-                            <Text style={styles.helpModalDescription}>
-                              {SOFT_GATE_HELP[softGateHelpVisible].description}
-                            </Text>
-                            <Text style={styles.helpModalSubtitle}>
-                              Stages/Ranges:
-                            </Text>
-                            {SOFT_GATE_HELP[softGateHelpVisible].stages.map(
-                              (stage, idx) => (
-                                <Text key={idx} style={styles.helpModalStage}>
-                                  • {stage}
-                                </Text>
-                              ),
-                            )}
-                            <Text style={styles.helpModalSubtitle}>
-                              Calculation:
-                            </Text>
-                            <Text style={styles.helpModalCalc}>
-                              {SOFT_GATE_HELP[softGateHelpVisible].calculation}
-                            </Text>
-                          </>
-                        )}
-                      <TouchableOpacity
-                        style={styles.helpModalClose}
-                        onPress={() => setSoftGateHelpVisible(null)}
-                      >
-                        <Text style={styles.helpModalCloseText}>Close</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
-                </Modal>
-
-                {/* Capabilities by Domain */}
-                <View style={styles.previewSection}>
-                  <View style={styles.previewSectionHeader}>
-                    <Text
-                      style={[styles.previewSectionTitle, { marginBottom: 0 }]}
-                    >
-                      Detected Capabilities ({uploadPreview.capability_count})
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() =>
-                        setShowAllCapabilities(!showAllCapabilities)
-                      }
-                      style={styles.toggleCapabilitiesButton}
-                    >
-                      <Text style={styles.toggleCapabilitiesText}>
-                        {showAllCapabilities ? "Collapse All" : "Expand All"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Grouped by domain - use API response if available, fallback to local grouping */}
-                  {(() => {
-                    let grouped, sortedDomains;
-                    if (
-                      uploadPreview.capabilities_by_domain &&
-                      Object.keys(uploadPreview.capabilities_by_domain).length >
-                        0
-                    ) {
-                      // Use domain grouping from API
-                      grouped = uploadPreview.capabilities_by_domain;
-                      sortedDomains = Object.keys(grouped).sort((a, b) => {
-                        if (a === "unknown") return 1;
-                        if (b === "unknown") return -1;
-                        return a.localeCompare(b);
-                      });
-                    } else {
-                      // Fallback to local grouping
-                      const result = groupCapabilitiesByDomain(
-                        uploadPreview.capabilities,
-                      );
-                      grouped = result.grouped;
-                      sortedDomains = result.sortedDomains;
-                    }
-                    return sortedDomains.map((domain) => {
-                      const isExpanded =
-                        showAllCapabilities || expandedDomains[domain];
-                      const caps = grouped[domain];
-                      return (
-                        <View key={domain} style={styles.domainSection}>
-                          <TouchableOpacity
-                            style={styles.domainHeader}
-                            onPress={() => toggleDomain(domain)}
-                          >
-                            <Text style={styles.domainHeaderText}>
-                              {isExpanded ? "▼" : "▶"}{" "}
-                              {domain.replace(/_/g, " ")} ({caps.length})
-                            </Text>
-                          </TouchableOpacity>
-                          {isExpanded && (
-                            <View style={styles.capabilityTagsContainer}>
-                              {caps.map((cap, idx) => (
-                                <View key={idx} style={styles.capabilityTag}>
-                                  <Text style={styles.capabilityTagText}>
-                                    {cap}
-                                  </Text>
-                                </View>
-                              ))}
-                            </View>
-                          )}
-                        </View>
-                      );
-                    });
-                  })()}
                 </View>
 
                 {uploadError && (
@@ -3136,8 +2651,6 @@ function MaterialExplorer() {
 function MaterialDetailView({ material, userId, onClose, onTriggerAnalysis }) {
   const [gateStatus, setGateStatus] = useState(null);
   const [loadingGates, setLoadingGates] = useState(false);
-  const [reanalyzing, setReanalyzing] = useState(false);
-  const [reanalyzeResult, setReanalyzeResult] = useState(null);
 
   useEffect(() => {
     if (material && userId) {
@@ -3159,42 +2672,6 @@ function MaterialDetailView({ material, userId, onClose, onTriggerAnalysis }) {
       console.log("[AdminScreen] Gate check failed");
     }
     setLoadingGates(false);
-  };
-
-  const handleReanalyze = async (metrics = null) => {
-    setReanalyzing(true);
-    setReanalyzeResult(null);
-    try {
-      const response = await fetch(
-        `${baseUrl}/materials/${material.id}/reanalyze`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ metrics }),
-        },
-      );
-      const data = await response.json();
-      if (response.ok) {
-        setReanalyzeResult({
-          type: "success",
-          message: `Updated: ${data.metrics_updated.join(", ")}`,
-          data,
-        });
-        // Reload material analysis
-        if (onTriggerAnalysis) {
-          onTriggerAnalysis(material.id);
-        }
-      } else {
-        setReanalyzeResult({
-          type: "error",
-          message: data.detail || "Reanalysis failed",
-        });
-      }
-    } catch (err) {
-      console.error("[AdminScreen] Reanalyze error:", err);
-      setReanalyzeResult({ type: "error", message: err.message });
-    }
-    setReanalyzing(false);
   };
 
   if (!material) return null;
@@ -3354,57 +2831,12 @@ function MaterialDetailView({ material, userId, onClose, onTriggerAnalysis }) {
 
       <View style={styles.detailSection}>
         <Text style={styles.detailSectionTitle}>Actions</Text>
-        <View style={styles.actionButtonRow}>
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              reanalyzing && styles.actionButtonDisabled,
-            ]}
-            onPress={() => handleReanalyze(null)}
-            disabled={reanalyzing}
-          >
-            <Text style={styles.actionButtonText}>
-              {reanalyzing ? "Analyzing..." : "Reanalyze All"}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              reanalyzing && styles.actionButtonDisabled,
-            ]}
-            onPress={() => handleReanalyze(["soft_gates"])}
-            disabled={reanalyzing}
-          >
-            <Text style={styles.actionButtonText}>Soft Gates Only</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              reanalyzing && styles.actionButtonDisabled,
-            ]}
-            onPress={() => handleReanalyze(["capabilities"])}
-            disabled={reanalyzing}
-          >
-            <Text style={styles.actionButtonText}>Capabilities Only</Text>
-          </TouchableOpacity>
-        </View>
-        {reanalyzeResult && (
-          <View
-            style={[
-              styles.statusBanner,
-              reanalyzeResult.type === "success"
-                ? styles.statusSuccess
-                : styles.statusError,
-            ]}
-          >
-            <Text style={styles.statusText}>{reanalyzeResult.message}</Text>
-            {reanalyzeResult.data?.soft_gates && (
-              <Text style={styles.statusText}>
-                IVS: {reanalyzeResult.data.soft_gates.interval_velocity_score}
-              </Text>
-            )}
-          </View>
-        )}
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => onTriggerAnalysis(material.id)}
+        >
+          <Text style={styles.actionButtonText}>Re-run Analysis</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -4320,7 +3752,7 @@ function FocusCardDetailView({ focusCard, onClose, onEdit, onDelete }) {
 
         <View style={styles.detailModalActions}>
           <TouchableOpacity
-            style={[styles.actionButton, styles.modalEditButton]}
+            style={[styles.actionButton, styles.editButton]}
             onPress={onEdit}
           >
             <Text style={styles.actionButtonText}>Edit</Text>
@@ -5912,16 +5344,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginVertical: 4,
     borderRadius: 8,
-    ...Platform.select({
-      web: { boxShadow: "0px 1px 2px rgba(0, 0, 0, 0.1)" },
-      default: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-      },
-    }),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
     flexDirection: "row",
     alignItems: "center",
   },
@@ -5985,18 +5412,12 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   closeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: 8,
-    minWidth: 40,
-    alignItems: "center",
+    padding: 5,
   },
   closeButtonText: {
     color: "#fff",
-    fontSize: 18,
-    fontWeight: "500",
-    lineHeight: 18,
+    fontSize: 24,
+    fontWeight: "300",
   },
   detailSection: {
     backgroundColor: "#fff",
@@ -6334,16 +5755,13 @@ const styles = StyleSheet.create({
   detailHeaderButtons: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
   },
   editButton: {
     backgroundColor: "#4CAF50",
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    minWidth: 70,
-    alignItems: "center",
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginRight: 12,
   },
   editButtonText: {
     color: "#fff",
@@ -6395,10 +5813,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 6,
   },
-  modalEditButton: {
+  editButton: {
     backgroundColor: "#2196F3",
   },
-  modalDeleteButton: {
+  deleteButton: {
     backgroundColor: "#f44336",
   },
   actionButtonText: {
@@ -6890,16 +6308,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginVertical: 4,
     borderRadius: 8,
-    ...Platform.select({
-      web: { boxShadow: "0px 1px 2px rgba(0, 0, 0, 0.1)" },
-      default: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-      },
-    }),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   domainReorderName: {
     fontSize: 16,
@@ -7193,46 +6606,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     marginBottom: 4,
   },
-  // Material ingestion action bar
-  actionBar: {
-    flexDirection: "row",
-    padding: 12,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
-    gap: 8,
-  },
-  actionButtonDisabled: {
-    backgroundColor: "#ccc",
-    opacity: 0.6,
-  },
-  statusBanner: {
-    marginHorizontal: 12,
-    marginTop: 8,
-    padding: 12,
-    borderRadius: 8,
-  },
-  statusSuccess: {
-    backgroundColor: "#e8f5e9",
-    borderLeftWidth: 4,
-    borderLeftColor: "#4CAF50",
-  },
-  statusError: {
-    backgroundColor: "#ffebee",
-    borderLeftWidth: 4,
-    borderLeftColor: "#f44336",
-  },
-  statusText: {
-    fontSize: 13,
-    color: "#333",
-  },
-  // Action button row for side-by-side buttons
-  actionButtonRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 10,
-  },
   // Upload Button & Modal Styles
   uploadButton: {
     backgroundColor: "#4CAF50",
@@ -7330,45 +6703,6 @@ const styles = StyleSheet.create({
     color: "#1976D2",
     marginBottom: 10,
   },
-  previewSectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  toggleCapabilitiesButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    backgroundColor: "#e3f2fd",
-    borderRadius: 12,
-  },
-  toggleCapabilitiesText: {
-    fontSize: 12,
-    color: "#1976D2",
-    fontWeight: "500",
-  },
-  domainSection: {
-    marginBottom: 12,
-  },
-  domainHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    backgroundColor: "#e8f4fc",
-    borderRadius: 6,
-    marginBottom: 6,
-  },
-  domainHeaderText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#1565C0",
-    textTransform: "capitalize",
-  },
-  moreCapabilitiesButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
   softGateGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -7391,84 +6725,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#333",
-  },
-  softGateLabelRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 2,
-  },
-  helpButton: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "#e0e0e0",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  helpButtonText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#666",
-  },
-  helpModalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  helpModalContent: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 20,
-    maxWidth: 400,
-    width: "100%",
-  },
-  helpModalTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1976D2",
-    marginBottom: 8,
-  },
-  helpModalDescription: {
-    fontSize: 14,
-    color: "#333",
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  helpModalSubtitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#555",
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  helpModalStage: {
-    fontSize: 12,
-    color: "#666",
-    marginLeft: 8,
-    marginBottom: 2,
-    lineHeight: 18,
-  },
-  helpModalCalc: {
-    fontSize: 12,
-    color: "#888",
-    fontStyle: "italic",
-    marginTop: 4,
-    lineHeight: 18,
-  },
-  helpModalClose: {
-    marginTop: 16,
-    paddingVertical: 10,
-    backgroundColor: "#1976D2",
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  helpModalCloseText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 14,
   },
   capabilityTagsContainer: {
     flexDirection: "row",

@@ -1,6 +1,8 @@
 import React from "react";
 import { render } from "@testing-library/react-native";
-import VolumeBar, { CircularVolumeIndicator } from "../src/components/VolumeBar";
+import VolumeBar, {
+  CircularVolumeIndicator,
+} from "../src/components/VolumeBar";
 
 describe("VolumeBar Component", () => {
   describe("Rendering", () => {
@@ -11,7 +13,7 @@ describe("VolumeBar Component", () => {
 
     it("renders with label", () => {
       const { getByText } = render(
-        <VolumeBar volume={0.5} label="Your Sound" />
+        <VolumeBar volume={0.5} label="Your Sound" />,
       );
       expect(getByText("Your Sound")).toBeTruthy();
     });
@@ -53,28 +55,28 @@ describe("VolumeBar Component", () => {
   describe("Pitch Accuracy Colors", () => {
     it("renders with correct pitch accuracy and shows message", () => {
       const { getByText } = render(
-        <VolumeBar volume={0.5} pitchAccuracy="correct" />
+        <VolumeBar volume={0.5} pitchAccuracy="correct" />,
       );
       expect(getByText("Great pitch!")).toBeTruthy();
     });
 
     it("renders with off pitch accuracy and shows message", () => {
       const { getByText } = render(
-        <VolumeBar volume={0.5} pitchAccuracy="off" />
+        <VolumeBar volume={0.5} pitchAccuracy="off" />,
       );
       expect(getByText("Adjust your pitch")).toBeTruthy();
     });
 
     it("renders with listening pitch accuracy", () => {
       const { toJSON } = render(
-        <VolumeBar volume={0.5} pitchAccuracy="listening" />
+        <VolumeBar volume={0.5} pitchAccuracy="listening" />,
       );
       expect(toJSON()).toBeTruthy();
     });
 
     it("renders without pitch accuracy", () => {
       const { toJSON } = render(
-        <VolumeBar volume={0.5} pitchAccuracy={null} />
+        <VolumeBar volume={0.5} pitchAccuracy={null} />,
       );
       expect(toJSON()).toBeTruthy();
     });
@@ -105,14 +107,14 @@ describe("VolumeBar Component", () => {
   describe("Style Props", () => {
     it("accepts custom style", () => {
       const { toJSON } = render(
-        <VolumeBar volume={0.5} style={{ marginTop: 20 }} />
+        <VolumeBar volume={0.5} style={{ marginTop: 20 }} />,
       );
       expect(toJSON()).toBeTruthy();
     });
 
     it("accepts showPercentage prop", () => {
       const { toJSON } = render(
-        <VolumeBar volume={0.75} showPercentage={true} />
+        <VolumeBar volume={0.75} showPercentage={true} />,
       );
       expect(toJSON()).toBeTruthy();
     });
@@ -128,10 +130,10 @@ describe("CircularVolumeIndicator Component", () => {
 
     it("renders at various sizes", () => {
       const sizes = [50, 80, 100, 150];
-      
+
       sizes.forEach((size) => {
         const { toJSON, unmount } = render(
-          <CircularVolumeIndicator volume={0.5} size={size} />
+          <CircularVolumeIndicator volume={0.5} size={size} />,
         );
         expect(toJSON()).toBeTruthy();
         unmount();
@@ -154,21 +156,21 @@ describe("CircularVolumeIndicator Component", () => {
   describe("Pitch Accuracy", () => {
     it("renders with correct pitch", () => {
       const { toJSON } = render(
-        <CircularVolumeIndicator volume={0.5} pitchAccuracy="correct" />
+        <CircularVolumeIndicator volume={0.5} pitchAccuracy="correct" />,
       );
       expect(toJSON()).toBeTruthy();
     });
 
     it("renders with off pitch", () => {
       const { toJSON } = render(
-        <CircularVolumeIndicator volume={0.5} pitchAccuracy="off" />
+        <CircularVolumeIndicator volume={0.5} pitchAccuracy="off" />,
       );
       expect(toJSON()).toBeTruthy();
     });
 
     it("renders with listening state", () => {
       const { toJSON } = render(
-        <CircularVolumeIndicator volume={0.5} pitchAccuracy="listening" />
+        <CircularVolumeIndicator volume={0.5} pitchAccuracy="listening" />,
       );
       expect(toJSON()).toBeTruthy();
     });
