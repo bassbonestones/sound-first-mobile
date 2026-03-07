@@ -1,6 +1,6 @@
 import React from "react";
 import { render, fireEvent, waitFor } from "@testing-library/react-native";
-import FirstNoteScreen from "../screens/FirstNoteScreen";
+import FirstNoteScreen from "../src/screens/FirstNoteScreen";
 
 // Mock navigation
 const mockNavigate = jest.fn();
@@ -14,7 +14,7 @@ const mockNavigation = {
 };
 
 // Mock AudioInput component - simpler mock for navigation tests
-jest.mock("../components/AudioInput", () => {
+jest.mock("../src/components/AudioInput", () => {
   const React = require("react");
   return function MockAudioInput(props) {
     return React.createElement("View", {
@@ -25,7 +25,7 @@ jest.mock("../components/AudioInput", () => {
 });
 
 // Mock VolumeBar component
-jest.mock("../components/VolumeBar", () => {
+jest.mock("../src/components/VolumeBar", () => {
   const React = require("react");
   const VolumeBar = (props) => React.createElement("View", { testID: "mock-volume-bar", ...props });
   const CircularVolumeIndicator = (props) => React.createElement("View", { testID: "mock-circular-indicator", ...props });

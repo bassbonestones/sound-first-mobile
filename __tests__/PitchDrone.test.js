@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { render, fireEvent, act } from '@testing-library/react-native';
-import PitchDrone from '../components/PitchDrone';
+import PitchDrone from '../src/components/PitchDrone';
 
 // Mock AudioContext for web
 const mockOscillator = {

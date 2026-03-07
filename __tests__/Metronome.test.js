@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { render, fireEvent, act } from '@testing-library/react-native';
-import Metronome from '../components/Metronome';
+import Metronome from '../src/components/Metronome';
 
 // Mock AudioContext for web
 const mockOscillator = {

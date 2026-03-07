@@ -1,6 +1,6 @@
 import React from "react";
 import { render } from "@testing-library/react-native";
-import VolumeBar, { CircularVolumeIndicator } from "../components/VolumeBar";
+import VolumeBar, { CircularVolumeIndicator } from "../src/components/VolumeBar";
 
 describe("VolumeBar Component", () => {
   describe("Rendering", () => {

@@ -1,6 +1,6 @@
 import React from "react";
 import { render, act, waitFor } from "@testing-library/react-native";
-import AudioInput from "../components/AudioInput";
+import AudioInput from "../src/components/AudioInput";
 
 // Note: Tests run in a mobile environment where AudioInput returns null.
 // These tests verify the component doesn't crash and handles props correctly.

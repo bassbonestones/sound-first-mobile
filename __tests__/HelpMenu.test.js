@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { render, fireEvent, waitFor, screen } from '@testing-library/react-native';
-import HelpMenu from '../components/HelpMenu';
+import HelpMenu from '../src/components/HelpMenu';
 
 // Mock fetch
 global.fetch = jest.fn();

@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
-import MiniLesson from '../components/MiniLesson';
+import MiniLesson from '../src/components/MiniLesson';
 
 // Mock fetch
 global.fetch = jest.fn();

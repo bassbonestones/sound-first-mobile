@@ -5,7 +5,7 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
-import StartPracticeScreen from '../screens/StartPracticeScreen';
+import StartPracticeScreen from '../src/screens/StartPracticeScreen';
 
 // Mock Alert
 jest.spyOn(Alert, 'alert');

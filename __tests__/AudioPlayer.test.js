@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
-import AudioPlayer from '../components/AudioPlayer';
+import AudioPlayer from '../src/components/AudioPlayer';
 
 // Mock fetch
 global.fetch = jest.fn();

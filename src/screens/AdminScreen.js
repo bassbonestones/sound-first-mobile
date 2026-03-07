@@ -2094,6 +2094,20 @@ function MaterialExplorer() {
   const [selectedMaterial, setSelectedMaterial] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("1");
+  const [ingesting, setIngesting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [actionStatus, setActionStatus] = useState(null);
+
+  // Upload modal state
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadStep, setUploadStep] = useState("select"); // "select" | "preview" | "saving"
+  const [uploadFileName, setUploadFileName] = useState("");
+  const [uploadFileContent, setUploadFileContent] = useState("");
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [uploadKeyCenter, setUploadKeyCenter] = useState("");
+  const [uploadPreview, setUploadPreview] = useState(null);
+  const [uploadError, setUploadError] = useState(null);
+  const [uploadSaving, setUploadSaving] = useState(false);
 
   useEffect(() => {
     loadMaterials();
@@ -2171,6 +2185,170 @@ function MaterialExplorer() {
     }
   };
 
+  const handleBatchIngest = async (analyzeAll = false) => {
+    setIngesting(true);
+    setActionStatus(null);
+    try {
+      const response = await fetch(`${baseUrl}/materials/ingest-batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          analyze_missing_only: !analyzeAll,
+          overwrite: analyzeAll,
+        }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setActionStatus({
+          type: "success",
+          message: `Analyzed ${data.files_analyzed} files, ${data.orphans_removed} orphans removed`,
+        });
+        loadMaterials();
+      } else {
+        setActionStatus({
+          type: "error",
+          message: data.detail || "Ingestion failed",
+        });
+      }
+    } catch (err) {
+      console.error("[AdminScreen] Batch ingest error:", err);
+      setActionStatus({ type: "error", message: err.message });
+    }
+    setIngesting(false);
+    setTimeout(() => setActionStatus(null), 5000);
+  };
+
+  const handleExportToJson = async () => {
+    setExporting(true);
+    setActionStatus(null);
+    try {
+      const response = await fetch(`${baseUrl}/materials/export-json`, {
+        method: "POST",
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setActionStatus({
+          type: "success",
+          message: `Exported to ${data.path}`,
+        });
+      } else {
+        setActionStatus({
+          type: "error",
+          message: data.detail || "Export failed",
+        });
+      }
+    } catch (err) {
+      console.error("[AdminScreen] Export error:", err);
+      setActionStatus({ type: "error", message: err.message });
+    }
+    setExporting(false);
+    setTimeout(() => setActionStatus(null), 5000);
+  };
+
+  // === UPLOAD FUNCTIONS ===
+
+  const openUploadModal = () => {
+    setShowUploadModal(true);
+    setUploadStep("select");
+    setUploadFileName("");
+    setUploadFileContent("");
+    setUploadTitle("");
+    setUploadKeyCenter("");
+    setUploadPreview(null);
+    setUploadError(null);
+  };
+
+  const handleFilePick = async () => {
+    // For web/desktop, use file input
+    if (Platform.OS === "web") {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".xml,.musicxml";
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          setUploadFileName(file.name);
+          const content = await file.text();
+          setUploadFileContent(content);
+          const nameWithoutExt = file.name.replace(/\.(xml|musicxml)$/i, "");
+          setUploadTitle(nameWithoutExt);
+        }
+      };
+      input.click();
+    } else {
+      alert("On mobile, please paste MusicXML content in the text area below.");
+    }
+  };
+
+  const analyzeUploadedFile = async () => {
+    if (!uploadFileContent) {
+      setUploadError("Please select or paste a MusicXML file first");
+      return;
+    }
+
+    setUploadStep("preview");
+    setUploadError(null);
+
+    try {
+      const response = await fetch(`${baseUrl}/materials/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: uploadTitle || "Untitled",
+          musicxml_content: uploadFileContent,
+          original_key_center: uploadKeyCenter || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || "Analysis failed");
+      }
+
+      const preview = await response.json();
+      setUploadPreview(preview);
+      if (preview.title && !uploadTitle) {
+        setUploadTitle(preview.title);
+      }
+    } catch (err) {
+      setUploadError(err.message);
+      setUploadStep("select");
+    }
+  };
+
+  const confirmUpload = async () => {
+    if (!uploadPreview) return;
+
+    setUploadSaving(true);
+    setUploadError(null);
+
+    try {
+      const response = await fetch(`${baseUrl}/materials/upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: uploadTitle || uploadPreview.title || "Untitled",
+          musicxml_content: uploadFileContent,
+          original_key_center: uploadKeyCenter || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || "Upload failed");
+      }
+
+      const result = await response.json();
+      alert(`Material saved successfully! ID: ${result.material_id}`);
+      setShowUploadModal(false);
+      loadMaterials();
+    } catch (err) {
+      setUploadError(err.message);
+    } finally {
+      setUploadSaving(false);
+    }
+  };
+
   const renderMaterialItem = ({ item }) => (
     <TouchableOpacity
       style={styles.listItem}
@@ -2209,14 +2387,20 @@ function MaterialExplorer() {
 
   return (
     <View style={styles.section}>
-      {/* Search */}
+      {/* Search and Upload */}
       <View style={styles.filterBar}>
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { flex: 1 }]}
           placeholder="Search materials..."
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
+        <TouchableOpacity
+          style={styles.uploadButton}
+          onPress={openUploadModal}
+        >
+          <Text style={styles.uploadButtonText}>+ Upload</Text>
+        </TouchableOpacity>
       </View>
 
       {/* User selector for gate checks */}
@@ -2234,6 +2418,44 @@ function MaterialExplorer() {
       <Text style={styles.resultCount}>
         {filteredMaterials.length} materials
       </Text>
+
+      {/* Batch Actions */}
+      <View style={styles.actionBar}>
+        <TouchableOpacity
+          style={[styles.actionButton, ingesting && styles.actionButtonDisabled]}
+          onPress={() => handleBatchIngest(false)}
+          disabled={ingesting || exporting}
+        >
+          <Text style={styles.actionButtonText}>
+            {ingesting ? "Analyzing..." : "Analyze New"}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionButton, ingesting && styles.actionButtonDisabled]}
+          onPress={() => handleBatchIngest(true)}
+          disabled={ingesting || exporting}
+        >
+          <Text style={styles.actionButtonText}>Re-analyze All</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.exportButton, exporting && styles.actionButtonDisabled]}
+          onPress={handleExportToJson}
+          disabled={ingesting || exporting}
+        >
+          <Text style={styles.actionButtonText}>
+            {exporting ? "Exporting..." : "Export JSON"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {actionStatus && (
+        <View style={[
+          styles.statusBanner,
+          actionStatus.type === "success" ? styles.statusSuccess : styles.statusError
+        ]}>
+          <Text style={styles.statusText}>{actionStatus.message}</Text>
+        </View>
+      )}
 
       <FlatList
         data={filteredMaterials}
@@ -2255,6 +2477,211 @@ function MaterialExplorer() {
           onTriggerAnalysis={triggerAnalysis}
         />
       </Modal>
+
+      {/* Upload Modal */}
+      <Modal
+        visible={showUploadModal}
+        animationType="slide"
+        onRequestClose={() => setShowUploadModal(false)}
+      >
+        <View style={styles.uploadModalContainer}>
+          <View style={styles.detailHeader}>
+            <Text style={styles.detailTitle}>
+              {uploadStep === "select" ? "Upload Material" : "Analysis Preview"}
+            </Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowUploadModal(false)}
+            >
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.uploadModalContent}>
+            {uploadStep === "select" && (
+              <View style={styles.uploadSelectStep}>
+                {/* File Picker */}
+                <Text style={styles.uploadLabel}>MusicXML File</Text>
+                <TouchableOpacity
+                  style={styles.filePickerButton}
+                  onPress={handleFilePick}
+                >
+                  <Text style={styles.filePickerButtonText}>
+                    {uploadFileName || "Choose File..."}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Manual Content Input (for mobile) */}
+                {Platform.OS !== "web" && (
+                  <>
+                    <Text style={[styles.uploadLabel, { marginTop: 16 }]}>
+                      Or paste MusicXML content:
+                    </Text>
+                    <TextInput
+                      style={styles.xmlContentInput}
+                      multiline
+                      numberOfLines={8}
+                      placeholder="<?xml version='1.0'?>..."
+                      value={uploadFileContent}
+                      onChangeText={setUploadFileContent}
+                    />
+                  </>
+                )}
+
+                {/* Title */}
+                <Text style={[styles.uploadLabel, { marginTop: 16 }]}>Title</Text>
+                <TextInput
+                  style={styles.uploadInput}
+                  placeholder="Material title"
+                  value={uploadTitle}
+                  onChangeText={setUploadTitle}
+                />
+
+                {/* Key Center */}
+                <Text style={[styles.uploadLabel, { marginTop: 16 }]}>
+                  Original Key Center (optional)
+                </Text>
+                <TextInput
+                  style={styles.uploadInput}
+                  placeholder="e.g., C, G, Bb"
+                  value={uploadKeyCenter}
+                  onChangeText={setUploadKeyCenter}
+                />
+
+                {uploadError && (
+                  <Text style={styles.uploadError}>{uploadError}</Text>
+                )}
+
+                <TouchableOpacity
+                  style={styles.analyzeButton}
+                  onPress={analyzeUploadedFile}
+                  disabled={!uploadFileContent}
+                >
+                  <Text style={styles.analyzeButtonText}>Analyze File</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {uploadStep === "preview" && uploadPreview && (
+              <View style={styles.uploadPreviewStep}>
+                {/* Basic Info */}
+                <View style={styles.previewSection}>
+                  <Text style={styles.previewSectionTitle}>Basic Info</Text>
+                  <DetailRow label="Title" value={uploadPreview.title || uploadTitle} />
+                  <DetailRow label="Measures" value={String(uploadPreview.measure_count || "N/A")} />
+                  <DetailRow label="Tempo" value={uploadPreview.tempo_marking || (uploadPreview.tempo_bpm ? `${uploadPreview.tempo_bpm} BPM` : "N/A")} />
+                </View>
+
+                {/* Range Analysis */}
+                {uploadPreview.range_analysis && (
+                  <View style={styles.previewSection}>
+                    <Text style={styles.previewSectionTitle}>Range Analysis</Text>
+                    <DetailRow label="Lowest" value={uploadPreview.range_analysis.lowest_pitch || "N/A"} />
+                    <DetailRow label="Highest" value={uploadPreview.range_analysis.highest_pitch || "N/A"} />
+                    <DetailRow label="Range" value={`${uploadPreview.range_analysis.range_semitones || "?"} semitones`} />
+                  </View>
+                )}
+
+                {/* Soft Gates */}
+                {uploadPreview.soft_gates && !uploadPreview.soft_gates.error && (
+                  <View style={styles.previewSection}>
+                    <Text style={styles.previewSectionTitle}>Soft Gate Metrics</Text>
+                    <View style={styles.softGateGrid}>
+                      <View style={styles.softGateCell}>
+                        <Text style={styles.softGateCellLabel}>Tonal (D1)</Text>
+                        <Text style={styles.softGateCellValue}>
+                          Stage {uploadPreview.soft_gates.tonal_complexity_stage}
+                        </Text>
+                      </View>
+                      <View style={styles.softGateCell}>
+                        <Text style={styles.softGateCellLabel}>Interval (D2)</Text>
+                        <Text style={styles.softGateCellValue}>
+                          Stage {uploadPreview.soft_gates.interval_size_stage}
+                        </Text>
+                      </View>
+                      <View style={styles.softGateCell}>
+                        <Text style={styles.softGateCellLabel}>Rhythm (D3)</Text>
+                        <Text style={styles.softGateCellValue}>
+                          {(uploadPreview.soft_gates.rhythm_complexity_score * 100).toFixed(0)}%
+                        </Text>
+                      </View>
+                      <View style={styles.softGateCell}>
+                        <Text style={styles.softGateCellLabel}>Range (D4)</Text>
+                        <Text style={styles.softGateCellValue}>
+                          Stage {uploadPreview.soft_gates.range_usage_stage}
+                        </Text>
+                      </View>
+                      <View style={styles.softGateCell}>
+                        <Text style={styles.softGateCellLabel}>IVS</Text>
+                        <Text style={styles.softGateCellValue}>
+                          {(uploadPreview.soft_gates.interval_velocity_score * 100).toFixed(0)}%
+                        </Text>
+                      </View>
+                      <View style={styles.softGateCell}>
+                        <Text style={styles.softGateCellLabel}>Tempo Diff</Text>
+                        <Text style={styles.softGateCellValue}>
+                          {(uploadPreview.soft_gates.tempo_difficulty_score * 100).toFixed(0)}%
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                {/* Capabilities */}
+                <View style={styles.previewSection}>
+                  <Text style={styles.previewSectionTitle}>
+                    Detected Capabilities ({uploadPreview.capability_count})
+                  </Text>
+                  <View style={styles.capabilityTagsContainer}>
+                    {(uploadPreview.capabilities || []).slice(0, 20).map((cap, idx) => (
+                      <View key={idx} style={styles.capabilityTag}>
+                        <Text style={styles.capabilityTagText}>{cap}</Text>
+                      </View>
+                    ))}
+                    {uploadPreview.capability_count > 20 && (
+                      <Text style={styles.moreCapabilities}>
+                        +{uploadPreview.capability_count - 20} more
+                      </Text>
+                    )}
+                  </View>
+                </View>
+
+                {uploadError && (
+                  <Text style={styles.uploadError}>{uploadError}</Text>
+                )}
+
+                {/* Action Buttons */}
+                <View style={styles.uploadActions}>
+                  <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => setUploadStep("select")}
+                  >
+                    <Text style={styles.backButtonText}>← Back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.confirmButton, uploadSaving && styles.buttonDisabled]}
+                    onPress={confirmUpload}
+                    disabled={uploadSaving}
+                  >
+                    {uploadSaving ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.confirmButtonText}>Save to Database</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {uploadStep === "preview" && !uploadPreview && (
+              <View style={styles.centered}>
+                <ActivityIndicator size="large" color="#2196F3" />
+                <Text style={styles.loadingText}>Analyzing...</Text>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -2262,6 +2689,8 @@ function MaterialExplorer() {
 function MaterialDetailView({ material, userId, onClose, onTriggerAnalysis }) {
   const [gateStatus, setGateStatus] = useState(null);
   const [loadingGates, setLoadingGates] = useState(false);
+  const [reanalyzing, setReanalyzing] = useState(false);
+  const [reanalyzeResult, setReanalyzeResult] = useState(null);
 
   useEffect(() => {
     if (material && userId) {
@@ -2283,6 +2712,42 @@ function MaterialDetailView({ material, userId, onClose, onTriggerAnalysis }) {
       console.log("[AdminScreen] Gate check failed");
     }
     setLoadingGates(false);
+  };
+
+  const handleReanalyze = async (metrics = null) => {
+    setReanalyzing(true);
+    setReanalyzeResult(null);
+    try {
+      const response = await fetch(
+        `${baseUrl}/materials/${material.id}/reanalyze`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ metrics }),
+        },
+      );
+      const data = await response.json();
+      if (response.ok) {
+        setReanalyzeResult({
+          type: "success",
+          message: `Updated: ${data.metrics_updated.join(", ")}`,
+          data,
+        });
+        // Reload material analysis
+        if (onTriggerAnalysis) {
+          onTriggerAnalysis(material.id);
+        }
+      } else {
+        setReanalyzeResult({
+          type: "error",
+          message: data.detail || "Reanalysis failed",
+        });
+      }
+    } catch (err) {
+      console.error("[AdminScreen] Reanalyze error:", err);
+      setReanalyzeResult({ type: "error", message: err.message });
+    }
+    setReanalyzing(false);
   };
 
   if (!material) return null;
@@ -2442,12 +2907,44 @@ function MaterialDetailView({ material, userId, onClose, onTriggerAnalysis }) {
 
       <View style={styles.detailSection}>
         <Text style={styles.detailSectionTitle}>Actions</Text>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => onTriggerAnalysis(material.id)}
-        >
-          <Text style={styles.actionButtonText}>Re-run Analysis</Text>
-        </TouchableOpacity>
+        <View style={styles.actionButtonRow}>
+          <TouchableOpacity
+            style={[styles.actionButton, reanalyzing && styles.actionButtonDisabled]}
+            onPress={() => handleReanalyze(null)}
+            disabled={reanalyzing}
+          >
+            <Text style={styles.actionButtonText}>
+              {reanalyzing ? "Analyzing..." : "Reanalyze All"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, reanalyzing && styles.actionButtonDisabled]}
+            onPress={() => handleReanalyze(["soft_gates"])}
+            disabled={reanalyzing}
+          >
+            <Text style={styles.actionButtonText}>Soft Gates Only</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, reanalyzing && styles.actionButtonDisabled]}
+            onPress={() => handleReanalyze(["capabilities"])}
+            disabled={reanalyzing}
+          >
+            <Text style={styles.actionButtonText}>Capabilities Only</Text>
+          </TouchableOpacity>
+        </View>
+        {reanalyzeResult && (
+          <View style={[
+            styles.statusBanner,
+            reanalyzeResult.type === "success" ? styles.statusSuccess : styles.statusError
+          ]}>
+            <Text style={styles.statusText}>{reanalyzeResult.message}</Text>
+            {reanalyzeResult.data?.soft_gates && (
+              <Text style={styles.statusText}>
+                IVS: {reanalyzeResult.data.soft_gates.interval_velocity_score}
+              </Text>
+            )}
+          </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -6235,5 +6732,222 @@ const styles = StyleSheet.create({
     color: "#333",
     marginLeft: 8,
     marginBottom: 4,
+  },
+  // Material ingestion action bar
+  actionBar: {
+    flexDirection: "row",
+    padding: 12,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+    gap: 8,
+  },
+  actionButtonDisabled: {
+    backgroundColor: "#ccc",
+    opacity: 0.6,
+  },
+  statusBanner: {
+    marginHorizontal: 12,
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+  },
+  statusSuccess: {
+    backgroundColor: "#e8f5e9",
+    borderLeftWidth: 4,
+    borderLeftColor: "#4CAF50",
+  },
+  statusError: {
+    backgroundColor: "#ffebee",
+    borderLeftWidth: 4,
+    borderLeftColor: "#f44336",
+  },
+  statusText: {
+    fontSize: 13,
+    color: "#333",
+  },
+  // Action button row for side-by-side buttons
+  actionButtonRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 10,
+  },
+  // Upload Button & Modal Styles
+  uploadButton: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginLeft: 10,
+  },
+  uploadButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  uploadModalContainer: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  uploadModalContent: {
+    flex: 1,
+    padding: 16,
+  },
+  uploadSelectStep: {
+    flex: 1,
+  },
+  uploadPreviewStep: {
+    flex: 1,
+  },
+  uploadLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 8,
+  },
+  filePickerButton: {
+    backgroundColor: "#f5f5f5",
+    borderWidth: 2,
+    borderColor: "#ddd",
+    borderStyle: "dashed",
+    borderRadius: 8,
+    padding: 20,
+    alignItems: "center",
+  },
+  filePickerButtonText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  xmlContentInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 12,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    minHeight: 150,
+    textAlignVertical: "top",
+    backgroundColor: "#fafafa",
+  },
+  uploadInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    backgroundColor: "#fff",
+  },
+  uploadError: {
+    color: "#f44336",
+    fontSize: 13,
+    marginTop: 12,
+    padding: 10,
+    backgroundColor: "#ffebee",
+    borderRadius: 6,
+  },
+  analyzeButton: {
+    backgroundColor: "#2196F3",
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 24,
+  },
+  analyzeButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  previewSection: {
+    marginBottom: 20,
+    padding: 12,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+  },
+  previewSectionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1976D2",
+    marginBottom: 10,
+  },
+  softGateGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  softGateCell: {
+    width: "48%",
+    backgroundColor: "#fff",
+    padding: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  softGateCellLabel: {
+    fontSize: 11,
+    color: "#666",
+    marginBottom: 2,
+  },
+  softGateCellValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+  },
+  capabilityTagsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  capabilityTag: {
+    backgroundColor: "#e3f2fd",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  capabilityTagText: {
+    fontSize: 12,
+    color: "#1976D2",
+  },
+  moreCapabilities: {
+    fontSize: 12,
+    color: "#666",
+    alignSelf: "center",
+    marginLeft: 8,
+  },
+  uploadActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 20,
+    paddingBottom: 40,
+  },
+  backButton: {
+    backgroundColor: "#f5f5f5",
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  backButtonText: {
+    color: "#666",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  confirmButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    flex: 1,
+    marginLeft: 12,
+    alignItems: "center",
+  },
+  confirmButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
 });
