@@ -3056,23 +3056,31 @@ function MaterialExplorer() {
                               {domainLabels[domain]}
                             </Text>
                             <View style={styles.unifiedScoreSummary}>
-                              <Text style={styles.unifiedScoreLabel}>P:</Text>
-                              <Text style={styles.unifiedScoreValue}>
-                                {(domainData.scores.primary * 100).toFixed(0)}%
-                              </Text>
-                              <Text style={styles.unifiedScoreLabel}>H:</Text>
-                              <Text style={[styles.unifiedScoreValue, 
-                                domainData.scores.hazard > domainData.scores.primary + 0.15 && { color: '#e74c3c' }
-                              ]}>
-                                {(domainData.scores.hazard * 100).toFixed(0)}%
-                              </Text>
-                              <Text style={styles.unifiedScoreLabel}>O:</Text>
-                              <Text style={styles.unifiedScoreValue}>
-                                {(domainData.scores.overall * 100).toFixed(0)}%
-                              </Text>
-                              <Text style={styles.unifiedScoreStage}>
-                                Stage {domainData.bands.overall_stage}
-                              </Text>
+                              {domainData.scores.primary !== null ? (
+                                <>
+                                  <Text style={styles.unifiedScoreLabel}>P:</Text>
+                                  <Text style={styles.unifiedScoreValue}>
+                                    {(domainData.scores.primary * 100).toFixed(0)}%
+                                  </Text>
+                                  <Text style={styles.unifiedScoreLabel}>H:</Text>
+                                  <Text style={[styles.unifiedScoreValue, 
+                                    domainData.scores.hazard > domainData.scores.primary + 0.15 && { color: '#e74c3c' }
+                                  ]}>
+                                    {(domainData.scores.hazard * 100).toFixed(0)}%
+                                  </Text>
+                                  <Text style={styles.unifiedScoreLabel}>O:</Text>
+                                  <Text style={styles.unifiedScoreValue}>
+                                    {(domainData.scores.overall * 100).toFixed(0)}%
+                                  </Text>
+                                  <Text style={styles.unifiedScoreStage}>
+                                    Stage {domainData.bands.overall_stage}
+                                  </Text>
+                                </>
+                              ) : (
+                                <Text style={[styles.unifiedScoreValue, { color: '#95a5a6', fontStyle: 'italic' }]}>
+                                  Not scored
+                                </Text>
+                              )}
                             </View>
                           </View>
                           
@@ -3083,12 +3091,20 @@ function MaterialExplorer() {
                                 <Text style={styles.unifiedScoreFacetName}>
                                   {facet.replace(/_/g, ' ')}
                                 </Text>
-                                <View style={styles.unifiedScoreFacetBar}>
-                                  <View style={[styles.unifiedScoreFacetFill, { width: `${value * 100}%` }]} />
-                                </View>
-                                <Text style={styles.unifiedScoreFacetValue}>
-                                  {(value * 100).toFixed(0)}%
-                                </Text>
+                                {value !== null ? (
+                                  <>
+                                    <View style={styles.unifiedScoreFacetBar}>
+                                      <View style={[styles.unifiedScoreFacetFill, { width: `${value * 100}%` }]} />
+                                    </View>
+                                    <Text style={styles.unifiedScoreFacetValue}>
+                                      {(value * 100).toFixed(0)}%
+                                    </Text>
+                                  </>
+                                ) : (
+                                  <Text style={[styles.unifiedScoreFacetValue, { color: '#95a5a6' }]}>
+                                    —
+                                  </Text>
+                                )}
                               </View>
                             ))}
                           </View>
