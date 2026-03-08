@@ -347,9 +347,12 @@ const styles = StyleSheet.create({
   answerButton: {
     backgroundColor: "#2a2a2a",
     width: "45%",
+    minHeight: 100,
     paddingVertical: 20,
+    paddingHorizontal: 16,
     borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
     borderColor: "transparent",
   },

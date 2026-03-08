@@ -7,12 +7,25 @@ import {
   base64ToFloat32Array,
 } from "../utils/audioUtils";
 
-// Import live audio stream for native audio access
+// Import live audio stream for native audio access (not available on web)
 let LiveAudioStream = null;
-try {
-  LiveAudioStream = require("react-native-live-audio-stream").default;
-} catch (e) {
-  console.warn("react-native-live-audio-stream not available:", e);
+if (Platform.OS !== "web") {
+  try {
+    LiveAudioStream = require("react-native-live-audio-stream").default;
+    // Verify the module has the required methods
+    if (
+      !LiveAudioStream?.init ||
+      !LiveAudioStream?.start ||
+      !LiveAudioStream?.stop
+    ) {
+      console.warn(
+        "react-native-live-audio-stream loaded but missing required methods",
+      );
+      LiveAudioStream = null;
+    }
+  } catch (e) {
+    console.warn("react-native-live-audio-stream not available:", e);
+  }
 }
 
 const SAMPLE_RATE = 44100;
@@ -43,6 +56,8 @@ export function usePitchDetection({
   pitchMargin = 100,
   allowOctaveEquivalent = false,
   enabled = true,
+  externalAudioContext = null, // Optional: share AudioContext with caller to avoid conflicts
+  soundingFrequencyRange = null, // Optional: {min, max} - only trigger isSounding for pitches in this Hz range
 }) {
   const [isListening, setIsListening] = useState(false);
   const [permissionGranted, setPermissionGranted] = useState(false);
@@ -59,6 +74,13 @@ export function usePitchDetection({
   const targetMidiRef = useRef(noteNameToMidi(targetNote));
   const isListeningRef = useRef(false);
 
+  // Web-specific refs
+  const webAudioContextRef = useRef(null);
+  const webMediaStreamRef = useRef(null);
+  const webAnalyserRef = useRef(null);
+  const webAnimationFrameRef = useRef(null);
+  const webSampleRateRef = useRef(SAMPLE_RATE);
+
   // Update target MIDI when prop changes
   useEffect(() => {
     targetMidiRef.current = noteNameToMidi(targetNote);
@@ -67,7 +89,11 @@ export function usePitchDetection({
   // Request microphone permission
   const requestPermission = useCallback(async () => {
     try {
-      if (Platform.OS === "android") {
+      if (Platform.OS === "web") {
+        // Web: getUserMedia will prompt for permission
+        setPermissionGranted(true);
+        return true;
+      } else if (Platform.OS === "android") {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
           {
@@ -124,23 +150,28 @@ export function usePitchDetection({
             silenceTimerRef.current = null;
           }
 
-          // Fire sound start
-          if (!soundStartedRef.current) {
-            soundStartedRef.current = true;
-            setIsSounding(true);
-            onSoundStart?.();
-          }
-
           // Pitch detection
+          let validPitchDetected = false;
           if (result.frequency > 0 && result.confidence > 0.5) {
             const noteInfo = frequencyToNote(result.frequency);
             if (noteInfo) {
-              // Only process and log pitches in a reasonable range (80-1000 Hz)
-              if (noteInfo.frequency >= 80 && noteInfo.frequency <= 1000) {
-                console.log("[Audio Processing]", result, noteInfo);
+              // Check if pitch is in the valid range for "sounding"
+              const inDefaultRange = noteInfo.frequency >= 80 && noteInfo.frequency <= 1000;
+              const inSoundingRange = !soundingFrequencyRange || 
+                (noteInfo.frequency >= soundingFrequencyRange.min && 
+                 noteInfo.frequency <= soundingFrequencyRange.max);
+              
+              // Only set currentPitch if in soundingFrequencyRange (when specified) to filter out metronome etc
+              if (inDefaultRange && inSoundingRange) {
+                console.log("[Audio Processing]", result, noteInfo, "IN RANGE");
                 setCurrentPitch(noteInfo);
-                console.log("[Pitch Detected]", noteInfo);
               }
+              
+              // Only count as valid pitch for isSounding if in the specified range
+              if (inSoundingRange && inDefaultRange) {
+                validPitchDetected = true;
+              }
+              
               pitchBufferRef.current.push({
                 midi: noteInfo.midiNote,
                 timestamp: Date.now(),
@@ -168,6 +199,14 @@ export function usePitchDetection({
                 onPitchMatch?.(isMatch, noteInfo);
               }
             }
+          }
+          
+          // Fire sound start - either based on valid pitch (if range specified) or just volume
+          const shouldTriggerSounding = soundingFrequencyRange ? validPitchDetected : true;
+          if (!soundStartedRef.current && shouldTriggerSounding) {
+            soundStartedRef.current = true;
+            setIsSounding(true);
+            onSoundStart?.();
           }
         } else {
           // Below threshold - start silence timer
@@ -231,22 +270,249 @@ export function usePitchDetection({
       pitchMargin,
       allowOctaveEquivalent,
       isSounding,
+      soundingFrequencyRange,
     ],
   );
 
-  // Start listening
-  const startListening = useCallback(async () => {
+  // Web audio frame processor
+  const processWebAudioFrame = useCallback(() => {
+    if (!isListeningRef.current || !webAnalyserRef.current) return;
+
+    try {
+      const analyser = webAnalyserRef.current;
+      const dataArray = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(dataArray);
+
+      // Calculate RMS volume
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        sum += dataArray[i] * dataArray[i];
+      }
+      const rms = Math.sqrt(sum / dataArray.length);
+      const normalizedVolume = Math.min(1, rms * 15);
+
+      setVolume(normalizedVolume);
+      onVolumeChange?.(normalizedVolume);
+
+      const isAboveThreshold = normalizedVolume > volumeThreshold;
+
+      if (isAboveThreshold) {
+        // Run pitch detection first to check if it's in range
+        let validPitchDetected = false;
+        let outOfRangePitchDetected = false;
+        const result = autoCorrelate(dataArray, webSampleRateRef.current);
+        if (result.frequency > 0 && result.confidence > 0.5) {
+          const noteInfo = frequencyToNote(result.frequency);
+          if (noteInfo) {
+            const inDefaultRange = noteInfo.frequency >= 80 && noteInfo.frequency <= 1000;
+            const inSoundingRange = !soundingFrequencyRange || 
+              (noteInfo.frequency >= soundingFrequencyRange.min && 
+               noteInfo.frequency <= soundingFrequencyRange.max);
+            
+            if (inDefaultRange) {
+              console.log("[usePitchDetection Web]", noteInfo.noteName, noteInfo.frequency.toFixed(0) + "Hz", inSoundingRange ? "IN RANGE" : "OUT OF RANGE");
+              
+              // Only set currentPitch if in soundingFrequencyRange (when specified) to filter out metronome etc
+              if (inSoundingRange) {
+                setCurrentPitch(noteInfo);
+                onRealtimePitch?.(noteInfo);
+              }
+
+              // Check target match
+              if (targetMidiRef.current !== null) {
+                const diff = Math.abs(noteInfo.midiNote - targetMidiRef.current);
+                const noteMatches = allowOctaveEquivalent ? diff % 12 === 0 : diff === 0;
+                const isMatch = noteMatches && Math.abs(noteInfo.cents) < pitchMargin;
+                onPitchMatch?.(isMatch, noteInfo);
+              }
+              
+              if (inSoundingRange) {
+                validPitchDetected = true;
+              } else if (soundingFrequencyRange) {
+                // We detected a pitch outside the sounding range (e.g., metronome click)
+                outOfRangePitchDetected = true;
+              }
+            }
+          }
+        }
+
+        // Only clear silence timer if we detect a valid in-range pitch
+        // (Don't let metronome clicks interrupt the silence timer)
+        if (validPitchDetected && silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+
+        // Handle sounding state based on pitch detection
+        if (soundingFrequencyRange) {
+          // When using frequency range filtering:
+          // - Turn ON when valid pitch in range is detected
+          // - Keep ON during out-of-range sounds (like metronome over sustained user playing)
+          // - Only turn OFF when volume drops (handled in else block below)
+          if (validPitchDetected && !soundStartedRef.current) {
+            soundStartedRef.current = true;
+            setIsSounding(true);
+            onSoundStart?.();
+          }
+          // Note: We intentionally do NOT turn off isSounding for out-of-range pitches
+          // because the user might be sustaining a note while the metronome clicks
+        } else {
+          // No frequency filtering - just use volume threshold
+          if (!soundStartedRef.current) {
+            soundStartedRef.current = true;
+            setIsSounding(true);
+            onSoundStart?.();
+          }
+        }
+      } else {
+        // Below threshold - start silence timer
+        if (soundStartedRef.current && !silenceTimerRef.current) {
+          silenceTimerRef.current = setTimeout(() => {
+            soundStartedRef.current = false;
+            setIsSounding(false);
+            setCurrentPitch(null);
+            onSoundEnd?.();
+          }, silenceDuration);
+        }
+      }
+    } catch (err) {
+      console.warn("[usePitchDetection] Frame processing error:", err);
+    }
+
+    // Continue animation loop (even after errors, try to recover)
+    if (isListeningRef.current) {
+      webAnimationFrameRef.current = requestAnimationFrame(processWebAudioFrame);
+    }
+  }, [onVolumeChange, onSoundStart, onSoundEnd, onRealtimePitch, onPitchMatch, volumeThreshold, silenceDuration, pitchMargin, allowOctaveEquivalent, soundingFrequencyRange]);
+
+  // Track if we own the AudioContext (should close it) or if it's external (don't close)
+  const ownsAudioContextRef = useRef(false);
+  const isStartingRef = useRef(false); // Prevent concurrent start calls
+
+  // Start listening - web version
+  const startListeningWeb = useCallback(async () => {
+    // Prevent concurrent starts
+    if (isListeningRef.current || isStartingRef.current) {
+      console.log("[usePitchDetection] Already listening or starting, skipping");
+      return;
+    }
+    isStartingRef.current = true;
+
+    try {
+      console.log("[usePitchDetection] Starting web audio...");
+
+      // Get user media
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
+
+      // Check if we were stopped while waiting for getUserMedia
+      if (!isStartingRef.current) {
+        console.log("[usePitchDetection] Cancelled during getUserMedia");
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
+      webMediaStreamRef.current = stream;
+
+      // Use external AudioContext if provided, otherwise create our own
+      let audioContext;
+      if (externalAudioContext) {
+        audioContext = externalAudioContext;
+        ownsAudioContextRef.current = false;
+        console.log("[usePitchDetection] Using external AudioContext");
+      } else {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioContextClass();
+        ownsAudioContextRef.current = true;
+        console.log("[usePitchDetection] Created new AudioContext");
+      }
+      
+      webAudioContextRef.current = audioContext;
+      webSampleRateRef.current = audioContext.sampleRate;
+      console.log("[usePitchDetection] Using sample rate:", audioContext.sampleRate);
+
+      // Resume context if suspended (required after user interaction)
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+
+      // Create analyser
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = BUFFER_SIZE;
+      webAnalyserRef.current = analyser;
+
+      // Connect stream to analyser
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
+
+      isListeningRef.current = true;
+      isStartingRef.current = false;
+      setIsListening(true);
+      setError(null);
+
+      // Start processing
+      processWebAudioFrame();
+
+      console.log("[usePitchDetection] Web audio started");
+    } catch (err) {
+      console.error("Web audio start error:", err);
+      setError(`Failed to start microphone: ${err.message}`);
+      isStartingRef.current = false;
+    }
+  }, [processWebAudioFrame, externalAudioContext]);
+
+  // Stop listening - web version
+  const stopListeningWeb = useCallback(() => {
+    console.log("[usePitchDetection] Stopping web audio");
+    isListeningRef.current = false;
+    isStartingRef.current = false; // Cancel any pending start
+
+    if (webAnimationFrameRef.current) {
+      cancelAnimationFrame(webAnimationFrameRef.current);
+      webAnimationFrameRef.current = null;
+    }
+
+    if (webMediaStreamRef.current) {
+      webMediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      webMediaStreamRef.current = null;
+    }
+
+    // Only close AudioContext if we created it (not external)
+    if (webAudioContextRef.current && ownsAudioContextRef.current) {
+      webAudioContextRef.current.close();
+    }
+    webAudioContextRef.current = null;
+
+    webAnalyserRef.current = null;
+
+    setIsListening(false);
+    setVolume(0);
+    setCurrentPitch(null);
+    setIsSounding(false);
+    soundStartedRef.current = false;
+
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+  }, []);
+
+  // Start listening - native version
+  const startListeningNative = useCallback(async () => {
     if (!LiveAudioStream) {
-      setError(
-        "Native audio streaming not available. Please use Expo Dev Client.",
-      );
+      setError("Native audio streaming not available. Please use Expo Dev Client.");
       return;
     }
 
     if (isListeningRef.current) return;
 
     try {
-      console.log("[usePitchDetection] Initializing audio stream...");
+      console.log("[usePitchDetection] Initializing native audio stream...");
 
       // Initialize audio stream
       LiveAudioStream.init({
@@ -265,18 +531,19 @@ export function usePitchDetection({
       isListeningRef.current = true;
       setIsListening(true);
       setError(null);
-      console.log("[usePitchDetection] Started listening");
+      console.log("[usePitchDetection] Native audio started");
     } catch (err) {
-      console.error("Start listening error:", err);
+      console.error("Native audio start error:", err);
       setError(`Failed to start audio: ${err.message}`);
     }
   }, [processAudioData]);
 
-  // Stop listening
-  const stopListening = useCallback(() => {
+  // Stop listening - native version
+  const stopListeningNative = useCallback(() => {
     if (!LiveAudioStream || !isListeningRef.current) return;
 
     try {
+      console.log("[usePitchDetection] Stopping native audio");
       isListeningRef.current = false;
       LiveAudioStream.stop();
       setIsListening(false);
@@ -289,38 +556,65 @@ export function usePitchDetection({
         clearTimeout(silenceTimerRef.current);
         silenceTimerRef.current = null;
       }
-
-      console.log("[usePitchDetection] Stopped listening");
     } catch (err) {
       console.warn("Stop listening error:", err);
     }
   }, []);
 
-  // Handle enabled state
+  // Platform-aware start/stop
+  const startListening = useCallback(async () => {
+    if (Platform.OS === "web") {
+      await startListeningWeb();
+    } else {
+      await startListeningNative();
+    }
+  }, [startListeningWeb, startListeningNative]);
+
+  const stopListening = useCallback(() => {
+    if (Platform.OS === "web") {
+      stopListeningWeb();
+    } else {
+      stopListeningNative();
+    }
+  }, [stopListeningWeb, stopListeningNative]);
+
+  // Use refs to avoid effect re-running when functions change
+  const startListeningRef = useRef(startListening);
+  const stopListeningRef = useRef(stopListening);
+  const permissionGrantedRef = useRef(permissionGranted);
   useEffect(() => {
+    startListeningRef.current = startListening;
+    stopListeningRef.current = stopListening;
+    permissionGrantedRef.current = permissionGranted;
+  });
+
+  // Handle enabled state - ONLY depends on enabled
+  // We use refs for everything else to prevent re-triggering
+  useEffect(() => {
+    let isCancelled = false;
+
     const setup = async () => {
       if (enabled) {
-        const hasPermission = permissionGranted || (await requestPermission());
-        if (hasPermission) {
-          startListening();
+        // Check permission using ref to avoid dependency
+        let hasPermission = permissionGrantedRef.current;
+        if (!hasPermission) {
+          hasPermission = await requestPermission();
+        }
+        if (hasPermission && !isCancelled) {
+          startListeningRef.current();
         }
       } else {
-        stopListening();
+        stopListeningRef.current();
       }
     };
 
     setup();
 
     return () => {
-      stopListening();
+      isCancelled = true;
+      stopListeningRef.current();
     };
-  }, [
-    enabled,
-    permissionGranted,
-    requestPermission,
-    startListening,
-    stopListening,
-  ]);
+  }, [enabled]); // Only re-run when enabled changes
 
   return {
     isListening,
@@ -329,7 +623,7 @@ export function usePitchDetection({
     currentPitch,
     volume,
     isSounding,
-    isAvailable: !!LiveAudioStream,
+    isAvailable: Platform.OS === "web" || !!LiveAudioStream,
     startListening,
     stopListening,
   };

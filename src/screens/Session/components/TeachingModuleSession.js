@@ -180,7 +180,7 @@ export default function TeachingModuleSession({
   onExtend,
   isLastItem,
 }) {
-  const [phase, setPhase] = useState("intro"); // 'intro' | 'exercise' | 'complete'
+  const [phase, setPhase] = useState("intro"); // 'intro' | 'exercise' | 'complete' | 'closing'
   const [result, setResult] = useState(null);
   const [progress, setProgress] = useState({ streak: 0, masteryRequired: 8 });
 
@@ -191,6 +191,16 @@ export default function TeachingModuleSession({
   const handleStart = useCallback(() => {
     setPhase("exercise");
   }, []);
+
+  // Handle closing/exiting - unmounts exercise BEFORE calling onSkip
+  const handleClose = useCallback(() => {
+    console.log("[TeachingModule] Closing - setting phase to closing");
+    setPhase("closing");
+    // Small delay to ensure exercise unmounts before navigation
+    setTimeout(() => {
+      onSkip?.();
+    }, 50);
+  }, [onSkip]);
 
   // Handle exercise completion (mastery achieved)
   // Record completion immediately to backend - don't wait for button clicks
@@ -253,6 +263,17 @@ export default function TeachingModuleSession({
     );
   }
 
+  // Closing phase - show nothing while exercise unmounts
+  if (phase === "closing") {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.closingContainer}>
+          <Text style={styles.closingText}>Closing...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   // Exercise phase
   if (!ExerciseComponent) {
     return (
@@ -281,7 +302,7 @@ export default function TeachingModuleSession({
           >
             <Text style={styles.devSkipButtonText}>⏭ Skip</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.exitButton} onPress={onSkip}>
+          <TouchableOpacity style={styles.exitButton} onPress={handleClose}>
             <Text style={styles.exitButtonText}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -303,6 +324,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#1a1a1a",
+  },
+
+  // Closing state
+  closingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  closingText: {
+    fontSize: 16,
+    color: "#888",
   },
 
   // Intro styles

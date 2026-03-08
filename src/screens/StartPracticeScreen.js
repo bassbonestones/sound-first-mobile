@@ -9,7 +9,7 @@ import {
   Alert,
   StyleSheet,
 } from "react-native";
-import ResetButton from "../components/ResetButton";
+import { DevNavMenu } from "../components/DevNavMenu";
 
 // Fatigue level descriptions
 const FATIGUE_LABELS = {
@@ -258,7 +258,7 @@ export default function StartPracticeScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      <ResetButton />
+      <DevNavMenu />
     </View>
   );
 }
@@ -514,16 +514,19 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     borderTopWidth: 1,
     borderTopColor: "#3b2c1a",
+    alignItems: "center",
   },
   secondaryButton: {
     backgroundColor: "#3b2c1a",
     borderRadius: 28,
     paddingVertical: 14,
-    paddingHorizontal: 48,
+    paddingHorizontal: 24,
     marginBottom: 10,
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#bfa76a",
+    width: "70%",
+    minWidth: 200,
   },
   secondaryButtonText: {
     color: "#bfa76a",
@@ -534,8 +537,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#4ADE80",
     borderRadius: 28,
     paddingVertical: 16,
-    paddingHorizontal: 48,
+    paddingHorizontal: 24,
     alignItems: "center",
+    width: "70%",
+    minWidth: 200,
   },
   primaryButtonText: {
     color: "#1a1410",

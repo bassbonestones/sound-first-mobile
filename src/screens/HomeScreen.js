@@ -3,40 +3,21 @@
  *
  * Features:
  * - Practice button to start a session
- * - Dev navigation menu for testing
+ * - Dev navigation via ResetButton component
  */
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  Modal,
-  ScrollView,
 } from "react-native";
 import ResetButton from "../components/ResetButton";
 
-// Dev navigation items
-const DEV_NAV_ITEMS = [
-  { screen: "StartPractice", label: "Practice Setup", icon: "🎯" },
-  { screen: "FirstNote", label: "First Note (Day 0)", icon: "🎵" },
-  { screen: "SelfDirected", label: "Self-Directed Mode", icon: "🎹" },
-  { screen: "History", label: "Practice History", icon: "📊" },
-  { screen: "Admin", label: "Admin Console", icon: "⚙️" },
-  { screen: "Onboarding", label: "Onboarding", icon: "👋" },
-];
-
 export default function HomeScreen({ navigation }) {
-  const [showDevMenu, setShowDevMenu] = useState(false);
-
   const handleStartPractice = () => {
     navigation.navigate("StartPractice");
-  };
-
-  const handleDevNav = (screen) => {
-    setShowDevMenu(false);
-    navigation.navigate(screen);
   };
 
   return (
@@ -74,49 +55,7 @@ export default function HomeScreen({ navigation }) {
             </View>
           </View>
         </View>
-
-        {/* Dev Menu Toggle */}
-        <TouchableOpacity
-          style={styles.devButton}
-          onPress={() => setShowDevMenu(true)}
-        >
-          <Text style={styles.devButtonText}>🔧 Dev Menu</Text>
-        </TouchableOpacity>
       </View>
-
-      {/* Dev Navigation Modal */}
-      <Modal
-        visible={showDevMenu}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowDevMenu(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Developer Navigation</Text>
-
-            <ScrollView style={styles.navList}>
-              {DEV_NAV_ITEMS.map((item) => (
-                <TouchableOpacity
-                  key={item.screen}
-                  style={styles.navItem}
-                  onPress={() => handleDevNav(item.screen)}
-                >
-                  <Text style={styles.navIcon}>{item.icon}</Text>
-                  <Text style={styles.navLabel}>{item.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowDevMenu(false)}
-            >
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       <ResetButton />
     </SafeAreaView>
@@ -221,72 +160,5 @@ const styles = StyleSheet.create({
     width: 1,
     height: 40,
     backgroundColor: "#444",
-  },
-
-  // Dev Button
-  devButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#444",
-  },
-  devButtonText: {
-    fontSize: 14,
-    color: "#888",
-  },
-
-  // Modal
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  modalContent: {
-    backgroundColor: "#2a2a3e",
-    borderRadius: 16,
-    padding: 24,
-    width: "100%",
-    maxHeight: "80%",
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#FFD700",
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  navList: {
-    marginBottom: 16,
-  },
-  navItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1a1a2e",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  navIcon: {
-    fontSize: 24,
-    marginRight: 16,
-  },
-  navLabel: {
-    fontSize: 16,
-    color: "#fff",
-    fontWeight: "500",
-  },
-  closeButton: {
-    backgroundColor: "#444",
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  closeButtonText: {
-    fontSize: 16,
-    color: "#fff",
-    fontWeight: "600",
   },
 });
