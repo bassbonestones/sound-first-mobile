@@ -51,11 +51,11 @@ function createClickSound(
   const source = audioContext.createBufferSource();
   source.buffer = buffer;
 
-  // Highpass filter - frequency param controls brightness
+  // Highpass filter - frequency param controls brightness (cooler sound)
   const filter = audioContext.createBiquadFilter();
   filter.type = "highpass";
-  filter.frequency.value = 1500 + ((frequency - 700) / 500) * 2500;
-  filter.Q.value = 1.0;
+  filter.frequency.value = 800 + ((frequency - 700) / 500) * 1200;
+  filter.Q.value = 0.7;
 
   const gainNode = audioContext.createGain();
   gainNode.gain.setValueAtTime(volume * 1.5, audioContext.currentTime);

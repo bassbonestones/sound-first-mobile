@@ -190,11 +190,11 @@ export function createClickSound(
   source.buffer = buffer;
 
   // Highpass filter - frequency param controls cutoff (brighter = higher cutoff)
-  // Map 700-1200 Hz input range to 1500-4000 Hz filter cutoff
+  // Map 700-1200 Hz input range to 800-2000 Hz filter cutoff (cooler/warmer sound)
   const filter = audioContext.createBiquadFilter();
   filter.type = "highpass";
-  filter.frequency.value = 1500 + ((frequency - 700) / 500) * 2500;
-  filter.Q.value = 1.0;
+  filter.frequency.value = 800 + ((frequency - 700) / 500) * 1200;
+  filter.Q.value = 0.7;
 
   const gainNode = audioContext.createGain();
   gainNode.gain.setValueAtTime(volume * 1.5, audioContext.currentTime); // Noise needs more gain
