@@ -22,15 +22,21 @@ import CurriculumSteps from "./components/CurriculumSteps";
 import ToolsPanel from "./components/ToolsPanel";
 import ReflectionModal from "./components/ReflectionModal";
 import VolumeModal from "./components/VolumeModal";
+import TeachingModuleSession from "./components/TeachingModuleSession";
+
+import { baseUrl } from "../../api/client";
 
 export default function SessionScreenContent() {
   // Get session state from context
   const {
     session,
+    setSession,
     current,
+    setCurrent,
     loading,
     error,
     mini,
+    routeParams,
     cooldownMode,
     earOnlyMode,
     curriculumSteps,
@@ -131,6 +137,192 @@ export default function SessionScreenContent() {
 
   const currentStep = getCurrentStep();
 
+  // Check if current mini-session is a teaching module
+  const isTeachingModule = mini?.session_type === "teaching_module";
+
+  // Check if this is the last item in the session
+  const isLastItem = current >= session.mini_sessions.length - 1;
+
+  // Handle ending practice early (go home)
+  const handleEndPractice = () => {
+    navigation.reset({
+      index: 0,
+      routes: [{ name: "Home" }],
+    });
+  };
+
+  // Handle extending session with one more item
+  const handleModuleExtend = async () => {
+    console.log("[Session] handleModuleExtend called");
+    console.log("[Session] current before extend:", current);
+    try {
+      // Fetch one more mini-session
+      const url = `${baseUrl}/generate-session`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planned_duration_minutes: 5, // Short duration to get 1-2 items
+          fatigue: routeParams?.fatigue || 2,
+          cooldown_mode: routeParams?.cooldownMode || false,
+          ear_only_mode: routeParams?.earOnlyMode || false,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to extend session");
+      }
+
+      const newSession = await response.json();
+      console.log(
+        "[Session] Extended session received, lesson:",
+        newSession.mini_sessions?.[0]?.lesson_id,
+      );
+
+      if (newSession.mini_sessions && newSession.mini_sessions.length > 0) {
+        // Append the first new mini-session to our current session
+        const extendedMinis = [
+          ...session.mini_sessions,
+          newSession.mini_sessions[0],
+        ];
+        console.log(
+          "[Session] Setting session with",
+          extendedMinis.length,
+          "items",
+        );
+        console.log(
+          "[Session] New lesson at index",
+          current + 1,
+          ":",
+          newSession.mini_sessions[0].lesson_id,
+        );
+        setSession({
+          ...session,
+          mini_sessions: extendedMinis,
+        });
+        // Move to the new item
+        setCurrent(current + 1);
+        console.log("[Session] current after extend:", current + 1);
+      } else {
+        // No more items available, end session
+        navigation.navigate("SessionEnd", {
+          completedCount: session.mini_sessions.length,
+          totalDuration: routeParams?.duration || 20,
+          sessionParams: {
+            duration: routeParams?.duration || 20,
+            fatigue: routeParams?.fatigue || 2,
+            cooldownMode: routeParams?.cooldownMode,
+            earOnlyMode: routeParams?.earOnlyMode,
+          },
+        });
+      }
+    } catch (err) {
+      console.warn("[Session] Failed to extend session:", err);
+      // On error, navigate to session end
+      navigation.navigate("SessionEnd", {
+        completedCount: session.mini_sessions.length,
+        totalDuration: routeParams?.duration || 20,
+        sessionParams: {
+          duration: routeParams?.duration || 20,
+          fatigue: routeParams?.fatigue || 2,
+          cooldownMode: routeParams?.cooldownMode,
+          earOnlyMode: routeParams?.earOnlyMode,
+        },
+      });
+    }
+  };
+
+  // Handle teaching module completion
+  // Record lesson completion to backend immediately when mastery achieved
+  const recordLessonCompletion = async (result) => {
+    console.log("[Session] recordLessonCompletion called");
+    console.log("[Session] mini:", mini?.lesson_id);
+    console.log("[Session] result:", JSON.stringify(result));
+
+    if (mini?.lesson_id && result?.success) {
+      try {
+        const params = new URLSearchParams({
+          streak: result.streak || 8,
+          total_attempts: result.totalAttempts || 8,
+          correct_count: result.correctCount || 8,
+        });
+
+        const url = `${baseUrl}/modules/user/1/lesson/${mini.lesson_id}/complete?${params}`;
+        console.log("[Session] Calling:", url);
+
+        const response = await fetch(url, { method: "POST" });
+        const data = await response.json();
+        console.log("[Session] Complete response:", JSON.stringify(data));
+      } catch (err) {
+        console.warn("[Session] Failed to record lesson completion:", err);
+      }
+    } else {
+      console.log(
+        "[Session] NOT recording - mini.lesson_id:",
+        mini?.lesson_id,
+        "result.success:",
+        result?.success,
+      );
+    }
+  };
+
+  // Handle navigation after user clicks Continue/Finish button
+  const handleModuleNavigate = () => {
+    console.log(
+      "[Session] handleModuleNavigate called, isLastItem:",
+      isLastItem,
+    );
+
+    if (isLastItem) {
+      // Navigate to session end screen
+      navigation.navigate("SessionEnd", {
+        completedCount: session.mini_sessions.length,
+        totalDuration: routeParams?.duration || 20,
+        sessionParams: {
+          duration: routeParams?.duration || 20,
+          fatigue: routeParams?.fatigue || 2,
+          cooldownMode: routeParams?.cooldownMode,
+          earOnlyMode: routeParams?.earOnlyMode,
+        },
+      });
+    } else {
+      // Move to next mini-session
+      setCurrent(current + 1);
+    }
+  };
+
+  // Teaching Module Session
+  if (isTeachingModule) {
+    return (
+      <View style={styles.container}>
+        {/* Progress indicator */}
+        <View style={styles.progressContainer}>
+          <View
+            style={[
+              styles.progressBar,
+              {
+                width: `${((current + 1) / session.mini_sessions.length) * 100}%`,
+              },
+            ]}
+          />
+        </View>
+
+        <TeachingModuleSession
+          key={`teaching-module-${current}`}
+          mini={mini}
+          userResonantNote={session.user_resonant_note}
+          onRecordCompletion={recordLessonCompletion}
+          onNavigate={handleModuleNavigate}
+          onSkip={handleSkip}
+          onEndPractice={handleEndPractice}
+          onExtend={handleModuleExtend}
+          isLastItem={isLastItem}
+        />
+      </View>
+    );
+  }
+
+  // Material-based session (existing UI)
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -243,6 +435,8 @@ export default function SessionScreenContent() {
           onSkip={handleSkip}
           onExtend={handleExtend}
           onSubmit={handleReflectionSubmit}
+          onEndPractice={handleEndPractice}
+          isLastItem={isLastItem}
         />
 
         {/* Help Menu Modal */}

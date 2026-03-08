@@ -100,7 +100,7 @@ export const Stage7Content = () => {
 };
 
 /**
- * Stage 7 Buttons - Final stage with play and complete
+ * Stage 7 Buttons - Final stage with play and complete options
  */
 export const Stage7Buttons = () => {
   const { isPlaying, playNote, goBackTeaching, completeDay0 } = useFirstNote();
@@ -122,9 +122,22 @@ export const Stage7Buttons = () => {
           {isPlaying ? "🔊 Playing..." : "▶️ Play Your Note"}
         </Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.primaryButton} onPress={completeDay0}>
-        <Text style={styles.primaryButtonText}>🎉 Start Practicing!</Text>
-      </TouchableOpacity>
+
+      {/* Two completion options */}
+      <View style={styles.completionButtons}>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => completeDay0("StartPractice")}
+        >
+          <Text style={styles.primaryButtonText}>🎯 Start Practicing</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.homeButton}
+          onPress={() => completeDay0("Home")}
+        >
+          <Text style={styles.homeButtonText}>🏠 Home</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };

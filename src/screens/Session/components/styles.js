@@ -215,6 +215,18 @@ export const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
+  // End practice link
+  endPracticeLink: {
+    paddingVertical: 12,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  endPracticeLinkText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    textDecorationLine: "underline",
+  },
+
   // Close/Done button
   doneButton: {
     backgroundColor: colors.gold,

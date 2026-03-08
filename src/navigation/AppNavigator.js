@@ -9,8 +9,10 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 // Screen imports - these will be updated as screens are reorganized
+import HomeScreen from "../screens/HomeScreen";
 import StartPracticeScreen from "../screens/StartPracticeScreen";
 import SessionScreen from "../screens/Session";
+import SessionEndScreen from "../screens/SessionEndScreen";
 import FocusCardScreen from "../screens/FocusCardScreen";
 import RatingScreen from "../screens/RatingScreen";
 import OnboardingScreen from "../screens/Onboarding";
@@ -25,6 +27,10 @@ const Stack = createNativeStackNavigator();
  * Screen configuration
  */
 export const screenConfig = {
+  Home: {
+    component: HomeScreen,
+    options: { title: "Sound First", headerShown: false },
+  },
   Onboarding: {
     component: OnboardingScreen,
     options: { title: "Welcome" },
@@ -35,7 +41,7 @@ export const screenConfig = {
   },
   StartPractice: {
     component: StartPracticeScreen,
-    options: { title: "Sound First Mobile" },
+    options: { title: "Practice Setup" },
   },
   SelfDirected: {
     component: SelfDirectedScreen,
@@ -43,7 +49,11 @@ export const screenConfig = {
   },
   Session: {
     component: SessionScreen,
-    options: { title: "Practice Session" },
+    options: { title: "Practice Session", headerShown: false },
+  },
+  SessionEnd: {
+    component: SessionEndScreen,
+    options: { title: "Session Complete", headerShown: false },
   },
   FocusCard: {
     component: FocusCardScreen,
@@ -74,6 +84,11 @@ export function AppNavigator({ initialRoute, initialParams }) {
     <NavigationContainer>
       <Stack.Navigator initialRouteName={initialRoute}>
         <Stack.Screen
+          name="Home"
+          component={HomeScreen}
+          options={{ title: "Sound First", headerShown: false }}
+        />
+        <Stack.Screen
           name="Onboarding"
           component={OnboardingScreen}
           options={{ title: "Welcome" }}
@@ -87,7 +102,7 @@ export function AppNavigator({ initialRoute, initialParams }) {
         <Stack.Screen
           name="StartPractice"
           component={StartPracticeScreen}
-          options={{ title: "Sound First Mobile" }}
+          options={{ title: "Practice Setup" }}
         />
         <Stack.Screen
           name="SelfDirected"
@@ -97,7 +112,12 @@ export function AppNavigator({ initialRoute, initialParams }) {
         <Stack.Screen
           name="Session"
           component={SessionScreen}
-          options={{ title: "Practice Session" }}
+          options={{ title: "Practice Session", headerShown: false }}
+        />
+        <Stack.Screen
+          name="SessionEnd"
+          component={SessionEndScreen}
+          options={{ title: "Session Complete", headerShown: false }}
         />
         <Stack.Screen
           name="FocusCard"

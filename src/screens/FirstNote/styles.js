@@ -171,6 +171,25 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
   },
+  completionButtons: {
+    width: "100%",
+    gap: 10,
+    marginTop: 8,
+  },
+  homeButton: {
+    backgroundColor: "transparent",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#666",
+    alignItems: "center",
+  },
+  homeButtonText: {
+    color: "#888",
+    fontSize: 16,
+    fontWeight: "500",
+  },
   backTextButton: {
     paddingVertical: 12,
     paddingHorizontal: 16,

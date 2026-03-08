@@ -245,7 +245,12 @@ export function SessionProvider({ children, routeParams, navigation }) {
       if (current < session.mini_sessions.length - 1) {
         setCurrent(current + 1);
       } else {
-        navigation.navigate("StartPractice");
+        // Session complete - navigate to end screen
+        navigation.navigate("SessionEnd", {
+          completedCount: session.mini_sessions.length,
+          totalDuration: duration,
+          sessionParams: { duration, fatigue, cooldownMode, earOnlyMode },
+        });
       }
     }
   };
@@ -259,7 +264,12 @@ export function SessionProvider({ children, routeParams, navigation }) {
     if (current < session.mini_sessions.length - 1) {
       setCurrent(current + 1);
     } else {
-      navigation.navigate("StartPractice");
+      // Session complete - navigate to end screen
+      navigation.navigate("SessionEnd", {
+        completedCount: session.mini_sessions.length,
+        totalDuration: duration,
+        sessionParams: { duration, fatigue, cooldownMode, earOnlyMode },
+      });
     }
   };
 
@@ -277,12 +287,15 @@ export function SessionProvider({ children, routeParams, navigation }) {
   const value = {
     // Session state
     session,
+    setSession,
     current,
+    setCurrent,
     loading,
     error,
     mini,
 
     // Route params
+    routeParams,
     cooldownMode,
     earOnlyMode,
     selfDirected,

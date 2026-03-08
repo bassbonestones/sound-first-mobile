@@ -25,6 +25,8 @@ export default function ReflectionModal({
   onSkip,
   onExtend,
   onSubmit,
+  onEndPractice,
+  isLastItem,
 }) {
   const renderRatingRow = () => (
     <View style={styles.ratingRow}>
@@ -112,10 +114,24 @@ export default function ReflectionModal({
               {submitting ? (
                 <ActivityIndicator size="small" color={colors.textDark} />
               ) : (
-                <Text style={styles.submitButtonText}>Submit</Text>
+                <Text style={styles.submitButtonText}>
+                  {isLastItem ? "Finish" : "Submit"}
+                </Text>
               )}
             </TouchableOpacity>
           </View>
+
+          {/* End Practice option - shown when not on last item */}
+          {!isLastItem && onEndPractice && (
+            <TouchableOpacity
+              style={styles.endPracticeLink}
+              onPress={onEndPractice}
+            >
+              <Text style={styles.endPracticeLinkText}>
+                End Practice & Go Home
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </Modal>

@@ -31,20 +31,23 @@ export default function useFirstNoteNavigation({
     [userId],
   );
 
-  // Complete Day 0
-  const completeDay0 = useCallback(async () => {
-    try {
-      await fetch(`${getBackendUrl()}/users/${userId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ day0_completed: true, day0_stage: 7 }),
-      });
-      navigation.replace("StartPractice");
-    } catch (err) {
-      console.error("Failed to complete Day 0:", err);
-      navigation.replace("StartPractice");
-    }
-  }, [userId, navigation]);
+  // Complete Day 0 and navigate to destination
+  const completeDay0 = useCallback(
+    async (destination = "Home") => {
+      try {
+        await fetch(`${getBackendUrl()}/users/${userId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ day0_completed: true, day0_stage: 7 }),
+        });
+        navigation.replace(destination);
+      } catch (err) {
+        console.error("Failed to complete Day 0:", err);
+        navigation.replace(destination);
+      }
+    },
+    [userId, navigation],
+  );
 
   // Advance to next stage
   const nextStage = useCallback(() => {

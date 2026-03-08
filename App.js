@@ -84,8 +84,10 @@ class ErrorBoundary extends React.Component {
 }
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import HomeScreen from "./src/screens/HomeScreen";
 import StartPracticeScreen from "./src/screens/StartPracticeScreen";
 import SessionScreen from "./src/screens/Session";
+import SessionEndScreen from "./src/screens/SessionEndScreen";
 import FocusCardScreen from "./src/screens/FocusCardScreen";
 import RatingScreen from "./src/screens/RatingScreen";
 import OnboardingScreen from "./src/screens/Onboarding";
@@ -157,7 +159,7 @@ export default function App() {
               totalMs,
               breakdown: `Expo=${expoStartupMs}ms + App=${appStartupMs}ms`,
             });
-            setInitialRoute("StartPractice");
+            setInitialRoute("Home");
           }
         } else {
           // ============= NEW USER SCENARIO =============
@@ -207,6 +209,11 @@ export default function App() {
       <NavigationContainer>
         <Stack.Navigator initialRouteName={initialRoute}>
           <Stack.Screen
+            name="Home"
+            component={HomeScreen}
+            options={{ title: "Sound First", headerShown: false }}
+          />
+          <Stack.Screen
             name="Onboarding"
             component={OnboardingScreen}
             options={{ title: "Welcome" }}
@@ -220,7 +227,7 @@ export default function App() {
           <Stack.Screen
             name="StartPractice"
             component={StartPracticeScreen}
-            options={{ title: "Sound First Mobile" }}
+            options={{ title: "Practice Setup" }}
           />
           <Stack.Screen
             name="SelfDirected"
@@ -230,7 +237,12 @@ export default function App() {
           <Stack.Screen
             name="Session"
             component={SessionScreen}
-            options={{ title: "Practice Session" }}
+            options={{ title: "Practice Session", headerShown: false }}
+          />
+          <Stack.Screen
+            name="SessionEnd"
+            component={SessionEndScreen}
+            options={{ title: "Session Complete", headerShown: false }}
           />
           <Stack.Screen
             name="FocusCard"
