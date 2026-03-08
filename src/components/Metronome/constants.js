@@ -161,9 +161,12 @@ export const SUBDIVISIONS = {
 };
 
 /**
- * Generate a click sound using Web Audio API
+ * Generate a noise-based click sound using Web Audio API
+ * Uses white noise instead of pitched sine waves to avoid confusing pitch detection.
+ * The frequency parameter controls the highpass filter cutoff (brightness).
+ * 
  * @param {AudioContext} audioContext - Web Audio context
- * @param {number} frequency - Click frequency in Hz
+ * @param {number} frequency - Controls click brightness (higher = sharper). Default 1000.
  * @param {number} duration - Click duration in seconds
  * @param {number} volume - Click volume (0-1)
  */
@@ -173,21 +176,36 @@ export function createClickSound(
   duration = 0.05,
   volume = 0.5,
 ) {
-  const oscillator = audioContext.createOscillator();
+  const sampleRate = audioContext.sampleRate;
+  const bufferSize = Math.floor(sampleRate * duration * 2); // Slightly longer buffer for filter tail
+  const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
+  const data = buffer.getChannelData(0);
+
+  // Fill with white noise
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = Math.random() * 2 - 1;
+  }
+
+  const source = audioContext.createBufferSource();
+  source.buffer = buffer;
+
+  // Highpass filter - frequency param controls cutoff (brighter = higher cutoff)
+  // Map 700-1200 Hz input range to 1500-4000 Hz filter cutoff
+  const filter = audioContext.createBiquadFilter();
+  filter.type = "highpass";
+  filter.frequency.value = 1500 + ((frequency - 700) / 500) * 2500;
+  filter.Q.value = 1.0;
+
   const gainNode = audioContext.createGain();
-
-  oscillator.connect(gainNode);
-  gainNode.connect(audioContext.destination);
-
-  oscillator.frequency.value = frequency;
-  oscillator.type = "sine";
-
-  gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+  gainNode.gain.setValueAtTime(volume * 1.5, audioContext.currentTime); // Noise needs more gain
   gainNode.gain.exponentialRampToValueAtTime(
     0.001,
     audioContext.currentTime + duration,
   );
 
-  oscillator.start(audioContext.currentTime);
-  oscillator.stop(audioContext.currentTime + duration);
+  source.connect(filter);
+  filter.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+
+  source.start(audioContext.currentTime);
 }

@@ -29,7 +29,8 @@ if (Platform.OS !== "web") {
 const DEFAULT_TOLERANCE_MS = 150;
 
 /**
- * Create a click sound using Web Audio
+ * Create a noise-based click sound using Web Audio
+ * Uses white noise to avoid confusing pitch detection with any instrument.
  */
 function createClickSound(
   audioContext,
@@ -37,23 +38,37 @@ function createClickSound(
   duration = 0.05,
   volume = 0.5,
 ) {
-  const oscillator = audioContext.createOscillator();
+  const sampleRate = audioContext.sampleRate;
+  const bufferSize = Math.floor(sampleRate * duration * 2);
+  const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
+  const data = buffer.getChannelData(0);
+
+  // Fill with white noise
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = Math.random() * 2 - 1;
+  }
+
+  const source = audioContext.createBufferSource();
+  source.buffer = buffer;
+
+  // Highpass filter - frequency param controls brightness
+  const filter = audioContext.createBiquadFilter();
+  filter.type = "highpass";
+  filter.frequency.value = 1500 + ((frequency - 700) / 500) * 2500;
+  filter.Q.value = 1.0;
+
   const gainNode = audioContext.createGain();
-
-  oscillator.connect(gainNode);
-  gainNode.connect(audioContext.destination);
-
-  oscillator.frequency.value = frequency;
-  oscillator.type = "sine";
-
-  gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+  gainNode.gain.setValueAtTime(volume * 1.5, audioContext.currentTime);
   gainNode.gain.exponentialRampToValueAtTime(
     0.001,
     audioContext.currentTime + duration,
   );
 
-  oscillator.start(audioContext.currentTime);
-  oscillator.stop(audioContext.currentTime + duration);
+  source.connect(filter);
+  filter.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+
+  source.start(audioContext.currentTime);
 }
 
 export default function EnterOnBeatOneExercise({
