@@ -106,26 +106,8 @@ export default function HistoryScreen() {
             </View>
 
             {/* Spaced Repetition Stats */}
-            <Text
-              style={{
-                color: "#FFD700",
-                fontSize: 18,
-                fontWeight: "bold",
-                marginTop: 16,
-                marginBottom: 8,
-              }}
-            >
-              Spaced Repetition
-            </Text>
-            <View
-              style={{
-                backgroundColor: "#3b2c1a",
-                borderRadius: 12,
-                padding: 16,
-                borderWidth: 1,
-                borderColor: "#FFD700",
-              }}
-            >
+            <Text style={styles.sectionTitle}>Spaced Repetition</Text>
+            <View style={styles.srCard}>
               <StatRow
                 label="Due Today"
                 value={summary.spaced_repetition.due_today}
@@ -193,11 +175,7 @@ export default function HistoryScreen() {
                     {item.interval_days}d
                   </Text>
                   {item.is_due && (
-                    <Text
-                      style={{ color: "#FF9800", fontSize: 12, marginTop: 4 }}
-                    >
-                      ⚡ Due for review
-                    </Text>
+                    <Text style={styles.dueText}>⚡ Due for review</Text>
                   )}
                 </View>
               </View>
@@ -212,42 +190,24 @@ export default function HistoryScreen() {
             scrollEnabled={false}
             keyExtractor={(item) => item.focus_card_id.toString()}
             renderItem={({ item }) => (
-              <View
-                style={{
-                  backgroundColor: "#3b2c1a",
-                  borderRadius: 12,
-                  padding: 14,
-                  marginBottom: 12,
-                  borderWidth: 1,
-                  borderColor: "#5a4a3a",
-                }}
-              >
-                <Text
-                  style={{ color: "#FFD700", fontWeight: "bold", fontSize: 16 }}
-                >
+              <View style={styles.focusCardItem}>
+                <Text style={styles.focusCardTitle}>
                   {item.focus_card_name}
                 </Text>
-                <Text
-                  style={{ color: "#bfa76a", fontSize: 12, marginBottom: 4 }}
-                >
-                  {item.category}
-                </Text>
-                <View style={{ flexDirection: "row", marginTop: 6 }}>
-                  <Text style={{ color: "#fffbe6", fontSize: 13 }}>
+                <Text style={styles.focusCardCategory}>{item.category}</Text>
+                <View style={styles.focusCardStatsRow}>
+                  <Text style={styles.focusCardStats}>
                     {item.attempt_count} attempts • Avg:{" "}
                     {item.average_rating || "—"} •
                   </Text>
                   <Text
-                    style={{
-                      color:
-                        item.recent_trend === "improving"
-                          ? "#4CAF50"
-                          : item.recent_trend === "declining"
-                            ? "#f44336"
-                            : "#fffbe6",
-                      fontSize: 13,
-                      marginLeft: 4,
-                    }}
+                    style={[
+                      styles.focusCardTrend,
+                      item.recent_trend === "improving" &&
+                        styles.trendImproving,
+                      item.recent_trend === "declining" &&
+                        styles.trendDeclining,
+                    ]}
                   >
                     {item.recent_trend === "improving"
                       ? "↗ Improving"
@@ -264,36 +224,31 @@ export default function HistoryScreen() {
         {/* Timeline Tab */}
         {activeTab === "timeline" && (
           <View>
-            <Text style={{ color: "#fffbe6", fontSize: 14, marginBottom: 12 }}>
+            <Text style={styles.timelineDescription}>
               Last 30 days of practice
             </Text>
             {timeline.length === 0 ? (
-              <Text style={{ color: "#bfa76a", fontStyle: "italic" }}>
-                No practice data yet
-              </Text>
+              <Text style={styles.timelineEmptyText}>No practice data yet</Text>
             ) : (
-              <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+              <View style={styles.heatmapContainer}>
                 {timeline.map((day) => (
                   <View
                     key={day.date}
-                    style={{
-                      backgroundColor:
-                        day.attempts > 0
-                          ? `rgba(255, 215, 0, ${Math.min(day.attempts / 5, 1)})`
-                          : "#2d232e",
-                      width: 32,
-                      height: 32,
-                      margin: 2,
-                      borderRadius: 4,
-                      justifyContent: "center",
-                      alignItems: "center",
-                    }}
+                    style={[
+                      styles.heatmapDay,
+                      {
+                        backgroundColor:
+                          day.attempts > 0
+                            ? `rgba(255, 215, 0, ${Math.min(day.attempts / 5, 1)})`
+                            : "#2d232e",
+                      },
+                    ]}
                   >
                     <Text
-                      style={{
-                        color: day.attempts > 0 ? "#3b2c1a" : "#666",
-                        fontSize: 10,
-                      }}
+                      style={[
+                        styles.heatmapDayText,
+                        { color: day.attempts > 0 ? "#3b2c1a" : "#666" },
+                      ]}
                     >
                       {day.attempts || ""}
                     </Text>
@@ -303,24 +258,15 @@ export default function HistoryScreen() {
             )}
 
             {/* Daily breakdown list */}
-            <View style={{ marginTop: 20 }}>
+            <View style={styles.dailyBreakdown}>
               {timeline
                 .slice()
                 .reverse()
                 .slice(0, 7)
                 .map((day) => (
-                  <View
-                    key={day.date}
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      paddingVertical: 8,
-                      borderBottomWidth: 1,
-                      borderBottomColor: "#3b2c1a",
-                    }}
-                  >
-                    <Text style={{ color: "#fffbe6" }}>{day.date}</Text>
-                    <Text style={{ color: "#FFD700" }}>
+                  <View key={day.date} style={styles.dailyRow}>
+                    <Text style={styles.dailyDate}>{day.date}</Text>
+                    <Text style={styles.dailyStats}>
                       {day.attempts} attempts • Rating: {day.avg_rating}
                     </Text>
                   </View>
@@ -602,5 +548,80 @@ const styles = StyleSheet.create({
     color: "#FFD700",
     marginBottom: 16,
     fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
+  },
+
+  // Section title
+  sectionTitle: {
+    color: "#FFD700",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+
+  // Spaced Repetition card
+  srCard: {
+    backgroundColor: "#3b2c1a",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#FFD700",
+  },
+
+  // Due text
+  dueText: {
+    color: "#FF9800",
+    fontSize: 12,
+    marginTop: 4,
+  },
+
+  // Focus Card styles for list
+  focusCardItem: {
+    backgroundColor: "#3b2c1a",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#5a4a3a",
+  },
+  focusCardTitle: {
+    color: "#FFD700",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  focusCardCategory: {
+    color: "#bfa76a",
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  focusCardStatsRow: {
+    flexDirection: "row",
+    marginTop: 6,
+  },
+  focusCardStats: {
+    color: "#fffbe6",
+    fontSize: 13,
+  },
+  focusCardTrend: {
+    color: "#fffbe6",
+    fontSize: 13,
+    marginLeft: 4,
+  },
+  trendImproving: {
+    color: "#4CAF50",
+  },
+  trendDeclining: {
+    color: "#f44336",
+  },
+
+  // Timeline styles
+  timelineDescription: {
+    color: "#fffbe6",
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  timelineEmptyText: {
+    color: "#bfa76a",
+    fontStyle: "italic",
   },
 });

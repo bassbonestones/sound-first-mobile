@@ -167,46 +167,10 @@ export default function StartPracticeScreen({ navigation }) {
           animationType="fade"
           onRequestClose={() => setShowFatigue5Modal(false)}
         >
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: "rgba(0,0,0,0.85)",
-              justifyContent: "center",
-              alignItems: "center",
-              padding: 24,
-            }}
-          >
-            <View
-              style={{
-                backgroundColor: "#2d2020",
-                borderRadius: 20,
-                padding: 24,
-                width: "100%",
-                maxWidth: 340,
-                borderWidth: 2,
-                borderColor: "#ff6b6b",
-              }}
-            >
-              <Text
-                style={{
-                  color: "#ff6b6b",
-                  fontSize: 24,
-                  fontWeight: "bold",
-                  textAlign: "center",
-                  marginBottom: 8,
-                }}
-              >
-                ⚠️ Exhausted
-              </Text>
-              <Text
-                style={{
-                  color: "#fffbe6",
-                  fontSize: 15,
-                  textAlign: "center",
-                  marginBottom: 20,
-                  lineHeight: 22,
-                }}
-              >
+          <View style={styles.fatigue5ModalBackdrop}>
+            <View style={styles.fatigue5ModalContainer}>
+              <Text style={styles.fatigue5ModalTitle}>⚠️ Exhausted</Text>
+              <Text style={styles.fatigue5ModalDescription}>
                 Practicing while exhausted can reinforce bad habits. What would
                 you like to do?
               </Text>
@@ -214,32 +178,11 @@ export default function StartPracticeScreen({ navigation }) {
               {/* Option 1: Stop */}
               <TouchableOpacity
                 onPress={() => handleFatigue5Choice("stop")}
-                style={{
-                  backgroundColor: "#4a1c1c",
-                  borderRadius: 12,
-                  padding: 16,
-                  marginBottom: 12,
-                  borderWidth: 1,
-                  borderColor: "#ff6b6b",
-                }}
+                style={[styles.modalOption, styles.modalOptionStop]}
               >
+                <Text style={styles.modalOptionTitle}>🛑 Stop Completely</Text>
                 <Text
-                  style={{
-                    color: "#fff",
-                    fontSize: 16,
-                    fontWeight: "bold",
-                    textAlign: "center",
-                  }}
-                >
-                  🛑 Stop Completely
-                </Text>
-                <Text
-                  style={{
-                    color: "#ffaaaa",
-                    fontSize: 12,
-                    textAlign: "center",
-                    marginTop: 4,
-                  }}
+                  style={[styles.modalOptionSubtitle, { color: "#ffaaaa" }]}
                 >
                   Rest is the best choice right now
                 </Text>
@@ -248,32 +191,11 @@ export default function StartPracticeScreen({ navigation }) {
               {/* Option 2: Cooldown */}
               <TouchableOpacity
                 onPress={() => handleFatigue5Choice("cooldown")}
-                style={{
-                  backgroundColor: "#2d3d2d",
-                  borderRadius: 12,
-                  padding: 16,
-                  marginBottom: 12,
-                  borderWidth: 1,
-                  borderColor: "#6b8b6b",
-                }}
+                style={[styles.modalOption, styles.modalOptionReview]}
               >
+                <Text style={styles.modalOptionTitle}>🌿 Cooldown Mode</Text>
                 <Text
-                  style={{
-                    color: "#fff",
-                    fontSize: 16,
-                    fontWeight: "bold",
-                    textAlign: "center",
-                  }}
-                >
-                  🌿 Cooldown Mode
-                </Text>
-                <Text
-                  style={{
-                    color: "#aaffaa",
-                    fontSize: 12,
-                    textAlign: "center",
-                    marginTop: 4,
-                  }}
+                  style={[styles.modalOptionSubtitle, { color: "#aaffaa" }]}
                 >
                   Very light playing, breathing exercises
                 </Text>
@@ -282,32 +204,13 @@ export default function StartPracticeScreen({ navigation }) {
               {/* Option 3: Ear Training */}
               <TouchableOpacity
                 onPress={() => handleFatigue5Choice("ear_only")}
-                style={{
-                  backgroundColor: "#2d2d4d",
-                  borderRadius: 12,
-                  padding: 16,
-                  marginBottom: 12,
-                  borderWidth: 1,
-                  borderColor: "#6b6bbb",
-                }}
+                style={[styles.modalOption, styles.modalOptionEar]}
               >
-                <Text
-                  style={{
-                    color: "#fff",
-                    fontSize: 16,
-                    fontWeight: "bold",
-                    textAlign: "center",
-                  }}
-                >
+                <Text style={styles.modalOptionTitle}>
                   👂 Ear Training Only
                 </Text>
                 <Text
-                  style={{
-                    color: "#aaaaff",
-                    fontSize: 12,
-                    textAlign: "center",
-                    marginTop: 4,
-                  }}
+                  style={[styles.modalOptionSubtitle, { color: "#aaaaff" }]}
                 >
                   Listen and sing - no instrument
                 </Text>
@@ -319,33 +222,12 @@ export default function StartPracticeScreen({ navigation }) {
                   setShowFatigue5Modal(false);
                   setFatigue(4); // Reset to fatigue 4 if they cancel
                 }}
-                style={{
-                  backgroundColor: "#3d3d3d",
-                  borderRadius: 12,
-                  padding: 16,
-                  marginTop: 4,
-                  borderWidth: 1,
-                  borderColor: "#666",
-                }}
+                style={[styles.modalOption, styles.modalOptionCancel]}
               >
-                <Text
-                  style={{
-                    color: "#fff",
-                    fontSize: 16,
-                    fontWeight: "bold",
-                    textAlign: "center",
-                  }}
-                >
+                <Text style={styles.modalOptionTitle}>
                   ↩️ Cancel (set fatigue to 4)
                 </Text>
-                <Text
-                  style={{
-                    color: "#aaa",
-                    fontSize: 12,
-                    textAlign: "center",
-                    marginTop: 4,
-                  }}
-                >
+                <Text style={[styles.modalOptionSubtitle, { color: "#aaa" }]}>
                   Go back and adjust settings
                 </Text>
               </TouchableOpacity>
@@ -355,63 +237,24 @@ export default function StartPracticeScreen({ navigation }) {
       </ScrollView>
 
       {/* Fixed bottom buttons */}
-      <View
-        style={{
-          backgroundColor: "#1a1410",
-          paddingHorizontal: 24,
-          paddingTop: 12,
-          paddingBottom: 24,
-          borderTopWidth: 1,
-          borderTopColor: "#3b2c1a",
-        }}
-      >
+      <View style={styles.bottomButtons}>
         <TouchableOpacity
           onPress={() => navigation.navigate("History")}
-          style={{
-            backgroundColor: "#3b2c1a",
-            borderRadius: 28,
-            paddingVertical: 14,
-            paddingHorizontal: 48,
-            marginBottom: 10,
-            alignItems: "center",
-            borderWidth: 1,
-            borderColor: "#bfa76a",
-          }}
+          style={styles.secondaryButton}
         >
-          <Text style={{ color: "#bfa76a", fontWeight: "bold", fontSize: 18 }}>
-            Practice History
-          </Text>
+          <Text style={styles.secondaryButtonText}>Practice History</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => navigation.navigate("SelfDirected")}
-          style={{
-            backgroundColor: "#3b2c1a",
-            borderRadius: 28,
-            paddingVertical: 14,
-            paddingHorizontal: 48,
-            marginBottom: 10,
-            alignItems: "center",
-            borderWidth: 1,
-            borderColor: "#bfa76a",
-          }}
+          style={styles.secondaryButton}
         >
-          <Text style={{ color: "#bfa76a", fontWeight: "bold", fontSize: 18 }}>
-            Self-Directed Mode
-          </Text>
+          <Text style={styles.secondaryButtonText}>Self-Directed Mode</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={handleStartPractice}
-          style={{
-            backgroundColor: "#4ADE80",
-            borderRadius: 28,
-            paddingVertical: 16,
-            paddingHorizontal: 48,
-            alignItems: "center",
-          }}
+          style={styles.primaryButton}
         >
-          <Text style={{ color: "#1a1410", fontWeight: "bold", fontSize: 20 }}>
-            Start Practice
-          </Text>
+          <Text style={styles.primaryButtonText}>Start Practice</Text>
         </TouchableOpacity>
       </View>
 
@@ -582,6 +425,38 @@ const styles = StyleSheet.create({
     width: "90%",
     borderWidth: 1,
     borderColor: "#444",
+  },
+
+  // Fatigue 5 Modal specific styles
+  fatigue5ModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  fatigue5ModalContainer: {
+    backgroundColor: "#2d2020",
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    maxWidth: 340,
+    borderWidth: 2,
+    borderColor: "#ff6b6b",
+  },
+  fatigue5ModalTitle: {
+    color: "#ff6b6b",
+    fontSize: 24,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  fatigue5ModalDescription: {
+    color: "#fffbe6",
+    fontSize: 15,
+    textAlign: "center",
+    marginBottom: 20,
+    lineHeight: 22,
   },
   modalTitle: {
     color: "#FFD700",

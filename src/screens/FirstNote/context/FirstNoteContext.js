@@ -11,14 +11,8 @@ import React, {
   useEffect,
   useMemo,
 } from "react";
-import {
-  parseNoteName,
-  generateSingleNoteMusicXML,
-} from "../utils";
-import {
-  INSTRUMENT_CLEFS,
-  DEFAULT_PITCH_EXPLORER_INDEX,
-} from "../data";
+import { parseNoteName, generateSingleNoteMusicXML } from "../utils";
+import { INSTRUMENT_CLEFS, DEFAULT_PITCH_EXPLORER_INDEX } from "../data";
 import { useFirstNoteAudio, useFirstNoteNavigation } from "../hooks";
 
 const FirstNoteContext = createContext(null);

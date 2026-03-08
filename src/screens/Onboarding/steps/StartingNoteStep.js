@@ -5,18 +5,13 @@
  */
 
 import React from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Platform,
-} from "react-native";
+import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import StaffNotePicker from "../../../components/StaffNotePicker";
 import AudioInput from "../../../components/AudioInput";
 import ResetButton from "../../../components/ResetButton";
 import { createShadow } from "../../../styles/theme";
 import ProgressDots from "../components/ProgressDots";
+import { styles, colors } from "../styles";
 
 /**
  * Play-to-Select Mode - Microphone pitch detection
@@ -33,49 +28,23 @@ function PlayToSelectMode({
 }) {
   const canConfirm = !!detectedPitch;
 
+  // Determine pitch display background color
+  const getPitchBoxStyle = () => {
+    if (!isSounding) return styles.pitchDisplayBoxStopped;
+    if (detectedPitch?.isInTune) return styles.pitchDisplayBoxInTune;
+    return styles.pitchDisplayBoxDefault;
+  };
+
   return (
-    <View style={{ flex: 1, backgroundColor: "#1a1410" }}>
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          alignItems: "center",
-          padding: 24,
-          paddingBottom: 180,
-          paddingTop: 60,
-        }}
-      >
-        <TouchableOpacity
-          onPress={onBack}
-          style={{ position: "absolute", top: 50, left: 20 }}
-        >
-          <Text style={{ color: "#FFD700", fontSize: 16 }}>
-            ← Back to staff
-          </Text>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContentWithTopPadding}>
+        <TouchableOpacity onPress={onBack} style={styles.backButton}>
+          <Text style={styles.backButtonText}>← Back to staff</Text>
         </TouchableOpacity>
 
-        <Text style={{ fontSize: 36, marginBottom: 8 }}>{instrumentIcon}</Text>
-        <Text
-          style={{
-            fontSize: 24,
-            fontWeight: "bold",
-            color: "#FFD700",
-            marginBottom: 8,
-            fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
-            textAlign: "center",
-          }}
-        >
-          Play a note that feels great
-        </Text>
-        <Text
-          style={{
-            color: "#e6cfa7",
-            fontSize: 16,
-            marginBottom: 24,
-            fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
-            textAlign: "center",
-            paddingHorizontal: 20,
-          }}
-        >
+        <Text style={styles.pitchIconText}>{instrumentIcon}</Text>
+        <Text style={styles.sectionTitle}>Play a note that feels great</Text>
+        <Text style={styles.description}>
           Play around on your instrument and find a note that feels natural,
           resonant, and easy to play. When you find it, hold it steady.
         </Text>
@@ -90,45 +59,13 @@ function PlayToSelectMode({
         />
 
         {detectedPitch && (
-          <View style={{ marginTop: 24, alignItems: "center" }}>
-            <Text style={{ color: "#e6cfa7", fontSize: 16, marginBottom: 8 }}>
+          <View style={styles.pitchDisplayContainer}>
+            <Text style={styles.pitchLabel}>
               {isSounding ? "I hear:" : "Detected:"}
             </Text>
-            <View
-              style={{
-                backgroundColor: !isSounding
-                  ? "#4a2d5a"
-                  : detectedPitch.isInTune
-                    ? "#2d5a2d"
-                    : "#3b2c1a",
-                borderRadius: 16,
-                paddingVertical: 16,
-                paddingHorizontal: 32,
-                borderWidth: 2,
-                borderColor: "#FFD700",
-                minHeight: 90,
-                justifyContent: "center",
-              }}
-            >
-              <Text
-                style={{
-                  color: "#FFD700",
-                  fontSize: 32,
-                  fontWeight: "bold",
-                  textAlign: "center",
-                }}
-              >
-                {detectedPitch.noteName}
-              </Text>
-              <Text
-                style={{
-                  color: "#e6cfa7",
-                  fontSize: 14,
-                  textAlign: "center",
-                  marginTop: 4,
-                  minHeight: 18,
-                }}
-              >
+            <View style={[styles.pitchDisplayBox, getPitchBoxStyle()]}>
+              <Text style={styles.pitchNoteText}>{detectedPitch.noteName}</Text>
+              <Text style={styles.pitchCentsText}>
                 {detectedPitch.isRealtime
                   ? detectedPitch.isInTune
                     ? "In tune ✓"
@@ -141,35 +78,21 @@ function PlayToSelectMode({
       </ScrollView>
 
       {/* Fixed bottom area with button and progress dots */}
-      <View
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: 24,
-          paddingBottom: 40,
-          alignItems: "center",
-          backgroundColor: "#1a1410",
-        }}
-      >
+      <View style={styles.fixedBottomArea}>
         <TouchableOpacity
           disabled={!canConfirm}
           onPress={onConfirm}
-          style={{
-            backgroundColor: canConfirm ? "#FFD700" : "#5a4a2a",
-            borderRadius: 28,
-            paddingVertical: 16,
-            paddingHorizontal: 32,
-            opacity: canConfirm ? 1 : 0.5,
-          }}
+          style={[
+            styles.primaryButton,
+            { paddingHorizontal: 32 },
+            !canConfirm && styles.primaryButtonDisabled,
+          ]}
         >
           <Text
-            style={{
-              color: canConfirm ? "#3b2c1a" : "#8a7a5a",
-              fontWeight: "bold",
-              fontSize: 18,
-            }}
+            style={[
+              styles.primaryButtonText,
+              !canConfirm && styles.primaryButtonTextDisabled,
+            ]}
           >
             Yes, that's my note! ✓
           </Text>
@@ -198,46 +121,15 @@ function StaffSelectMode({
   const canProceed = !!startingNote;
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#1a1410" }}>
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          alignItems: "center",
-          padding: 24,
-          paddingBottom: 180,
-          paddingTop: 60,
-        }}
-      >
-        <TouchableOpacity
-          onPress={onBack}
-          style={{ position: "absolute", top: 50, left: 20 }}
-        >
-          <Text style={{ color: "#FFD700", fontSize: 16 }}>← Back</Text>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContentWithTopPadding}>
+        <TouchableOpacity onPress={onBack} style={styles.backButton}>
+          <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
 
-        <Text style={{ fontSize: 36, marginBottom: 8 }}>{instrumentIcon}</Text>
-        <Text
-          style={{
-            fontSize: 24,
-            fontWeight: "bold",
-            color: "#FFD700",
-            marginBottom: 8,
-            fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
-            textAlign: "center",
-          }}
-        >
-          Choose your starting note
-        </Text>
-        <Text
-          style={{
-            color: "#e6cfa7",
-            fontSize: 16,
-            marginBottom: 24,
-            fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
-            textAlign: "center",
-            paddingHorizontal: 20,
-          }}
-        >
+        <Text style={styles.pitchIconText}>{instrumentIcon}</Text>
+        <Text style={styles.sectionTitle}>Choose your starting note</Text>
+        <Text style={styles.description}>
           Pick a note that feels great, resonant, and easy to play. This will be
           your home base.
         </Text>
@@ -250,58 +142,28 @@ function StaffSelectMode({
           instrument={instrument}
         />
 
-        <Text
-          style={{
-            color: "#bfa76a",
-            fontSize: 14,
-            textAlign: "center",
-            marginTop: 16,
-            paddingHorizontal: 20,
-          }}
-        >
+        <Text style={styles.hint}>
           Don't worry about picking the "perfect" note — you can always change
           it later!
         </Text>
       </ScrollView>
 
       {/* Fixed bottom area with button and progress dots */}
-      <View
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: 24,
-          paddingBottom: 40,
-          alignItems: "center",
-          backgroundColor: "#1a1410",
-        }}
-      >
+      <View style={styles.fixedBottomArea}>
         <TouchableOpacity
           disabled={!canProceed}
           onPress={onSubmit}
-          style={{
-            backgroundColor: canProceed ? "#FFD700" : "#5a4a2a",
-            borderRadius: 28,
-            paddingVertical: 16,
-            paddingHorizontal: 48,
-            opacity: canProceed ? 1 : 0.5,
-            ...createShadow(
-              canProceed ? "#FFD700" : "#000",
-              0,
-              4,
-              canProceed ? 0.4 : 0,
-              12,
-            ),
-          }}
+          style={[
+            styles.primaryButton,
+            !canProceed && styles.primaryButtonDisabled,
+            canProceed && createShadow(colors.gold, 0, 4, 0.4, 12),
+          ]}
         >
           <Text
-            style={{
-              color: canProceed ? "#3b2c1a" : "#8a7a5a",
-              fontWeight: "bold",
-              fontSize: 20,
-              fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
-            }}
+            style={[
+              styles.primaryButtonTextLarge,
+              !canProceed && styles.primaryButtonTextDisabled,
+            ]}
           >
             Start Practicing 🎵
           </Text>

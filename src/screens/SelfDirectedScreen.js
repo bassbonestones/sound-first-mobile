@@ -2,13 +2,13 @@ import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  Button,
   Picker,
   ActivityIndicator,
   Alert,
   ScrollView,
   TouchableOpacity,
   Platform,
+  StyleSheet,
 } from "react-native";
 import ResetButton from "../components/ResetButton";
 import { baseUrl } from "../api/client";
@@ -46,53 +46,18 @@ export default function SelfDirectedScreen({ navigation }) {
     });
   };
 
-  if (loading) return <ActivityIndicator size="large" style={{ flex: 1 }} />;
+  if (loading) return <ActivityIndicator size="large" style={styles.loading} />;
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#1a1410" }}>
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: "#1a1410",
-          padding: 32,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 32,
-            fontWeight: "bold",
-            color: "#FFD700",
-            marginBottom: 20,
-            fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
-          }}
-        >
-          Self-Directed Practice
-        </Text>
-        <Text
-          style={{
-            color: "#fffbe6",
-            fontSize: 18,
-            marginBottom: 10,
-            alignSelf: "flex-start",
-          }}
-        >
-          Select Material:
-        </Text>
-        <View
-          style={{
-            backgroundColor: "#3b2c1a",
-            borderRadius: 12,
-            marginBottom: 20,
-            width: 240,
-            borderWidth: 2,
-            borderColor: "#FFD700",
-          }}
-        >
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.title}>Self-Directed Practice</Text>
+
+        <Text style={styles.label}>Select Material:</Text>
+        <View style={styles.pickerContainer}>
           <Picker
             selectedValue={selectedMaterial}
-            style={{ height: 50, color: "#FFD700" }}
+            style={styles.picker}
             onValueChange={setSelectedMaterial}
           >
             <Picker.Item label="Select..." value="" color="#888" />
@@ -106,29 +71,12 @@ export default function SelfDirectedScreen({ navigation }) {
             ))}
           </Picker>
         </View>
-        <Text
-          style={{
-            color: "#fffbe6",
-            fontSize: 18,
-            marginBottom: 10,
-            alignSelf: "flex-start",
-          }}
-        >
-          Select Focus Card:
-        </Text>
-        <View
-          style={{
-            backgroundColor: "#3b2c1a",
-            borderRadius: 12,
-            marginBottom: 20,
-            width: 240,
-            borderWidth: 2,
-            borderColor: "#FFD700",
-          }}
-        >
+
+        <Text style={styles.label}>Select Focus Card:</Text>
+        <View style={styles.pickerContainer}>
           <Picker
             selectedValue={selectedFocusCard}
-            style={{ height: 50, color: "#FFD700" }}
+            style={styles.picker}
             onValueChange={setSelectedFocusCard}
           >
             <Picker.Item label="Select..." value="" color="#888" />
@@ -142,29 +90,12 @@ export default function SelfDirectedScreen({ navigation }) {
             ))}
           </Picker>
         </View>
-        <Text
-          style={{
-            color: "#fffbe6",
-            fontSize: 18,
-            marginBottom: 10,
-            alignSelf: "flex-start",
-          }}
-        >
-          Goal:
-        </Text>
-        <View
-          style={{
-            backgroundColor: "#3b2c1a",
-            borderRadius: 12,
-            marginBottom: 20,
-            width: 240,
-            borderWidth: 2,
-            borderColor: "#FFD700",
-          }}
-        >
+
+        <Text style={styles.label}>Goal:</Text>
+        <View style={styles.pickerContainer}>
           <Picker
             selectedValue={goal}
-            style={{ height: 50, color: "#FFD700" }}
+            style={styles.picker}
             onValueChange={setGoal}
           >
             <Picker.Item label="Select..." value="" color="#888" />
@@ -185,25 +116,12 @@ export default function SelfDirectedScreen({ navigation }) {
             />
           </Picker>
         </View>
+
         <TouchableOpacity
           onPress={handleStart}
-          style={{
-            backgroundColor: "#FFD700",
-            borderRadius: 28,
-            paddingVertical: 16,
-            paddingHorizontal: 48,
-            marginTop: 12,
-            ...createShadow("#000", 0, 4, 0.2, 8),
-          }}
+          style={[styles.startButton, createShadow("#000", 0, 4, 0.2, 8)]}
         >
-          <Text
-            style={{
-              color: "#3b2c1a",
-              fontWeight: "bold",
-              fontSize: 20,
-              fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
-            }}
-          >
+          <Text style={styles.startButtonText}>
             Start Self-Directed Session
           </Text>
         </TouchableOpacity>
@@ -212,3 +130,58 @@ export default function SelfDirectedScreen({ navigation }) {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#1a1410",
+  },
+  loading: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#1a1410",
+    padding: 32,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#FFD700",
+    marginBottom: 20,
+    fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
+  },
+  label: {
+    color: "#fffbe6",
+    fontSize: 18,
+    marginBottom: 10,
+    alignSelf: "flex-start",
+  },
+  pickerContainer: {
+    backgroundColor: "#3b2c1a",
+    borderRadius: 12,
+    marginBottom: 20,
+    width: 240,
+    borderWidth: 2,
+    borderColor: "#FFD700",
+  },
+  picker: {
+    height: 50,
+    color: "#FFD700",
+  },
+  startButton: {
+    backgroundColor: "#FFD700",
+    borderRadius: 28,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    marginTop: 12,
+  },
+  startButtonText: {
+    color: "#3b2c1a",
+    fontWeight: "bold",
+    fontSize: 20,
+    fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
+  },
+});

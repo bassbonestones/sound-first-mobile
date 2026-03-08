@@ -5,6 +5,7 @@ import React from "react";
 import { View, Text, TouchableOpacity, Pressable } from "react-native";
 import Metronome from "../../../components/Metronome";
 import PitchDrone from "../../../components/PitchDrone";
+import { styles, colors } from "./styles";
 
 export default function ToolsPanel({
   mini,
@@ -28,33 +29,20 @@ export default function ToolsPanel({
   return (
     <>
       {/* Tools Row */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "center",
-          width: 320,
-          marginBottom: 18,
-        }}
-      >
+      <View style={styles.toolsRow}>
         {/* Metronome Toggle */}
         <TouchableOpacity
-          style={{
-            backgroundColor: metronomeEnabled ? "#9C27B0" : "#333",
-            paddingVertical: 10,
-            paddingHorizontal: 20,
-            borderRadius: 8,
-            marginRight: 10,
-            borderWidth: 1,
-            borderColor: metronomeEnabled ? "#9C27B0" : "#555",
-          }}
+          style={[
+            styles.toggleButton,
+            metronomeEnabled && styles.toggleButtonMetronomeActive,
+          ]}
           onPress={toggleMetronome}
         >
           <Text
-            style={{
-              color: metronomeEnabled ? "#fff" : "#888",
-              fontSize: 14,
-              fontWeight: "600",
-            }}
+            style={[
+              styles.toggleButtonText,
+              metronomeEnabled && styles.toggleButtonTextActive,
+            ]}
           >
             🥁 Metronome
           </Text>
@@ -62,23 +50,18 @@ export default function ToolsPanel({
 
         {/* Drone Toggle */}
         <TouchableOpacity
-          style={{
-            backgroundColor: droneEnabled ? "#00BCD4" : "#333",
-            paddingVertical: 10,
-            paddingHorizontal: 20,
-            borderRadius: 8,
-            marginLeft: 10,
-            borderWidth: 1,
-            borderColor: droneEnabled ? "#00BCD4" : "#555",
-          }}
+          style={[
+            styles.toggleButton,
+            styles.toggleButtonRight,
+            droneEnabled && styles.toggleButtonDroneActive,
+          ]}
           onPress={toggleDrone}
         >
           <Text
-            style={{
-              color: droneEnabled ? "#fff" : "#888",
-              fontSize: 14,
-              fontWeight: "600",
-            }}
+            style={[
+              styles.toggleButtonText,
+              droneEnabled && styles.toggleButtonTextActive,
+            ]}
           >
             🎶 Drone
           </Text>
@@ -91,15 +74,9 @@ export default function ToolsPanel({
           onPressIn={startMuteLongPress}
           onPressOut={cancelMuteLongPress}
           onPress={handleMutePress}
-          style={{
-            backgroundColor: audioMuted ? "#ff6b6b" : "#333",
-            paddingVertical: 8,
-            paddingHorizontal: 16,
-            borderRadius: 6,
-            marginBottom: 12,
-          }}
+          style={[styles.muteButton, audioMuted && styles.muteButtonActive]}
         >
-          <Text style={{ color: "#fff", fontSize: 14 }}>
+          <Text style={styles.muteButtonText}>
             {audioMuted ? "🔇 Unmute" : "🔊 Mute"} (hold for volume)
           </Text>
         </Pressable>
@@ -107,17 +84,7 @@ export default function ToolsPanel({
 
       {/* Metronome Component */}
       {metronomeEnabled && (
-        <View
-          style={{
-            width: 320,
-            marginBottom: 18,
-            backgroundColor: "#2a2a4a",
-            borderRadius: 12,
-            padding: 16,
-            borderWidth: 1,
-            borderColor: "#9C27B0",
-          }}
-        >
+        <View style={styles.toolWrapper}>
           <Metronome
             visible={metronomeVisible}
             onVisibilityChange={setMetronomeVisible}
@@ -131,17 +98,7 @@ export default function ToolsPanel({
 
       {/* Drone Component */}
       {droneEnabled && (
-        <View
-          style={{
-            width: 320,
-            marginBottom: 18,
-            backgroundColor: "#2a2a4a",
-            borderRadius: 12,
-            padding: 16,
-            borderWidth: 1,
-            borderColor: "#00BCD4",
-          }}
-        >
+        <View style={[styles.toolWrapper, styles.toolWrapperDrone]}>
           <PitchDrone
             visible={droneVisible}
             onVisibilityChange={setDroneVisible}

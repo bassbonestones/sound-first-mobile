@@ -4,6 +4,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { STEP_ICONS, STEP_LABELS } from "../data/stepTypes";
+import { styles, colors } from "./styles";
 
 export default function CurriculumSteps({
   curriculumSteps,
@@ -16,28 +17,23 @@ export default function CurriculumSteps({
     return null;
   }
 
+  const getStepItemStyle = (isActive, isCompleted) => [
+    styles.stepItem,
+    isActive && styles.stepItemActive,
+    isCompleted && !isActive && styles.stepItemCompleted,
+    !isActive && !isCompleted && styles.stepItemDefault,
+  ];
+
+  const getStepLabelStyle = (isActive, isCompleted) => [
+    styles.stepLabel,
+    isActive && styles.stepLabelActive,
+    isCompleted && !isActive && styles.stepLabelCompleted,
+    !isActive && !isCompleted && styles.stepLabelDefault,
+  ];
+
   return (
-    <View
-      style={{
-        width: 320,
-        marginBottom: 18,
-        backgroundColor: "#2a2a4a",
-        borderRadius: 12,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: "#4a4a6a",
-      }}
-    >
-      <Text
-        style={{
-          color: "#FFD700",
-          fontSize: 16,
-          fontWeight: "600",
-          marginBottom: 12,
-        }}
-      >
-        Curriculum Steps
-      </Text>
+    <View style={styles.cardContainer}>
+      <Text style={styles.cardTitle}>Curriculum Steps</Text>
 
       {curriculumSteps.map((step, idx) => {
         const isActive = idx === currentStepIndex;
@@ -46,58 +42,17 @@ export default function CurriculumSteps({
         const label = STEP_LABELS[step.type] || step.type;
 
         return (
-          <View
-            key={idx}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              paddingVertical: 10,
-              paddingHorizontal: 12,
-              marginBottom: 8,
-              borderRadius: 10,
-              backgroundColor: isActive
-                ? "#3a3a5a"
-                : isCompleted
-                  ? "#2d3d2d"
-                  : "#222",
-              borderWidth: isActive ? 2 : 1,
-              borderColor: isActive
-                ? "#FFD700"
-                : isCompleted
-                  ? "#4CAF50"
-                  : "#444",
-            }}
-          >
-            <Text style={{ fontSize: 20, marginRight: 10 }}>{icon}</Text>
-            <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  color: isActive
-                    ? "#FFD700"
-                    : isCompleted
-                      ? "#4CAF50"
-                      : "#888",
-                  fontSize: 14,
-                  fontWeight: isActive ? "bold" : "normal",
-                }}
-              >
+          <View key={idx} style={getStepItemStyle(isActive, isCompleted)}>
+            <Text style={styles.stepIcon}>{icon}</Text>
+            <View style={styles.stepContent}>
+              <Text style={getStepLabelStyle(isActive, isCompleted)}>
                 {label}
               </Text>
               {step.instruction && (
-                <Text
-                  style={{
-                    color: "#aaa",
-                    fontSize: 12,
-                    marginTop: 2,
-                  }}
-                >
-                  {step.instruction}
-                </Text>
+                <Text style={styles.stepInstruction}>{step.instruction}</Text>
               )}
             </View>
-            {isCompleted && (
-              <Text style={{ fontSize: 16, color: "#4CAF50" }}>✓</Text>
-            )}
+            {isCompleted && <Text style={styles.stepCheckmark}>✓</Text>}
           </View>
         );
       })}
@@ -105,24 +60,10 @@ export default function CurriculumSteps({
       {/* Step Complete Button */}
       {currentStep && !currentStep.is_completed && (
         <TouchableOpacity
-          style={{
-            backgroundColor: "#FFD700",
-            borderRadius: 10,
-            paddingVertical: 14,
-            alignItems: "center",
-            marginTop: 12,
-          }}
+          style={styles.completeStepButton}
           onPress={() => onCompleteStep(currentStepIndex, rating)}
         >
-          <Text
-            style={{
-              color: "#1a1a2e",
-              fontSize: 16,
-              fontWeight: "bold",
-            }}
-          >
-            Complete Step
-          </Text>
+          <Text style={styles.completeStepButtonText}>Complete Step</Text>
         </TouchableOpacity>
       )}
     </View>

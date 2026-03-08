@@ -8,45 +8,22 @@ import NotationDisplay, {
 } from "../../../components/NotationDisplay";
 import AudioPlayer from "../../../components/AudioPlayer";
 import { createShadow } from "../../../styles/theme";
+import { styles } from "./styles";
 
 export default function MaterialCard({ mini }) {
   return (
     <>
       <View
-        style={{
-          backgroundColor: "#2a2a4a",
-          borderRadius: 16,
-          padding: 16,
-          marginBottom: 18,
-          width: 320,
-          borderWidth: 1,
-          borderColor: "#4a4a6a",
-          ...createShadow("#000", 0, 2, 0.15, 4),
-        }}
+        style={[styles.cardContainerLarge, createShadow("#000", 0, 2, 0.15, 4)]}
       >
-        <Text
-          style={{
-            color: "#FFD700",
-            fontSize: 18,
-            fontWeight: "600",
-            marginBottom: 8,
-          }}
-        >
+        <Text style={styles.cardTitleLarge}>
           {mini.material_title || "Material"}
         </Text>
 
         {mini.key && (
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              marginBottom: 8,
-            }}
-          >
-            <Text style={{ color: "#888", fontSize: 13 }}>Key: </Text>
-            <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
-              {mini.key}
-            </Text>
+          <View style={styles.materialKeyRow}>
+            <Text style={styles.materialKeyLabel}>Key: </Text>
+            <Text style={styles.materialKeyValue}>{mini.key}</Text>
           </View>
         )}
 
@@ -56,7 +33,7 @@ export default function MaterialCard({ mini }) {
             notationUrl={mini.notation_url}
             materialId={mini.material_id}
             keySignature={mini.key}
-            style={{ marginTop: 8, borderRadius: 8, overflow: "hidden" }}
+            style={styles.notationDisplay}
           />
         ) : (
           <NotationPlaceholder />
@@ -65,17 +42,7 @@ export default function MaterialCard({ mini }) {
 
       {/* Audio Player */}
       {mini.audio_url && (
-        <View
-          style={{
-            width: 320,
-            marginBottom: 18,
-            backgroundColor: "#2a2a4a",
-            borderRadius: 12,
-            padding: 12,
-            borderWidth: 1,
-            borderColor: "#4a4a6a",
-          }}
-        >
+        <View style={styles.audioPlayerCard}>
           <AudioPlayer
             audioUrl={mini.audio_url}
             materialId={mini.material_id}
