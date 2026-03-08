@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import styles from "../../styles";
 import { useSoftGateRules, useUserSoftGateState } from "./hooks";
+import { baseUrl } from "../../../../api/client";
 
 function SoftGateExplorer() {
   const [activeSection, setActiveSection] = useState("rules");

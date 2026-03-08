@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import styles from "../../styles";
 import { useFocusCards } from "./hooks";
+import { baseUrl } from "../../../../api/client";
 
 function FocusCardExplorer() {
   // Use extracted hook for all state and CRUD operations
