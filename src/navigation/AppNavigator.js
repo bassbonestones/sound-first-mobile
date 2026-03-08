@@ -10,7 +10,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 // Screen imports - these will be updated as screens are reorganized
 import StartPracticeScreen from "../screens/StartPracticeScreen";
-import SessionScreen from "../screens/SessionScreen";
+import SessionScreen from "../screens/Session";
 import FocusCardScreen from "../screens/FocusCardScreen";
 import RatingScreen from "../screens/RatingScreen";
 import OnboardingScreen from "../screens/Onboarding";

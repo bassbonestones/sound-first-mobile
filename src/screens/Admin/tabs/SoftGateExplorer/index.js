@@ -2,7 +2,7 @@
  * SoftGateExplorer - Soft gate rules management
  * Part of Admin console
  */
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -13,8 +13,8 @@ import {
   Modal,
   ActivityIndicator,
 } from "react-native";
-import { baseUrl } from "../../../../api/client";
 import styles from "../../styles";
+import { useSoftGateRules, useUserSoftGateState } from "./hooks";
 
 function SoftGateExplorer() {
   const [activeSection, setActiveSection] = useState("rules");
@@ -64,47 +64,24 @@ function SoftGateExplorer() {
 }
 
 function SoftGateRulesList() {
-  const [rules, setRules] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedRule, setSelectedRule] = useState(null);
+  // Use extracted hook for state and CRUD operations
+  const {
+    rules,
+    loading,
+    selectedRule,
+    setSelectedRule,
+    deleteRule,
+    fetchRules,
+  } = useSoftGateRules();
+
+  // Modal visibility state (UI-only)
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const fetchRules = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${baseUrl}/admin/soft-gate-rules`);
-      if (response.ok) {
-        const data = await response.json();
-        setRules(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch rules:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchRules();
-  }, [fetchRules]);
-
   const handleDelete = async (ruleId) => {
-    try {
-      const response = await fetch(
-        `${baseUrl}/admin/soft-gate-rules/${ruleId}`,
-        {
-          method: "DELETE",
-        },
-      );
-      if (response.ok) {
-        await fetchRules();
-      } else {
-        const error = await response.json();
-        alert(error.detail || "Failed to delete rule");
-      }
-    } catch (error) {
-      alert("Failed to delete rule");
+    const result = await deleteRule(ruleId);
+    if (!result.success) {
+      alert(result.error || "Failed to delete rule");
     }
   };
 
@@ -566,81 +543,30 @@ function SoftGateRuleCreateModal({ onClose, onCreate }) {
 }
 
 function UserSoftGateStateView() {
-  const [users, setUsers] = useState([]);
-  const [selectedUserId, setSelectedUserId] = useState(null);
-  const [states, setStates] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedState, setSelectedState] = useState(null);
+  // Use extracted hook for state and operations
+  const {
+    users,
+    selectedUserId,
+    selectedUser,
+    states,
+    loading,
+    selectedState,
+    setSelectedUserId,
+    setSelectedState,
+    fetchStates,
+    resetStates,
+  } = useUserSoftGateState();
+
+  // Modal visibility state (UI-only)
   const [showEditModal, setShowEditModal] = useState(false);
   const [showUserPicker, setShowUserPicker] = useState(false);
 
-  // Fetch users for dropdown
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const response = await fetch(`${baseUrl}/admin/users`);
-        if (response.ok) {
-          const data = await response.json();
-          setUsers(data);
-          if (data.length > 0 && !selectedUserId) {
-            setSelectedUserId(data[0].id);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to fetch users:", error);
-      }
-    };
-    fetchUsers();
-  }, []);
-
-  // Fetch states when user changes
-  const fetchStates = useCallback(async () => {
-    if (!selectedUserId) return;
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `${baseUrl}/admin/user-soft-gate-state?user_id=${selectedUserId}`,
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setStates(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch states:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedUserId]);
-
-  useEffect(() => {
-    fetchStates();
-  }, [fetchStates]);
-
   const handleReset = async (dimensionNames = null) => {
-    try {
-      const response = await fetch(
-        `${baseUrl}/admin/user-soft-gate-state/reset`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            user_id: selectedUserId,
-            dimension_names: dimensionNames,
-          }),
-        },
-      );
-      if (response.ok) {
-        await fetchStates();
-      } else {
-        const error = await response.json();
-        alert(error.detail || "Failed to reset");
-      }
-    } catch (error) {
-      alert("Failed to reset");
+    const result = await resetStates(dimensionNames);
+    if (!result.success) {
+      alert(result.error || "Failed to reset");
     }
   };
-
-  const selectedUser = users.find((u) => u.id === selectedUserId);
 
   const renderStateItem = ({ item }) => (
     <View style={styles.listItem}>

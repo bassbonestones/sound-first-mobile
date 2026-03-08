@@ -2,7 +2,7 @@
  * MaterialExplorer - Browse materials with analysis data
  * Part of Admin console
  */
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,31 +14,54 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
-import { getBackendUrl, baseUrl } from "../../../../api/client";
+import { baseUrl } from "../../../../api/client";
 import styles from "../../styles";
+import { useMaterials, useUpload } from "./hooks";
 
 function MaterialExplorer() {
-  const [materials, setMaterials] = useState([]);
-  const [filteredMaterials, setFilteredMaterials] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedMaterial, setSelectedMaterial] = useState(null);
+  // Use extracted hooks for state and operations
+  const {
+    materials,
+    filteredMaterials,
+    loading,
+    searchQuery,
+    selectedMaterial,
+    ingesting,
+    exporting,
+    actionStatus,
+    setSearchQuery,
+    setSelectedMaterial,
+    setActionStatus,
+    loadMaterials,
+    fetchMaterialDetail,
+    handleBatchIngest,
+    handleExportToJson,
+  } = useMaterials();
+
+  const {
+    showModal: showUploadModal,
+    openModal: openUploadModal,
+    closeModal: closeUploadModal,
+    step: uploadStep,
+    setStep: setUploadStep,
+    fileName: uploadFileName,
+    fileContent: uploadFileContent,
+    title: uploadTitle,
+    setTitle: setUploadTitle,
+    keyCenter: uploadKeyCenter,
+    setKeyCenter: setUploadKeyCenter,
+    preview: uploadPreview,
+    error: uploadError,
+    saving: uploadSaving,
+    setContent: setUploadFileContent,
+    handleFilePick,
+    analyzeFile: analyzeUploadedFile,
+    confirmUpload,
+  } = useUpload(loadMaterials);
+
+  // UI-only state
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("1");
-  const [ingesting, setIngesting] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [actionStatus, setActionStatus] = useState(null);
-
-  // Upload modal state
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadStep, setUploadStep] = useState("select"); // "select" | "preview" | "saving"
-  const [uploadFileName, setUploadFileName] = useState("");
-  const [uploadFileContent, setUploadFileContent] = useState("");
-  const [uploadTitle, setUploadTitle] = useState("");
-  const [uploadKeyCenter, setUploadKeyCenter] = useState("");
-  const [uploadPreview, setUploadPreview] = useState(null);
-  const [uploadError, setUploadError] = useState(null);
-  const [uploadSaving, setUploadSaving] = useState(false);
   const [showAllCapabilities, setShowAllCapabilities] = useState(false);
   const [allCapabilities, setAllCapabilities] = useState([]);
   const [expandedDomains, setExpandedDomains] = useState({});
@@ -169,8 +192,8 @@ function MaterialExplorer() {
     },
   };
 
+  // Load capabilities for domain grouping (UI helper)
   useEffect(() => {
-    loadMaterials();
     loadAllCapabilities();
   }, []);
 
@@ -219,244 +242,30 @@ function MaterialExplorer() {
     }));
   };
 
-  useEffect(() => {
-    filterMaterials();
-  }, [materials, searchQuery]);
-
-  const loadMaterials = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${baseUrl}/admin/materials`);
-      if (!response.ok) throw new Error("Failed to load materials");
-      const data = await response.json();
-      setMaterials(data.materials || []);
-    } catch (err) {
-      console.error("[AdminScreen] Load materials error:", err);
-      // Fallback to basic materials endpoint
-      try {
-        const fallback = await fetch(`${baseUrl}/materials`);
-        const data = await fallback.json();
-        setMaterials(data.materials || data || []);
-      } catch (e) {
-        console.error("[AdminScreen] Materials fallback failed:", e);
-      }
-    }
-    setLoading(false);
-  };
-
-  const filterMaterials = () => {
-    let filtered = [...materials];
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((m) => m.title?.toLowerCase().includes(query));
-    }
-
-    setFilteredMaterials(filtered);
-  };
-
   const viewMaterialDetail = async (material) => {
     setSelectedMaterial(material);
     setShowDetailModal(true);
 
-    // Load analysis data
-    try {
-      const response = await fetch(
-        `${baseUrl}/materials/${material.id}/analysis`,
-      );
-      if (response.ok) {
-        const analysis = await response.json();
-        setSelectedMaterial({ ...material, analysis });
-      }
-    } catch (err) {
-      console.log("[AdminScreen] Could not load material analysis");
+    // Load analysis data using hook
+    const withAnalysis = await fetchMaterialDetail(material);
+    if (withAnalysis) {
+      setSelectedMaterial(withAnalysis);
     }
   };
 
-  const triggerAnalysis = async (materialId) => {
-    try {
-      const response = await fetch(
-        `${baseUrl}/admin/materials/${materialId}/analyze`,
-        {
-          method: "POST",
-        },
-      );
-      if (response.ok) {
-        alert("Analysis triggered successfully");
-        loadMaterials();
-      }
-    } catch (err) {
-      console.error("Analysis failed:", err);
-      alert("Analysis failed");
-    }
+  // UI helper for profile section expansion
+  const toggleProfile = (materialId, profileKey) => {
+    setExpandedProfiles((prev) => ({
+      ...prev,
+      [`${materialId}-${profileKey}`]: !prev[`${materialId}-${profileKey}`],
+    }));
   };
 
-  const handleBatchIngest = async (analyzeAll = false) => {
-    setIngesting(true);
-    setActionStatus(null);
-    try {
-      const response = await fetch(`${baseUrl}/materials/ingest-batch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          analyze_missing_only: !analyzeAll,
-          overwrite: analyzeAll,
-        }),
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setActionStatus({
-          type: "success",
-          message: `Analyzed ${data.files_analyzed} files, ${data.orphans_removed} orphans removed`,
-        });
-        loadMaterials();
-      } else {
-        setActionStatus({
-          type: "error",
-          message: data.detail || "Ingestion failed",
-        });
-      }
-    } catch (err) {
-      console.error("[AdminScreen] Batch ingest error:", err);
-      setActionStatus({ type: "error", message: err.message });
-    }
-    setIngesting(false);
-    setTimeout(() => setActionStatus(null), 5000);
-  };
-
-  const handleExportToJson = async () => {
-    setExporting(true);
-    setActionStatus(null);
-    try {
-      const response = await fetch(`${baseUrl}/materials/export-json`, {
-        method: "POST",
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setActionStatus({
-          type: "success",
-          message: `Exported to ${data.path}`,
-        });
-      } else {
-        setActionStatus({
-          type: "error",
-          message: data.detail || "Export failed",
-        });
-      }
-    } catch (err) {
-      console.error("[AdminScreen] Export error:", err);
-      setActionStatus({ type: "error", message: err.message });
-    }
-    setExporting(false);
-    setTimeout(() => setActionStatus(null), 5000);
-  };
-
-  // === UPLOAD FUNCTIONS ===
-
-  const openUploadModal = () => {
-    setShowUploadModal(true);
-    setUploadStep("select");
-    setUploadFileName("");
-    setUploadFileContent("");
-    setUploadTitle("");
-    setUploadKeyCenter("");
-    setUploadPreview(null);
-    setUploadError(null);
-    setShowAllCapabilities(false);
-  };
-
-  const handleFilePick = async () => {
-    // For web/desktop, use file input
-    if (Platform.OS === "web") {
-      const input = document.createElement("input");
-      input.type = "file";
-      input.accept = ".xml,.musicxml";
-      input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (file) {
-          setUploadFileName(file.name);
-          const content = await file.text();
-          setUploadFileContent(content);
-          const nameWithoutExt = file.name.replace(/\.(xml|musicxml)$/i, "");
-          setUploadTitle(nameWithoutExt);
-        }
-      };
-      input.click();
-    } else {
-      alert("On mobile, please paste MusicXML content in the text area below.");
-    }
-  };
-
-  const analyzeUploadedFile = async () => {
-    if (!uploadFileContent) {
-      setUploadError("Please select or paste a MusicXML file first");
-      return;
-    }
-
-    setUploadStep("preview");
-    setUploadError(null);
-
-    try {
-      const response = await fetch(`${baseUrl}/materials/analyze`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: uploadTitle || "Untitled",
-          musicxml_content: uploadFileContent,
-          original_key_center: uploadKeyCenter || null,
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.detail || "Analysis failed");
-      }
-
-      const preview = await response.json();
-      console.log(
-        "[AdminScreen] Preview response:",
-        JSON.stringify(preview.unified_scores, null, 2),
-      );
-      setUploadPreview(preview);
-      if (preview.title && !uploadTitle) {
-        setUploadTitle(preview.title);
-      }
-    } catch (err) {
-      setUploadError(err.message);
-      setUploadStep("select");
-    }
-  };
-
-  const confirmUpload = async () => {
-    if (!uploadPreview) return;
-
-    setUploadSaving(true);
-    setUploadError(null);
-
-    try {
-      const response = await fetch(`${baseUrl}/materials/upload`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: uploadTitle || uploadPreview.title || "Untitled",
-          musicxml_content: uploadFileContent,
-          original_key_center: uploadKeyCenter || null,
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.detail || "Upload failed");
-      }
-
-      const result = await response.json();
+  // Handle upload confirmation with callback to refresh materials
+  const handleUploadConfirm = async () => {
+    const result = await confirmUpload();
+    if (result) {
       alert(`Material saved successfully! ID: ${result.material_id}`);
-      setShowUploadModal(false);
-      loadMaterials();
-    } catch (err) {
-      setUploadError(err.message);
-    } finally {
-      setUploadSaving(false);
     }
   };
 
@@ -596,7 +405,7 @@ function MaterialExplorer() {
           material={selectedMaterial}
           userId={selectedUserId}
           onClose={() => setShowDetailModal(false)}
-          onTriggerAnalysis={triggerAnalysis}
+          onTriggerAnalysis={loadMaterials}
         />
       </Modal>
 
@@ -604,7 +413,7 @@ function MaterialExplorer() {
       <Modal
         visible={showUploadModal}
         animationType="slide"
-        onRequestClose={() => setShowUploadModal(false)}
+        onRequestClose={closeUploadModal}
       >
         <View style={styles.uploadModalContainer}>
           <View style={styles.detailHeader}>
@@ -613,7 +422,7 @@ function MaterialExplorer() {
             </Text>
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => setShowUploadModal(false)}
+              onPress={closeUploadModal}
             >
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>

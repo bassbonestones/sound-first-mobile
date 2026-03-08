@@ -85,7 +85,7 @@ class ErrorBoundary extends React.Component {
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import StartPracticeScreen from "./src/screens/StartPracticeScreen";
-import SessionScreen from "./src/screens/SessionScreen";
+import SessionScreen from "./src/screens/Session";
 import FocusCardScreen from "./src/screens/FocusCardScreen";
 import RatingScreen from "./src/screens/RatingScreen";
 import OnboardingScreen from "./src/screens/Onboarding";

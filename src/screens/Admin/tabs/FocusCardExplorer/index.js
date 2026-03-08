@@ -2,7 +2,7 @@
  * FocusCardExplorer - Focus card management
  * Part of Admin console
  */
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -13,103 +13,48 @@ import {
   Modal,
   ActivityIndicator,
 } from "react-native";
-import { baseUrl } from "../../../../api/client";
 import styles from "../../styles";
+import { useFocusCards } from "./hooks";
 
 function FocusCardExplorer() {
-  const [focusCards, setFocusCards] = useState([]);
-  const [filteredFocusCards, setFilteredFocusCards] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [categories, setCategories] = useState([]);
-  const [selectedFocusCard, setSelectedFocusCard] = useState(null);
+  // Use extracted hook for all state and CRUD operations
+  const {
+    focusCards,
+    filteredFocusCards,
+    loading,
+    searchQuery,
+    setSearchQuery,
+    categoryFilter,
+    setCategoryFilter,
+    categories,
+    selectedFocusCard,
+    setSelectedFocusCard,
+    createFocusCard,
+    deleteFocusCard,
+    fetchFocusCards,
+  } = useFocusCards();
+
+  // Modal visibility state (UI-only, not in hook)
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Fetch focus cards
-  const fetchFocusCards = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${baseUrl}/focus-cards`);
-      if (response.ok) {
-        const data = await response.json();
-        setFocusCards(data);
-        setFilteredFocusCards(data);
-        // Extract unique categories
-        const uniqueCategories = [
-          ...new Set(data.map((fc) => fc.category).filter(Boolean)),
-        ].sort();
-        setCategories(uniqueCategories);
-      }
-    } catch (error) {
-      console.error("Failed to fetch focus cards:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchFocusCards();
-  }, [fetchFocusCards]);
-
-  // Filter effect
-  useEffect(() => {
-    let filtered = focusCards;
-    if (categoryFilter !== "all") {
-      filtered = filtered.filter((fc) => fc.category === categoryFilter);
-    }
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (fc) =>
-          fc.name.toLowerCase().includes(query) ||
-          fc.description?.toLowerCase().includes(query) ||
-          fc.attention_cue?.toLowerCase().includes(query),
-      );
-    }
-    setFilteredFocusCards(filtered);
-  }, [focusCards, categoryFilter, searchQuery]);
-
   const handleDelete = async (focusCardId) => {
-    try {
-      const response = await fetch(
-        `${baseUrl}/admin/focus-cards/${focusCardId}`,
-        {
-          method: "DELETE",
-        },
-      );
-      if (response.ok) {
-        await fetchFocusCards();
-        setShowDetailModal(false);
-        setSelectedFocusCard(null);
-      } else {
-        const error = await response.json();
-        alert(error.detail || "Failed to delete focus card");
-      }
-    } catch (error) {
-      console.error("Delete error:", error);
-      alert("Failed to delete focus card");
+    const result = await deleteFocusCard(focusCardId);
+    if (result.success) {
+      setShowDetailModal(false);
+      setSelectedFocusCard(null);
+    } else {
+      alert(result.error || "Failed to delete focus card");
     }
   };
 
   const handleCreate = async (createData) => {
-    try {
-      const response = await fetch(`${baseUrl}/admin/focus-cards`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(createData),
-      });
-      if (response.ok) {
-        await fetchFocusCards();
-        setShowCreateModal(false);
-      } else {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to create focus card");
-      }
-    } catch (error) {
-      throw error;
+    const result = await createFocusCard(createData);
+    if (result.success) {
+      setShowCreateModal(false);
+    } else {
+      throw new Error(result.error || "Failed to create focus card");
     }
   };
 

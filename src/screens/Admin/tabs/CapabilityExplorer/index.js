@@ -2,7 +2,7 @@
  * CapabilityExplorer - Browse/filter/inspect capabilities
  * Part of Admin console
  */
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,102 +14,51 @@ import {
   ActivityIndicator,
   Switch,
 } from "react-native";
-import { baseUrl } from "../../../../api/client";
 import styles from "../../styles";
+import useCapabilities from "./hooks/useCapabilities";
+import { baseUrl } from "../../../../api/client";
 
 function CapabilityExplorer() {
-  const [capabilities, setCapabilities] = useState([]);
-  const [filteredCapabilities, setFilteredCapabilities] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [domainFilter, setDomainFilter] = useState("all");
-  const [domains, setDomains] = useState([]);
+  // Use extracted hook for capabilities state and operations
+  const {
+    capabilities,
+    filteredCapabilities,
+    loading,
+    searchQuery,
+    setSearchQuery,
+    domainFilter,
+    setDomainFilter,
+    domains,
+    exporting,
+    exportStatus,
+    loadCapabilities,
+    loadDependencyGraph,
+    archiveCapability,
+    restoreCapability,
+    deleteCapability,
+    createCapability,
+    updateCapability,
+    moveCapability,
+    renameDomain,
+    exportToFile,
+  } = useCapabilities();
+
+  // UI-only state
   const [selectedCapability, setSelectedCapability] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDomainManageModal, setShowDomainManageModal] = useState(false);
   const [dependencyGraph, setDependencyGraph] = useState(null);
-  const [exporting, setExporting] = useState(false);
-  const [exportStatus, setExportStatus] = useState(null);
-
-  useEffect(() => {
-    loadCapabilities();
-  }, []);
-
-  useEffect(() => {
-    filterCapabilities();
-  }, [capabilities, searchQuery, domainFilter]);
-
-  const loadCapabilities = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${baseUrl}/admin/capabilities`);
-      if (!response.ok) throw new Error("Failed to load capabilities");
-      const data = await response.json();
-      setCapabilities(data.capabilities || []);
-
-      // Extract unique domains
-      const uniqueDomains = [
-        ...new Set((data.capabilities || []).map((c) => c.domain)),
-      ].sort();
-      setDomains(uniqueDomains);
-    } catch (err) {
-      console.error("[AdminScreen] Load capabilities error:", err);
-      // Fallback to v2 endpoint
-      try {
-        const fallback = await fetch(`${baseUrl}/capabilities/v2`);
-        const data = await fallback.json();
-        setCapabilities(data.capabilities || []);
-        const uniqueDomains = [
-          ...new Set((data.capabilities || []).map((c) => c.domain)),
-        ].sort();
-        setDomains(uniqueDomains);
-      } catch (e) {
-        console.error("[AdminScreen] Fallback failed:", e);
-      }
-    }
-    setLoading(false);
-  };
-
-  const filterCapabilities = () => {
-    let filtered = [...capabilities];
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (c) =>
-          c.name?.toLowerCase().includes(query) ||
-          c.display_name?.toLowerCase().includes(query) ||
-          c.domain?.toLowerCase().includes(query),
-      );
-    }
-
-    if (domainFilter !== "all") {
-      filtered = filtered.filter((c) => c.domain === domainFilter);
-    }
-
-    // Sort by bit_index to maintain proper order
-    filtered.sort((a, b) => (a.bit_index ?? 0) - (b.bit_index ?? 0));
-
-    setFilteredCapabilities(filtered);
-  };
 
   const viewCapabilityDetail = async (capability) => {
     setSelectedCapability(capability);
     setShowDetailModal(true);
 
-    // Load dependency graph
-    try {
-      const response = await fetch(
-        `${baseUrl}/admin/capabilities/${capability.id}/graph`,
-      );
-      if (response.ok) {
-        const graph = await response.json();
-        setDependencyGraph(graph);
-      }
-    } catch (err) {
-      console.log("[AdminScreen] Could not load dependency graph");
+    // Load dependency graph using hook
+    const graph = await loadDependencyGraph(capability.id);
+    if (graph) {
+      setDependencyGraph(graph);
     }
   };
 
@@ -120,217 +69,54 @@ function CapabilityExplorer() {
   };
 
   const handleCapabilitySaved = async (updatedCapability) => {
-    const capId = updatedCapability.id;
-    // Reload capabilities from server to get fresh data
-    try {
-      const response = await fetch(`${baseUrl}/admin/capabilities`);
-      if (response.ok) {
-        const data = await response.json();
-        const freshCapabilities = data.capabilities || [];
-        setCapabilities(freshCapabilities);
-
-        // Extract unique domains
-        const uniqueDomains = [
-          ...new Set(freshCapabilities.map((c) => c.domain)),
-        ].sort();
-        setDomains(uniqueDomains);
-
-        // Find and set the fresh capability for detail view
-        const freshCap = freshCapabilities.find((c) => c.id === capId);
-        if (freshCap) {
-          setSelectedCapability(freshCap);
-        }
-      }
-    } catch (err) {
-      console.error("[AdminScreen] Failed to reload capabilities:", err);
-    }
+    // Modal already saved - just update UI and refresh list in background
+    setSelectedCapability(updatedCapability);
     setShowEditModal(false);
     setShowDetailModal(true);
+    // Refresh list in background to sync state
+    loadCapabilities();
   };
 
   const handleArchiveCapability = async (capability) => {
-    try {
-      const response = await fetch(
-        `${baseUrl}/admin/capabilities/${capability.id}/archive`,
-        { method: "POST" },
-      );
-      if (response.ok) {
-        const updated = { ...capability, is_active: false };
-        setCapabilities((prev) =>
-          prev.map((c) => (c.id === capability.id ? updated : c)),
-        );
-        setSelectedCapability(updated);
-      }
-    } catch (err) {
-      console.log("[AdminScreen] Could not archive capability", err);
+    const result = await archiveCapability(capability);
+    if (result.success) {
+      setSelectedCapability(result.capability);
     }
   };
 
   const handleRestoreCapability = async (capability) => {
-    try {
-      const response = await fetch(
-        `${baseUrl}/admin/capabilities/${capability.id}/restore`,
-        { method: "POST" },
-      );
-      if (response.ok) {
-        const updated = { ...capability, is_active: true };
-        setCapabilities((prev) =>
-          prev.map((c) => (c.id === capability.id ? updated : c)),
-        );
-        setSelectedCapability(updated);
-      }
-    } catch (err) {
-      console.log("[AdminScreen] Could not restore capability", err);
+    const result = await restoreCapability(capability);
+    if (result.success) {
+      setSelectedCapability(result.capability);
     }
   };
 
   const handleDeleteCapability = async (capability) => {
-    try {
-      const response = await fetch(
-        `${baseUrl}/admin/capabilities/${capability.id}`,
-        { method: "DELETE" },
-      );
-      if (response.ok) {
-        const data = await response.json();
-        // Reload capabilities to get updated bit_indexes
-        await loadCapabilities();
-        setShowDetailModal(false);
-        setSelectedCapability(null);
-      }
-    } catch (err) {
-      console.log("[AdminScreen] Could not delete capability", err);
+    const result = await deleteCapability(capability);
+    if (result.success) {
+      setShowDetailModal(false);
+      setSelectedCapability(null);
     }
   };
 
   const handleCreateCapability = async (createData) => {
-    try {
-      const response = await fetch(`${baseUrl}/admin/capabilities`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(createData),
-      });
-      const data = await response.json();
-      if (response.ok && data.success) {
-        // Reload capabilities to get the new one with all fields
-        await loadCapabilities();
-        setShowCreateModal(false);
-        return { success: true };
-      } else {
-        return {
-          success: false,
-          error: data.detail || "Failed to create capability",
-        };
-      }
-    } catch (err) {
-      console.log("[AdminScreen] Could not create capability", err);
-      return { success: false, error: "Network error" };
+    const result = await createCapability(createData);
+    if (result.success) {
+      setShowCreateModal(false);
     }
+    return result;
   };
 
   const handleMoveCapability = async (capability, direction) => {
-    // Only works when viewing a specific domain
-    if (domainFilter === "all") return;
-
-    // Get capabilities in this domain sorted by bit_index
-    const domainCaps = capabilities
-      .filter((c) => c.domain === domainFilter)
-      .sort((a, b) => (a.bit_index ?? 0) - (b.bit_index ?? 0));
-
-    const currentIndex = domainCaps.findIndex((c) => c.id === capability.id);
-    if (currentIndex === -1) return;
-
-    const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex < 0 || newIndex >= domainCaps.length) return;
-
-    // Swap positions
-    const newOrder = [...domainCaps];
-    [newOrder[currentIndex], newOrder[newIndex]] = [
-      newOrder[newIndex],
-      newOrder[currentIndex],
-    ];
-
-    // Send reorder request
-    try {
-      const response = await fetch(`${baseUrl}/admin/capabilities/reorder`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          domain: domainFilter,
-          capability_ids: newOrder.map((c) => c.id),
-        }),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        // Update local state with new bit_indexes
-        const newBitIndexes = {};
-        data.new_order.forEach((item) => {
-          newBitIndexes[item.id] = item.bit_index;
-        });
-        setCapabilities((prev) =>
-          prev.map((c) => ({
-            ...c,
-            bit_index: newBitIndexes[c.id] ?? c.bit_index,
-          })),
-        );
-      }
-    } catch (err) {
-      console.log("[AdminScreen] Could not reorder capabilities", err);
-    }
+    await moveCapability(capability, direction);
   };
 
   const handleRenameDomain = async (oldName, newName) => {
-    try {
-      const response = await fetch(`${baseUrl}/admin/domains/rename`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ old_name: oldName, new_name: newName }),
-      });
-      if (response.ok) {
-        // Reload capabilities to get updated domains
-        await loadCapabilities();
-        return { success: true };
-      } else {
-        const data = await response.json();
-        return {
-          success: false,
-          error: data.detail || "Failed to rename domain",
-        };
-      }
-    } catch (err) {
-      console.log("[AdminScreen] Could not rename domain", err);
-      return { success: false, error: "Network error" };
-    }
+    return await renameDomain(oldName, newName);
   };
 
   const handleExportToFile = async () => {
-    setExporting(true);
-    setExportStatus(null);
-    try {
-      const response = await fetch(`${baseUrl}/admin/capabilities/export`, {
-        method: "POST",
-      });
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setExportStatus({
-          type: "success",
-          message: `Exported to ${data.filename}`,
-        });
-      } else {
-        setExportStatus({
-          type: "error",
-          message: data.detail?.message || "Export failed",
-        });
-      }
-    } catch (err) {
-      console.error("[AdminScreen] Export error:", err);
-      setExportStatus({
-        type: "error",
-        message: "Failed to connect to server",
-      });
-    }
-    setExporting(false);
-    // Clear status after 5 seconds
-    setTimeout(() => setExportStatus(null), 5000);
+    await exportToFile();
   };
 
   const renderCapabilityItem = ({ item, index }) => {
@@ -956,32 +742,34 @@ function CapabilityEditModal({ capability, allCapabilities, onClose, onSave }) {
     setSaveSuccess(false);
 
     try {
+      const requestBody = {
+        name: formData.name.trim(),
+        display_name: formData.display_name?.trim() || null,
+        domain: formData.domain.trim(),
+        subdomain: formData.subdomain?.trim() || null,
+        requirement_type: formData.requirement_type,
+        difficulty_tier: Number(formData.difficulty_tier),
+        mastery_type: formData.mastery_type,
+        mastery_count: Number(formData.mastery_count),
+        evidence_required_count: Number(formData.evidence_required_count),
+        evidence_distinct_materials: formData.evidence_distinct_materials,
+        evidence_acceptance_threshold: Number(
+          formData.evidence_acceptance_threshold,
+        ),
+        difficulty_weight: Number(formData.difficulty_weight),
+        prerequisite_ids: selectedPrereqIds,
+        soft_gate_requirements: formData.soft_gate_requirements?.trim()
+          ? JSON.parse(formData.soft_gate_requirements)
+          : null,
+        detection_rule: detectionRule && detectionRule.type ? detectionRule : null,
+      };
+      
       const response = await fetch(
         `${baseUrl}/admin/capabilities/${capability.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: formData.name.trim(),
-            display_name: formData.display_name?.trim() || null,
-            domain: formData.domain.trim(),
-            subdomain: formData.subdomain?.trim() || null,
-            requirement_type: formData.requirement_type,
-            difficulty_tier: Number(formData.difficulty_tier),
-            mastery_type: formData.mastery_type,
-            mastery_count: Number(formData.mastery_count),
-            evidence_required_count: Number(formData.evidence_required_count),
-            evidence_distinct_materials: formData.evidence_distinct_materials,
-            evidence_acceptance_threshold: Number(
-              formData.evidence_acceptance_threshold,
-            ),
-            difficulty_weight: Number(formData.difficulty_weight),
-            prerequisite_ids: selectedPrereqIds,
-            soft_gate_requirements: formData.soft_gate_requirements?.trim()
-              ? JSON.parse(formData.soft_gate_requirements)
-              : null,
-            detection_rule: detectionRule,
-          }),
+          body: JSON.stringify(requestBody),
         },
       );
 
