@@ -9,19 +9,7 @@ import {
   Platform,
   Image,
 } from "react-native";
-
-function getBaseUrl() {
-  const LOCAL_IP = "192.168.1.19";
-  if (Platform.OS === "android") {
-    return "http://10.0.2.2:8000";
-  } else if (Platform.OS === "ios") {
-    return `http://${LOCAL_IP}:8000`;
-  } else if (Platform.OS === "web") {
-    return `http://${window.location.hostname}:8000`;
-  } else {
-    return `http://${LOCAL_IP}:8000`;
-  }
-}
+import { baseUrl } from "../api/client";
 
 // Step type icons for mini-lesson
 const LESSON_STEP_ICONS = {
@@ -67,9 +55,7 @@ export default function MiniLesson({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `${getBaseUrl()}/capabilities/${capabilityId}/lesson`,
-      );
+      const res = await fetch(`${baseUrl}/capabilities/${capabilityId}/lesson`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setLesson(data);
@@ -101,7 +87,7 @@ export default function MiniLesson({
 
     // Record quiz result
     try {
-      await fetch(`${getBaseUrl()}/capabilities/${capabilityId}/quiz-result`, {
+      await fetch(`${baseUrl}/capabilities/${capabilityId}/quiz-result`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

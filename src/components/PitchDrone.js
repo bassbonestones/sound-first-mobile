@@ -10,6 +10,20 @@ import {
 } from "react-native";
 import Slider from "@react-native-community/slider";
 
+// Import constants and utilities from extracted module
+import {
+  NOTES,
+  OCTAVE_COLORS,
+  JUST_RATIOS,
+  calculateEqualTemperamentFrequency,
+  calculateJustIntonationFrequency,
+  getNoteNameBySemitone,
+  getOctaveColor,
+} from "./PitchDrone/constants";
+
+// Import styles
+import { styles, colors } from "./PitchDrone/styles";
+
 // Cross-platform AudioContext
 // Web: use browser's native AudioContext
 // Native: use react-native-audio-api
@@ -21,51 +35,6 @@ if (Platform.OS !== "web") {
     console.warn("react-native-audio-api not available");
   }
 }
-
-// Note definitions with enharmonic equivalents
-const NOTES = [
-  { name: "C", enharmonic: "B♯/C", semitone: 0 },
-  { name: "C#", enharmonic: "C♯/D♭", semitone: 1 },
-  { name: "D", enharmonic: "D", semitone: 2 },
-  { name: "D#", enharmonic: "D♯/E♭", semitone: 3 },
-  { name: "E", enharmonic: "E/F♭", semitone: 4 },
-  { name: "F", enharmonic: "E♯/F", semitone: 5 },
-  { name: "F#", enharmonic: "F♯/G♭", semitone: 6 },
-  { name: "G", enharmonic: "G", semitone: 7 },
-  { name: "G#", enharmonic: "G♯/A♭", semitone: 8 },
-  { name: "A", enharmonic: "A", semitone: 9 },
-  { name: "A#", enharmonic: "A♯/B♭", semitone: 10 },
-  { name: "B", enharmonic: "B/C♭", semitone: 11 },
-];
-
-// Octave colors - contrasting adjacent colors
-const OCTAVE_COLORS = {
-  1: "#E74C3C", // Red
-  2: "#3498DB", // Blue
-  3: "#F39C12", // Orange
-  4: "#9B59B6", // Purple
-  5: "#2ECC71", // Green
-  6: "#E91E63", // Pink
-  7: "#00BCD4", // Cyan
-  8: "#FF5722", // Deep Orange
-  9: "#8BC34A", // Light Green
-};
-
-// Just intonation ratios (relative to the root)
-const JUST_RATIOS = {
-  0: 1, // Unison
-  1: 16 / 15, // Minor second
-  2: 9 / 8, // Major second
-  3: 6 / 5, // Minor third
-  4: 5 / 4, // Major third
-  5: 4 / 3, // Perfect fourth
-  6: 45 / 32, // Tritone (augmented fourth)
-  7: 3 / 2, // Perfect fifth
-  8: 8 / 5, // Minor sixth
-  9: 5 / 3, // Major sixth
-  10: 9 / 5, // Minor seventh
-  11: 15 / 8, // Major seventh
-};
 
 export default function PitchDrone({
   onPlayingChange,
@@ -621,7 +590,7 @@ export default function PitchDrone({
   const isAnyDronePlaying = Object.keys(activeDrones).length > 0;
 
   return (
-    <View style={{ alignItems: "center", padding: 16 }}>
+    <View style={styles.container}>
       {/* Mute Button - top right corner, only when playing */}
       {/* Tap to mute, long-press for volume controls */}
       {isAnyDronePlaying && (
@@ -629,89 +598,58 @@ export default function PitchDrone({
           onPress={toggleMute}
           onLongPress={() => setShowVolumeModal(true)}
           delayLongPress={400}
-          style={({ pressed }) => ({
-            position: "absolute",
-            top: 8,
-            right: 8,
-            backgroundColor: muted ? "#555" : pressed ? "#444" : "#333",
-            paddingVertical: 8,
-            paddingHorizontal: 12,
-            borderRadius: 20,
-            zIndex: 10,
-          })}
+          style={({ pressed }) => [
+            styles.muteButton,
+            { backgroundColor: muted ? "#555" : pressed ? "#444" : "#333" },
+          ]}
         >
-          <Text style={{ fontSize: 18 }}>{muted ? "🔇" : "🔊"}</Text>
+          <Text style={styles.muteButtonText}>{muted ? "🔇" : "🔊"}</Text>
         </Pressable>
       )}
 
       {/* Header */}
-      <Text
-        style={{
-          color: "#FFD700",
-          fontSize: 20,
-          fontWeight: "bold",
-          marginBottom: 12,
-          fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
-        }}
-      >
-        Pitch Drone
-      </Text>
+      <Text style={styles.headerTitle}>Pitch Drone</Text>
 
       {/* Temperament & Concert A Row */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          marginBottom: 12,
-          flexWrap: "wrap",
-          justifyContent: "center",
-        }}
-      >
+      <View style={styles.headerRow}>
         {/* Temperament Toggle */}
-        <View
-          style={{ flexDirection: "row", marginRight: 16, marginBottom: 8 }}
-        >
+        <View style={styles.temperamentToggle}>
           <TouchableOpacity
             onPress={() => setTemperament("equal")}
-            style={{
-              backgroundColor: temperament === "equal" ? "#9C27B0" : "#2d232e",
-              paddingVertical: 6,
-              paddingHorizontal: 12,
-              borderTopLeftRadius: 12,
-              borderBottomLeftRadius: 12,
-              borderWidth: 1,
-              borderColor: "#9C27B0",
-            }}
+            style={[
+              styles.temperamentButtonLeft,
+              temperament === "equal"
+                ? styles.temperamentButtonActive
+                : styles.temperamentButtonInactive,
+            ]}
           >
             <Text
-              style={{
-                color: temperament === "equal" ? "#fff" : "#9C27B0",
-                fontSize: 12,
-                fontWeight: "bold",
-              }}
+              style={[
+                styles.temperamentButtonText,
+                temperament === "equal"
+                  ? styles.temperamentButtonTextActive
+                  : styles.temperamentButtonTextInactive,
+              ]}
             >
               Equal
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setTemperament("just")}
-            style={{
-              backgroundColor: temperament === "just" ? "#9C27B0" : "#2d232e",
-              paddingVertical: 6,
-              paddingHorizontal: 12,
-              borderTopRightRadius: 12,
-              borderBottomRightRadius: 12,
-              borderWidth: 1,
-              borderLeftWidth: 0,
-              borderColor: "#9C27B0",
-            }}
+            style={[
+              styles.temperamentButtonRight,
+              temperament === "just"
+                ? styles.temperamentButtonActive
+                : styles.temperamentButtonInactive,
+            ]}
           >
             <Text
-              style={{
-                color: temperament === "just" ? "#fff" : "#9C27B0",
-                fontSize: 12,
-                fontWeight: "bold",
-              }}
+              style={[
+                styles.temperamentButtonText,
+                temperament === "just"
+                  ? styles.temperamentButtonTextActive
+                  : styles.temperamentButtonTextInactive,
+              ]}
             >
               Just
             </Text>
@@ -719,16 +657,8 @@ export default function PitchDrone({
         </View>
 
         {/* Concert A Input */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            marginBottom: 8,
-          }}
-        >
-          <Text style={{ color: "#bfa76a", fontSize: 12, marginRight: 4 }}>
-            A=
-          </Text>
+        <View style={styles.concertARow}>
+          <Text style={styles.concertALabel}>A=</Text>
           <TextInput
             value={concertA}
             onChangeText={setConcertA}
@@ -767,31 +697,25 @@ export default function PitchDrone({
           >
             Root for Just Intonation:
           </Text>
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              justifyContent: "center",
-            }}
-          >
+          <View style={styles.pitchCenterGrid}>
             {NOTES.map((note, idx) => (
               <TouchableOpacity
                 key={note.name}
                 onPress={() => setPitchCenter(idx)}
-                style={{
-                  backgroundColor: pitchCenter === idx ? "#FFD700" : "#2d232e",
-                  paddingVertical: 4,
-                  paddingHorizontal: 8,
-                  borderRadius: 6,
-                  margin: 2,
-                }}
+                style={[
+                  styles.pitchCenterButton,
+                  pitchCenter === idx
+                    ? styles.pitchCenterButtonActive
+                    : styles.pitchCenterButtonInactive,
+                ]}
               >
                 <Text
-                  style={{
-                    color: pitchCenter === idx ? "#1a1a2e" : "#bfa76a",
-                    fontSize: 11,
-                    fontWeight: pitchCenter === idx ? "bold" : "normal",
-                  }}
+                  style={[
+                    styles.pitchCenterText,
+                    pitchCenter === idx
+                      ? styles.pitchCenterTextActive
+                      : styles.pitchCenterTextInactive,
+                  ]}
                 >
                   {note.name}
                 </Text>
@@ -802,64 +726,48 @@ export default function PitchDrone({
       )}
 
       {/* Octave Selector */}
-      <View
-        style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}
-      >
+      <View style={styles.octaveRow}>
         <TouchableOpacity
           onPress={() => setOctave(Math.max(1, octave - 1))}
-          style={{
-            backgroundColor: octave > 1 ? "#3b2c1a" : "#222",
-            paddingVertical: 8,
-            paddingHorizontal: 16,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: octave > 1 ? "#FFD700" : "#444",
-          }}
+          style={[
+            styles.octaveButton,
+            octave > 1
+              ? styles.octaveButtonEnabled
+              : styles.octaveButtonDisabled,
+          ]}
         >
           <Text
-            style={{
-              color: octave > 1 ? "#FFD700" : "#666",
-              fontSize: 18,
-              fontWeight: "bold",
-            }}
+            style={[
+              styles.octaveButtonText,
+              octave > 1
+                ? styles.octaveButtonTextEnabled
+                : styles.octaveButtonTextDisabled,
+            ]}
           >
             −
           </Text>
         </TouchableOpacity>
 
-        <View
-          style={{
-            backgroundColor: "#2d232e",
-            paddingVertical: 8,
-            paddingHorizontal: 16,
-            marginHorizontal: 8,
-            borderRadius: 8,
-            minWidth: 100,
-            alignItems: "center",
-          }}
-        >
-          <Text style={{ color: "#FFD700", fontSize: 14, fontWeight: "bold" }}>
-            Octave ({octave})
-          </Text>
+        <View style={styles.octaveDisplay}>
+          <Text style={styles.octaveDisplayText}>Octave ({octave})</Text>
         </View>
 
         <TouchableOpacity
           onPress={() => setOctave(Math.min(9, octave + 1))}
-          style={{
-            backgroundColor: octave < 9 ? "#3b2c1a" : "#222",
-            paddingVertical: 8,
-            paddingHorizontal: 16,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: octave < 9 ? "#FFD700" : "#444",
-          }}
+          style={[
+            styles.octaveButton,
+            octave < 9
+              ? styles.octaveButtonEnabled
+              : styles.octaveButtonDisabled,
+          ]}
         >
           <Text
-            style={{
-              color: octave < 9 ? "#FFD700" : "#666",
-              fontSize: 18,
-              fontWeight: "bold",
-            }}
+            style={[
+              styles.octaveButtonText,
+              octave < 9
+                ? styles.octaveButtonTextEnabled
+                : styles.octaveButtonTextDisabled,
+            ]}
           >
             +
           </Text>
@@ -867,25 +775,22 @@ export default function PitchDrone({
       </View>
 
       {/* Sustain & Vibrato Row */}
-      <View style={{ flexDirection: "row", gap: 12, marginBottom: 16 }}>
+      <View style={styles.toggleRow}>
         {/* Sustain Button */}
         <TouchableOpacity
           onPress={handleSustainToggle}
-          style={{
-            backgroundColor: sustain ? "#27ae60" : "#2d232e",
-            paddingVertical: 10,
-            paddingHorizontal: 20,
-            borderRadius: 20,
-            borderWidth: 2,
-            borderColor: sustain ? "#27ae60" : "#444",
-          }}
+          style={[
+            styles.toggleButton,
+            sustain ? styles.sustainButtonActive : styles.sustainButtonInactive,
+          ]}
         >
           <Text
-            style={{
-              color: sustain ? "#fff" : "#bfa76a",
-              fontSize: 14,
-              fontWeight: "bold",
-            }}
+            style={[
+              styles.toggleButtonText,
+              sustain
+                ? styles.toggleButtonTextActive
+                : styles.toggleButtonTextInactive,
+            ]}
           >
             {sustain ? "🔒 Sustain" : "🔓 Sustain"}
           </Text>
@@ -916,14 +821,7 @@ export default function PitchDrone({
       </View>
 
       {/* Note Grid */}
-      <View
-        style={{
-          flexDirection: "row",
-          flexWrap: "wrap",
-          justifyContent: "center",
-          maxWidth: 340,
-        }}
-      >
+      <View style={styles.noteGrid}>
         {NOTES.map((note, idx) => {
           const activeOctaves = getActiveOctavesForNote(idx);
           const isActive = activeOctaves.length > 0;
@@ -933,49 +831,28 @@ export default function PitchDrone({
               key={note.name}
               onPressIn={() => handleNotePress(idx)}
               onPressOut={() => handleNoteRelease(idx)}
-              style={{
-                width: 72,
-                height: 56,
-                margin: 4,
-                borderRadius: 8,
-                backgroundColor: "#2d232e",
-                borderWidth: 2,
-                borderColor: isActive ? "#FFD700" : "#444",
-                justifyContent: "center",
-                alignItems: "center",
-                position: "relative",
-                overflow: "hidden",
-              }}
+              style={[
+                styles.noteButton,
+                { borderColor: isActive ? colors.gold : "#444" },
+              ]}
             >
               {/* Multi-octave highlight */}
               {renderOctaveHighlight(idx, activeOctaves)}
 
               {/* Note label */}
-              <View style={{ zIndex: 1 }}>
+              <View style={styles.noteLabelWrapper}>
                 <Text
-                  style={{
-                    color: isActive ? "#fff" : "#FFD700",
-                    fontSize: 14,
-                    fontWeight: "bold",
-                    textAlign: "center",
-                    textShadowColor: isActive ? "#000" : "transparent",
-                    textShadowOffset: { width: 1, height: 1 },
-                    textShadowRadius: 2,
-                  }}
+                  style={[
+                    styles.noteLabel,
+                    isActive
+                      ? styles.noteLabelActive
+                      : styles.noteLabelInactive,
+                  ]}
                 >
                   {note.enharmonic}
                 </Text>
                 {activeOctaves.length > 0 && (
-                  <Text
-                    style={{
-                      color: "#fff",
-                      fontSize: 10,
-                      textAlign: "center",
-                      textShadowColor: "#000",
-                      textShadowOffset: { width: 1, height: 1 },
-                      textShadowRadius: 2,
-                    }}
-                  >
+                  <Text style={styles.noteOctaveLabel}>
                     Oct: {activeOctaves.join(", ")}
                   </Text>
                 )}
@@ -987,28 +864,16 @@ export default function PitchDrone({
 
       {/* Active Drones Summary */}
       {isAnyDronePlaying && (
-        <View style={{ marginTop: 12 }}>
-          <Text style={{ color: "#bfa76a", fontSize: 12, textAlign: "center" }}>
+        <View style={styles.activeDronesSummary}>
+          <Text style={styles.activeDronesText}>
             Active: {Object.keys(activeDrones).join(", ")}
           </Text>
         </View>
       )}
 
       {/* Octave Color Legend */}
-      <View
-        style={{
-          flexDirection: "row",
-          flexWrap: "wrap",
-          justifyContent: "center",
-          marginTop: 12,
-          paddingTop: 8,
-          borderTopWidth: 1,
-          borderTopColor: "#333",
-        }}
-      >
-        <Text style={{ color: "#666", fontSize: 10, marginRight: 8 }}>
-          Octave colors:
-        </Text>
+      <View style={styles.legendContainer}>
+        <Text style={styles.legendLabel}>Octave colors:</Text>
         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((oct) => (
           <View
             key={oct}
@@ -1064,32 +929,15 @@ export default function PitchDrone({
                   }),
             }}
           >
-            <Text
-              style={{
-                color: "#FFD700",
-                fontSize: 18,
-                fontWeight: "bold",
-                marginBottom: 20,
-                textAlign: "center",
-              }}
-            >
-              🔊 Volume Controls
-            </Text>
+            <Text style={styles.volumeModalTitle}>🔊 Volume Controls</Text>
 
             {/* Metronome Volume */}
-            <View style={{ marginBottom: 20 }}>
-              <Text
-                style={{
-                  color: "#9C27B0",
-                  fontSize: 14,
-                  fontWeight: "600",
-                  marginBottom: 8,
-                }}
-              >
+            <View style={styles.volumeRow}>
+              <Text style={styles.volumeLabelPurple}>
                 🎵 Metronome: {Math.round(metronomeVolume * 100)}%
               </Text>
               <Slider
-                style={{ width: "100%", height: 40 }}
+                style={styles.slider}
                 minimumValue={0}
                 maximumValue={1}
                 value={metronomeVolume}
@@ -1103,19 +951,12 @@ export default function PitchDrone({
             </View>
 
             {/* Drone Volume */}
-            <View style={{ marginBottom: 24 }}>
-              <Text
-                style={{
-                  color: "#00BCD4",
-                  fontSize: 14,
-                  fontWeight: "600",
-                  marginBottom: 8,
-                }}
-              >
+            <View style={styles.volumeRowLast}>
+              <Text style={styles.volumeLabelCyan}>
                 🎶 Drone: {Math.round(volume * 100)}%
               </Text>
               <Slider
-                style={{ width: "100%", height: 40 }}
+                style={styles.slider}
                 minimumValue={0}
                 maximumValue={1}
                 value={volume}
@@ -1129,18 +970,9 @@ export default function PitchDrone({
             {/* Close Button */}
             <TouchableOpacity
               onPress={() => setShowVolumeModal(false)}
-              style={{
-                backgroundColor: "#FFD700",
-                borderRadius: 8,
-                paddingVertical: 12,
-                alignItems: "center",
-              }}
+              style={styles.doneButton}
             >
-              <Text
-                style={{ color: "#1a1a2e", fontWeight: "bold", fontSize: 16 }}
-              >
-                Done
-              </Text>
+              <Text style={styles.doneButtonText}>Done</Text>
             </TouchableOpacity>
           </View>
         </View>

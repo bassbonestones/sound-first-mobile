@@ -8,19 +8,7 @@ import {
   ActivityIndicator,
   Platform,
 } from "react-native";
-
-function getBaseUrl() {
-  const LOCAL_IP = "192.168.1.19";
-  if (Platform.OS === "android") {
-    return "http://10.0.2.2:8000";
-  } else if (Platform.OS === "ios") {
-    return `http://${LOCAL_IP}:8000`;
-  } else if (Platform.OS === "web") {
-    return `http://${window.location.hostname}:8000`;
-  } else {
-    return `http://${LOCAL_IP}:8000`;
-  }
-}
+import { baseUrl } from "../api/client";
 
 /**
  * HelpMenu - Shows capabilities referenced in a material for quick review
@@ -49,7 +37,7 @@ export default function HelpMenu({
     setError(null);
     try {
       const res = await fetch(
-        `${getBaseUrl()}/materials/${materialId}/help-capabilities`,
+        `${baseUrl}/materials/${materialId}/help-capabilities`,
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();

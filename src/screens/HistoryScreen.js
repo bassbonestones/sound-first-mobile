@@ -6,13 +6,11 @@ import {
   ActivityIndicator,
   ScrollView,
   TouchableOpacity,
+  StyleSheet,
+  Platform,
 } from "react-native";
 import ResetButton from "../components/ResetButton";
 import { baseUrl } from "../api/client";
-
-function getBackendUrl(endpoint) {
-  return `${baseUrl}/${endpoint}`;
-}
 
 // Mastery level colors
 const MASTERY_COLORS = {
@@ -33,12 +31,10 @@ export default function HistoryScreen() {
 
   useEffect(() => {
     Promise.all([
-      fetch(getBackendUrl("history/summary?user_id=1")).then((r) => r.json()),
-      fetch(getBackendUrl("history/materials?user_id=1")).then((r) => r.json()),
-      fetch(getBackendUrl("history/focus-cards?user_id=1")).then((r) =>
-        r.json(),
-      ),
-      fetch(getBackendUrl("history/timeline?user_id=1&days=30")).then((r) =>
+      fetch(`${baseUrl}/history/summary?user_id=1`).then((r) => r.json()),
+      fetch(`${baseUrl}/history/materials?user_id=1`).then((r) => r.json()),
+      fetch(`${baseUrl}/history/focus-cards?user_id=1`).then((r) => r.json()),
+      fetch(`${baseUrl}/history/timeline?user_id=1&days=30`).then((r) =>
         r.json(),
       ),
     ])
@@ -56,31 +52,23 @@ export default function HistoryScreen() {
   }, []);
 
   if (loading)
-    return (
-      <ActivityIndicator
-        size="large"
-        style={{ flex: 1, backgroundColor: "#1a1410" }}
-      />
-    );
+    return <ActivityIndicator size="large" style={styles.loadingContainer} />;
 
   const TabButton = ({ name, label }) => (
     <TouchableOpacity
       onPress={() => setActiveTab(name)}
-      style={{
-        backgroundColor: activeTab === name ? "#FFD700" : "#3b2c1a",
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderRadius: 20,
-        marginRight: 8,
-        marginBottom: 8,
-      }}
+      style={[
+        styles.tabButton,
+        activeTab === name ? styles.tabButtonActive : styles.tabButtonInactive,
+      ]}
     >
       <Text
-        style={{
-          color: activeTab === name ? "#3b2c1a" : "#FFD700",
-          fontWeight: "bold",
-          fontSize: 14,
-        }}
+        style={[
+          styles.tabButtonText,
+          activeTab === name
+            ? styles.tabButtonTextActive
+            : styles.tabButtonTextInactive,
+        ]}
       >
         {label}
       </Text>
@@ -88,30 +76,12 @@ export default function HistoryScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#1a1410" }}>
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          backgroundColor: "#1a1410",
-          padding: 24,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 28,
-            fontWeight: "bold",
-            color: "#FFD700",
-            marginBottom: 16,
-            fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
-          }}
-        >
-          Practice History
-        </Text>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.pageTitle}>Practice History</Text>
 
         {/* Tab Navigation */}
-        <View
-          style={{ flexDirection: "row", marginBottom: 20, flexWrap: "wrap" }}
-        >
+        <View style={styles.tabContainer}>
           <TabButton name="summary" label="Summary" />
           <TabButton name="materials" label="Materials" />
           <TabButton name="focus" label="Focus Cards" />
@@ -122,13 +92,7 @@ export default function HistoryScreen() {
         {activeTab === "summary" && summary && (
           <View>
             {/* Stats Cards */}
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                marginBottom: 16,
-              }}
-            >
+            <View style={styles.statsRow}>
               <StatCard label="Sessions" value={summary.total_sessions} />
               <StatCard label="Attempts" value={summary.total_attempts} />
               <StatCard
@@ -199,54 +163,31 @@ export default function HistoryScreen() {
             keyExtractor={(item) => item.material_id.toString()}
             renderItem={({ item }) => (
               <View
-                style={{
-                  backgroundColor: "#3b2c1a",
-                  borderRadius: 12,
-                  padding: 14,
-                  marginBottom: 12,
-                  borderWidth: 1,
-                  borderColor: item.is_due ? "#FF9800" : "#5a4a3a",
-                }}
+                style={[
+                  styles.materialItem,
+                  { borderColor: item.is_due ? "#FF9800" : "#5a4a3a" },
+                ]}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: "#FFD700",
-                      fontWeight: "bold",
-                      fontSize: 16,
-                      flex: 1,
-                    }}
-                  >
+                <View style={styles.materialHeader}>
+                  <Text style={styles.materialTitle}>
                     {item.material_title}
                   </Text>
                   <View
-                    style={{
-                      backgroundColor:
-                        MASTERY_COLORS[item.mastery_level] || "#666",
-                      paddingHorizontal: 8,
-                      paddingVertical: 4,
-                      borderRadius: 8,
-                    }}
+                    style={[
+                      styles.masteryBadge,
+                      {
+                        backgroundColor:
+                          MASTERY_COLORS[item.mastery_level] || "#666",
+                      },
+                    ]}
                   >
-                    <Text
-                      style={{
-                        color: "#fff",
-                        fontSize: 11,
-                        fontWeight: "bold",
-                      }}
-                    >
+                    <Text style={styles.masteryBadgeText}>
                       {item.mastery_level?.toUpperCase()}
                     </Text>
                   </View>
                 </View>
-                <View style={{ marginTop: 8 }}>
-                  <Text style={{ color: "#fffbe6", fontSize: 13 }}>
+                <View style={styles.materialDetails}>
+                  <Text style={styles.materialDetailText}>
                     Practiced {item.attempt_count}x • Avg:{" "}
                     {item.average_rating || "—"} • Interval:{" "}
                     {item.interval_days}d
@@ -396,42 +337,270 @@ export default function HistoryScreen() {
 // Helper Components
 function StatCard({ label, value }) {
   return (
-    <View
-      style={{
-        backgroundColor: "#3b2c1a",
-        borderRadius: 12,
-        padding: 16,
-        marginRight: 12,
-        marginBottom: 12,
-        minWidth: 80,
-        alignItems: "center",
-        borderWidth: 1,
-        borderColor: "#5a4a3a",
-      }}
-    >
-      <Text style={{ color: "#FFD700", fontSize: 24, fontWeight: "bold" }}>
-        {value}
-      </Text>
-      <Text style={{ color: "#bfa76a", fontSize: 12 }}>{label}</Text>
+    <View style={styles.statCard}>
+      <Text style={styles.statCardValue}>{value}</Text>
+      <Text style={styles.statCardLabel}>{label}</Text>
     </View>
   );
 }
 
 function StatRow({ label, value, highlight }) {
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        paddingVertical: 6,
-      }}
-    >
-      <Text style={{ color: "#fffbe6" }}>{label}</Text>
+    <View style={styles.statRow}>
+      <Text style={styles.statRowLabel}>{label}</Text>
       <Text
-        style={{ color: highlight ? "#FF9800" : "#FFD700", fontWeight: "bold" }}
+        style={[styles.statRowValue, highlight && styles.statRowValueHighlight]}
       >
         {value}
       </Text>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  // Container styles
+  container: {
+    flex: 1,
+    backgroundColor: "#1a1410",
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    backgroundColor: "#1a1410",
+    padding: 24,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: "#1a1410",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#1a1410",
+  },
+  errorText: {
+    color: "#ff6b6b",
+    textAlign: "center",
+    padding: 20,
+  },
+  noDataText: {
+    color: "#888",
+    textAlign: "center",
+    padding: 20,
+  },
+
+  // Tab styles
+  tabContainer: {
+    flexDirection: "row",
+    marginBottom: 20,
+    flexWrap: "wrap",
+  },
+  tabButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  tabButtonActive: {
+    backgroundColor: "#FFD700",
+  },
+  tabButtonInactive: {
+    backgroundColor: "#3b2c1a",
+  },
+  tabButtonText: {
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  tabButtonTextActive: {
+    color: "#3b2c1a",
+  },
+  tabButtonTextInactive: {
+    color: "#FFD700",
+  },
+
+  // Card styles
+  card: {
+    backgroundColor: "#2d2d2d",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#3b2c1a",
+  },
+  cardTitle: {
+    color: "#FFD700",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 12,
+  },
+  statsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+
+  // StatCard styles
+  statCard: {
+    backgroundColor: "#3b2c1a",
+    borderRadius: 12,
+    padding: 16,
+    marginRight: 12,
+    marginBottom: 12,
+    minWidth: 80,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#5a4a3a",
+  },
+  statCardValue: {
+    color: "#FFD700",
+    fontSize: 24,
+    fontWeight: "bold",
+  },
+  statCardLabel: {
+    color: "#bfa76a",
+    fontSize: 12,
+  },
+
+  // StatRow styles
+  statRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 6,
+  },
+  statRowLabel: {
+    color: "#fffbe6",
+  },
+  statRowValue: {
+    color: "#FFD700",
+    fontWeight: "bold",
+  },
+  statRowValueHighlight: {
+    color: "#FF9800",
+  },
+
+  // Timeline styles
+  timelineTitle: {
+    color: "#FFD700",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+  heatmapContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: 16,
+  },
+  heatmapDay: {
+    width: 32,
+    height: 32,
+    borderRadius: 4,
+    margin: 2,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  heatmapDayText: {
+    fontSize: 10,
+  },
+  dailyBreakdown: {
+    marginTop: 20,
+  },
+  dailyRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#3b2c1a",
+  },
+  dailyDate: {
+    color: "#fffbe6",
+  },
+  dailyStats: {
+    color: "#FFD700",
+  },
+
+  // Material list styles
+  materialItem: {
+    backgroundColor: "#3b2c1a",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+  },
+  materialHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  materialTitle: {
+    color: "#FFD700",
+    fontWeight: "bold",
+    fontSize: 16,
+    flex: 1,
+  },
+  masteryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  masteryBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "bold",
+  },
+  materialDetails: {
+    marginTop: 8,
+  },
+  materialDetailText: {
+    color: "#fffbe6",
+    fontSize: 13,
+  },
+  materialAttempts: {
+    color: "#888",
+    fontSize: 12,
+  },
+  materialLevel: {
+    color: "#FFD700",
+    fontSize: 12,
+    textTransform: "capitalize",
+  },
+  materialBadge: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 12,
+  },
+
+  // Focus card styles
+  focusItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#3b2c1a",
+  },
+  focusNumber: {
+    color: "#FFD700",
+    fontWeight: "bold",
+    width: 24,
+  },
+  focusTitle: {
+    color: "#fffbe6",
+    flex: 1,
+  },
+  focusAttempts: {
+    color: "#888",
+    fontSize: 12,
+  },
+
+  // Page title
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#FFD700",
+    marginBottom: 16,
+    fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
+  },
+});

@@ -14,10 +14,6 @@ import ResetButton from "../components/ResetButton";
 import { baseUrl } from "../api/client";
 import { createShadow } from "../styles/theme";
 
-function getBackendUrl(endpoint) {
-  return `${baseUrl}/${endpoint}`;
-}
-
 export default function SelfDirectedScreen({ navigation }) {
   const [materials, setMaterials] = useState([]);
   const [focusCards, setFocusCards] = useState([]);
@@ -28,8 +24,8 @@ export default function SelfDirectedScreen({ navigation }) {
 
   useEffect(() => {
     Promise.all([
-      fetch(getBackendUrl("materials")).then((r) => r.json()),
-      fetch(getBackendUrl("focus-cards")).then((r) => r.json()),
+      fetch(`${baseUrl}/materials`).then((r) => r.json()),
+      fetch(`${baseUrl}/focus-cards`).then((r) => r.json()),
     ]).then(([mats, fcs]) => {
       setMaterials(mats);
       setFocusCards(fcs);

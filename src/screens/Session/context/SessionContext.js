@@ -9,21 +9,15 @@ import React, {
   useEffect,
 } from "react";
 import { Platform, Alert } from "react-native";
-import { baseUrl, LOCAL_IP } from "../../../api/client";
+import { baseUrl } from "../../../api/client";
 
 const SessionContext = createContext(null);
 
-function getBackendUrl(selfDirected = false) {
+function getSessionUrl(selfDirected = false) {
   const endpoint = selfDirected
     ? "generate-self-directed-session"
     : "generate-session";
   return `${baseUrl}/${endpoint}`;
-}
-
-function getLocalUrl() {
-  return Platform.OS === "web"
-    ? `http://${window.location.hostname}:8000`
-    : `http://${LOCAL_IP}:8000`;
 }
 
 export function SessionProvider({ children, routeParams, navigation }) {
@@ -65,7 +59,7 @@ export function SessionProvider({ children, routeParams, navigation }) {
 
   // Fetch session on mount
   useEffect(() => {
-    const url = getBackendUrl(selfDirected);
+    const url = getSessionUrl(selfDirected);
     let body;
     if (selfDirected) {
       body = JSON.stringify({
@@ -112,9 +106,8 @@ export function SessionProvider({ children, routeParams, navigation }) {
     const mini = session.mini_sessions[current];
 
     setCurriculumLoading(true);
-    const localUrl = getLocalUrl();
 
-    fetch(`${localUrl}/mini-sessions/${mini.mini_session_id}/curriculum`)
+    fetch(`${baseUrl}/mini-sessions/${mini.mini_session_id}/curriculum`)
       .then((res) =>
         res.ok ? res.json() : Promise.reject("Failed to load curriculum"),
       )
@@ -141,11 +134,9 @@ export function SessionProvider({ children, routeParams, navigation }) {
   ) => {
     if (!mini?.mini_session_id) return;
 
-    const localUrl = getLocalUrl();
-
     try {
       const res = await fetch(
-        `${localUrl}/mini-sessions/${mini.mini_session_id}/steps/${stepIndex}/complete`,
+        `${baseUrl}/mini-sessions/${mini.mini_session_id}/steps/${stepIndex}/complete`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -227,8 +218,7 @@ export function SessionProvider({ children, routeParams, navigation }) {
   const handleReflectionSubmit = async () => {
     setSubmitting(true);
     try {
-      const localUrl = getLocalUrl();
-      const res = await fetch(`${localUrl}/practice-attempt`, {
+      const res = await fetch(`${baseUrl}/practice-attempt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
