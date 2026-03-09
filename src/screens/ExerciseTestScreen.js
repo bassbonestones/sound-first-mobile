@@ -19,6 +19,7 @@ import {
   TapAlongExercise,
   StartOnCueExercise,
   FeelThePulseExercise,
+  RangeExpansionExercise,
 } from "./Session/components/exercises";
 
 const EXERCISES = [
@@ -54,12 +55,45 @@ const EXERCISES = [
     config: { bpm: 60 },
     mastery: { correct_streak: 3 },
   },
+  {
+    id: "range_expansion_up",
+    name: "Expand Range (Up)",
+    icon: "⬆️",
+    description: "Extend your high note by one half step",
+    component: RangeExpansionExercise,
+    config: {},
+    mastery: { correct_streak: 3 },
+    extraProps: {
+      direction: "up",
+      userRangeLow: "Bb3",
+      userRangeHigh: "Bb3",
+      clef: "treble",
+    },
+  },
+  {
+    id: "range_expansion_down",
+    name: "Expand Range (Down)",
+    icon: "⬇️",
+    description: "Extend your low note by one half step",
+    component: RangeExpansionExercise,
+    config: {},
+    mastery: { correct_streak: 3 },
+    extraProps: {
+      direction: "down",
+      userRangeLow: "Bb3",
+      userRangeHigh: "Bb3",
+      clef: "treble",
+    },
+  },
 ];
 
 export default function ExerciseTestScreen() {
   const navigation = useNavigation();
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [result, setResult] = useState(null);
+  const [selectedClef, setSelectedClef] = useState("treble");
+  const [showClefPicker, setShowClefPicker] = useState(false);
+  const [pendingExercise, setPendingExercise] = useState(null);
 
   const handleComplete = (exerciseResult) => {
     console.log("[ExerciseTest] Complete:", exerciseResult);
@@ -74,6 +108,97 @@ export default function ExerciseTestScreen() {
   const handleProgress = (progress) => {
     console.log("[ExerciseTest] Progress:", progress);
   };
+
+  // Handle exercise selection - show clef picker for range expansion
+  const handleSelectExercise = (exercise) => {
+    if (exercise.id.startsWith("range_expansion")) {
+      setPendingExercise(exercise);
+      setShowClefPicker(true);
+    } else {
+      setSelectedExercise(exercise);
+    }
+  };
+
+  // Start range expansion with selected clef
+  const handleStartWithClef = () => {
+    if (pendingExercise) {
+      setSelectedExercise({
+        ...pendingExercise,
+        extraProps: {
+          ...pendingExercise.extraProps,
+          clef: selectedClef,
+        },
+      });
+      setShowClefPicker(false);
+      setPendingExercise(null);
+    }
+  };
+
+  // Show clef picker
+  if (showClefPicker && pendingExercise) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => {
+              setShowClefPicker(false);
+              setPendingExercise(null);
+            }}
+          >
+            <Text style={styles.backButtonText}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Select Clef</Text>
+        </View>
+
+        <View style={styles.clefPickerContainer}>
+          <Text style={styles.clefPickerTitle}>
+            {pendingExercise.icon} {pendingExercise.name}
+          </Text>
+          <Text style={styles.clefPickerSubtitle}>
+            Choose your instrument's clef:
+          </Text>
+
+          <View style={styles.clefOptions}>
+            <TouchableOpacity
+              style={[
+                styles.clefOption,
+                selectedClef === "treble" && styles.clefOptionSelected,
+              ]}
+              onPress={() => setSelectedClef("treble")}
+            >
+              <Text style={styles.clefSymbol}>𝄞</Text>
+              <Text style={styles.clefLabel}>Treble</Text>
+              <Text style={styles.clefInstruments}>
+                Trumpet, Sax, Flute, Violin, etc.
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.clefOption,
+                selectedClef === "bass" && styles.clefOptionSelected,
+              ]}
+              onPress={() => setSelectedClef("bass")}
+            >
+              <Text style={styles.clefSymbol}>𝄢</Text>
+              <Text style={styles.clefLabel}>Bass</Text>
+              <Text style={styles.clefInstruments}>
+                Trombone, Tuba, Bass, Cello, etc.
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={styles.startButton}
+            onPress={handleStartWithClef}
+          >
+            <Text style={styles.startButtonText}>Start Exercise</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // Show exercise
   if (selectedExercise) {
@@ -108,6 +233,7 @@ export default function ExerciseTestScreen() {
               mastery={selectedExercise.mastery}
               onComplete={handleComplete}
               onProgress={handleProgress}
+              {...(selectedExercise.extraProps || {})}
             />
           </View>
         )}
@@ -137,7 +263,7 @@ export default function ExerciseTestScreen() {
           <TouchableOpacity
             key={exercise.id}
             style={styles.exerciseCard}
-            onPress={() => setSelectedExercise(exercise)}
+            onPress={() => handleSelectExercise(exercise)}
           >
             <View style={styles.exerciseIconContainer}>
               <Text style={styles.exerciseIcon}>{exercise.icon}</Text>
@@ -253,6 +379,69 @@ const styles = StyleSheet.create({
   resultText: {
     fontSize: 24,
     fontWeight: "bold",
+    color: "#fff",
+  },
+  // Clef picker styles
+  clefPickerContainer: {
+    flex: 1,
+    padding: 24,
+    alignItems: "center",
+  },
+  clefPickerTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 8,
+  },
+  clefPickerSubtitle: {
+    fontSize: 16,
+    color: "#888",
+    marginBottom: 32,
+  },
+  clefOptions: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 16,
+    marginBottom: 32,
+  },
+  clefOption: {
+    width: 150,
+    padding: 20,
+    backgroundColor: "#2a2a2a",
+    borderRadius: 16,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  clefOptionSelected: {
+    borderColor: "#4CAF50",
+    backgroundColor: "#2a3a2a",
+  },
+  clefSymbol: {
+    fontSize: 48,
+    color: "#fff",
+    marginBottom: 8,
+  },
+  clefLabel: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#fff",
+    marginBottom: 4,
+  },
+  clefInstruments: {
+    fontSize: 11,
+    color: "#888",
+    textAlign: "center",
+  },
+  startButton: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 48,
+    paddingVertical: 16,
+    borderRadius: 12,
+  },
+  startButtonText: {
+    fontSize: 18,
+    fontWeight: "600",
     color: "#fff",
   },
 });

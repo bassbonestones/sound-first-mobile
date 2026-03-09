@@ -24,6 +24,7 @@ export default function NotationDisplay({
   width = 320, 
   height = 200,
   showTitle = false,
+  zoom = 0.7,
 }) {
   const containerRef = useRef(null);
   const osmdRef = useRef(null);
@@ -65,12 +66,19 @@ export default function NotationDisplay({
         setLoading(false);
         return;
       }
+      
+      // Check again after any async operations - component may have unmounted
+      if (!containerRef.current) {
+        setLoading(false);
+        return;
+      }
 
       try {
         const { OpenSheetMusicDisplay } = window.opensheetmusicdisplay;
         
         // ALWAYS clear the container before creating a new instance
         // (This prevents concatenation of multiple staves on re-render)
+        if (!containerRef.current) return; // Guard against unmount
         containerRef.current.innerHTML = "";
         osmdRef.current = null;
 
@@ -103,11 +111,17 @@ export default function NotationDisplay({
         // Load and render with fixed width
         if (musicxml) {
           await osmdRef.current.load(musicxml);
+          // Check if still mounted after async load
+          if (!containerRef.current) {
+            setLoading(false);
+            return;
+          }
           // Set a fixed zoom to stabilize rendering
-          osmdRef.current.zoom = 0.7;
+          osmdRef.current.zoom = zoom;
           osmdRef.current.render();
           
           // Force consistent positioning by fixing the SVG
+          if (!containerRef.current) return; // Guard after render
           const svgElement = containerRef.current.querySelector('svg');
           if (svgElement) {
             // Fix size
@@ -139,7 +153,7 @@ export default function NotationDisplay({
         osmdRef.current = null;
       }
     };
-  }, [musicxml, showTitle]);
+  }, [musicxml, showTitle, zoom]);
 
   // Generate HTML for WebView (mobile)
   const webviewHtml = useMemo(() => {
@@ -221,7 +235,7 @@ export default function NotationDisplay({
         
         const musicxml = \`${escapedXml}\`;
         await osmd.load(musicxml);
-        osmd.zoom = 0.8;
+        osmd.zoom = ${zoom};
         osmd.render();
         
         if (loadingDiv) loadingDiv.remove();
@@ -233,7 +247,7 @@ export default function NotationDisplay({
   </script>
 </body>
 </html>`;
-  }, [musicxml, width, showTitle]);
+  }, [musicxml, width, showTitle, zoom]);
 
   // Mobile: use WebView
   if (Platform.OS !== "web") {

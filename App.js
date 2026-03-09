@@ -95,6 +95,7 @@ import SelfDirectedScreen from "./src/screens/SelfDirectedScreen";
 import HistoryScreen from "./src/screens/HistoryScreen";
 import AdminScreen from "./src/screens/Admin";
 import FirstNoteScreen from "./src/screens/FirstNote";
+import ExerciseTestScreen from "./src/screens/ExerciseTestScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -263,6 +264,11 @@ export default function App() {
             name="Admin"
             component={AdminScreen}
             options={{ title: "Admin Console", headerShown: false }}
+          />
+          <Stack.Screen
+            name="ExerciseTest"
+            component={ExerciseTestScreen}
+            options={{ title: "Exercise Tester", headerShown: false }}
           />
         </Stack.Navigator>
       </NavigationContainer>
