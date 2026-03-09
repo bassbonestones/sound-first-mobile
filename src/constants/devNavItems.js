@@ -7,6 +7,7 @@ export const DEV_NAV_ITEMS = [
   { screen: "FirstNote", label: "First Note (Day 0)", icon: "🎵" },
   { screen: "SelfDirected", label: "Self-Directed Mode", icon: "🎹" },
   { screen: "History", label: "Practice History", icon: "📊" },
+  { screen: "ExerciseTest", label: "Exercise Tester", icon: "🧪" },
   { screen: "Admin", label: "Admin Console", icon: "⚙️" },
   { screen: "Onboarding", label: "Onboarding", icon: "👋" },
 ];

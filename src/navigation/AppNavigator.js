@@ -20,6 +20,7 @@ import SelfDirectedScreen from "../screens/SelfDirectedScreen";
 import HistoryScreen from "../screens/HistoryScreen";
 import AdminScreen from "../screens/Admin";
 import FirstNoteScreen from "../screens/FirstNote";
+import ExerciseTestScreen from "../screens/ExerciseTestScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -138,6 +139,11 @@ export function AppNavigator({ initialRoute, initialParams }) {
           name="Admin"
           component={AdminScreen}
           options={{ title: "Admin Console", headerShown: false }}
+        />
+        <Stack.Screen
+          name="ExerciseTest"
+          component={ExerciseTestScreen}
+          options={{ title: "Exercise Tester", headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>

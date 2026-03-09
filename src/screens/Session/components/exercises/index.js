@@ -8,6 +8,7 @@ import ContourCopyExercise from "./ContourCopyExercise";
 import TapAlongExercise from "./TapAlongExercise";
 import EnterOnBeatOneExercise from "./EnterOnBeatOneExercise";
 import StartOnCueExercise from "./StartOnCueExercise";
+import FeelThePulseExercise from "./FeelThePulseExercise";
 
 // Map template IDs to exercise components
 export const EXERCISE_COMPONENTS = {
@@ -18,6 +19,8 @@ export const EXERCISE_COMPONENTS = {
   tap_with_beat: TapAlongExercise, // alias
   enter_on_beat_one: EnterOnBeatOneExercise,
   start_on_cue: StartOnCueExercise,
+  feel_the_pulse: FeelThePulseExercise,
+  internal_pulse: FeelThePulseExercise, // alias
 };
 
 export {
@@ -27,6 +30,7 @@ export {
   TapAlongExercise,
   EnterOnBeatOneExercise,
   StartOnCueExercise,
+  FeelThePulseExercise,
 };
 
 /**
