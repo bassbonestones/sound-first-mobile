@@ -164,7 +164,7 @@ export const SUBDIVISIONS = {
  * Generate a noise-based click sound using Web Audio API
  * Uses white noise instead of pitched sine waves to avoid confusing pitch detection.
  * The frequency parameter controls the highpass filter cutoff (brightness).
- * 
+ *
  * @param {AudioContext} audioContext - Web Audio context
  * @param {number} frequency - Controls click brightness (higher = sharper). Default 1000.
  * @param {number} duration - Click duration in seconds

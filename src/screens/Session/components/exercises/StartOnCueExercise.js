@@ -108,7 +108,8 @@ export default function StartOnCueExercise({
   // Using state so we can pass it to usePitchDetection and re-render when it's ready
   const [sharedAudioContext] = useState(() => {
     if (Platform.OS === "web") {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      const AudioContextClass =
+        window.AudioContext || window.webkitAudioContext;
       return new AudioContextClass();
     } else if (NativeAudioContext) {
       return new NativeAudioContext();
@@ -142,9 +143,23 @@ export default function StartOnCueExercise({
   // can return overtones instead of fundamentals on brass instruments
   const targetMidiNote = React.useMemo(() => {
     const noteMap = {
-      C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3, E: 4,
-      F: 5, "F#": 6, Gb: 6, G: 7, "G#": 8, Ab: 8,
-      A: 9, "A#": 10, Bb: 10, B: 11,
+      C: 0,
+      "C#": 1,
+      Db: 1,
+      D: 2,
+      "D#": 3,
+      Eb: 3,
+      E: 4,
+      F: 5,
+      "F#": 6,
+      Gb: 6,
+      G: 7,
+      "G#": 8,
+      Ab: 8,
+      A: 9,
+      "A#": 10,
+      Bb: 10,
+      B: 11,
     };
     const match = userFirstNote.match(/^([A-Ga-g][#b]?)(\d)$/);
     if (match) {
@@ -154,7 +169,9 @@ export default function StartOnCueExercise({
       if (semitone !== undefined) {
         const midi = (octave + 1) * 12 + semitone;
         const freq = 440 * Math.pow(2, (midi - 69) / 12);
-        console.log(`[StartOnCueExercise] Target note ${userFirstNote} = MIDI ${midi} (~${freq.toFixed(1)}Hz), tolerance: ±3 semitones`);
+        console.log(
+          `[StartOnCueExercise] Target note ${userFirstNote} = MIDI ${midi} (~${freq.toFixed(1)}Hz), tolerance: ±3 semitones`,
+        );
         return midi;
       }
     }
@@ -170,7 +187,20 @@ export default function StartOnCueExercise({
   // Helper: convert MIDI note number to note name (e.g., 53 -> "F3")
   const midiToNoteName = React.useCallback((midi) => {
     if (midi === null || midi === undefined) return null;
-    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const noteNames = [
+      "C",
+      "C#",
+      "D",
+      "D#",
+      "E",
+      "F",
+      "F#",
+      "G",
+      "G#",
+      "A",
+      "A#",
+      "B",
+    ];
     const octave = Math.floor(midi / 12) - 1;
     const noteIndex = midi % 12;
     return `${noteNames[noteIndex]}${octave}`;
@@ -211,7 +241,7 @@ export default function StartOnCueExercise({
   const soundStartPitchRef = useRef(null);
   // Buffer to collect MIDI readings during sustain for averaging (filters out transient overtone detections)
   const pitchBufferRef = useRef([]);
-  
+
   // Keep isSoundingRef in sync with isSounding
   useEffect(() => {
     isSoundingRef.current = isSounding;
@@ -229,7 +259,7 @@ export default function StartOnCueExercise({
       }
     }
   }, [currentPitch]);
-  
+
   // Watch for sustained sound to trigger entry
   // Only respond when we're actually waiting for entry
   useEffect(() => {
@@ -250,7 +280,9 @@ export default function StartOnCueExercise({
     if (!waitingForNewSoundRef.current && !soundStartTimeRef.current) {
       if (wasSoundingAtListenStartRef.current) {
         // User was genuinely playing BEFORE beat 1 - that's an early entry!
-        console.log("[StartOnCueExercise] User was already playing when listening started - counting as EARLY");
+        console.log(
+          "[StartOnCueExercise] User was already playing when listening started - counting as EARLY",
+        );
         wasSoundingAtListenStartRef.current = false; // Reset so we only check once
         // Set soundStartTimeRef to before beat 1 so timing calculation shows "early"
         soundStartTimeRef.current = lastBeatOneTimeRef.current - 500;
@@ -266,7 +298,7 @@ export default function StartOnCueExercise({
       if (waitingForNewSoundRef.current) {
         return;
       }
-      
+
       // New sound started - record time, pitch, and start sustain timer
       if (!soundStartTimeRef.current) {
         const now = Date.now();
@@ -274,11 +306,20 @@ export default function StartOnCueExercise({
         soundStartTimeRef.current = now;
         // currentPitch is an object with .frequency property
         soundStartPitchRef.current = currentPitchRef.current?.frequency || null;
-        console.log("[StartOnCueExercise] Sound detected at", now, "pitch=", soundStartPitchRef.current?.toFixed(1), "Hz, timeSinceBeatOne=", timeSinceBeatOne);
+        console.log(
+          "[StartOnCueExercise] Sound detected at",
+          now,
+          "pitch=",
+          soundStartPitchRef.current?.toFixed(1),
+          "Hz, timeSinceBeatOne=",
+          timeSinceBeatOne,
+        );
         sustainTimerRef.current = setTimeout(() => {
           // Sound has been sustained long enough - this is real user input
           if (waitingForEntry && !hasEnteredRef.current && isSounding) {
-            console.log("[StartOnCueExercise] Sustained long enough, triggering entry");
+            console.log(
+              "[StartOnCueExercise] Sustained long enough, triggering entry",
+            );
             handleEntryRef.current?.();
           }
         }, MIN_SUSTAIN_MS);
@@ -295,7 +336,9 @@ export default function StartOnCueExercise({
       pitchBufferRef.current = []; // Clear buffer on sound stop
       // They released - now we can detect a fresh sound
       if (waitingForNewSoundRef.current) {
-        console.log("[StartOnCueExercise] User released - now listening for fresh sound");
+        console.log(
+          "[StartOnCueExercise] User released - now listening for fresh sound",
+        );
         waitingForNewSoundRef.current = false;
       }
     }
@@ -345,7 +388,7 @@ export default function StartOnCueExercise({
   // Play a beat click
   const playBeat = useCallback(async (isAccent = false) => {
     if (!audioContextRef.current) return;
-    
+
     // Resume AudioContext if suspended (required by browsers)
     if (audioContextRef.current.state === "suspended") {
       try {
@@ -354,7 +397,7 @@ export default function StartOnCueExercise({
         console.warn("Failed to resume AudioContext:", e);
       }
     }
-    
+
     const freq = isAccent ? 1200 : 800;
     const vol = isAccent ? 0.7 : 0.5;
     createClickSound(audioContextRef.current, freq, 0.05, vol);
@@ -473,7 +516,7 @@ export default function StartOnCueExercise({
       pitchBufferRef.current.forEach((midi) => {
         counts[midi] = (counts[midi] || 0) + 1;
       });
-      
+
       // Any pitch that appears at least twice is a candidate
       // We use a low threshold because the fundamental may only appear briefly during attack
       // while overtones can dominate, but the fundamental IS there
@@ -481,7 +524,7 @@ export default function StartOnCueExercise({
       const candidates = Object.entries(counts)
         .filter(([, count]) => count >= MIN_VOTES)
         .map(([midi]) => parseInt(midi, 10));
-      
+
       // Pick the LOWEST MIDI note (fundamental frequency) among candidates
       // Overtones are always HIGHER than the fundamental
       if (candidates.length > 0) {
@@ -496,20 +539,28 @@ export default function StartOnCueExercise({
           }
         });
       }
-      
-      console.log(`[Entry] Pitch buffer:`, counts, `-> candidates (>=${MIN_VOTES} votes):`, candidates, `-> lowest (fundamental): MIDI ${detectedMidi}`);
+
+      console.log(
+        `[Entry] Pitch buffer:`,
+        counts,
+        `-> candidates (>=${MIN_VOTES} votes):`,
+        candidates,
+        `-> lowest (fundamental): MIDI ${detectedMidi}`,
+      );
     } else if (currentPitchRef.current?.midiNote) {
       // Fallback to current pitch if buffer is empty
       detectedMidi = currentPitchRef.current.midiNote;
     }
-    
+
     // Check if pitch is within ±3 semitones of target
     const PITCH_TOLERANCE_SEMITONES = 3;
     let isPitchCorrect = true; // Assume correct if we can't detect
     if (detectedMidi !== null) {
       const midiDiff = Math.abs(detectedMidi - targetMidiNote);
       isPitchCorrect = midiDiff <= PITCH_TOLERANCE_SEMITONES;
-      console.log(`[Entry] Most common MIDI ${detectedMidi} (${midiToNoteName(detectedMidi)}), target: MIDI ${targetMidiNote}, diff: ${midiDiff} semitones, correct: ${isPitchCorrect}`);
+      console.log(
+        `[Entry] Most common MIDI ${detectedMidi} (${midiToNoteName(detectedMidi)}), target: MIDI ${targetMidiNote}, diff: ${midiDiff} semitones, correct: ${isPitchCorrect}`,
+      );
     } else {
       console.log(`[Entry] No pitch detected, skipping pitch validation`);
     }
@@ -519,14 +570,14 @@ export default function StartOnCueExercise({
       stopMetronome();
       setStreak(0);
       setTotalAttempts((t) => t + 1);
-      
+
       // Store info about the wrong note for display
       const detectedNoteName = midiToNoteName(detectedMidi);
-      const direction = detectedMidi < targetMidiNote ? 'higher' : 'lower';
+      const direction = detectedMidi < targetMidiNote ? "higher" : "lower";
       setWrongNoteInfo({ detectedNote: detectedNoteName, direction });
-      
+
       showFeedback("wrong_note");
-      
+
       onProgress?.({
         streak: 0,
         masteryRequired: masteryStreak,
@@ -545,27 +596,35 @@ export default function StartOnCueExercise({
     const entryTime = soundStartTimeRef.current || Date.now();
     const timeSinceBeatOne = entryTime - lastBeatOneTimeRef.current;
     const measureDuration = beatsPerMeasure * beatIntervalMs;
-    
+
     // Calculate distance to nearest beat 1 (handles both early and late)
     // Positive timeSinceBeatOne means after beat 1, negative means before
-    const positionInMeasure = ((timeSinceBeatOne % measureDuration) + measureDuration) % measureDuration;
+    const positionInMeasure =
+      ((timeSinceBeatOne % measureDuration) + measureDuration) %
+      measureDuration;
     const timeToNextBeatOne = measureDuration - positionInMeasure;
 
-    console.log(`[Entry] timeSinceBeatOne=${timeSinceBeatOne}ms, positionInMeasure=${positionInMeasure}ms, timeToNextBeatOne=${timeToNextBeatOne}ms, tolerance=${timingToleranceMs}ms`);
+    console.log(
+      `[Entry] timeSinceBeatOne=${timeSinceBeatOne}ms, positionInMeasure=${positionInMeasure}ms, timeToNextBeatOne=${timeToNextBeatOne}ms, tolerance=${timingToleranceMs}ms`,
+    );
 
     // Check timing - was it close to beat 1?
     // isNearBeatOne: started AFTER beat 1 but within tolerance (slightly late is OK)
     // isAnticipatoryBeatOne: started just BEFORE beat 1 (slightly early is OK)
-    // 
+    //
     // The key insight: timeSinceBeatOne can be:
     // - Positive and small (<= tolerance): just after beat 1, good timing
     // - Negative but small (>= -tolerance): just before beat 1, good anticipation
     // - Negative and large (< -tolerance): started way too early (e.g., during count-in)
     // - Positive and large: in the middle of the measure
-    const isNearBeatOne = timeSinceBeatOne >= -timingToleranceMs && timeSinceBeatOne <= timingToleranceMs;
-    
+    const isNearBeatOne =
+      timeSinceBeatOne >= -timingToleranceMs &&
+      timeSinceBeatOne <= timingToleranceMs;
+
     // Also check anticipation of the NEXT beat 1 (for when they're close to the end of a measure)
-    const isAnticipatoryNextBeatOne = timeToNextBeatOne <= timingToleranceMs && timeSinceBeatOne >= measureDuration - timingToleranceMs;
+    const isAnticipatoryNextBeatOne =
+      timeToNextBeatOne <= timingToleranceMs &&
+      timeSinceBeatOne >= measureDuration - timingToleranceMs;
 
     // Stop the current metronome - we'll restart with a new round
     stopMetronome();
@@ -579,7 +638,9 @@ export default function StartOnCueExercise({
       setStreak(newStreak);
 
       // Calculate how close they were to perfect
-      const deviation = isNearBeatOne ? Math.abs(timeSinceBeatOne) : timeToNextBeatOne;
+      const deviation = isNearBeatOne
+        ? Math.abs(timeSinceBeatOne)
+        : timeToNextBeatOne;
       if (deviation <= timingToleranceMs / 2) {
         showFeedback("perfect");
       } else {
@@ -665,7 +726,7 @@ export default function StartOnCueExercise({
       clearInterval(beatIntervalRef.current);
       beatIntervalRef.current = null;
     }
-    
+
     // Clear any pending sustain timer and reset sound tracking
     if (sustainTimerRef.current) {
       clearTimeout(sustainTimerRef.current);
@@ -705,11 +766,17 @@ export default function StartOnCueExercise({
         // This way we know if they were already playing BEFORE beat 1
         // Use the ref since we're in a callback that might have stale closures
         wasSoundingAtListenStartRef.current = isSoundingRef.current;
-        console.log("[StartOnCueExercise] Starting to listen, isSounding at this moment:", isSoundingRef.current);
+        console.log(
+          "[StartOnCueExercise] Starting to listen, isSounding at this moment:",
+          isSoundingRef.current,
+        );
         setPhase("listening");
         setWaitingForEntry(true); // This enables pitch detection via the hook
         lastBeatOneTimeRef.current = Date.now();
-        console.log("[StartOnCueExercise] Beat 1 (first listening) at", lastBeatOneTimeRef.current);
+        console.log(
+          "[StartOnCueExercise] Beat 1 (first listening) at",
+          lastBeatOneTimeRef.current,
+        );
         currentBeatRef.current = 1;
         playBeat(true);
         animatePulse(true);
@@ -721,7 +788,12 @@ export default function StartOnCueExercise({
 
         if (beatInMeasure === 1) {
           lastBeatOneTimeRef.current = Date.now();
-          console.log("[StartOnCueExercise] Beat 1 (measure", measureCountRef.current + 1, ") at", lastBeatOneTimeRef.current);
+          console.log(
+            "[StartOnCueExercise] Beat 1 (measure",
+            measureCountRef.current + 1,
+            ") at",
+            lastBeatOneTimeRef.current,
+          );
           measureCountRef.current++;
 
           // If they haven't entered after 2 measures, count as missed

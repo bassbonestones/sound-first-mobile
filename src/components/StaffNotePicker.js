@@ -210,7 +210,7 @@ export default function StaffNotePicker({
             <NotationDisplay 
               musicxml={musicxml} 
               width={240} 
-              height={140}
+              height={400}
               showTitle={false}
             />
           </View>
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
   },
   notationContainer: {
     width: 260,
-    height: 160,
+    height: 420,
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 2,
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
   },
   notationInner: {
     width: 240,
-    height: 140,
+    height: 400,
     overflow: 'hidden',
   },
   arrowButton: {

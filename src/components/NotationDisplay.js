@@ -14,14 +14,14 @@ if (Platform?.OS && Platform.OS !== "web") {
 
 /**
  * NotationDisplay Component
- * 
+ *
  * Renders MusicXML notation using OpenSheetMusicDisplay (OSMD).
  * Uses WebView on mobile, direct DOM on web.
  */
 
-export default function NotationDisplay({ 
-  musicxml, 
-  width = 320, 
+export default function NotationDisplay({
+  musicxml,
+  width = 320,
   height = 200,
   showTitle = false,
   zoom = 0.7,
@@ -49,7 +49,8 @@ export default function NotationDisplay({
 
       // Load OSMD from CDN
       const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.6/build/opensheetmusicdisplay.min.js";
+      script.src =
+        "https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.6/build/opensheetmusicdisplay.min.js";
       script.async = true;
       script.onload = () => {
         initializeOSMD();
@@ -66,7 +67,7 @@ export default function NotationDisplay({
         setLoading(false);
         return;
       }
-      
+
       // Check again after any async operations - component may have unmounted
       if (!containerRef.current) {
         setLoading(false);
@@ -75,7 +76,7 @@ export default function NotationDisplay({
 
       try {
         const { OpenSheetMusicDisplay } = window.opensheetmusicdisplay;
-        
+
         // ALWAYS clear the container before creating a new instance
         // (This prevents concatenation of multiple staves on re-render)
         if (!containerRef.current) return; // Guard against unmount
@@ -107,7 +108,7 @@ export default function NotationDisplay({
         osmdRef.current.EngravingRules.PageBottomMargin = 0;
         osmdRef.current.EngravingRules.SheetMinimumDistanceBetweenSystems = 0;
         osmdRef.current.EngravingRules.MinimumDistanceBetweenSystems = 0;
-        
+
         // Load and render with fixed width
         if (musicxml) {
           await osmdRef.current.load(musicxml);
@@ -119,10 +120,10 @@ export default function NotationDisplay({
           // Set a fixed zoom to stabilize rendering
           osmdRef.current.zoom = zoom;
           osmdRef.current.render();
-          
+
           // Force consistent positioning by fixing the SVG
           if (!containerRef.current) return; // Guard after render
-          const svgElement = containerRef.current.querySelector('svg');
+          const svgElement = containerRef.current.querySelector("svg");
           if (svgElement) {
             // Fix size
             svgElement.style.width = `${width - 20}px`;
@@ -130,14 +131,14 @@ export default function NotationDisplay({
             svgElement.style.maxWidth = `${width - 20}px`;
             svgElement.style.maxHeight = `${height}px`;
             // Fix position at top-left
-            svgElement.style.position = 'absolute';
-            svgElement.style.top = '10px';
-            svgElement.style.left = '10px';
+            svgElement.style.position = "absolute";
+            svgElement.style.top = "10px";
+            svgElement.style.left = "10px";
             // Ensure no overflow creates sizing issues
-            svgElement.style.overflow = 'hidden';
+            svgElement.style.overflow = "hidden";
           }
         }
-        
+
         setLoading(false);
       } catch (err) {
         console.error("OSMD error:", err);
@@ -158,13 +159,13 @@ export default function NotationDisplay({
   // Generate HTML for WebView (mobile)
   const webviewHtml = useMemo(() => {
     if (Platform.OS === "web" || !musicxml) return "";
-    
+
     // Escape the MusicXML for embedding in JavaScript
     const escapedXml = musicxml
       .replace(/\\/g, "\\\\")
       .replace(/`/g, "\\`")
       .replace(/\$/g, "\\$");
-    
+
     return `
 <!DOCTYPE html>
 <html>
@@ -253,34 +254,38 @@ export default function NotationDisplay({
   if (Platform.OS !== "web") {
     if (!musicxml) {
       return (
-        <View style={{
-          width,
-          height,
-          backgroundColor: "#2d232e",
-          borderRadius: 12,
-          justifyContent: "center",
-          alignItems: "center",
-          borderWidth: 1,
-          borderColor: "#5a4a3a",
-        }}>
+        <View
+          style={{
+            width,
+            height,
+            backgroundColor: "#2d232e",
+            borderRadius: 12,
+            justifyContent: "center",
+            alignItems: "center",
+            borderWidth: 1,
+            borderColor: "#5a4a3a",
+          }}
+        >
           <Text style={{ color: "#666", fontSize: 12 }}>No notation data</Text>
         </View>
       );
     }
-    
+
     return (
-      <View style={{ 
-        width, 
-        height, 
-        borderRadius: 12, 
-        overflow: "hidden",
-        backgroundColor: "transparent",
-      }}>
+      <View
+        style={{
+          width,
+          height,
+          borderRadius: 12,
+          overflow: "hidden",
+          backgroundColor: "transparent",
+        }}
+      >
         <WebView
           source={{ html: webviewHtml }}
-          style={{ 
-            width, 
-            height, 
+          style={{
+            width,
+            height,
             backgroundColor: "transparent",
           }}
           scrollEnabled={false}
@@ -298,41 +303,47 @@ export default function NotationDisplay({
   // Web: use direct DOM (existing code)
   if (error) {
     return (
-      <View style={{
-        width,
-        height: 60,
-        backgroundColor: "#2d232e",
-        borderRadius: 12,
-        justifyContent: "center",
-        alignItems: "center",
-        borderWidth: 1,
-        borderColor: "#c0392b",
-      }}>
+      <View
+        style={{
+          width,
+          height: 60,
+          backgroundColor: "#2d232e",
+          borderRadius: 12,
+          justifyContent: "center",
+          alignItems: "center",
+          borderWidth: 1,
+          borderColor: "#c0392b",
+        }}
+      >
         <Text style={{ color: "#c0392b", fontSize: 12 }}>{error}</Text>
       </View>
     );
   }
 
   return (
-    <View style={{ 
-      width, 
-      height, 
-      overflow: 'hidden',
-      position: 'relative',
-    }}>
+    <View
+      style={{
+        width,
+        height,
+        overflow: "hidden",
+        position: "relative",
+      }}
+    >
       {loading && (
-        <View style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: "#2d232e",
-          borderRadius: 12,
-          justifyContent: "center",
-          alignItems: "center",
-          zIndex: 10,
-        }}>
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "#2d232e",
+            borderRadius: 12,
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 10,
+          }}
+        >
           <ActivityIndicator color="#FFD700" />
           <Text style={{ color: "#bfa76a", fontSize: 12, marginTop: 8 }}>
             Loading notation...
@@ -342,7 +353,7 @@ export default function NotationDisplay({
       <View
         ref={containerRef}
         style={{
-          position: 'absolute',
+          position: "absolute",
           top: 0,
           left: 0,
           width,
@@ -359,17 +370,23 @@ export default function NotationDisplay({
 /**
  * Simple notation placeholder when show_notation is false
  */
-export function NotationPlaceholder({ message = "Notation hidden - practice by ear" }) {
+export function NotationPlaceholder({
+  message = "Notation hidden - practice by ear",
+}) {
   return (
-    <View style={{
-      backgroundColor: "#2d232e",
-      borderRadius: 12,
-      padding: 16,
-      alignItems: "center",
-      borderWidth: 1,
-      borderColor: "#5a4a3a",
-    }}>
-      <Text style={{ color: "#FFD700", fontSize: 24, marginBottom: 4 }}>🎧</Text>
+    <View
+      style={{
+        backgroundColor: "#2d232e",
+        borderRadius: 12,
+        padding: 16,
+        alignItems: "center",
+        borderWidth: 1,
+        borderColor: "#5a4a3a",
+      }}
+    >
+      <Text style={{ color: "#FFD700", fontSize: 24, marginBottom: 4 }}>
+        🎧
+      </Text>
       <Text style={{ color: "#bfa76a", fontSize: 13, textAlign: "center" }}>
         {message}
       </Text>
