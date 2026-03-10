@@ -20,6 +20,7 @@ import {
   SoftGateExplorer,
   UserProgressionInspector,
   SessionDiagnostics,
+  EngineSettings,
 } from "./tabs";
 import styles from "./styles";
 
@@ -30,6 +31,7 @@ const TABS = [
   { id: "focus_cards", label: "Focus Cards" },
   { id: "soft_gates", label: "Soft Gates" },
   { id: "users", label: "User Progress" },
+  { id: "engine", label: "Engine" },
   { id: "sessions", label: "Session Diag" },
 ];
 
@@ -71,6 +73,7 @@ export default function AdminScreen({ navigation }) {
         {activeTab === "focus_cards" && <FocusCardExplorer />}
         {activeTab === "soft_gates" && <SoftGateExplorer />}
         {activeTab === "users" && <UserProgressionInspector />}
+        {activeTab === "engine" && <EngineSettings />}
         {activeTab === "sessions" && <SessionDiagnostics />}
       </View>
     </View>

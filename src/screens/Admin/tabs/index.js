@@ -7,3 +7,4 @@ export { default as FocusCardExplorer } from "./FocusCardExplorer";
 export { default as SoftGateExplorer } from "./SoftGateExplorer";
 export { default as UserProgressionInspector } from "./UserProgressionInspector";
 export { default as SessionDiagnostics } from "./SessionDiagnostics";
+export { default as EngineSettings } from "./EngineSettings";
