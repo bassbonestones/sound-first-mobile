@@ -10,13 +10,16 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
+  Modal,
 } from "react-native";
 import { getExerciseComponent } from "./exercises";
 
 /**
  * Intro screen shown before starting the exercise
  */
-function LessonIntro({ mini, onStart, onSkip }) {
+function LessonIntro({ mini, onStart, onSkip, onEndPractice }) {
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
+
   return (
     <View style={styles.introContainer}>
       {/* Module Header */}
@@ -63,6 +66,14 @@ function LessonIntro({ mini, onStart, onSkip }) {
         </TouchableOpacity>
       </View>
 
+      {/* End Practice Button */}
+      <TouchableOpacity
+        style={styles.endPracticeIntroButton}
+        onPress={() => setShowEndConfirm(true)}
+      >
+        <Text style={styles.endPracticeIntroText}>End Practice</Text>
+      </TouchableOpacity>
+
       {/* Capability Info */}
       <View style={styles.capabilityInfo}>
         <Text style={styles.capabilityLabel}>
@@ -70,6 +81,37 @@ function LessonIntro({ mini, onStart, onSkip }) {
           <Text style={styles.capabilityName}>{mini.capability_name}</Text>
         </Text>
       </View>
+
+      {/* End Practice Confirmation Modal */}
+      <Modal
+        visible={showEndConfirm}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowEndConfirm(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>End Practice?</Text>
+            <Text style={styles.modalText}>
+             Your progress on completed exercises has been saved.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setShowEndConfirm(false)}
+              >
+                <Text style={styles.modalCancelText}>Continue</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalConfirmButton}
+                onPress={onEndPractice}
+              >
+                <Text style={styles.modalConfirmText}>End Practice</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -243,7 +285,12 @@ export default function TeachingModuleSession({
   if (phase === "intro") {
     return (
       <SafeAreaView style={styles.container}>
-        <LessonIntro mini={mini} onStart={handleStart} onSkip={onSkip} />
+        <LessonIntro
+          mini={mini}
+          onStart={handleStart}
+          onSkip={onSkip}
+          onEndPractice={onEndPractice}
+        />
       </SafeAreaView>
     );
   }
@@ -625,5 +672,80 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     marginBottom: 32,
+  },
+
+  // End practice intro button
+  endPracticeIntroButton: {
+    alignSelf: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#555",
+    borderRadius: 8,
+    backgroundColor: "#2a2a2a",
+  },
+  endPracticeIntroText: {
+    color: "#aaa",
+    fontSize: 15,
+    fontWeight: "500",
+  },
+
+  // Confirmation modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: "#2a2a2a",
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+    maxWidth: 340,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  modalText: {
+    fontSize: 16,
+    color: "#aaa",
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: "#444",
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  modalCancelText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalConfirmButton: {
+    flex: 1,
+    backgroundColor: "#c0392b",
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  modalConfirmText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
