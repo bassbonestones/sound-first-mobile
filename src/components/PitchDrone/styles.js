@@ -414,9 +414,14 @@ export const styles = StyleSheet.create({
   },
   noteLabelActive: {
     color: colors.textLight,
-    textShadowColor: "#000",
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    ...Platform.select({
+      web: { textShadow: "1px 1px 2px #000" },
+      default: {
+        textShadowColor: "#000",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+      },
+    }),
   },
   noteLabelInactive: {
     color: colors.gold,
@@ -425,9 +430,14 @@ export const styles = StyleSheet.create({
     color: colors.textLight,
     fontSize: 10,
     textAlign: "center",
-    textShadowColor: "#000",
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    ...Platform.select({
+      web: { textShadow: "1px 1px 2px #000" },
+      default: {
+        textShadowColor: "#000",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+      },
+    }),
   },
 
   // Active drones summary

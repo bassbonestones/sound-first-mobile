@@ -29,24 +29,49 @@ import {
 import StaffNotePicker from "../components/StaffNotePicker";
 
 // Note/MIDI conversion helpers
-const CHROMATIC_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const FLAT_EQUIVALENTS = { 'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb' };
+const CHROMATIC_NOTES = [
+  "C",
+  "C#",
+  "D",
+  "D#",
+  "E",
+  "F",
+  "F#",
+  "G",
+  "G#",
+  "A",
+  "A#",
+  "B",
+];
+const FLAT_EQUIVALENTS = {
+  "C#": "Db",
+  "D#": "Eb",
+  "F#": "Gb",
+  "G#": "Ab",
+  "A#": "Bb",
+};
 
 function parseNoteName(noteName) {
   if (!noteName) return null;
   const match = noteName.match(/^([A-Ga-g])([#b]?)(\d)$/);
   if (!match) return null;
   const [, letter, accidental, octaveStr] = match;
-  return { letter: letter.toUpperCase(), accidental, octave: parseInt(octaveStr, 10) };
+  return {
+    letter: letter.toUpperCase(),
+    accidental,
+    octave: parseInt(octaveStr, 10),
+  };
 }
 
 function noteToMidi(noteName) {
   const parsed = parseNoteName(noteName);
   if (!parsed) return 60;
-  const letterIndex = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[parsed.letter];
+  const letterIndex = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[
+    parsed.letter
+  ];
   let noteIndex = letterIndex;
-  if (parsed.accidental === '#') noteIndex += 1;
-  if (parsed.accidental === 'b') noteIndex -= 1;
+  if (parsed.accidental === "#") noteIndex += 1;
+  if (parsed.accidental === "b") noteIndex -= 1;
   return (parsed.octave + 1) * 12 + noteIndex;
 }
 
@@ -67,34 +92,34 @@ function midiToNoteInContext(midi, referenceNote) {
   const noteIndex = midi % 12;
   const sharpName = CHROMATIC_NOTES[noteIndex];
   const flatName = FLAT_EQUIVALENTS[sharpName] || sharpName;
-  
+
   // If it's a natural note (no enharmonic choice), just return it
   if (sharpName === flatName) {
     return `${sharpName}${octave}`;
   }
-  
+
   // Get reference base (letter + accidental, without octave)
-  const refBase = referenceNote ? referenceNote.replace(/\d+$/, '') : '';
-  
+  const refBase = referenceNote ? referenceNote.replace(/\d+$/, "") : "";
+
   // If reference already uses flat spelling (e.g., Eb), keep using flats
-  if (refBase.includes('b')) {
+  if (refBase.includes("b")) {
     return `${flatName}${octave}`;
   }
-  
+
   // If reference already uses sharp spelling (e.g., F#), keep using sharps
-  if (refBase.includes('#')) {
+  if (refBase.includes("#")) {
     return `${sharpName}${octave}`;
   }
-  
+
   // Get reference letter (without accidental or octave)
-  const refLetter = referenceNote ? referenceNote.charAt(0).toUpperCase() : '';
-  
+  const refLetter = referenceNote ? referenceNote.charAt(0).toUpperCase() : "";
+
   // If the sharp spelling would have the same letter as reference (e.g., D → D#),
   // that's musically awkward - use the flat spelling instead (Eb)
   if (sharpName.charAt(0) === refLetter) {
     return `${flatName}${octave}`;
   }
-  
+
   // Default: use sharp/flat preference based on key context
   const useFlats = !shouldUseSharps(referenceNote);
   if (useFlats) {
@@ -108,10 +133,10 @@ function midiToNoteInContext(midi, referenceNote) {
 // Also use sharps if the note itself has a sharp
 function shouldUseSharps(noteName) {
   if (!noteName) return false;
-  if (noteName.includes('#')) return true;
+  if (noteName.includes("#")) return true;
   const letter = noteName.charAt(0).toUpperCase();
   // Natural notes that typically use sharps in their key signatures
-  const sharpRoots = ['G', 'D', 'A', 'E', 'B'];
+  const sharpRoots = ["G", "D", "A", "E", "B"];
   return sharpRoots.includes(letter);
 }
 
@@ -334,7 +359,9 @@ export default function ExerciseTestScreen() {
           </View>
 
           {/* Target Pitch Selection with Staff */}
-          <Text style={styles.sectionLabel}>Target Pitch (new note to reach)</Text>
+          <Text style={styles.sectionLabel}>
+            Target Pitch (new note to reach)
+          </Text>
           <View style={styles.staffPickerContainer}>
             <StaffNotePicker
               clef={selectedClef}
@@ -342,9 +369,7 @@ export default function ExerciseTestScreen() {
               onChange={setSelectedTargetNote}
             />
           </View>
-          <Text style={styles.anchorLabel}>
-            Starting from: {startingPitch}
-          </Text>
+          <Text style={styles.anchorLabel}>Starting from: {startingPitch}</Text>
 
           {/* Pattern Selection */}
           <Text style={styles.sectionLabel}>Exercise Pattern</Text>

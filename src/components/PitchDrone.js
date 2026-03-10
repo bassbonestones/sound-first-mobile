@@ -239,6 +239,9 @@ export default function PitchDrone({
       // Don't start if already playing
       if (oscillatorsRef.current[key]) return;
 
+      // Don't create oscillators if context is closed
+      if (audioContextRef.current.state === "closed") return;
+
       // Resume audio context if suspended
       if (audioContextRef.current.state === "suspended") {
         audioContextRef.current.resume();

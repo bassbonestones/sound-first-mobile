@@ -115,10 +115,10 @@ function midiToNote(midi, preferFlats = true) {
 // Also use sharps if the note itself has a sharp
 function shouldUseSharps(noteName) {
   if (!noteName) return false;
-  if (noteName.includes('#')) return true;
+  if (noteName.includes("#")) return true;
   const letter = noteName.charAt(0).toUpperCase();
   // Natural notes that typically use sharps in their key signatures
-  const sharpRoots = ['G', 'D', 'A', 'E', 'B'];
+  const sharpRoots = ["G", "D", "A", "E", "B"];
   return sharpRoots.includes(letter);
 }
 
@@ -129,34 +129,34 @@ function midiToNoteInContext(midi, referenceNote) {
   const noteIndex = midi % 12;
   const sharpName = CHROMATIC_NOTES[noteIndex];
   const flatName = FLAT_EQUIVALENTS[sharpName] || sharpName;
-  
+
   // If it's a natural note (no enharmonic choice), just return it
   if (sharpName === flatName) {
     return `${sharpName}${octave}`;
   }
-  
+
   // Get reference base (letter + accidental, without octave)
-  const refBase = referenceNote ? referenceNote.replace(/\d+$/, '') : '';
-  
+  const refBase = referenceNote ? referenceNote.replace(/\d+$/, "") : "";
+
   // If reference already uses flat spelling (e.g., Eb), keep using flats
-  if (refBase.includes('b')) {
+  if (refBase.includes("b")) {
     return `${flatName}${octave}`;
   }
-  
+
   // If reference already uses sharp spelling (e.g., F#), keep using sharps
-  if (refBase.includes('#')) {
+  if (refBase.includes("#")) {
     return `${sharpName}${octave}`;
   }
-  
+
   // Get reference letter (without accidental or octave)
-  const refLetter = referenceNote ? referenceNote.charAt(0).toUpperCase() : '';
-  
+  const refLetter = referenceNote ? referenceNote.charAt(0).toUpperCase() : "";
+
   // If the sharp spelling would have the same letter as reference (e.g., D → D#),
   // that's musically awkward - use the flat spelling instead (Eb)
   if (sharpName.charAt(0) === refLetter) {
     return `${flatName}${octave}`;
   }
-  
+
   // Default: use sharp/flat preference based on key context
   const useFlats = !shouldUseSharps(referenceNote);
   if (useFlats) {

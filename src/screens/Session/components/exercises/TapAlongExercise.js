@@ -479,11 +479,16 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     justifyContent: "center",
     alignItems: "center",
-    elevation: 8,
-    shadowColor: "#2196F3",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    ...Platform.select({
+      web: { boxShadow: "0px 4px 8px rgba(33, 150, 243, 0.3)" },
+      default: {
+        elevation: 8,
+        shadowColor: "#2196F3",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+    }),
   },
   prepText: {
     fontSize: 18,

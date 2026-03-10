@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
+  Platform,
 } from "react-native";
 import ResetButton from "../components/ResetButton";
 
@@ -105,11 +106,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 48,
     borderRadius: 16,
     marginBottom: 32,
-    shadowColor: "#FFD700",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    ...Platform.select({
+      web: { boxShadow: "0px 4px 8px rgba(255, 215, 0, 0.3)" },
+      default: {
+        shadowColor: "#FFD700",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 8,
+      },
+    }),
   },
   practiceButtonIcon: {
     fontSize: 24,

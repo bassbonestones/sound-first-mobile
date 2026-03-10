@@ -81,7 +81,7 @@ export default function useFirstNoteAudio(resonantNote) {
 
       stopOscillator();
       const ctx = await getAudioContext();
-      if (!ctx) {
+      if (!ctx || ctx.state === 'closed') {
         setIsPlaying(false);
         return;
       }
@@ -143,7 +143,7 @@ export default function useFirstNoteAudio(resonantNote) {
       try {
         stopOscillator();
         const ctx = await getAudioContext();
-        if (!ctx) return;
+        if (!ctx || ctx.state === 'closed') return;
 
         const now = ctx.currentTime;
         const masterGain = ctx.createGain();

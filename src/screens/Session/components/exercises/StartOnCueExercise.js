@@ -436,7 +436,7 @@ export default function StartOnCueExercise({
 
   // Play the target note so user can hear it
   const playTargetNote = useCallback(() => {
-    if (!audioContextRef.current || isPlayingNote) return;
+    if (!audioContextRef.current || audioContextRef.current.state === 'closed' || isPlayingNote) return;
 
     setIsPlayingNote(true);
     const freq = noteToFrequency(userFirstNote);
@@ -1198,11 +1198,16 @@ const styles = StyleSheet.create({
     borderRadius: 90,
     justifyContent: "center",
     alignItems: "center",
-    elevation: 8,
-    shadowColor: "#9C27B0",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    ...Platform.select({
+      web: { boxShadow: "0px 4px 8px rgba(156, 39, 176, 0.3)" },
+      default: {
+        elevation: 8,
+        shadowColor: "#9C27B0",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+    }),
   },
   prepText: {
     fontSize: 16,
