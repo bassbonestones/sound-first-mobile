@@ -7,6 +7,7 @@ import React, {
   useContext,
   useRef,
   useEffect,
+  useCallback,
 } from "react";
 import { Platform, Alert } from "react-native";
 import { baseUrl } from "../../../api/client";
@@ -26,6 +27,14 @@ export function SessionProvider({ children, routeParams, navigation }) {
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Timer state
+  const [sessionStartTime, setSessionStartTime] = useState(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [showTimeUpModal, setShowTimeUpModal] = useState(false);
+  const [hasShownTimeUpModal, setHasShownTimeUpModal] = useState(false);
+  const timerIntervalRef = useRef(null);
 
   // Reflection modal state
   const [showReflection, setShowReflection] = useState(false);
@@ -93,12 +102,124 @@ export function SessionProvider({ children, routeParams, navigation }) {
       .then((data) => {
         setSession(data);
         setLoading(false);
+        setSessionStartTime(Date.now());
       })
       .catch((err) => {
         setError(err.message || "Network error");
         setLoading(false);
       });
   }, []);
+
+  // Timer effect - update elapsed time and current clock every second
+  useEffect(() => {
+    if (!sessionStartTime) return;
+
+    timerIntervalRef.current = setInterval(() => {
+      const now = Date.now();
+      setElapsedSeconds(Math.floor((now - sessionStartTime) / 1000));
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [sessionStartTime]);
+
+  // Check if target duration reached
+  const targetDurationSeconds = duration * 60;
+  const isOverTime = elapsedSeconds >= targetDurationSeconds;
+
+  // Show time-up modal when target duration is reached (only once)
+  useEffect(() => {
+    if (isOverTime && !hasShownTimeUpModal && !loading) {
+      setHasShownTimeUpModal(true);
+      setShowTimeUpModal(true);
+    }
+  }, [isOverTime, hasShownTimeUpModal, loading]);
+
+  // Auto-extend session when material runs out before time is up
+  const fetchMoreMaterial = useCallback(async () => {
+    if (!session || loading) return false;
+
+    try {
+      const url = getSessionUrl(selfDirected);
+      let body;
+
+      if (selfDirected) {
+        body = JSON.stringify({
+          user_id: 1,
+          planned_duration_minutes: 10, // Get ~10 mins more
+          material_id,
+          focus_card_id,
+          goal_type: goal,
+        });
+      } else {
+        body = JSON.stringify({
+          planned_duration_minutes: 10,
+          fatigue,
+          cooldown_mode: cooldownMode,
+          ear_only_mode: earOnlyMode,
+        });
+      }
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+
+      if (!response.ok) return false;
+
+      const newSession = await response.json();
+
+      if (newSession.mini_sessions && newSession.mini_sessions.length > 0) {
+        // Append new mini-sessions to current session
+        setSession((prev) => ({
+          ...prev,
+          mini_sessions: [...prev.mini_sessions, ...newSession.mini_sessions],
+        }));
+        return true;
+      }
+
+      return false;
+    } catch (err) {
+      console.warn("[SessionContext] Failed to fetch more material:", err);
+      return false;
+    }
+  }, [
+    session,
+    loading,
+    selfDirected,
+    fatigue,
+    cooldownMode,
+    earOnlyMode,
+    material_id,
+    focus_card_id,
+    goal,
+  ]);
+
+  // Dismiss time-up modal and continue session
+  const handleDismissTimeUp = () => {
+    setShowTimeUpModal(false);
+  };
+
+  // Handle extending session from time-up modal
+  const handleTimeUpExtend = async () => {
+    setShowTimeUpModal(false);
+    await fetchMoreMaterial();
+  };
+
+  // Handle finishing session from time-up modal
+  const handleTimeUpFinish = () => {
+    setShowTimeUpModal(false);
+    navigation.navigate("SessionEnd", {
+      completedCount: current + 1,
+      totalDuration: Math.ceil(elapsedSeconds / 60),
+      sessionParams: { duration, fatigue, cooldownMode, earOnlyMode },
+    });
+  };
 
   // Fetch curriculum when mini-session changes
   useEffect(() => {
@@ -244,11 +365,24 @@ export function SessionProvider({ children, routeParams, navigation }) {
       resetCurriculumState();
       if (current < session.mini_sessions.length - 1) {
         setCurrent(current + 1);
+      } else if (!isOverTime) {
+        // Session material exhausted but time remains - try to fetch more
+        const gotMore = await fetchMoreMaterial();
+        if (gotMore) {
+          setCurrent(current + 1);
+        } else {
+          // No more material available - offer to finish early
+          navigation.navigate("SessionEnd", {
+            completedCount: session.mini_sessions.length,
+            totalDuration: Math.ceil(elapsedSeconds / 60),
+            sessionParams: { duration, fatigue, cooldownMode, earOnlyMode },
+          });
+        }
       } else {
         // Session complete - navigate to end screen
         navigation.navigate("SessionEnd", {
           completedCount: session.mini_sessions.length,
-          totalDuration: duration,
+          totalDuration: Math.ceil(elapsedSeconds / 60),
           sessionParams: { duration, fatigue, cooldownMode, earOnlyMode },
         });
       }
@@ -256,18 +390,31 @@ export function SessionProvider({ children, routeParams, navigation }) {
   };
 
   // Skip handler
-  const handleSkip = () => {
+  const handleSkip = async () => {
     setShowReflection(false);
     setReflection("");
     setExtended(false);
     resetCurriculumState();
     if (current < session.mini_sessions.length - 1) {
       setCurrent(current + 1);
+    } else if (!isOverTime) {
+      // Session material exhausted but time remains - try to fetch more
+      const gotMore = await fetchMoreMaterial();
+      if (gotMore) {
+        setCurrent(current + 1);
+      } else {
+        // No more material available - offer to finish early
+        navigation.navigate("SessionEnd", {
+          completedCount: session.mini_sessions.length,
+          totalDuration: Math.ceil(elapsedSeconds / 60),
+          sessionParams: { duration, fatigue, cooldownMode, earOnlyMode },
+        });
+      }
     } else {
       // Session complete - navigate to end screen
       navigation.navigate("SessionEnd", {
         completedCount: session.mini_sessions.length,
-        totalDuration: duration,
+        totalDuration: Math.ceil(elapsedSeconds / 60),
         sessionParams: { duration, fatigue, cooldownMode, earOnlyMode },
       });
     }
@@ -294,8 +441,19 @@ export function SessionProvider({ children, routeParams, navigation }) {
     error,
     mini,
 
+    // Timer state
+    elapsedSeconds,
+    currentTime,
+    targetDurationSeconds,
+    isOverTime,
+    showTimeUpModal,
+    handleDismissTimeUp,
+    handleTimeUpExtend,
+    handleTimeUpFinish,
+
     // Route params
     routeParams,
+    duration,
     cooldownMode,
     earOnlyMode,
     selfDirected,
@@ -335,6 +493,7 @@ export function SessionProvider({ children, routeParams, navigation }) {
     handleSkip,
     handleExtend,
     handleNext,
+    fetchMoreMaterial,
 
     // Navigation
     navigation,

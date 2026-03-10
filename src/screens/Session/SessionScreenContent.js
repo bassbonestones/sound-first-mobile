@@ -23,6 +23,8 @@ import ToolsPanel from "./components/ToolsPanel";
 import ReflectionModal from "./components/ReflectionModal";
 import VolumeModal from "./components/VolumeModal";
 import TeachingModuleSession from "./components/TeachingModuleSession";
+import SessionTimer from "./components/SessionTimer";
+import TimeUpModal from "./components/TimeUpModal";
 
 import { baseUrl } from "../../api/client";
 
@@ -37,8 +39,19 @@ export default function SessionScreenContent() {
     error,
     mini,
     routeParams,
+    duration,
     cooldownMode,
     earOnlyMode,
+    // Timer state
+    elapsedSeconds,
+    currentTime,
+    targetDurationSeconds,
+    isOverTime,
+    showTimeUpModal,
+    handleDismissTimeUp,
+    handleTimeUpExtend,
+    handleTimeUpFinish,
+    // Curriculum state
     curriculumSteps,
     currentStepIndex,
     getCurrentStep,
@@ -62,6 +75,7 @@ export default function SessionScreenContent() {
     handleSkip,
     handleExtend,
     handleNext,
+    fetchMoreMaterial,
     navigation,
   } = useSession();
 
@@ -155,78 +169,21 @@ export default function SessionScreenContent() {
   const handleModuleExtend = async () => {
     console.log("[Session] handleModuleExtend called");
     console.log("[Session] current before extend:", current);
-    try {
-      // Fetch one more mini-session
-      const url = `${baseUrl}/generate-session`;
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          planned_duration_minutes: 5, // Short duration to get 1-2 items
-          fatigue: routeParams?.fatigue || 2,
-          cooldown_mode: routeParams?.cooldownMode || false,
-          ear_only_mode: routeParams?.earOnlyMode || false,
-        }),
-      });
 
-      if (!response.ok) {
-        throw new Error("Failed to extend session");
-      }
-
-      const newSession = await response.json();
-      console.log(
-        "[Session] Extended session received, lesson:",
-        newSession.mini_sessions?.[0]?.lesson_id,
-      );
-
-      if (newSession.mini_sessions && newSession.mini_sessions.length > 0) {
-        // Append the first new mini-session to our current session
-        const extendedMinis = [
-          ...session.mini_sessions,
-          newSession.mini_sessions[0],
-        ];
-        console.log(
-          "[Session] Setting session with",
-          extendedMinis.length,
-          "items",
-        );
-        console.log(
-          "[Session] New lesson at index",
-          current + 1,
-          ":",
-          newSession.mini_sessions[0].lesson_id,
-        );
-        setSession({
-          ...session,
-          mini_sessions: extendedMinis,
-        });
-        // Move to the new item
-        setCurrent(current + 1);
-        console.log("[Session] current after extend:", current + 1);
-      } else {
-        // No more items available, end session
-        navigation.navigate("SessionEnd", {
-          completedCount: session.mini_sessions.length,
-          totalDuration: routeParams?.duration || 20,
-          sessionParams: {
-            duration: routeParams?.duration || 20,
-            fatigue: routeParams?.fatigue || 2,
-            cooldownMode: routeParams?.cooldownMode,
-            earOnlyMode: routeParams?.earOnlyMode,
-          },
-        });
-      }
-    } catch (err) {
-      console.warn("[Session] Failed to extend session:", err);
-      // On error, navigate to session end
+    const gotMore = await fetchMoreMaterial();
+    if (gotMore) {
+      setCurrent(current + 1);
+      console.log("[Session] current after extend:", current + 1);
+    } else {
+      // No more items available, end session
       navigation.navigate("SessionEnd", {
         completedCount: session.mini_sessions.length,
-        totalDuration: routeParams?.duration || 20,
+        totalDuration: Math.ceil(elapsedSeconds / 60),
         sessionParams: {
-          duration: routeParams?.duration || 20,
+          duration: duration,
           fatigue: routeParams?.fatigue || 2,
-          cooldownMode: routeParams?.cooldownMode,
-          earOnlyMode: routeParams?.earOnlyMode,
+          cooldownMode: cooldownMode,
+          earOnlyMode: earOnlyMode,
         },
       });
     }
@@ -267,27 +224,45 @@ export default function SessionScreenContent() {
   };
 
   // Handle navigation after user clicks Continue/Finish button
-  const handleModuleNavigate = () => {
+  const handleModuleNavigate = async () => {
     console.log(
       "[Session] handleModuleNavigate called, isLastItem:",
       isLastItem,
     );
 
-    if (isLastItem) {
+    if (!isLastItem) {
+      // Move to next mini-session
+      setCurrent(current + 1);
+    } else if (!isOverTime) {
+      // Session material exhausted but time remains - try to fetch more
+      const gotMore = await fetchMoreMaterial();
+      if (gotMore) {
+        setCurrent(current + 1);
+      } else {
+        // No more material available
+        navigation.navigate("SessionEnd", {
+          completedCount: session.mini_sessions.length,
+          totalDuration: Math.ceil(elapsedSeconds / 60),
+          sessionParams: {
+            duration: duration,
+            fatigue: routeParams?.fatigue || 2,
+            cooldownMode: cooldownMode,
+            earOnlyMode: earOnlyMode,
+          },
+        });
+      }
+    } else {
       // Navigate to session end screen
       navigation.navigate("SessionEnd", {
         completedCount: session.mini_sessions.length,
-        totalDuration: routeParams?.duration || 20,
+        totalDuration: Math.ceil(elapsedSeconds / 60),
         sessionParams: {
-          duration: routeParams?.duration || 20,
+          duration: duration,
           fatigue: routeParams?.fatigue || 2,
-          cooldownMode: routeParams?.cooldownMode,
-          earOnlyMode: routeParams?.earOnlyMode,
+          cooldownMode: cooldownMode,
+          earOnlyMode: earOnlyMode,
         },
       });
-    } else {
-      // Move to next mini-session
-      setCurrent(current + 1);
     }
   };
 
@@ -295,6 +270,14 @@ export default function SessionScreenContent() {
   if (isTeachingModule) {
     return (
       <View style={styles.container}>
+        {/* Session Timer */}
+        <SessionTimer
+          currentTime={currentTime}
+          elapsedSeconds={elapsedSeconds}
+          targetDurationSeconds={targetDurationSeconds}
+          isOverTime={isOverTime}
+        />
+
         {/* Progress indicator */}
         <View style={styles.progressContainer}>
           <View
@@ -318,6 +301,14 @@ export default function SessionScreenContent() {
           onExtend={handleModuleExtend}
           isLastItem={isLastItem}
         />
+
+        {/* Time Up Modal */}
+        <TimeUpModal
+          visible={showTimeUpModal}
+          onDismiss={handleDismissTimeUp}
+          onExtend={handleTimeUpExtend}
+          onFinish={handleTimeUpFinish}
+        />
       </View>
     );
   }
@@ -326,6 +317,14 @@ export default function SessionScreenContent() {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Session Timer */}
+        <SessionTimer
+          currentTime={currentTime}
+          elapsedSeconds={elapsedSeconds}
+          targetDurationSeconds={targetDurationSeconds}
+          isOverTime={isOverTime}
+        />
+
         {/* Progress indicator */}
         <View style={styles.progressContainer}>
           <View
@@ -467,6 +466,14 @@ export default function SessionScreenContent() {
           setMetronomeVolume={setMetronomeVolume}
           droneVolume={droneVolume}
           setDroneVolume={setDroneVolume}
+        />
+
+        {/* Time Up Modal */}
+        <TimeUpModal
+          visible={showTimeUpModal}
+          onDismiss={handleDismissTimeUp}
+          onExtend={handleTimeUpExtend}
+          onFinish={handleTimeUpFinish}
         />
       </ScrollView>
       <ResetButton />
