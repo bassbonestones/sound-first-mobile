@@ -35,7 +35,7 @@ export default function HomeScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       loadInstruments();
-    }, [loadInstruments])
+    }, [loadInstruments]),
   );
 
   const handleStartPractice = () => {
@@ -108,7 +108,9 @@ export default function HomeScreen({ navigation }) {
             onPress={() => navigation.navigate("Onboarding")}
           >
             <Text style={styles.addFirstInstrumentIcon}>🎵</Text>
-            <Text style={styles.addFirstInstrumentText}>Add Your Instrument</Text>
+            <Text style={styles.addFirstInstrumentText}>
+              Add Your Instrument
+            </Text>
             <Text style={styles.addFirstInstrumentHint}>
               Get started by selecting your instrument
             </Text>
@@ -438,7 +440,7 @@ const styles = StyleSheet.create({
     color: "#4CAF50",
     fontWeight: "600",
   },
-  
+
   // Add First Instrument (when no instruments exist)
   addFirstInstrument: {
     backgroundColor: "#2a2a3e",

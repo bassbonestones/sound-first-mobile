@@ -19,7 +19,7 @@ import StartingNoteStep from "./steps/StartingNoteStep";
 
 function OnboardingScreen({ navigation, route }) {
   const { addInstrument, loadInstruments } = useUser();
-  
+
   // Get initial step from route params (for dev navigation)
   const initialStep = route?.params?.step || 1;
   const clearFamily = route?.params?.clearFamily || false;
@@ -109,10 +109,10 @@ function OnboardingScreen({ navigation, route }) {
         range_high: startingNote,
         is_primary: !addingInstrument, // Primary if this is first instrument
       });
-      
+
       // Reload instruments to update context
       await loadInstruments();
-      
+
       // Navigate to Day 0 First Note Experience
       navigation.replace("FirstNote", {
         userId: 1,

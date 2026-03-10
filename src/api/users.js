@@ -371,14 +371,11 @@ export async function deleteUserInstrument(userId, instrumentId) {
  * @returns {Promise<Object>}
  */
 export async function selectUserInstrument(userId, instrumentId) {
-  const response = await fetch(
-    `${baseUrl}/users/${userId}/select-instrument`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ instrument_id: instrumentId }),
-    },
-  );
+  const response = await fetch(`${baseUrl}/users/${userId}/select-instrument`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ instrument_id: instrumentId }),
+  });
   if (!response.ok) {
     throw new Error(`Select failed: ${response.status}`);
   }

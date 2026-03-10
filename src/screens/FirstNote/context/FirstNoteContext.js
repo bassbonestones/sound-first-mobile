@@ -39,7 +39,7 @@ export function FirstNoteProvider({ children, navigation, route }) {
   const [showSummary, setShowSummary] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  
+
   // Skippable stages (for returning users with a new instrument)
   const [skippableStages, setSkippableStages] = useState([]);
 

@@ -39,7 +39,9 @@ export function UserProvider({ children, initialUserId = 1 }) {
         let selected = null;
         // Prefer last used instrument if available
         if (data.last_instrument_id) {
-          selected = data.instruments.find((i) => i.id === data.last_instrument_id);
+          selected = data.instruments.find(
+            (i) => i.id === data.last_instrument_id,
+          );
         }
         // Fall back to first in list
         if (!selected) {
@@ -67,7 +69,10 @@ export function UserProvider({ children, initialUserId = 1 }) {
       try {
         await selectUserInstrument(userId, instrument.id);
       } catch (err) {
-        console.error("[UserContext] Failed to persist instrument selection:", err);
+        console.error(
+          "[UserContext] Failed to persist instrument selection:",
+          err,
+        );
         // Don't throw - local selection still works
       }
     },
@@ -102,7 +107,11 @@ export function UserProvider({ children, initialUserId = 1 }) {
   const updateInstrument = useCallback(
     async (instrumentId, updates) => {
       try {
-        const result = await updateUserInstrument(userId, instrumentId, updates);
+        const result = await updateUserInstrument(
+          userId,
+          instrumentId,
+          updates,
+        );
         // Update local state
         setInstruments((prev) =>
           prev.map((inst) =>

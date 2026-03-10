@@ -362,9 +362,7 @@ export default function CapabilityEditModal({
         {/* Is Global (vs Instrument-Specific) */}
         <View style={styles.formFieldContainer}>
           <View style={styles.switchRow}>
-            <Text style={styles.formFieldLabel}>
-              Global Capability
-            </Text>
+            <Text style={styles.formFieldLabel}>Global Capability</Text>
             <Switch
               value={formData.is_global}
               onValueChange={(v) => updateField("is_global", v)}

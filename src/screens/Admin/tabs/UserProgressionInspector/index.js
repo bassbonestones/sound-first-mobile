@@ -49,17 +49,21 @@ function UserProgressionInspector() {
     if (!userId) return;
     setLoading(true);
     try {
-      const url = instrumentId 
+      const url = instrumentId
         ? `${baseUrl}/admin/users/${userId}/progression?instrument_id=${instrumentId}`
         : `${baseUrl}/admin/users/${userId}/progression`;
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to load user data");
       const data = await response.json();
       setUserData(data);
-      
+
       // Auto-select primary instrument if none selected
-      if (instrumentId === null && data.instruments && data.instruments.length > 0) {
-        const primary = data.instruments.find(i => i.is_primary);
+      if (
+        instrumentId === null &&
+        data.instruments &&
+        data.instruments.length > 0
+      ) {
+        const primary = data.instruments.find((i) => i.is_primary);
         if (primary) {
           setSelectedInstrumentId(primary.id);
         }
@@ -112,7 +116,10 @@ function UserProgressionInspector() {
           keyboardType="numeric"
           placeholder="Enter user ID"
         />
-        <TouchableOpacity style={styles.loadButton} onPress={() => loadUserData()}>
+        <TouchableOpacity
+          style={styles.loadButton}
+          onPress={() => loadUserData()}
+        >
           <Text style={styles.loadButtonText}>Load</Text>
         </TouchableOpacity>
       </View>
@@ -121,32 +128,46 @@ function UserProgressionInspector() {
       {userData && instruments.length > 0 && (
         <View style={localStyles.instrumentSelectorRow}>
           <Text style={localStyles.instrumentSelectorLabel}>Instrument:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={localStyles.instrumentScroll}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={localStyles.instrumentScroll}
+          >
             <TouchableOpacity
               style={[
                 localStyles.instrumentChip,
-                selectedInstrumentId === null && localStyles.instrumentChipSelected,
+                selectedInstrumentId === null &&
+                  localStyles.instrumentChipSelected,
               ]}
               onPress={() => handleInstrumentChange(null)}
             >
-              <Text style={[
-                localStyles.instrumentChipText,
-                selectedInstrumentId === null && localStyles.instrumentChipTextSelected,
-              ]}>All (Global Only)</Text>
+              <Text
+                style={[
+                  localStyles.instrumentChipText,
+                  selectedInstrumentId === null &&
+                    localStyles.instrumentChipTextSelected,
+                ]}
+              >
+                All (Global Only)
+              </Text>
             </TouchableOpacity>
             {instruments.map((inst) => (
               <TouchableOpacity
                 key={inst.id}
                 style={[
                   localStyles.instrumentChip,
-                  selectedInstrumentId === inst.id && localStyles.instrumentChipSelected,
+                  selectedInstrumentId === inst.id &&
+                    localStyles.instrumentChipSelected,
                 ]}
                 onPress={() => handleInstrumentChange(inst.id)}
               >
-                <Text style={[
-                  localStyles.instrumentChipText,
-                  selectedInstrumentId === inst.id && localStyles.instrumentChipTextSelected,
-                ]}>
+                <Text
+                  style={[
+                    localStyles.instrumentChipText,
+                    selectedInstrumentId === inst.id &&
+                      localStyles.instrumentChipTextSelected,
+                  ]}
+                >
                   {inst.instrument_name}
                   {inst.is_primary ? " ★" : ""}
                 </Text>
@@ -611,7 +632,12 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
 // CAPABILITIES TAB - Now with add/remove/toggle mastery
 // =============================================================================
 
-function UserCapabilitiesTab({ userData, userId, selectedInstrumentId, onRefresh }) {
+function UserCapabilitiesTab({
+  userData,
+  userId,
+  selectedInstrumentId,
+  onRefresh,
+}) {
   const caps = userData.capabilities || {};
   const mastered = caps.mastered || [];
   const introduced = caps.introduced || [];
@@ -664,7 +690,7 @@ function UserCapabilitiesTab({ userData, userId, selectedInstrumentId, onRefresh
       if (!capIsGlobal && selectedInstrumentId) {
         body.instrument_id = selectedInstrumentId;
       }
-      
+
       const response = await fetch(
         `${baseUrl}/admin/users/${userId}/capabilities`,
         {
@@ -750,7 +776,9 @@ function UserCapabilitiesTab({ userData, userId, selectedInstrumentId, onRefresh
                   ✓ {cap.display_name || cap.name}
                 </Text>
                 <Text style={localStyles.capMeta}>
-                  {cap.is_global === false ? "🎸 Instrument-specific" : "🌐 Global"}
+                  {cap.is_global === false
+                    ? "🎸 Instrument-specific"
+                    : "🌐 Global"}
                 </Text>
               </View>
               <View style={localStyles.capActions}>
@@ -766,7 +794,11 @@ function UserCapabilitiesTab({ userData, userId, selectedInstrumentId, onRefresh
                     localStyles.removeButton,
                   ]}
                   onPress={() =>
-                    handleRemoveCapability(cap.id, cap.display_name || cap.name, cap.instrument_id)
+                    handleRemoveCapability(
+                      cap.id,
+                      cap.display_name || cap.name,
+                      cap.instrument_id,
+                    )
                   }
                 >
                   <Text style={localStyles.removeButtonText}>×</Text>
@@ -791,7 +823,9 @@ function UserCapabilitiesTab({ userData, userId, selectedInstrumentId, onRefresh
                   ○ {cap.display_name || cap.name}
                 </Text>
                 <Text style={localStyles.capMeta}>
-                  {cap.is_global === false ? "🎸 Instrument-specific" : "🌐 Global"}
+                  {cap.is_global === false
+                    ? "🎸 Instrument-specific"
+                    : "🌐 Global"}
                 </Text>
               </View>
               <View style={localStyles.capActions}>
@@ -807,7 +841,11 @@ function UserCapabilitiesTab({ userData, userId, selectedInstrumentId, onRefresh
                     localStyles.removeButton,
                   ]}
                   onPress={() =>
-                    handleRemoveCapability(cap.id, cap.display_name || cap.name, cap.instrument_id)
+                    handleRemoveCapability(
+                      cap.id,
+                      cap.display_name || cap.name,
+                      cap.instrument_id,
+                    )
                   }
                 >
                   <Text style={localStyles.removeButtonText}>×</Text>
@@ -850,13 +888,22 @@ function UserCapabilitiesTab({ userData, userId, selectedInstrumentId, onRefresh
                           {cap.display_name || cap.name}
                         </Text>
                         <Text style={localStyles.modalCapDomain}>
-                          {cap.domain} • {cap.is_global === false ? "🎸 Instrument-specific" : "🌐 Global"}
+                          {cap.domain} •{" "}
+                          {cap.is_global === false
+                            ? "🎸 Instrument-specific"
+                            : "🌐 Global"}
                         </Text>
                       </View>
                       <View style={localStyles.modalCapActions}>
                         <TouchableOpacity
                           style={localStyles.modalAddButton}
-                          onPress={() => handleAddCapability(cap.id, cap.is_global !== false, false)}
+                          onPress={() =>
+                            handleAddCapability(
+                              cap.id,
+                              cap.is_global !== false,
+                              false,
+                            )
+                          }
                         >
                           <Text style={localStyles.modalAddText}>
                             Introduce
@@ -867,7 +914,13 @@ function UserCapabilitiesTab({ userData, userId, selectedInstrumentId, onRefresh
                             localStyles.modalAddButton,
                             localStyles.modalMasterButton,
                           ]}
-                          onPress={() => handleAddCapability(cap.id, cap.is_global !== false, true)}
+                          onPress={() =>
+                            handleAddCapability(
+                              cap.id,
+                              cap.is_global !== false,
+                              true,
+                            )
+                          }
                         >
                           <Text style={localStyles.modalMasterText}>
                             + Mastered

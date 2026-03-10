@@ -147,10 +147,15 @@ function CapabilityExplorer() {
               {item.display_name || item.name}
             </Text>
             <Text style={styles.listItemBadge}>{item.domain}</Text>
-            <Text style={[
-              styles.listItemBadge,
-              { backgroundColor: item.is_global !== false ? "#1565C0" : "#6A1B9A" }
-            ]}>
+            <Text
+              style={[
+                styles.listItemBadge,
+                {
+                  backgroundColor:
+                    item.is_global !== false ? "#1565C0" : "#6A1B9A",
+                },
+              ]}
+            >
               {item.is_global !== false ? "🌐 Global" : "🎸 Per-Inst"}
             </Text>
           </View>

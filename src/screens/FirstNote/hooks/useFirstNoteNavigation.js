@@ -25,7 +25,7 @@ export default function useFirstNoteNavigation({
         const endpoint = instrumentId
           ? `${getBackendUrl()}/users/${userId}/instruments/${instrumentId}`
           : `${getBackendUrl()}/users/${userId}`;
-        
+
         await fetch(endpoint, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -46,7 +46,7 @@ export default function useFirstNoteNavigation({
         const endpoint = instrumentId
           ? `${getBackendUrl()}/users/${userId}/instruments/${instrumentId}`
           : `${getBackendUrl()}/users/${userId}`;
-        
+
         await fetch(endpoint, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -62,39 +62,42 @@ export default function useFirstNoteNavigation({
   );
 
   // Helper to reset UI state for a new stage
-  const resetStageState = useCallback((newStage) => {
-    setSubStep(newStage === 1 ? 2 : 0);
-    setFocusCardIndex(0);
-    setFocusCardRatings([]);
-    setFocusStepsDone({
-      listen: false,
-      sing: false,
-      imagine: false,
-      play: false,
-    });
-    setPitchAccuracy(null);
-  }, [setSubStep, setFocusCardIndex, setFocusCardRatings, setFocusStepsDone, setPitchAccuracy]);
+  const resetStageState = useCallback(
+    (newStage) => {
+      setSubStep(newStage === 1 ? 2 : 0);
+      setFocusCardIndex(0);
+      setFocusCardRatings([]);
+      setFocusStepsDone({
+        listen: false,
+        sing: false,
+        imagine: false,
+        play: false,
+      });
+      setPitchAccuracy(null);
+    },
+    [
+      setSubStep,
+      setFocusCardIndex,
+      setFocusCardRatings,
+      setFocusStepsDone,
+      setPitchAccuracy,
+    ],
+  );
 
   // Advance to next stage, skipping over any stages in skippableStages
   const nextStage = useCallback(() => {
     let newStage = stage + 1;
-    
+
     // Skip over any stages that are in skippableStages (max stage is 7)
     while (newStage < 7 && skippableStages.includes(newStage)) {
       console.log(`[Day0] Skipping stage ${newStage} (already mastered)`);
       newStage++;
     }
-    
+
     setStage(newStage);
     resetStageState(newStage);
     saveProgress(newStage);
-  }, [
-    stage,
-    skippableStages,
-    setStage,
-    resetStageState,
-    saveProgress,
-  ]);
+  }, [stage, skippableStages, setStage, resetStageState, saveProgress]);
 
   // Go back within teaching stages (3+)
   const goBackTeaching = useCallback(

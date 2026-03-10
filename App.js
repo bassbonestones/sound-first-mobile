@@ -112,7 +112,7 @@ export default function App() {
       expoStartupMs,
       timestamp: new Date(appMountTime).toISOString(),
     });
-    
+
     // Home screen now handles instrument selection and Day 0 routing
     logTiming("Startup complete - Home screen", {
       expoStartupMs,
