@@ -70,7 +70,7 @@ function EngineSettings() {
         const result = await response.json();
         Alert.alert(
           "Saved",
-          `Applied ${result.changes_applied.length} changes.\n\nNote: Changes are in-memory only and reset on server restart.`
+          `Applied ${result.changes_applied.length} changes.\n\nNote: Changes are in-memory only and reset on server restart.`,
         );
         loadConfig();
       }
@@ -96,7 +96,10 @@ function EngineSettings() {
                 method: "POST",
               });
               if (response.ok) {
-                Alert.alert("Success", "Engine configuration reset to defaults");
+                Alert.alert(
+                  "Success",
+                  "Engine configuration reset to defaults",
+                );
                 loadConfig();
               }
             } catch (err) {
@@ -104,7 +107,7 @@ function EngineSettings() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -120,7 +123,9 @@ function EngineSettings() {
   if (!config) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.noDataText}>Failed to load engine configuration</Text>
+        <Text style={styles.noDataText}>
+          Failed to load engine configuration
+        </Text>
         <TouchableOpacity style={styles.loadButton} onPress={loadConfig}>
           <Text style={styles.loadButtonText}>Retry</Text>
         </TouchableOpacity>
@@ -143,7 +148,10 @@ function EngineSettings() {
             {saving ? "Saving..." : "Save Changes"}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={localStyles.resetButton} onPress={resetToDefaults}>
+        <TouchableOpacity
+          style={localStyles.resetButton}
+          onPress={resetToDefaults}
+        >
           <Text style={localStyles.resetButtonText}>Reset to Defaults</Text>
         </TouchableOpacity>
       </View>
@@ -234,9 +242,7 @@ function EngineSettings() {
         </Text>
         {Object.entries(config.anti_repetition).map(([key, value]) => (
           <View key={key} style={localStyles.ruleRow}>
-            <Text style={localStyles.ruleLabel}>
-              {key.replace(/_/g, " ")}:
-            </Text>
+            <Text style={localStyles.ruleLabel}>{key.replace(/_/g, " ")}:</Text>
             <Text style={localStyles.ruleValue}>{value}</Text>
           </View>
         ))}
@@ -309,7 +315,9 @@ function WeightSection({
                 <View
                   style={[
                     localStyles.bar,
-                    { width: `${Math.min(parseFloat(displayValue) * 100, 100)}%` },
+                    {
+                      width: `${Math.min(parseFloat(displayValue) * 100, 100)}%`,
+                    },
                   ]}
                 />
               </View>

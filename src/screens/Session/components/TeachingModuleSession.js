@@ -93,7 +93,7 @@ function LessonIntro({ mini, onStart, onSkip, onEndPractice }) {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>End Practice?</Text>
             <Text style={styles.modalText}>
-             Your progress on completed exercises has been saved.
+              Your progress on completed exercises has been saved.
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity

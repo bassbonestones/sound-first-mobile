@@ -47,7 +47,7 @@ function UserProgressionInspector() {
     setLoading(true);
     try {
       const response = await fetch(
-        `${baseUrl}/admin/users/${userId}/progression`
+        `${baseUrl}/admin/users/${userId}/progression`,
       );
       if (!response.ok) throw new Error("Failed to load user data");
       const data = await response.json();
@@ -131,13 +131,25 @@ function UserProgressionInspector() {
       ) : userData ? (
         <ScrollView style={styles.userContent}>
           {activeSubTab === "overview" && (
-            <UserOverviewTab userData={userData} userId={userId} onRefresh={loadUserData} />
+            <UserOverviewTab
+              userData={userData}
+              userId={userId}
+              onRefresh={loadUserData}
+            />
           )}
           {activeSubTab === "capabilities" && (
-            <UserCapabilitiesTab userData={userData} userId={userId} onRefresh={loadUserData} />
+            <UserCapabilitiesTab
+              userData={userData}
+              userId={userId}
+              onRefresh={loadUserData}
+            />
           )}
           {activeSubTab === "soft_gates" && (
-            <UserSoftGatesTab userData={userData} userId={userId} onRefresh={loadUserData} />
+            <UserSoftGatesTab
+              userData={userData}
+              userId={userId}
+              onRefresh={loadUserData}
+            />
           )}
           {activeSubTab === "candidates" && (
             <UserCandidatesTab userId={userId} />
@@ -220,19 +232,31 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
     // Validate: if day0_completed, require instrument, resonant note and range
     if (editValues.day0_completed) {
       if (!editValues.instrument || !editValues.instrument.trim()) {
-        showAlert("Validation Error", "Instrument is required when Day 0 is complete");
+        showAlert(
+          "Validation Error",
+          "Instrument is required when Day 0 is complete",
+        );
         return;
       }
       if (!editValues.resonant_note || !editValues.resonant_note.trim()) {
-        showAlert("Validation Error", "Resonant note is required when Day 0 is complete");
+        showAlert(
+          "Validation Error",
+          "Resonant note is required when Day 0 is complete",
+        );
         return;
       }
       if (!editValues.range_low || !editValues.range_low.trim()) {
-        showAlert("Validation Error", "Range low is required when Day 0 is complete");
+        showAlert(
+          "Validation Error",
+          "Range low is required when Day 0 is complete",
+        );
         return;
       }
       if (!editValues.range_high || !editValues.range_high.trim()) {
-        showAlert("Validation Error", "Range high is required when Day 0 is complete");
+        showAlert(
+          "Validation Error",
+          "Range high is required when Day 0 is complete",
+        );
         return;
       }
     }
@@ -256,16 +280,19 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
       if (editValues.day0_completed && !wasDay0Completed) {
         const grantResponse = await fetch(
           `${baseUrl}/admin/users/${userId}/grant-day0-capabilities`,
-          { method: "POST" }
+          { method: "POST" },
         );
         if (grantResponse.ok) {
           const result = await grantResponse.json();
           showAlert(
             "Success",
-            `User info updated.\n\nDay 0 capabilities granted:\n${result.granted.join(", ") || "All already present"}`
+            `User info updated.\n\nDay 0 capabilities granted:\n${result.granted.join(", ") || "All already present"}`,
           );
         } else {
-          showAlert("Partial Success", "User info saved but failed to grant Day 0 capabilities");
+          showAlert(
+            "Partial Success",
+            "User info saved but failed to grant Day 0 capabilities",
+          );
         }
       } else {
         showAlert("Success", "User info updated");
@@ -293,11 +320,14 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
             try {
               const response = await fetch(
                 `${baseUrl}/admin/users/${userId}/reset`,
-                { method: "POST" }
+                { method: "POST" },
               );
               if (response.ok) {
                 const result = await response.json();
-                showAlert("Success", `User reset complete.\n\nDeleted counts:\n${JSON.stringify(result.deleted_counts, null, 2)}`);
+                showAlert(
+                  "Success",
+                  `User reset complete.\n\nDeleted counts:\n${JSON.stringify(result.deleted_counts, null, 2)}`,
+                );
                 onRefresh();
               }
             } catch (err) {
@@ -305,7 +335,7 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -315,10 +345,16 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
       <View style={localStyles.actionBar}>
         {!editing ? (
           <>
-            <TouchableOpacity style={localStyles.editButton} onPress={startEditing}>
+            <TouchableOpacity
+              style={localStyles.editButton}
+              onPress={startEditing}
+            >
               <Text style={localStyles.editButtonText}>Edit User Info</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={localStyles.resetButton} onPress={resetUser}>
+            <TouchableOpacity
+              style={localStyles.resetButton}
+              onPress={resetUser}
+            >
               <Text style={localStyles.resetButtonText}>Reset User</Text>
             </TouchableOpacity>
           </>
@@ -366,7 +402,9 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
             <EditableRow
               label="Resonant Note"
               value={editValues.resonant_note}
-              onChange={(v) => setEditValues({ ...editValues, resonant_note: v })}
+              onChange={(v) =>
+                setEditValues({ ...editValues, resonant_note: v })
+              }
               placeholder="e.g. F3"
             />
             <EditableRow
@@ -389,7 +427,10 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
                   editValues.day0_completed && localStyles.toggleActive,
                 ]}
                 onPress={() =>
-                  setEditValues({ ...editValues, day0_completed: !editValues.day0_completed })
+                  setEditValues({
+                    ...editValues,
+                    day0_completed: !editValues.day0_completed,
+                  })
                 }
               >
                 <Text style={localStyles.toggleText}>
@@ -405,14 +446,18 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
                     key={stage.value}
                     style={[
                       localStyles.stageButton,
-                      editValues.day0_stage === stage.value && localStyles.stageButtonActive,
+                      editValues.day0_stage === stage.value &&
+                        localStyles.stageButtonActive,
                     ]}
-                    onPress={() => setEditValues({ ...editValues, day0_stage: stage.value })}
+                    onPress={() =>
+                      setEditValues({ ...editValues, day0_stage: stage.value })
+                    }
                   >
                     <Text
                       style={[
                         localStyles.stageButtonText,
-                        editValues.day0_stage === stage.value && localStyles.stageButtonTextActive,
+                        editValues.day0_stage === stage.value &&
+                          localStyles.stageButtonTextActive,
                       ]}
                     >
                       {stage.value}
@@ -425,7 +470,10 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
         ) : (
           <>
             <DetailRow label="Instrument" value={user.instrument || "N/A"} />
-            <DetailRow label="Resonant Note" value={user.resonant_note || "N/A"} />
+            <DetailRow
+              label="Resonant Note"
+              value={user.resonant_note || "N/A"}
+            />
             <DetailRow
               label="Range"
               value={`${user.range_low || "?"} - ${user.range_high || "?"}`}
@@ -434,7 +482,10 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
               label="Day 0 Complete"
               value={user.day0_completed ? "Yes" : "No"}
             />
-            <DetailRow label="Day 0 Stage" value={String(user.day0_stage || 0)} />
+            <DetailRow
+              label="Day 0 Stage"
+              value={String(user.day0_stage || 0)}
+            />
           </>
         )}
       </View>
@@ -463,7 +514,8 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
                   key={inst.name}
                   style={[
                     localStyles.instrumentOption,
-                    editValues.instrument === inst.name && localStyles.instrumentOptionSelected,
+                    editValues.instrument === inst.name &&
+                      localStyles.instrumentOptionSelected,
                   ]}
                   onPress={() => {
                     setEditValues({ ...editValues, instrument: inst.name });
@@ -473,7 +525,8 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
                   <Text
                     style={[
                       localStyles.instrumentOptionText,
-                      editValues.instrument === inst.name && localStyles.instrumentOptionTextSelected,
+                      editValues.instrument === inst.name &&
+                        localStyles.instrumentOptionTextSelected,
                     ]}
                   >
                     {inst.name}
@@ -519,7 +572,9 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
   const loadAllCapabilities = async () => {
     setLoadingCaps(true);
     try {
-      const response = await fetch(`${baseUrl}/admin/users/${userId}/capabilities/available`);
+      const response = await fetch(
+        `${baseUrl}/admin/users/${userId}/capabilities/available`,
+      );
       if (response.ok) {
         const data = await response.json();
         setAllCaps(data.capabilities);
@@ -546,11 +601,14 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
 
   const handleAddCapability = async (capId, mastered) => {
     try {
-      const response = await fetch(`${baseUrl}/admin/users/${userId}/capabilities`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ capability_id: capId, mastered }),
-      });
+      const response = await fetch(
+        `${baseUrl}/admin/users/${userId}/capabilities`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ capability_id: capId, mastered }),
+        },
+      );
       if (response.ok) {
         showAlert("Success", "Capability added");
         setShowAddModal(false);
@@ -571,7 +629,7 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
           try {
             const response = await fetch(
               `${baseUrl}/admin/users/${userId}/capabilities/${capId}`,
-              { method: "DELETE" }
+              { method: "DELETE" },
             );
             if (response.ok) {
               onRefresh();
@@ -588,7 +646,7 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
     try {
       const response = await fetch(
         `${baseUrl}/admin/users/${userId}/capabilities/${capId}/toggle-mastery`,
-        { method: "PUT" }
+        { method: "PUT" },
       );
       if (response.ok) {
         onRefresh();
@@ -618,7 +676,9 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
         {mastered.length > 0 ? (
           mastered.map((cap, idx) => (
             <View key={idx} style={localStyles.capRow}>
-              <Text style={localStyles.capName}>✓ {cap.display_name || cap.name}</Text>
+              <Text style={localStyles.capName}>
+                ✓ {cap.display_name || cap.name}
+              </Text>
               <View style={localStyles.capActions}>
                 <TouchableOpacity
                   style={localStyles.capActionButton}
@@ -627,8 +687,13 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
                   <Text style={localStyles.capActionText}>Unmaster</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[localStyles.capActionButton, localStyles.removeButton]}
-                  onPress={() => handleRemoveCapability(cap.id, cap.display_name || cap.name)}
+                  style={[
+                    localStyles.capActionButton,
+                    localStyles.removeButton,
+                  ]}
+                  onPress={() =>
+                    handleRemoveCapability(cap.id, cap.display_name || cap.name)
+                  }
                 >
                   <Text style={localStyles.removeButtonText}>×</Text>
                 </TouchableOpacity>
@@ -647,7 +712,9 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
         {introduced.length > 0 ? (
           introduced.map((cap, idx) => (
             <View key={idx} style={localStyles.capRow}>
-              <Text style={localStyles.capNameIntro}>○ {cap.display_name || cap.name}</Text>
+              <Text style={localStyles.capNameIntro}>
+                ○ {cap.display_name || cap.name}
+              </Text>
               <View style={localStyles.capActions}>
                 <TouchableOpacity
                   style={localStyles.capActionButton}
@@ -656,8 +723,13 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
                   <Text style={localStyles.capActionText}>Master</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[localStyles.capActionButton, localStyles.removeButton]}
-                  onPress={() => handleRemoveCapability(cap.id, cap.display_name || cap.name)}
+                  style={[
+                    localStyles.capActionButton,
+                    localStyles.removeButton,
+                  ]}
+                  onPress={() =>
+                    handleRemoveCapability(cap.id, cap.display_name || cap.name)
+                  }
                 >
                   <Text style={localStyles.removeButtonText}>×</Text>
                 </TouchableOpacity>
@@ -697,19 +769,28 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
                       <Text style={localStyles.modalCapName}>
                         {cap.display_name || cap.name}
                       </Text>
-                      <Text style={localStyles.modalCapDomain}>{cap.domain}</Text>
+                      <Text style={localStyles.modalCapDomain}>
+                        {cap.domain}
+                      </Text>
                       <View style={localStyles.modalCapActions}>
                         <TouchableOpacity
                           style={localStyles.modalAddButton}
                           onPress={() => handleAddCapability(cap.id, false)}
                         >
-                          <Text style={localStyles.modalAddText}>Introduce</Text>
+                          <Text style={localStyles.modalAddText}>
+                            Introduce
+                          </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={[localStyles.modalAddButton, localStyles.modalMasterButton]}
+                          style={[
+                            localStyles.modalAddButton,
+                            localStyles.modalMasterButton,
+                          ]}
                           onPress={() => handleAddCapability(cap.id, true)}
                         >
-                          <Text style={localStyles.modalMasterText}>+ Mastered</Text>
+                          <Text style={localStyles.modalMasterText}>
+                            + Mastered
+                          </Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -746,7 +827,9 @@ function UserSoftGatesTab({ userData, userId, onRefresh }) {
   const loadAllGates = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${baseUrl}/admin/users/${userId}/soft-gates/all`);
+      const response = await fetch(
+        `${baseUrl}/admin/users/${userId}/soft-gates/all`,
+      );
       if (response.ok) {
         const data = await response.json();
         setAllGates(data.soft_gates);
@@ -767,7 +850,7 @@ function UserSoftGatesTab({ userData, userId, onRefresh }) {
       max_demonstrated_value: String(gate.max_demonstrated_value || 0),
       frontier_success_ema: String(gate.frontier_success_ema || 0),
       frontier_attempt_count_since_last_promo: String(
-        gate.frontier_attempt_count_since_last_promo || 0
+        gate.frontier_attempt_count_since_last_promo || 0,
       ),
     });
     setEditingGate(gate.dimension_name);
@@ -782,13 +865,15 @@ function UserSoftGatesTab({ userData, userId, onRefresh }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             comfortable_value: parseFloat(editValues.comfortable_value),
-            max_demonstrated_value: parseFloat(editValues.max_demonstrated_value),
+            max_demonstrated_value: parseFloat(
+              editValues.max_demonstrated_value,
+            ),
             frontier_success_ema: parseFloat(editValues.frontier_success_ema),
             frontier_attempt_count_since_last_promo: parseInt(
-              editValues.frontier_attempt_count_since_last_promo
+              editValues.frontier_attempt_count_since_last_promo,
             ),
           }),
-        }
+        },
       );
       if (response.ok) {
         setEditingGate(null);
@@ -811,9 +896,7 @@ function UserSoftGatesTab({ userData, userId, onRefresh }) {
     <View>
       <View style={styles.detailSection}>
         <Text style={styles.detailSectionTitle}>Soft Envelope State</Text>
-        <Text style={localStyles.helpText}>
-          Tap a dimension to edit values
-        </Text>
+        <Text style={localStyles.helpText}>Tap a dimension to edit values</Text>
         {allGates.length > 0 ? (
           allGates.map((gate, idx) => (
             <View key={idx} style={localStyles.softGateCard}>
@@ -825,7 +908,9 @@ function UserSoftGatesTab({ userData, userId, onRefresh }) {
                     : startEditingGate(gate)
                 }
               >
-                <Text style={localStyles.softGateName}>{gate.dimension_name}</Text>
+                <Text style={localStyles.softGateName}>
+                  {gate.dimension_name}
+                </Text>
                 <Text style={localStyles.softGateExpand}>
                   {editingGate === gate.dimension_name ? "▲" : "▼"}
                 </Text>
@@ -845,7 +930,10 @@ function UserSoftGatesTab({ userData, userId, onRefresh }) {
                     label="Max Demonstrated"
                     value={editValues.max_demonstrated_value}
                     onChange={(v) =>
-                      setEditValues({ ...editValues, max_demonstrated_value: v })
+                      setEditValues({
+                        ...editValues,
+                        max_demonstrated_value: v,
+                      })
                     }
                     keyboardType="decimal-pad"
                   />
@@ -895,7 +983,8 @@ function UserSoftGatesTab({ userData, userId, onRefresh }) {
                     EMA: {((gate.frontier_success_ema || 0) * 100).toFixed(0)}%
                   </Text>
                   <Text style={localStyles.softGateValue}>
-                    Attempts: {gate.frontier_attempt_count_since_last_promo || 0}
+                    Attempts:{" "}
+                    {gate.frontier_attempt_count_since_last_promo || 0}
                   </Text>
                 </View>
               )}
@@ -921,7 +1010,7 @@ function UserCandidatesTab({ userId }) {
     setLoading(true);
     try {
       const response = await fetch(
-        `${baseUrl}/admin/users/${userId}/session-candidates`
+        `${baseUrl}/admin/users/${userId}/session-candidates`,
       );
       if (response.ok) {
         const data = await response.json();
@@ -1004,7 +1093,13 @@ function DetailRow({ label, value, valueStyle }) {
   );
 }
 
-function EditableRow({ label, value, onChange, placeholder, keyboardType = "default" }) {
+function EditableRow({
+  label,
+  value,
+  onChange,
+  placeholder,
+  keyboardType = "default",
+}) {
   return (
     <View style={localStyles.editableRow}>
       <Text style={styles.detailLabel}>{label}:</Text>
