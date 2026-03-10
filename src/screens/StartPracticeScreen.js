@@ -28,7 +28,8 @@ const FATIGUE_HINTS = {
   5: "Consider resting",
 };
 
-export default function StartPracticeScreen({ navigation }) {
+export default function StartPracticeScreen({ navigation, route }) {
+  const { instrumentId } = route.params || {};
   const [duration, setDuration] = useState(20);
   const [fatigue, setFatigue] = useState(2);
   const [showFatigue5Modal, setShowFatigue5Modal] = useState(false);
@@ -48,6 +49,7 @@ export default function StartPracticeScreen({ navigation }) {
       navigation.navigate("Session", {
         duration,
         fatigue,
+        instrumentId,
         sessionKey: Date.now(),
       });
     }
@@ -69,6 +71,7 @@ export default function StartPracticeScreen({ navigation }) {
           duration: Math.min(duration, 15), // Cap at 15 min for cooldown
           fatigue: 5,
           cooldownMode: true,
+          instrumentId,
           sessionKey: Date.now(),
         });
         break;
@@ -78,6 +81,7 @@ export default function StartPracticeScreen({ navigation }) {
           duration: Math.min(duration, 20),
           fatigue: 5,
           earOnlyMode: true,
+          instrumentId,
           sessionKey: Date.now(),
         });
         break;

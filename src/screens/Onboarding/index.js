@@ -8,7 +8,7 @@
 
 import React, { useState, useCallback } from "react";
 import { Alert } from "react-native";
-import { getBackendUrl } from "../../api/client";
+import { useUser } from "../../context/UserContext";
 import {
   instrumentDefaults,
   getClefForInstrument,
@@ -18,9 +18,12 @@ import InstrumentStep from "./steps/InstrumentStep";
 import StartingNoteStep from "./steps/StartingNoteStep";
 
 function OnboardingScreen({ navigation, route }) {
+  const { addInstrument, loadInstruments } = useUser();
+  
   // Get initial step from route params (for dev navigation)
   const initialStep = route?.params?.step || 1;
   const clearFamily = route?.params?.clearFamily || false;
+  const addingInstrument = route?.params?.addingInstrument || false;
 
   // State
   const [selectedFamily, setSelectedFamily] = useState(clearFamily ? "" : "");
@@ -97,22 +100,23 @@ function OnboardingScreen({ navigation, route }) {
       return;
     }
     try {
-      const response = await fetch(`${getBackendUrl()}/onboarding`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: 1,
-          instrument,
-          resonant_note: startingNote,
-          range_low: startingNote,
-          range_high: startingNote,
-          comfortable_capabilities: [],
-        }),
+      // Create the instrument via the new UserInstrument API
+      const newInstrument = await addInstrument({
+        instrument_name: instrument,
+        clef: clef,
+        resonant_note: startingNote,
+        range_low: startingNote,
+        range_high: startingNote,
+        is_primary: !addingInstrument, // Primary if this is first instrument
       });
-      if (!response.ok) throw new Error("Failed to save onboarding info");
-      // Navigate to Day 0 First Note Experience for new users
+      
+      // Reload instruments to update context
+      await loadInstruments();
+      
+      // Navigate to Day 0 First Note Experience
       navigation.replace("FirstNote", {
         userId: 1,
+        instrumentId: newInstrument.id,
         resonantNote: startingNote,
         instrument,
       });

@@ -14,6 +14,7 @@ import React, {
 import { parseNoteName, generateSingleNoteMusicXML } from "../utils";
 import { INSTRUMENT_CLEFS, DEFAULT_PITCH_EXPLORER_INDEX } from "../data";
 import { useFirstNoteAudio, useFirstNoteNavigation } from "../hooks";
+import { getBackendUrl } from "../../../api/client";
 
 const FirstNoteContext = createContext(null);
 
@@ -23,6 +24,7 @@ const FirstNoteContext = createContext(null);
 export function FirstNoteProvider({ children, navigation, route }) {
   const {
     userId = 1,
+    instrumentId = null,
     resonantNote = "Bb3",
     instrument = "trombone",
   } = route?.params || {};
@@ -37,6 +39,9 @@ export function FirstNoteProvider({ children, navigation, route }) {
   const [showSummary, setShowSummary] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Skippable stages (for returning users with a new instrument)
+  const [skippableStages, setSkippableStages] = useState([]);
 
   // Audio UI state
   const [volume, setVolume] = useState(0);
@@ -70,9 +75,31 @@ export function FirstNoteProvider({ children, navigation, route }) {
   // Audio hook
   const audio = useFirstNoteAudio(resonantNote);
 
+  // Fetch skippable stages on mount (for users who already mastered global caps)
+  useEffect(() => {
+    const fetchDay0Status = async () => {
+      try {
+        const url = instrumentId
+          ? `${getBackendUrl()}/users/${userId}/day0-status?instrument_id=${instrumentId}`
+          : `${getBackendUrl()}/users/${userId}/day0-status`;
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          setSkippableStages(data.skippable_stages || []);
+          console.log("[Day0] Skippable stages:", data.skippable_stages);
+        }
+      } catch (err) {
+        console.error("[Day0] Failed to fetch day0 status:", err);
+      }
+    };
+    fetchDay0Status();
+  }, [userId, instrumentId]);
+
   // Navigation hook
   const nav = useFirstNoteNavigation({
     userId,
+    instrumentId,
+    skippableStages,
     stage,
     setStage,
     setSubStep,
@@ -126,6 +153,7 @@ export function FirstNoteProvider({ children, navigation, route }) {
     setStage,
     subStep,
     setSubStep,
+    skippableStages,
     pitchExplorerIndex,
     setPitchExplorerIndex,
     accidentalExplorer,

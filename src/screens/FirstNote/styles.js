@@ -43,6 +43,11 @@ export const styles = StyleSheet.create({
     backgroundColor: "#4CAF50",
     borderColor: "#4CAF50",
   },
+  progressDotSkipped: {
+    backgroundColor: "#666",
+    borderColor: "#888",
+    opacity: 0.5,
+  },
   stageContainer: {
     alignItems: "center",
     flex: 1,

@@ -62,6 +62,7 @@ export function SessionProvider({ children, routeParams, navigation }) {
   const selfDirected = routeParams?.selfDirected || false;
   const cooldownMode = routeParams?.cooldownMode || false;
   const earOnlyMode = routeParams?.earOnlyMode || false;
+  const instrumentId = routeParams?.instrumentId;
   const material_id = routeParams?.material_id;
   const focus_card_id = routeParams?.focus_card_id;
   const goal = routeParams?.goal;
@@ -77,6 +78,7 @@ export function SessionProvider({ children, routeParams, navigation }) {
         material_id,
         focus_card_id,
         goal_type: goal,
+        instrument_id: instrumentId,
       });
     } else {
       body = JSON.stringify({
@@ -84,6 +86,7 @@ export function SessionProvider({ children, routeParams, navigation }) {
         fatigue,
         cooldown_mode: cooldownMode,
         ear_only_mode: earOnlyMode,
+        instrument_id: instrumentId,
       });
     }
 

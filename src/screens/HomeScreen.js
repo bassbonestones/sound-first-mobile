@@ -3,9 +3,10 @@
  *
  * Features:
  * - Practice button to start a session
+ * - Instrument selector for multi-instrument users
  * - Dev navigation via ResetButton component
  */
-import React from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -13,12 +14,63 @@ import {
   StyleSheet,
   SafeAreaView,
   Platform,
+  Modal,
+  FlatList,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import ResetButton from "../components/ResetButton";
+import { useUser } from "../context/UserContext";
 
 export default function HomeScreen({ navigation }) {
+  const {
+    instruments,
+    selectedInstrument,
+    loadInstruments,
+    selectInstrument,
+    loading,
+  } = useUser();
+  const [showPicker, setShowPicker] = useState(false);
+
+  // Load instruments when screen gets focus (handles navigation back from FirstNote/Onboarding)
+  useFocusEffect(
+    useCallback(() => {
+      loadInstruments();
+    }, [loadInstruments])
+  );
+
   const handleStartPractice = () => {
-    navigation.navigate("StartPractice");
+    // Check if selected instrument needs Day 0
+    if (selectedInstrument && !selectedInstrument.day0_completed) {
+      navigation.navigate("FirstNote", {
+        userId: 1,
+        instrumentId: selectedInstrument.id,
+        resonantNote: selectedInstrument.resonant_note,
+        instrument: selectedInstrument.instrument_name,
+      });
+    } else {
+      navigation.navigate("StartPractice", {
+        instrumentId: selectedInstrument?.id,
+      });
+    }
+  };
+
+  const handleSelectInstrument = (instrument) => {
+    selectInstrument(instrument);
+    setShowPicker(false);
+  };
+
+  const getInstrumentEmoji = (name) => {
+    const lower = (name || "").toLowerCase();
+    if (lower.includes("trombone")) return "🎺";
+    if (lower.includes("trumpet")) return "🎺";
+    if (lower.includes("clarinet")) return "🎵";
+    if (lower.includes("flute")) return "🎶";
+    if (lower.includes("saxophone") || lower.includes("sax")) return "🎷";
+    if (lower.includes("piano")) return "🎹";
+    if (lower.includes("violin") || lower.includes("viola")) return "🎻";
+    if (lower.includes("guitar")) return "🎸";
+    if (lower.includes("drum")) return "🥁";
+    return "🎵";
   };
 
   return (
@@ -26,19 +78,63 @@ export default function HomeScreen({ navigation }) {
       <View style={styles.content}>
         {/* App Logo/Title */}
         <View style={styles.header}>
-          <Text style={styles.logo}>🎺</Text>
+          <Text style={styles.logo}>
+            {getInstrumentEmoji(selectedInstrument?.instrument_name)}
+          </Text>
           <Text style={styles.title}>Sound First</Text>
           <Text style={styles.subtitle}>Ear-First Music Practice</Text>
         </View>
 
+        {/* Instrument Selector */}
+        {instruments.length > 0 ? (
+          <TouchableOpacity
+            style={styles.instrumentSelector}
+            onPress={() => setShowPicker(true)}
+          >
+            <Text style={styles.instrumentLabel}>Practicing:</Text>
+            <View style={styles.instrumentValue}>
+              <Text style={styles.instrumentName}>
+                {selectedInstrument?.instrument_name || "Select instrument"}
+              </Text>
+              <Text style={styles.dropdownArrow}>▼</Text>
+            </View>
+            {selectedInstrument && !selectedInstrument.day0_completed && (
+              <Text style={styles.day0Badge}>Setup needed</Text>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.addFirstInstrument}
+            onPress={() => navigation.navigate("Onboarding")}
+          >
+            <Text style={styles.addFirstInstrumentIcon}>🎵</Text>
+            <Text style={styles.addFirstInstrumentText}>Add Your Instrument</Text>
+            <Text style={styles.addFirstInstrumentHint}>
+              Get started by selecting your instrument
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* Main Practice Button */}
         <TouchableOpacity
-          style={styles.practiceButton}
+          style={[
+            styles.practiceButton,
+            (!selectedInstrument || loading) && styles.practiceButtonDisabled,
+          ]}
           onPress={handleStartPractice}
           activeOpacity={0.8}
+          disabled={!selectedInstrument || loading}
         >
-          <Text style={styles.practiceButtonIcon}>▶️</Text>
-          <Text style={styles.practiceButtonText}>Start Practice</Text>
+          <Text style={styles.practiceButtonIcon}>
+            {selectedInstrument && !selectedInstrument.day0_completed
+              ? "🎯"
+              : "▶️"}
+          </Text>
+          <Text style={styles.practiceButtonText}>
+            {selectedInstrument && !selectedInstrument.day0_completed
+              ? "Set Up Instrument"
+              : "Start Practice"}
+          </Text>
         </TouchableOpacity>
 
         {/* Quick Stats - placeholder for now */}
@@ -57,6 +153,62 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
       </View>
+
+      {/* Instrument Picker Modal */}
+      <Modal
+        visible={showPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowPicker(false)}
+        >
+          <View style={styles.pickerContainer}>
+            <Text style={styles.pickerTitle}>Select Instrument</Text>
+            <FlatList
+              data={instruments}
+              keyExtractor={(item) => String(item.id)}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.pickerItem,
+                    selectedInstrument?.id === item.id &&
+                      styles.pickerItemSelected,
+                  ]}
+                  onPress={() => handleSelectInstrument(item)}
+                >
+                  <Text style={styles.pickerItemEmoji}>
+                    {getInstrumentEmoji(item.instrument_name)}
+                  </Text>
+                  <View style={styles.pickerItemInfo}>
+                    <Text style={styles.pickerItemName}>
+                      {item.instrument_name}
+                    </Text>
+                    {!item.day0_completed && (
+                      <Text style={styles.setupBadge}>Needs setup</Text>
+                    )}
+                  </View>
+                  {selectedInstrument?.id === item.id && (
+                    <Text style={styles.checkmark}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity
+              style={styles.addInstrumentButton}
+              onPress={() => {
+                setShowPicker(false);
+                navigation.navigate("Onboarding", { addingInstrument: true });
+              }}
+            >
+              <Text style={styles.addInstrumentText}>+ Add New Instrument</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       <ResetButton />
     </SafeAreaView>
@@ -166,5 +318,152 @@ const styles = StyleSheet.create({
     width: 1,
     height: 40,
     backgroundColor: "#444",
+  },
+
+  // Practice Button Disabled
+  practiceButtonDisabled: {
+    opacity: 0.5,
+  },
+
+  // Instrument Selector
+  instrumentSelector: {
+    backgroundColor: "#2a2a3e",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    width: "100%",
+    alignItems: "center",
+  },
+  instrumentLabel: {
+    fontSize: 12,
+    color: "#888",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  instrumentValue: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  instrumentName: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  dropdownArrow: {
+    fontSize: 12,
+    color: "#888",
+    marginLeft: 8,
+  },
+  day0Badge: {
+    fontSize: 11,
+    color: "#FFD700",
+    backgroundColor: "rgba(255, 215, 0, 0.15)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 8,
+    overflow: "hidden",
+  },
+
+  // Modal / Picker
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  pickerContainer: {
+    backgroundColor: "#2a2a3e",
+    borderRadius: 16,
+    width: "85%",
+    maxHeight: "70%",
+    padding: 20,
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#fff",
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  pickerItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: "#1a1a2e",
+  },
+  pickerItemSelected: {
+    backgroundColor: "rgba(255, 215, 0, 0.15)",
+    borderWidth: 1,
+    borderColor: "#FFD700",
+  },
+  pickerItemEmoji: {
+    fontSize: 28,
+    marginRight: 12,
+  },
+  pickerItemInfo: {
+    flex: 1,
+  },
+  pickerItemName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  primaryBadge: {
+    fontSize: 10,
+    color: "#4CAF50",
+    marginTop: 4,
+  },
+  setupBadge: {
+    fontSize: 10,
+    color: "#FFD700",
+    marginTop: 4,
+  },
+  checkmark: {
+    fontSize: 20,
+    color: "#FFD700",
+  },
+  addInstrumentButton: {
+    borderTopWidth: 1,
+    borderTopColor: "#444",
+    paddingTop: 16,
+    marginTop: 8,
+    alignItems: "center",
+  },
+  addInstrumentText: {
+    fontSize: 16,
+    color: "#4CAF50",
+    fontWeight: "600",
+  },
+  
+  // Add First Instrument (when no instruments exist)
+  addFirstInstrument: {
+    backgroundColor: "#2a2a3e",
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
+    width: "100%",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#FFD700",
+    borderStyle: "dashed",
+  },
+  addFirstInstrumentIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  addFirstInstrumentText: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#FFD700",
+    marginBottom: 8,
+  },
+  addFirstInstrumentHint: {
+    fontSize: 14,
+    color: "#888",
+    textAlign: "center",
   },
 });

@@ -41,17 +41,29 @@ function UserProgressionInspector() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState("overview");
+  const [selectedInstrumentId, setSelectedInstrumentId] = useState(null);
 
-  const loadUserData = async () => {
+  const instruments = userData?.instruments || [];
+
+  const loadUserData = async (instrumentId = selectedInstrumentId) => {
     if (!userId) return;
     setLoading(true);
     try {
-      const response = await fetch(
-        `${baseUrl}/admin/users/${userId}/progression`,
-      );
+      const url = instrumentId 
+        ? `${baseUrl}/admin/users/${userId}/progression?instrument_id=${instrumentId}`
+        : `${baseUrl}/admin/users/${userId}/progression`;
+      const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to load user data");
       const data = await response.json();
       setUserData(data);
+      
+      // Auto-select primary instrument if none selected
+      if (instrumentId === null && data.instruments && data.instruments.length > 0) {
+        const primary = data.instruments.find(i => i.is_primary);
+        if (primary) {
+          setSelectedInstrumentId(primary.id);
+        }
+      }
     } catch (err) {
       console.error("[AdminScreen] Load user progression error:", err);
       // Try fallback endpoints
@@ -76,6 +88,11 @@ function UserProgressionInspector() {
     setLoading(false);
   };
 
+  const handleInstrumentChange = (instrumentId) => {
+    setSelectedInstrumentId(instrumentId);
+    loadUserData(instrumentId);
+  };
+
   const SUB_TABS = [
     { id: "overview", label: "Overview" },
     { id: "capabilities", label: "Capabilities" },
@@ -95,10 +112,49 @@ function UserProgressionInspector() {
           keyboardType="numeric"
           placeholder="Enter user ID"
         />
-        <TouchableOpacity style={styles.loadButton} onPress={loadUserData}>
+        <TouchableOpacity style={styles.loadButton} onPress={() => loadUserData()}>
           <Text style={styles.loadButtonText}>Load</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Instrument Selector - show after data loaded */}
+      {userData && instruments.length > 0 && (
+        <View style={localStyles.instrumentSelectorRow}>
+          <Text style={localStyles.instrumentSelectorLabel}>Instrument:</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={localStyles.instrumentScroll}>
+            <TouchableOpacity
+              style={[
+                localStyles.instrumentChip,
+                selectedInstrumentId === null && localStyles.instrumentChipSelected,
+              ]}
+              onPress={() => handleInstrumentChange(null)}
+            >
+              <Text style={[
+                localStyles.instrumentChipText,
+                selectedInstrumentId === null && localStyles.instrumentChipTextSelected,
+              ]}>All (Global Only)</Text>
+            </TouchableOpacity>
+            {instruments.map((inst) => (
+              <TouchableOpacity
+                key={inst.id}
+                style={[
+                  localStyles.instrumentChip,
+                  selectedInstrumentId === inst.id && localStyles.instrumentChipSelected,
+                ]}
+                onPress={() => handleInstrumentChange(inst.id)}
+              >
+                <Text style={[
+                  localStyles.instrumentChipText,
+                  selectedInstrumentId === inst.id && localStyles.instrumentChipTextSelected,
+                ]}>
+                  {inst.instrument_name}
+                  {inst.is_primary ? " ★" : ""}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {/* Sub-tabs */}
       <View style={styles.subTabBar}>
@@ -134,21 +190,22 @@ function UserProgressionInspector() {
             <UserOverviewTab
               userData={userData}
               userId={userId}
-              onRefresh={loadUserData}
+              onRefresh={() => loadUserData()}
             />
           )}
           {activeSubTab === "capabilities" && (
             <UserCapabilitiesTab
               userData={userData}
               userId={userId}
-              onRefresh={loadUserData}
+              selectedInstrumentId={selectedInstrumentId}
+              onRefresh={() => loadUserData()}
             />
           )}
           {activeSubTab === "soft_gates" && (
             <UserSoftGatesTab
               userData={userData}
               userId={userId}
-              onRefresh={loadUserData}
+              onRefresh={() => loadUserData()}
             />
           )}
           {activeSubTab === "candidates" && (
@@ -554,7 +611,7 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
 // CAPABILITIES TAB - Now with add/remove/toggle mastery
 // =============================================================================
 
-function UserCapabilitiesTab({ userData, userId, onRefresh }) {
+function UserCapabilitiesTab({ userData, userId, selectedInstrumentId, onRefresh }) {
   const caps = userData.capabilities || {};
   const mastered = caps.mastered || [];
   const introduced = caps.introduced || [];
@@ -572,9 +629,10 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
   const loadAllCapabilities = async () => {
     setLoadingCaps(true);
     try {
-      const response = await fetch(
-        `${baseUrl}/admin/users/${userId}/capabilities/available`,
-      );
+      const url = selectedInstrumentId
+        ? `${baseUrl}/admin/users/${userId}/capabilities/available?instrument_id=${selectedInstrumentId}`
+        : `${baseUrl}/admin/users/${userId}/capabilities/available`;
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setAllCaps(data.capabilities);
@@ -599,27 +657,36 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
     );
   });
 
-  const handleAddCapability = async (capId, mastered) => {
+  const handleAddCapability = async (capId, capIsGlobal, mastered) => {
     try {
+      // For non-global caps, include the selected instrument_id
+      const body = { capability_id: capId, mastered };
+      if (!capIsGlobal && selectedInstrumentId) {
+        body.instrument_id = selectedInstrumentId;
+      }
+      
       const response = await fetch(
         `${baseUrl}/admin/users/${userId}/capabilities`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ capability_id: capId, mastered }),
+          body: JSON.stringify(body),
         },
       );
       if (response.ok) {
         showAlert("Success", "Capability added");
         setShowAddModal(false);
         onRefresh();
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        showAlert("Error", errData.detail || "Failed to add capability");
       }
     } catch (err) {
       showAlert("Error", "Failed to add capability");
     }
   };
 
-  const handleRemoveCapability = (capId, capName) => {
+  const handleRemoveCapability = (capId, capName, capInstrumentId) => {
     showAlert("Remove Capability", `Remove "${capName}" from this user?`, [
       { text: "Cancel", style: "cancel" },
       {
@@ -627,10 +694,11 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
         style: "destructive",
         onPress: async () => {
           try {
-            const response = await fetch(
-              `${baseUrl}/admin/users/${userId}/capabilities/${capId}`,
-              { method: "DELETE" },
-            );
+            // Include instrument_id if the capability is instrument-specific
+            const url = capInstrumentId
+              ? `${baseUrl}/admin/users/${userId}/capabilities/${capId}?instrument_id=${capInstrumentId}`
+              : `${baseUrl}/admin/users/${userId}/capabilities/${capId}`;
+            const response = await fetch(url, { method: "DELETE" });
             if (response.ok) {
               onRefresh();
             }
@@ -642,12 +710,13 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
     ]);
   };
 
-  const handleToggleMastery = async (capId) => {
+  const handleToggleMastery = async (capId, capInstrumentId) => {
     try {
-      const response = await fetch(
-        `${baseUrl}/admin/users/${userId}/capabilities/${capId}/toggle-mastery`,
-        { method: "PUT" },
-      );
+      // Include instrument_id if the capability is instrument-specific
+      const url = capInstrumentId
+        ? `${baseUrl}/admin/users/${userId}/capabilities/${capId}/toggle-mastery?instrument_id=${capInstrumentId}`
+        : `${baseUrl}/admin/users/${userId}/capabilities/${capId}/toggle-mastery`;
+      const response = await fetch(url, { method: "PUT" });
       if (response.ok) {
         onRefresh();
       }
@@ -676,13 +745,18 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
         {mastered.length > 0 ? (
           mastered.map((cap, idx) => (
             <View key={idx} style={localStyles.capRow}>
-              <Text style={localStyles.capName}>
-                ✓ {cap.display_name || cap.name}
-              </Text>
+              <View style={localStyles.capInfo}>
+                <Text style={localStyles.capName}>
+                  ✓ {cap.display_name || cap.name}
+                </Text>
+                <Text style={localStyles.capMeta}>
+                  {cap.is_global === false ? "🎸 Instrument-specific" : "🌐 Global"}
+                </Text>
+              </View>
               <View style={localStyles.capActions}>
                 <TouchableOpacity
                   style={localStyles.capActionButton}
-                  onPress={() => handleToggleMastery(cap.id)}
+                  onPress={() => handleToggleMastery(cap.id, cap.instrument_id)}
                 >
                   <Text style={localStyles.capActionText}>Unmaster</Text>
                 </TouchableOpacity>
@@ -692,7 +766,7 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
                     localStyles.removeButton,
                   ]}
                   onPress={() =>
-                    handleRemoveCapability(cap.id, cap.display_name || cap.name)
+                    handleRemoveCapability(cap.id, cap.display_name || cap.name, cap.instrument_id)
                   }
                 >
                   <Text style={localStyles.removeButtonText}>×</Text>
@@ -712,13 +786,18 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
         {introduced.length > 0 ? (
           introduced.map((cap, idx) => (
             <View key={idx} style={localStyles.capRow}>
-              <Text style={localStyles.capNameIntro}>
-                ○ {cap.display_name || cap.name}
-              </Text>
+              <View style={localStyles.capInfo}>
+                <Text style={localStyles.capNameIntro}>
+                  ○ {cap.display_name || cap.name}
+                </Text>
+                <Text style={localStyles.capMeta}>
+                  {cap.is_global === false ? "🎸 Instrument-specific" : "🌐 Global"}
+                </Text>
+              </View>
               <View style={localStyles.capActions}>
                 <TouchableOpacity
                   style={localStyles.capActionButton}
-                  onPress={() => handleToggleMastery(cap.id)}
+                  onPress={() => handleToggleMastery(cap.id, cap.instrument_id)}
                 >
                   <Text style={localStyles.capActionText}>Master</Text>
                 </TouchableOpacity>
@@ -728,7 +807,7 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
                     localStyles.removeButton,
                   ]}
                   onPress={() =>
-                    handleRemoveCapability(cap.id, cap.display_name || cap.name)
+                    handleRemoveCapability(cap.id, cap.display_name || cap.name, cap.instrument_id)
                   }
                 >
                   <Text style={localStyles.removeButtonText}>×</Text>
@@ -766,16 +845,18 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
                 <ScrollView style={localStyles.modalScroll}>
                   {filteredCaps.map((cap) => (
                     <View key={cap.id} style={localStyles.modalCapRow}>
-                      <Text style={localStyles.modalCapName}>
-                        {cap.display_name || cap.name}
-                      </Text>
-                      <Text style={localStyles.modalCapDomain}>
-                        {cap.domain}
-                      </Text>
+                      <View style={localStyles.modalCapInfo}>
+                        <Text style={localStyles.modalCapName}>
+                          {cap.display_name || cap.name}
+                        </Text>
+                        <Text style={localStyles.modalCapDomain}>
+                          {cap.domain} • {cap.is_global === false ? "🎸 Instrument-specific" : "🌐 Global"}
+                        </Text>
+                      </View>
                       <View style={localStyles.modalCapActions}>
                         <TouchableOpacity
                           style={localStyles.modalAddButton}
-                          onPress={() => handleAddCapability(cap.id, false)}
+                          onPress={() => handleAddCapability(cap.id, cap.is_global !== false, false)}
                         >
                           <Text style={localStyles.modalAddText}>
                             Introduce
@@ -786,7 +867,7 @@ function UserCapabilitiesTab({ userData, userId, onRefresh }) {
                             localStyles.modalAddButton,
                             localStyles.modalMasterButton,
                           ]}
-                          onPress={() => handleAddCapability(cap.id, true)}
+                          onPress={() => handleAddCapability(cap.id, cap.is_global !== false, true)}
                         >
                           <Text style={localStyles.modalMasterText}>
                             + Mastered
@@ -1259,15 +1340,21 @@ const localStyles = {
     borderBottomWidth: 1,
     borderBottomColor: "#333",
   },
+  capInfo: {
+    flex: 1,
+  },
+  capMeta: {
+    color: "#666",
+    fontSize: 10,
+    marginTop: 2,
+  },
   capName: {
     color: "#4CAF50",
     fontSize: 13,
-    flex: 1,
   },
   capNameIntro: {
     color: "#aaa",
     fontSize: 13,
-    flex: 1,
   },
   capActions: {
     flexDirection: "row",
@@ -1432,6 +1519,44 @@ const localStyles = {
     fontWeight: "600",
   },
   // Instrument picker styles
+  instrumentSelectorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1a1a1a",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    borderRadius: 8,
+  },
+  instrumentSelectorLabel: {
+    color: "#888",
+    fontSize: 12,
+    marginRight: 8,
+  },
+  instrumentScroll: {
+    flexGrow: 0,
+  },
+  instrumentChip: {
+    backgroundColor: "#2a2a2a",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "#444",
+  },
+  instrumentChipSelected: {
+    backgroundColor: "#1a3a5a",
+    borderColor: "#2196F3",
+  },
+  instrumentChipText: {
+    color: "#aaa",
+    fontSize: 12,
+  },
+  instrumentChipTextSelected: {
+    color: "#2196F3",
+    fontWeight: "600",
+  },
   instrumentButton: {
     flexDirection: "row",
     justifyContent: "space-between",

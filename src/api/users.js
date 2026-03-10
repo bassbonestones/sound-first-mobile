@@ -288,6 +288,103 @@ export async function resetUserSoftGateState(userId) {
   }
 }
 
+// ============================================
+// User Instruments
+// ============================================
+
+/**
+ * Get all instruments for a user
+ * @param {number} userId - User ID
+ * @returns {Promise<{user_id: number, instruments: Object[]}>}
+ */
+export async function getUserInstruments(userId) {
+  const response = await fetch(`${baseUrl}/users/${userId}/instruments`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch instruments: ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
+ * Add a new instrument for a user
+ * @param {number} userId - User ID
+ * @param {Object} instrument - Instrument data
+ * @returns {Promise<Object>} Created instrument
+ */
+export async function createUserInstrument(userId, instrument) {
+  const response = await fetch(`${baseUrl}/users/${userId}/instruments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(instrument),
+  });
+  if (!response.ok) {
+    throw new Error(`Create failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
+ * Update an instrument for a user
+ * @param {number} userId - User ID
+ * @param {number} instrumentId - Instrument ID
+ * @param {Object} updates - Fields to update
+ * @returns {Promise<Object>} Updated instrument
+ */
+export async function updateUserInstrument(userId, instrumentId, updates) {
+  const response = await fetch(
+    `${baseUrl}/users/${userId}/instruments/${instrumentId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(`Update failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
+ * Delete an instrument for a user
+ * @param {number} userId - User ID
+ * @param {number} instrumentId - Instrument ID
+ * @returns {Promise<Object>}
+ */
+export async function deleteUserInstrument(userId, instrumentId) {
+  const response = await fetch(
+    `${baseUrl}/users/${userId}/instruments/${instrumentId}`,
+    {
+      method: "DELETE",
+    },
+  );
+  if (!response.ok) {
+    throw new Error(`Delete failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
+ * Persist the user's current instrument selection
+ * @param {number} userId - User ID
+ * @param {number} instrumentId - Instrument ID to select
+ * @returns {Promise<Object>}
+ */
+export async function selectUserInstrument(userId, instrumentId) {
+  const response = await fetch(
+    `${baseUrl}/users/${userId}/select-instrument`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ instrument_id: instrumentId }),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(`Select failed: ${response.status}`);
+  }
+  return response.json();
+}
+
 export default {
   // User
   getUser,
@@ -310,4 +407,10 @@ export default {
   updateUserSoftGateState,
   createUserSoftGateState,
   resetUserSoftGateState,
+  // User Instruments
+  getUserInstruments,
+  createUserInstrument,
+  updateUserInstrument,
+  deleteUserInstrument,
+  selectUserInstrument,
 };

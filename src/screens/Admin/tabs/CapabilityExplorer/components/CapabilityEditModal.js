@@ -49,6 +49,7 @@ export default function CapabilityEditModal({
     evidence_acceptance_threshold:
       capability?.evidence_acceptance_threshold || 4,
     difficulty_weight: capability?.difficulty_weight || 1.0,
+    is_global: capability?.is_global !== false, // Default to true if undefined
     soft_gate_requirements: capability?.soft_gate_requirements
       ? JSON.stringify(capability.soft_gate_requirements)
       : "",
@@ -128,6 +129,7 @@ export default function CapabilityEditModal({
           formData.evidence_acceptance_threshold,
         ),
         difficulty_weight: Number(formData.difficulty_weight),
+        is_global: formData.is_global,
         prerequisite_ids: selectedPrereqIds,
         soft_gate_requirements: formData.soft_gate_requirements?.trim()
           ? JSON.parse(formData.soft_gate_requirements)
@@ -354,6 +356,26 @@ export default function CapabilityEditModal({
             {formData.evidence_distinct_materials
               ? "Evidence must come from different materials"
               : "Evidence can come from the same material"}
+          </Text>
+        </View>
+
+        {/* Is Global (vs Instrument-Specific) */}
+        <View style={styles.formFieldContainer}>
+          <View style={styles.switchRow}>
+            <Text style={styles.formFieldLabel}>
+              Global Capability
+            </Text>
+            <Switch
+              value={formData.is_global}
+              onValueChange={(v) => updateField("is_global", v)}
+              trackColor={{ false: "#ccc", true: "#81b0ff" }}
+              thumbColor={formData.is_global ? "#2196F3" : "#f4f3f4"}
+            />
+          </View>
+          <Text style={styles.switchHint}>
+            {formData.is_global
+              ? "Learned once, applies to all instruments"
+              : "Must be learned separately for each instrument"}
           </Text>
         </View>
 

@@ -36,7 +36,7 @@ import styles from "./styles";
  * Main content component that uses context
  */
 const FirstNoteContent = () => {
-  const { stage, error, setError } = useFirstNote();
+  const { stage, skippableStages, error, setError } = useFirstNote();
 
   // Render current stage content
   const renderStage = () => {
@@ -97,16 +97,20 @@ const FirstNoteContent = () => {
       >
         {/* Progress indicator */}
         <View style={styles.progressBar}>
-          {[0, 1, 2, 3, 4, 5, 6, 7].map((s) => (
-            <View
-              key={s}
-              style={[
-                styles.progressDot,
-                s === stage && styles.progressDotActive,
-                s < stage && styles.progressDotComplete,
-              ]}
-            />
-          ))}
+          {[0, 1, 2, 3, 4, 5, 6, 7].map((s) => {
+            const isSkipped = skippableStages.includes(s);
+            return (
+              <View
+                key={s}
+                style={[
+                  styles.progressDot,
+                  isSkipped && styles.progressDotSkipped,
+                  s === stage && styles.progressDotActive,
+                  s < stage && !isSkipped && styles.progressDotComplete,
+                ]}
+              />
+            );
+          })}
         </View>
 
         {error && (
