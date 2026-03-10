@@ -157,6 +157,10 @@ export default function SessionScreenContent() {
   // Check if this is the last item in the session
   const isLastItem = current >= session.mini_sessions.length - 1;
 
+  // Only show end-of-session options if last item AND target time reached
+  // If still under target time, we'll auto-fetch more material
+  const shouldShowEndOptions = isLastItem && isOverTime;
+
   // Handle ending practice early (go home)
   const handleEndPractice = () => {
     navigation.reset({
@@ -299,7 +303,7 @@ export default function SessionScreenContent() {
           onSkip={handleSkip}
           onEndPractice={handleEndPractice}
           onExtend={handleModuleExtend}
-          isLastItem={isLastItem}
+          isLastItem={shouldShowEndOptions}
         />
 
         {/* Time Up Modal */}
@@ -435,7 +439,7 @@ export default function SessionScreenContent() {
           onExtend={handleExtend}
           onSubmit={handleReflectionSubmit}
           onEndPractice={handleEndPractice}
-          isLastItem={isLastItem}
+          isLastItem={shouldShowEndOptions}
         />
 
         {/* Help Menu Modal */}
