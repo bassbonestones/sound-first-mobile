@@ -140,7 +140,7 @@ export default function useExerciseAudio() {
   const playNote = useCallback(
     (frequency, duration = 1.0, volume = 0.6) => {
       const ctx = initAudio();
-      if (!ctx || ctx.state === 'closed') return Promise.resolve();
+      if (!ctx || ctx.state === "closed") return Promise.resolve();
 
       return new Promise((resolve) => {
         const now = ctx.currentTime;

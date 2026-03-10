@@ -436,7 +436,12 @@ export default function StartOnCueExercise({
 
   // Play the target note so user can hear it
   const playTargetNote = useCallback(() => {
-    if (!audioContextRef.current || audioContextRef.current.state === 'closed' || isPlayingNote) return;
+    if (
+      !audioContextRef.current ||
+      audioContextRef.current.state === "closed" ||
+      isPlayingNote
+    )
+      return;
 
     setIsPlayingNote(true);
     const freq = noteToFrequency(userFirstNote);
