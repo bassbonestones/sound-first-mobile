@@ -842,7 +842,8 @@ export default function HalfRestLessonExercise({
 
     // 4 half note/rest positions: 2 in measure 1, 2 in measure 2
     const notePositions = [85, 145, 210, 270];
-    const highlightLeft = cursorNoteIndex !== null ? notePositions[cursorNoteIndex] : null;
+    const highlightLeft =
+      cursorNoteIndex !== null ? notePositions[cursorNoteIndex] : null;
     const highlightWidth = 40;
 
     return (
@@ -856,22 +857,22 @@ export default function HalfRestLessonExercise({
           </TouchableOpacity>
         ) : (
           <>
-            <View style={[styles.notationWrapper, { position: 'relative' }]}>
+            <View style={[styles.notationWrapper, { position: "relative" }]}>
               {memoizedNotation}
               {/* Green highlight overlay */}
               {highlightLeft !== null && (
                 <View
                   style={{
-                    position: 'absolute',
+                    position: "absolute",
                     left: highlightLeft,
                     top: 40,
                     width: highlightWidth,
                     height: 120,
-                    backgroundColor: 'rgba(76, 175, 80, 0.25)',
+                    backgroundColor: "rgba(76, 175, 80, 0.25)",
                     borderRadius: 4,
                     borderWidth: 2,
-                    borderColor: 'rgba(76, 175, 80, 0.6)',
-                    pointerEvents: 'none',
+                    borderColor: "rgba(76, 175, 80, 0.6)",
+                    pointerEvents: "none",
                   }}
                 />
               )}

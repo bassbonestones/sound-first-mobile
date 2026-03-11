@@ -830,22 +830,22 @@ export default function WholeNoteLessonExercise({
           </TouchableOpacity>
         ) : (
           <>
-            <View style={[styles.notationWrapper, { position: 'relative' }]}>
+            <View style={[styles.notationWrapper, { position: "relative" }]}>
               {memoizedNotation}
               {/* Green highlight overlay */}
               {highlightLeft !== null && (
                 <View
                   style={{
-                    position: 'absolute',
+                    position: "absolute",
                     left: highlightLeft,
                     top: 40,
                     width: highlightWidth,
                     height: 160,
-                    backgroundColor: 'rgba(76, 175, 80, 0.25)',
+                    backgroundColor: "rgba(76, 175, 80, 0.25)",
                     borderRadius: 4,
                     borderWidth: 2,
-                    borderColor: 'rgba(76, 175, 80, 0.6)',
-                    pointerEvents: 'none',
+                    borderColor: "rgba(76, 175, 80, 0.6)",
+                    pointerEvents: "none",
                   }}
                 />
               )}

@@ -907,7 +907,8 @@ export default function WholeRestLessonExercise({
 
     // 3 whole note/rest positions across 3 measures (shifted past bar lines)
     const notePositions = [95, 210, 290];
-    const highlightLeft = cursorNoteIndex !== null ? notePositions[cursorNoteIndex] : null;
+    const highlightLeft =
+      cursorNoteIndex !== null ? notePositions[cursorNoteIndex] : null;
     const highlightWidth = 60;
 
     return (
@@ -921,22 +922,22 @@ export default function WholeRestLessonExercise({
           </TouchableOpacity>
         ) : (
           <>
-            <View style={[styles.notationWrapper, { position: 'relative' }]}>
+            <View style={[styles.notationWrapper, { position: "relative" }]}>
               {memoizedNotation}
               {/* Green highlight overlay */}
               {highlightLeft !== null && (
                 <View
                   style={{
-                    position: 'absolute',
+                    position: "absolute",
                     left: highlightLeft,
                     top: 30,
                     width: highlightWidth,
                     height: 100,
-                    backgroundColor: 'rgba(76, 175, 80, 0.25)',
+                    backgroundColor: "rgba(76, 175, 80, 0.25)",
                     borderRadius: 4,
                     borderWidth: 2,
-                    borderColor: 'rgba(76, 175, 80, 0.6)',
-                    pointerEvents: 'none',
+                    borderColor: "rgba(76, 175, 80, 0.6)",
+                    pointerEvents: "none",
                   }}
                 />
               )}

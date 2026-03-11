@@ -870,7 +870,8 @@ export default function QuarterRestLessonExercise({
     // 8 quarter positions: 4 in measure 1, 4 in measure 2
     // Measure 2 positions shifted right to account for bar line
     const notePositions = [75, 105, 135, 165, 210, 240, 270, 300];
-    const highlightLeft = cursorNoteIndex !== null ? notePositions[cursorNoteIndex] : null;
+    const highlightLeft =
+      cursorNoteIndex !== null ? notePositions[cursorNoteIndex] : null;
     const highlightWidth = 25;
 
     return (
@@ -884,22 +885,22 @@ export default function QuarterRestLessonExercise({
           </TouchableOpacity>
         ) : (
           <>
-            <View style={[styles.notationWrapper, { position: 'relative' }]}>
+            <View style={[styles.notationWrapper, { position: "relative" }]}>
               {memoizedNotation}
               {/* Green highlight overlay */}
               {highlightLeft !== null && (
                 <View
                   style={{
-                    position: 'absolute',
+                    position: "absolute",
                     left: highlightLeft,
                     top: 40,
                     width: highlightWidth,
                     height: 120,
-                    backgroundColor: 'rgba(76, 175, 80, 0.25)',
+                    backgroundColor: "rgba(76, 175, 80, 0.25)",
                     borderRadius: 4,
                     borderWidth: 2,
-                    borderColor: 'rgba(76, 175, 80, 0.6)',
-                    pointerEvents: 'none',
+                    borderColor: "rgba(76, 175, 80, 0.6)",
+                    pointerEvents: "none",
                   }}
                 />
               )}
