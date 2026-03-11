@@ -22,6 +22,7 @@ import {
   ScrollView,
   Platform,
 } from "react-native";
+import { exercisePropTypes, exerciseDefaultProps } from "./shared";
 
 // Audio context for playing notes - works on web, iOS, and Android
 let AudioContextClass = null;
@@ -485,6 +486,10 @@ export default function NoteNamePatternExercise({
 
   return null;
 }
+
+// PropTypes validation
+NoteNamePatternExercise.propTypes = exercisePropTypes;
+NoteNamePatternExercise.defaultProps = exerciseDefaultProps;
 
 // ============================================================
 // STYLES

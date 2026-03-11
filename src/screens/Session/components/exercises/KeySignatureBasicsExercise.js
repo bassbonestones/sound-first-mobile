@@ -23,6 +23,7 @@ import {
   Platform,
 } from "react-native";
 import NotationDisplay from "../../../../components/NotationDisplay";
+import { exercisePropTypes, exerciseDefaultProps } from "./shared";
 
 // Audio context - works on web, iOS, and Android
 let AudioContextClass = null;
@@ -580,6 +581,10 @@ export default function KeySignatureBasicsExercise({
 
   return null;
 }
+
+// PropTypes validation
+KeySignatureBasicsExercise.propTypes = exercisePropTypes;
+KeySignatureBasicsExercise.defaultProps = exerciseDefaultProps;
 
 // ============================================================
 // STYLES

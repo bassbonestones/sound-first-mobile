@@ -17,6 +17,7 @@ import {
   StyleSheet,
   ScrollView,
 } from "react-native";
+import { exercisePropTypes, exerciseDefaultProps } from "./shared";
 
 // ============================================================
 // CONSTANTS
@@ -290,6 +291,10 @@ export default function NoteNameQuizExercise({
     </View>
   );
 }
+
+// PropTypes validation
+NoteNameQuizExercise.propTypes = exercisePropTypes;
+NoteNameQuizExercise.defaultProps = exerciseDefaultProps;
 
 // ============================================================
 // STYLES

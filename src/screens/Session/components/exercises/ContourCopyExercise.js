@@ -12,6 +12,7 @@ import {
   Animated,
 } from "react-native";
 import useExerciseAudio from "../../../../hooks/useExerciseAudio";
+import { exercisePropTypes, exerciseDefaultProps } from "./shared";
 
 // Contour shapes
 const CONTOURS = {
@@ -286,6 +287,10 @@ export default function ContourCopyExercise({
     </View>
   );
 }
+
+// PropTypes validation
+ContourCopyExercise.propTypes = exercisePropTypes;
+ContourCopyExercise.defaultProps = exerciseDefaultProps;
 
 const styles = StyleSheet.create({
   container: {

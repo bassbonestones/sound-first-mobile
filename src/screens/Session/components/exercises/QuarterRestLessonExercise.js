@@ -25,16 +25,18 @@ import {
 } from "react-native";
 import { usePitchDetection } from "../../../../hooks/usePitchDetection";
 import { CircularVolumeIndicator } from "../../../../components/VolumeBar";
-
-// Import AudioContext
-let NativeAudioContext = null;
-if (Platform.OS !== "web") {
-  try {
-    NativeAudioContext = require("react-native-audio-api").AudioContext;
-  } catch (e) {
-    console.warn("react-native-audio-api not available");
-  }
-}
+import {
+  parseNoteName,
+  noteToMidi,
+  midiToFrequency,
+  noteToFrequency,
+  createAudioContext,
+  createClickSound,
+  LESSON_PHASES as PHASE,
+  PITCH_DETECTION_OPTIONS,
+  exercisePropTypes,
+  exerciseDefaultProps,
+} from "./shared";
 
 // For notation display
 let NotationDisplay = null;
@@ -42,59 +44,6 @@ try {
   NotationDisplay = require("../../../../components/NotationDisplay").default;
 } catch (e) {
   console.warn("NotationDisplay not available");
-}
-
-// Pitch detection options
-const PITCH_DETECTION_OPTIONS = {
-  volumeThreshold: 0.05,
-  silenceDuration: 150,
-  soundingFrequencyRange: { min: 60, max: 1200 },
-};
-
-// Phases
-const PHASE = {
-  FOCUS_CARD: "focus_card",
-  LISTEN: "listen",
-  SING: "sing",
-  IMAGINE: "imagine",
-  PLAY: "play",
-  FEEDBACK: "feedback",
-};
-
-// Parse note name to components
-function parseNoteName(noteName) {
-  if (!noteName) return null;
-  const match = noteName.match(/^([A-Ga-g])([#b]?)(\d)$/);
-  if (!match) return null;
-  const [, letter, accidental, octaveStr] = match;
-  return {
-    letter: letter.toUpperCase(),
-    accidental,
-    octave: parseInt(octaveStr, 10),
-  };
-}
-
-// Convert note name to MIDI number
-function noteToMidi(noteName) {
-  const parsed = parseNoteName(noteName);
-  if (!parsed) return 60;
-  const letterIndex = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[
-    parsed.letter
-  ];
-  let noteIndex = letterIndex;
-  if (parsed.accidental === "#") noteIndex += 1;
-  if (parsed.accidental === "b") noteIndex -= 1;
-  return (parsed.octave + 1) * 12 + noteIndex;
-}
-
-// Convert MIDI to frequency
-function midiToFrequency(midi) {
-  return 440 * Math.pow(2, (midi - 69) / 12);
-}
-
-// Convert note name to frequency
-function noteToFrequency(noteName) {
-  return midiToFrequency(noteToMidi(noteName));
 }
 
 // Generate MusicXML for alternating quarter notes and rests (8 beats)
@@ -171,40 +120,6 @@ ${quarterRest}
     </measure>
   </part>
 </score-partwise>`;
-}
-
-// Create a click sound for metronome
-function createClickSound(audioContext, isAccent = false) {
-  const sampleRate = audioContext.sampleRate;
-  const duration = 0.03;
-  const bufferSize = Math.floor(sampleRate * duration);
-  const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
-  const data = buffer.getChannelData(0);
-
-  for (let i = 0; i < bufferSize; i++) {
-    data[i] = Math.random() * 2 - 1;
-  }
-
-  const source = audioContext.createBufferSource();
-  source.buffer = buffer;
-
-  const filter = audioContext.createBiquadFilter();
-  filter.type = "highpass";
-  filter.frequency.value = isAccent ? 1500 : 1000;
-  filter.Q.value = 0.7;
-
-  const gainNode = audioContext.createGain();
-  gainNode.gain.setValueAtTime(isAccent ? 0.8 : 0.5, audioContext.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(
-    0.001,
-    audioContext.currentTime + duration,
-  );
-
-  source.connect(filter);
-  filter.connect(gainNode);
-  gainNode.connect(audioContext.destination);
-
-  source.start(audioContext.currentTime);
 }
 
 // Create a softer subdivision click for eighth notes
@@ -359,12 +274,7 @@ export default function QuarterRestLessonExercise({
 
   // Initialize audio context
   useEffect(() => {
-    if (Platform.OS === "web") {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      audioContextRef.current = new AudioContext();
-    } else if (NativeAudioContext) {
-      audioContextRef.current = new NativeAudioContext();
-    }
+    audioContextRef.current = createAudioContext();
 
     return () => {
       unmountedRef.current = true;
@@ -1633,6 +1543,10 @@ export default function QuarterRestLessonExercise({
 
   return null;
 }
+
+// PropTypes validation
+QuarterRestLessonExercise.propTypes = exercisePropTypes;
+QuarterRestLessonExercise.defaultProps = exerciseDefaultProps;
 
 const styles = StyleSheet.create({
   container: {

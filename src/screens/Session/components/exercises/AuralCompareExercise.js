@@ -12,6 +12,7 @@ import {
   Animated,
 } from "react-native";
 import useExerciseAudio from "../../../../hooks/useExerciseAudio";
+import { exercisePropTypes, exerciseDefaultProps } from "./shared";
 
 export default function AuralCompareExercise({
   config,
@@ -270,6 +271,10 @@ export default function AuralCompareExercise({
     </View>
   );
 }
+
+// PropTypes validation
+AuralCompareExercise.propTypes = exercisePropTypes;
+AuralCompareExercise.defaultProps = exerciseDefaultProps;
 
 const styles = StyleSheet.create({
   container: {

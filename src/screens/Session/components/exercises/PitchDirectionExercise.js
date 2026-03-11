@@ -13,6 +13,7 @@ import {
   Animated,
 } from "react-native";
 import useExerciseAudio from "../../../../hooks/useExerciseAudio";
+import { exercisePropTypes, exerciseDefaultProps } from "./shared";
 
 export default function PitchDirectionExercise({
   config,
@@ -270,6 +271,10 @@ export default function PitchDirectionExercise({
     </View>
   );
 }
+
+// PropTypes validation
+PitchDirectionExercise.propTypes = exercisePropTypes;
+PitchDirectionExercise.defaultProps = exerciseDefaultProps;
 
 const styles = StyleSheet.create({
   container: {

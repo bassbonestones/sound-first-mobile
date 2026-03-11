@@ -22,6 +22,7 @@ import {
   ScrollView,
   Platform,
 } from "react-native";
+import { exercisePropTypes, exerciseDefaultProps } from "./shared";
 
 // Audio context for playing notes - works on web, iOS, and Android
 let AudioContextClass = null;
@@ -477,6 +478,10 @@ export default function OctaveConceptExercise({
 
   return null;
 }
+
+// PropTypes validation
+OctaveConceptExercise.propTypes = exercisePropTypes;
+OctaveConceptExercise.defaultProps = exerciseDefaultProps;
 
 // ============================================================
 // STYLES

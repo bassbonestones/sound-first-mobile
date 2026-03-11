@@ -1,5 +1,6 @@
 /**
- * Tests for ResetButton component
+ * Tests for ResetButton component (now DevNavMenu)
+ * The ResetButton component was replaced with DevNavMenu which shows a 🔧 icon
  */
 
 import React from "react";
@@ -11,6 +12,7 @@ const mockDispatch = jest.fn();
 jest.mock("@react-navigation/native", () => ({
   useNavigation: () => ({
     dispatch: mockDispatch,
+    navigate: jest.fn(),
   }),
   CommonActions: {
     reset: jest.fn((config) => ({ type: "RESET", ...config })),
@@ -28,19 +30,19 @@ describe("ResetButton", () => {
   });
 
   describe("Rendering", () => {
-    it("renders the reset button", () => {
+    it("renders the dev menu button", () => {
       const { getByText } = render(<ResetButton userId={1} />);
-      expect(getByText("↺")).toBeTruthy();
+      expect(getByText("🔧")).toBeTruthy();
     });
 
     it("renders with default userId", () => {
       const { getByText } = render(<ResetButton />);
-      expect(getByText("↺")).toBeTruthy();
+      expect(getByText("🔧")).toBeTruthy();
     });
 
     it("renders as a pressable element", () => {
       const { getByText } = render(<ResetButton userId={1} />);
-      const button = getByText("↺").parent;
+      const button = getByText("🔧").parent;
       expect(button).toBeTruthy();
     });
   });
@@ -48,12 +50,12 @@ describe("ResetButton", () => {
   describe("Props", () => {
     it("accepts custom userId prop", () => {
       const { getByText } = render(<ResetButton userId={42} />);
-      expect(getByText("↺")).toBeTruthy();
+      expect(getByText("🔧")).toBeTruthy();
     });
 
     it("works with userId as 0", () => {
       const { getByText } = render(<ResetButton userId={0} />);
-      expect(getByText("↺")).toBeTruthy();
+      expect(getByText("🔧")).toBeTruthy();
     });
   });
 });

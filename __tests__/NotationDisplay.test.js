@@ -7,12 +7,21 @@ import { render } from "@testing-library/react-native";
 import { Platform } from "react-native";
 import NotationDisplay from "../src/components/NotationDisplay";
 
-// Mock WebView
+// Mock WebView with ref support for postMessage
 jest.mock("react-native-webview", () => {
+  const React = require("react");
   const { View } = require("react-native");
-  return {
-    WebView: (props) => <View testID="webview" {...props} />,
-  };
+
+  const WebView = React.forwardRef((props, ref) => {
+    React.useImperativeHandle(ref, () => ({
+      postMessage: jest.fn(),
+      reload: jest.fn(),
+      injectJavaScript: jest.fn(),
+    }));
+    return <View testID="webview" {...props} />;
+  });
+
+  return { WebView };
 });
 
 // Sample MusicXML for testing

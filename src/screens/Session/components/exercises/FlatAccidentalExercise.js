@@ -15,6 +15,7 @@ import {
   ScrollView,
   Platform,
 } from "react-native";
+import { exercisePropTypes, exerciseDefaultProps } from "./shared";
 
 // Audio context
 // Audio context - works on web, iOS, and Android
@@ -780,6 +781,10 @@ export default function FlatAccidentalExercise({
 
   return null;
 }
+
+// PropTypes validation
+FlatAccidentalExercise.propTypes = exercisePropTypes;
+FlatAccidentalExercise.defaultProps = exerciseDefaultProps;
 
 // ============================================================
 // STYLES

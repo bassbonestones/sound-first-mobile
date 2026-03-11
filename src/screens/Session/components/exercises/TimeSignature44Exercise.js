@@ -25,6 +25,7 @@ import {
   StyleSheet,
   ScrollView,
 } from "react-native";
+import { exercisePropTypes, exerciseDefaultProps } from "./shared";
 
 // For notation display
 let NotationDisplay = null;
@@ -654,6 +655,10 @@ export default function TimeSignature44Exercise({
 
   return null;
 }
+
+// PropTypes validation
+TimeSignature44Exercise.propTypes = exercisePropTypes;
+TimeSignature44Exercise.defaultProps = exerciseDefaultProps;
 
 // ============================================================
 // STYLES

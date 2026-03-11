@@ -30,13 +30,13 @@ import {
 import EDMVisualizer from "../../../../components/EDMVisualizer";
 import { CircularVolumeIndicator } from "../../../../components/VolumeBar";
 import { DAY0_FOCUS_CARDS } from "../../../FirstNote/data/focusCards";
-
-// Static pitch detection options (defined outside component to avoid re-creating on every render)
-const PITCH_DETECTION_OPTIONS = {
-  volumeThreshold: 0.05,
-  silenceDuration: 300,
-  soundingFrequencyRange: { min: 60, max: 1200 },
-};
+import {
+  parseNoteName,
+  noteToMidi,
+  PITCH_DETECTION_OPTIONS,
+  exercisePropTypes,
+  exerciseDefaultProps,
+} from "./shared";
 
 // Constants for pitch detection
 const CONTOUR_TOLERANCE_SEMITONES = 1; // How close intervals must be
@@ -60,32 +60,6 @@ const PHASE = {
   PLAY: "play",
   FEEDBACK: "feedback",
 };
-
-// Parse note name to components
-function parseNoteName(noteName) {
-  if (!noteName) return null;
-  const match = noteName.match(/^([A-Ga-g])([#b]?)(\d)$/);
-  if (!match) return null;
-  const [, letter, accidental, octaveStr] = match;
-  return {
-    letter: letter.toUpperCase(),
-    accidental,
-    octave: parseInt(octaveStr, 10),
-  };
-}
-
-// Convert note name to MIDI number
-function noteToMidi(noteName) {
-  const parsed = parseNoteName(noteName);
-  if (!parsed) return 60;
-  const letterIndex = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[
-    parsed.letter
-  ];
-  let noteIndex = letterIndex;
-  if (parsed.accidental === "#") noteIndex += 1;
-  if (parsed.accidental === "b") noteIndex -= 1;
-  return (parsed.octave + 1) * 12 + noteIndex;
-}
 
 /**
  * Lower a note chromatically while preserving the letter name.
@@ -1437,6 +1411,10 @@ export default function RangeExpansionExercise({
 
   return null;
 }
+
+// PropTypes validation
+RangeExpansionExercise.propTypes = exercisePropTypes;
+RangeExpansionExercise.defaultProps = exerciseDefaultProps;
 
 const styles = StyleSheet.create({
   // Container - Day 0 warm theme

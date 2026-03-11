@@ -13,49 +13,16 @@ import {
   Animated,
   Platform,
 } from "react-native";
+import {
+  createAudioContext,
+  createClickSound,
+  TIMING_TOLERANCES,
+  exercisePropTypes,
+  exerciseDefaultProps,
+} from "./shared";
 
-let NativeAudioContext = null;
-if (Platform.OS !== "web") {
-  try {
-    NativeAudioContext = require("react-native-audio-api").AudioContext;
-  } catch (e) {
-    console.warn("react-native-audio-api not available");
-  }
-}
-
-const TIMING_TOLERANCE_MS = 150; // More forgiving - 18% of beat at 72bpm
-const PERFECT_TOLERANCE_MS = 60;
-
-function createClickSound(
-  audioContext,
-  frequency = 1000,
-  duration = 0.05,
-  volume = 0.5,
-) {
-  const sampleRate = audioContext.sampleRate;
-  const bufferSize = Math.floor(sampleRate * duration * 2);
-  const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) {
-    data[i] = Math.random() * 2 - 1;
-  }
-  const source = audioContext.createBufferSource();
-  source.buffer = buffer;
-  const filter = audioContext.createBiquadFilter();
-  filter.type = "highpass";
-  filter.frequency.value = 800 + ((frequency - 700) / 500) * 1200;
-  filter.Q.value = 0.7;
-  const gainNode = audioContext.createGain();
-  gainNode.gain.setValueAtTime(volume * 1.5, audioContext.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(
-    0.001,
-    audioContext.currentTime + duration,
-  );
-  source.connect(filter);
-  filter.connect(gainNode);
-  gainNode.connect(audioContext.destination);
-  source.start(audioContext.currentTime);
-}
+const TIMING_TOLERANCE_MS = TIMING_TOLERANCES.ACCEPTABLE; // More forgiving - 18% of beat at 72bpm
+const PERFECT_TOLERANCE_MS = TIMING_TOLERANCES.PERFECT;
 
 const PHASE_INTRO = "intro";
 const PHASE_LISTENING = "listening";
@@ -92,12 +59,7 @@ export default function FeelThePulseExercise({
   const beatIntervalMs = (60 / bpm) * 1000;
 
   useEffect(() => {
-    if (Platform.OS === "web") {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      audioContextRef.current = new AudioContext();
-    } else if (NativeAudioContext) {
-      audioContextRef.current = new NativeAudioContext();
-    }
+    audioContextRef.current = createAudioContext();
     return () => {
       unmountedRef.current = true;
       if (beatIntervalRef.current) clearInterval(beatIntervalRef.current);
@@ -407,6 +369,10 @@ export default function FeelThePulseExercise({
     </View>
   );
 }
+
+// PropTypes validation
+FeelThePulseExercise.propTypes = exercisePropTypes;
+FeelThePulseExercise.defaultProps = exerciseDefaultProps;
 
 const styles = StyleSheet.create({
   container: {

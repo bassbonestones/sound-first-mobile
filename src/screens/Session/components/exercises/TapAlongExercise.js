@@ -13,64 +13,18 @@ import {
   Animated,
   Platform,
 } from "react-native";
-
-// Import AudioContext
-let NativeAudioContext = null;
-if (Platform.OS !== "web") {
-  try {
-    NativeAudioContext = require("react-native-audio-api").AudioContext;
-  } catch (e) {
-    console.warn("react-native-audio-api not available");
-  }
-}
+import {
+  createAudioContext,
+  createClickSound,
+  TIMING_TOLERANCES,
+  exercisePropTypes,
+  exerciseDefaultProps,
+} from "./shared";
 
 // Tolerance in ms for "on time" taps
-const TIMING_TOLERANCE_MS = 100;
+const TIMING_TOLERANCE_MS = TIMING_TOLERANCES.GOOD;
 // "Good" timing is within this range
-const GOOD_TOLERANCE_MS = 50;
-
-/**
- * Create a noise-based click sound using Web Audio
- * Uses white noise to avoid confusing pitch detection with any instrument.
- */
-function createClickSound(
-  audioContext,
-  frequency = 1000,
-  duration = 0.05,
-  volume = 0.5,
-) {
-  const sampleRate = audioContext.sampleRate;
-  const bufferSize = Math.floor(sampleRate * duration * 2);
-  const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
-  const data = buffer.getChannelData(0);
-
-  // Fill with white noise
-  for (let i = 0; i < bufferSize; i++) {
-    data[i] = Math.random() * 2 - 1;
-  }
-
-  const source = audioContext.createBufferSource();
-  source.buffer = buffer;
-
-  // Highpass filter - frequency param controls brightness (cooler sound)
-  const filter = audioContext.createBiquadFilter();
-  filter.type = "highpass";
-  filter.frequency.value = 800 + ((frequency - 700) / 500) * 1200;
-  filter.Q.value = 0.7;
-
-  const gainNode = audioContext.createGain();
-  gainNode.gain.setValueAtTime(volume * 1.5, audioContext.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(
-    0.001,
-    audioContext.currentTime + duration,
-  );
-
-  source.connect(filter);
-  filter.connect(gainNode);
-  gainNode.connect(audioContext.destination);
-
-  source.start(audioContext.currentTime);
-}
+const GOOD_TOLERANCE_MS = TIMING_TOLERANCES.PERFECT;
 
 export default function TapAlongExercise({
   config,
@@ -111,12 +65,7 @@ export default function TapAlongExercise({
 
   // Initialize audio context
   useEffect(() => {
-    if (Platform.OS === "web") {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      audioContextRef.current = new AudioContext();
-    } else if (NativeAudioContext) {
-      audioContextRef.current = new NativeAudioContext();
-    }
+    audioContextRef.current = createAudioContext();
 
     return () => {
       unmountedRef.current = true;
@@ -437,6 +386,10 @@ export default function TapAlongExercise({
     </View>
   );
 }
+
+// PropTypes validation
+TapAlongExercise.propTypes = exercisePropTypes;
+TapAlongExercise.defaultProps = exerciseDefaultProps;
 
 const styles = StyleSheet.create({
   container: {

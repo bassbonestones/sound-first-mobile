@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { usePitchDetection } from "../../../../hooks/usePitchDetection";
 import { CircularVolumeIndicator } from "../../../../components/VolumeBar";
+import { exercisePropTypes, exerciseDefaultProps } from "./shared";
 
 // Audio context
 // Audio context - works on web, iOS, and Android
@@ -477,6 +478,10 @@ export default function OctavePlayExercise({
 
   return null;
 }
+
+// PropTypes validation
+OctavePlayExercise.propTypes = exercisePropTypes;
+OctavePlayExercise.defaultProps = exerciseDefaultProps;
 
 // ============================================================
 // STYLES

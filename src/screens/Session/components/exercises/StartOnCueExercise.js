@@ -15,63 +15,17 @@ import {
   Platform,
 } from "react-native";
 import { usePitchDetection } from "../../../../hooks/usePitchDetection";
-
-// Import AudioContext
-let NativeAudioContext = null;
-if (Platform.OS !== "web") {
-  try {
-    NativeAudioContext = require("react-native-audio-api").AudioContext;
-  } catch (e) {
-    console.warn("react-native-audio-api not available");
-  }
-}
+import {
+  createAudioContext,
+  createClickSound,
+  TIMING_TOLERANCES,
+  exercisePropTypes,
+  exerciseDefaultProps,
+} from "./shared";
 
 // Default timing tolerance - generous for beginners (~1/8 note at 60 BPM)
 // This allows being up to an 8th note early or late and still counting as success
-const DEFAULT_TOLERANCE_MS = 450;
-
-/**
- * Create a noise-based click sound using Web Audio
- * Uses white noise to avoid confusing pitch detection with any instrument.
- */
-function createClickSound(
-  audioContext,
-  frequency = 1000,
-  duration = 0.05,
-  volume = 0.5,
-) {
-  const sampleRate = audioContext.sampleRate;
-  const bufferSize = Math.floor(sampleRate * duration * 2);
-  const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
-  const data = buffer.getChannelData(0);
-
-  // Fill with white noise
-  for (let i = 0; i < bufferSize; i++) {
-    data[i] = Math.random() * 2 - 1;
-  }
-
-  const source = audioContext.createBufferSource();
-  source.buffer = buffer;
-
-  // Highpass filter - frequency param controls brightness (cooler sound)
-  const filter = audioContext.createBiquadFilter();
-  filter.type = "highpass";
-  filter.frequency.value = 800 + ((frequency - 700) / 500) * 1200;
-  filter.Q.value = 0.7;
-
-  const gainNode = audioContext.createGain();
-  gainNode.gain.setValueAtTime(volume * 1.5, audioContext.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(
-    0.001,
-    audioContext.currentTime + duration,
-  );
-
-  source.connect(filter);
-  filter.connect(gainNode);
-  gainNode.connect(audioContext.destination);
-
-  source.start(audioContext.currentTime);
-}
+const DEFAULT_TOLERANCE_MS = TIMING_TOLERANCES.LENIENT + 250; // 450ms
 
 export default function StartOnCueExercise({
   config,
@@ -106,16 +60,7 @@ export default function StartOnCueExercise({
 
   // Create AudioContext immediately (shared between metronome and pitch detection)
   // Using state so we can pass it to usePitchDetection and re-render when it's ready
-  const [sharedAudioContext] = useState(() => {
-    if (Platform.OS === "web") {
-      const AudioContextClass =
-        window.AudioContext || window.webkitAudioContext;
-      return new AudioContextClass();
-    } else if (NativeAudioContext) {
-      return new NativeAudioContext();
-    }
-    return null;
-  });
+  const [sharedAudioContext] = useState(() => createAudioContext());
 
   // Refs
   const audioContextRef = useRef(sharedAudioContext);
@@ -1079,6 +1024,10 @@ export default function StartOnCueExercise({
     </View>
   );
 }
+
+// PropTypes validation
+StartOnCueExercise.propTypes = exercisePropTypes;
+StartOnCueExercise.defaultProps = exerciseDefaultProps;
 
 const styles = StyleSheet.create({
   container: {

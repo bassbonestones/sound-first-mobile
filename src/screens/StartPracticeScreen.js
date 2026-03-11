@@ -29,7 +29,7 @@ const FATIGUE_HINTS = {
 };
 
 export default function StartPracticeScreen({ navigation, route }) {
-  const { instrumentId } = route.params || {};
+  const { instrumentId } = route?.params || {};
   const [duration, setDuration] = useState(20);
   const [fatigue, setFatigue] = useState(2);
   const [showFatigue5Modal, setShowFatigue5Modal] = useState(false);

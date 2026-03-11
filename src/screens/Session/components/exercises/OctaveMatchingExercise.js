@@ -15,6 +15,7 @@ import {
   StyleSheet,
   Platform,
 } from "react-native";
+import { exercisePropTypes, exerciseDefaultProps } from "./shared";
 
 // Audio context
 // Audio context - works on web, iOS, and Android
@@ -384,6 +385,10 @@ export default function OctaveMatchingExercise({
     </View>
   );
 }
+
+// PropTypes validation
+OctaveMatchingExercise.propTypes = exercisePropTypes;
+OctaveMatchingExercise.defaultProps = exerciseDefaultProps;
 
 // ============================================================
 // STYLES
