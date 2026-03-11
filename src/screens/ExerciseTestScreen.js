@@ -29,6 +29,8 @@ import {
   TimeSignatureBasicsExercise,
   TimeSignature44Exercise,
   Fragment2LessonExercise,
+  NoteNamePatternExercise,
+  OctaveConceptExercise,
 } from "./Session/components/exercises";
 import {
   getAvailablePatterns,
@@ -171,6 +173,26 @@ function shouldUseSharps(noteName) {
 }
 
 const EXERCISES = [
+  // === New Teaching Modules ===
+  {
+    id: "note_name_pattern",
+    name: "Note Names: A to G",
+    icon: "🔤",
+    description: "Learn the 7 note names that repeat: A B C D E F G",
+    component: NoteNamePatternExercise,
+    config: {},
+    mastery: { correct_streak: 4 },
+  },
+  {
+    id: "octave_concept",
+    name: "The Octave",
+    icon: "🎹",
+    description: "Learn that octaves are the same note at different heights",
+    component: OctaveConceptExercise,
+    config: {},
+    mastery: { correct_streak: 3 },
+  },
+  // === Pulse & Rhythm ===
   {
     id: "feel_the_pulse",
     name: "Feel the Pulse",

@@ -50,9 +50,14 @@ function CapabilityExplorer() {
 
   // Debug: log capabilitiesWithContent when it updates
   useEffect(() => {
-    console.log("[CapabilityExplorer] capabilitiesWithContent size:", capabilitiesWithContent.size);
+    console.log(
+      "[CapabilityExplorer] capabilitiesWithContent size:",
+      capabilitiesWithContent.size,
+    );
     if (capabilitiesWithContent.size > 0) {
-      console.log("[CapabilityExplorer] capabilities with content:", [...capabilitiesWithContent]);
+      console.log("[CapabilityExplorer] capabilities with content:", [
+        ...capabilitiesWithContent,
+      ]);
     }
   }, [capabilitiesWithContent]);
 
@@ -132,112 +137,140 @@ function CapabilityExplorer() {
     await exportToFile();
   };
 
-  const renderCapabilityItem = useCallback(({ item, index }) => {
-    // Get domain capabilities sorted by bit_index for determining if up/down is possible
-    const domainCaps =
-      domainFilter !== "all"
-        ? capabilities
-            .filter((c) => c.domain === domainFilter)
-            .sort((a, b) => (a.bit_index ?? 0) - (b.bit_index ?? 0))
-        : [];
-    const itemIndex = domainCaps.findIndex((c) => c.id === item.id);
-    const canMoveUp = domainFilter !== "all" && itemIndex > 0;
-    const canMoveDown =
-      domainFilter !== "all" && itemIndex < domainCaps.length - 1;
+  const renderCapabilityItem = useCallback(
+    ({ item, index }) => {
+      // Get domain capabilities sorted by bit_index for determining if up/down is possible
+      const domainCaps =
+        domainFilter !== "all"
+          ? capabilities
+              .filter((c) => c.domain === domainFilter)
+              .sort((a, b) => (a.bit_index ?? 0) - (b.bit_index ?? 0))
+          : [];
+      const itemIndex = domainCaps.findIndex((c) => c.id === item.id);
+      const canMoveUp = domainFilter !== "all" && itemIndex > 0;
+      const canMoveDown =
+        domainFilter !== "all" && itemIndex < domainCaps.length - 1;
 
-    // Debug: check matching for day 0 items
-    const day0Names = ['pitch_direction_awareness', 'pulse_tracking', 'rhythm_whole_notes', 'time_signature_basics', 'time_signature_4_4', 'rest_whole', 'rhythm_half_notes', 'rest_half', 'rhythm_quarter_notes', 'rest_quarter'];
-    if (day0Names.includes(item.name)) {
-      console.log(`[render] ${item.name}: has=${capabilitiesWithContent.has(item.name)}, setSize=${capabilitiesWithContent.size}`);
-    }
+      // Debug: check matching for day 0 items
+      const day0Names = [
+        "pitch_direction_awareness",
+        "pulse_tracking",
+        "rhythm_whole_notes",
+        "time_signature_basics",
+        "time_signature_4_4",
+        "rest_whole",
+        "rhythm_half_notes",
+        "rest_half",
+        "rhythm_quarter_notes",
+        "rest_quarter",
+      ];
+      if (day0Names.includes(item.name)) {
+        console.log(
+          `[render] ${item.name}: has=${capabilitiesWithContent.has(item.name)}, setSize=${capabilitiesWithContent.size}`,
+        );
+      }
 
-    return (
-      <View style={styles.listItem}>
-        <TouchableOpacity
-          style={{ flex: 1 }}
-          onPress={() => viewCapabilityDetail(item)}
-        >
-          <View style={styles.listItemHeader}>
-            {capabilitiesWithContent.has(item.name) && (
-              <Text style={{ color: '#4CAF50', fontSize: 16, marginRight: 4 }}>●</Text>
-            )}
-            <Text style={styles.listItemTitle}>
-              {item.display_name || item.name}
-            </Text>
-            <Text style={styles.listItemBadge}>{item.domain}</Text>
-            <Text
-              style={[
-                styles.listItemBadge,
-                {
-                  backgroundColor:
-                    item.is_global !== false ? "#1565C0" : "#6A1B9A",
-                },
-              ]}
-            >
-              {item.is_global !== false ? "🌐 Global" : "🎸 Per-Inst"}
-            </Text>
-          </View>
-          <View style={styles.listItemDetails}>
-            <Text style={styles.listItemDetail}>
-              Bit: {item.bit_index ?? "N/A"}
-            </Text>
-            <Text style={styles.listItemDetail}>
-              Tier: {item.difficulty_tier || 1}
-            </Text>
-            <Text style={styles.listItemDetail}>
-              Type: {item.requirement_type || "required"}
-            </Text>
-            <Text
-              style={[
-                styles.listItemDetail,
-                { color: item.is_active !== false ? "#4CAF50" : "#f44336" },
-              ]}
-            >
-              {item.is_active !== false ? "Active" : "Inactive"}
-            </Text>
-          </View>
-          {item.prerequisite_names?.length > 0 && (
-            <Text style={styles.listItemSubtext}>
-              Prerequisites: {item.prerequisite_names.join(", ")}
-            </Text>
-          )}
-          {item.soft_gate_requirements &&
-            Object.keys(item.soft_gate_requirements).length > 0 && (
-              <Text style={[styles.listItemSubtext, { color: "#9C27B0" }]}>
-                Soft Gates:{" "}
-                {Object.entries(item.soft_gate_requirements)
-                  .map(([k, v]) => `${k}: ${v}`)
-                  .join(", ")}
+      return (
+        <View style={styles.listItem}>
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            onPress={() => viewCapabilityDetail(item)}
+          >
+            <View style={styles.listItemHeader}>
+              {capabilitiesWithContent.has(item.name) && (
+                <Text
+                  style={{ color: "#4CAF50", fontSize: 16, marginRight: 4 }}
+                >
+                  ●
+                </Text>
+              )}
+              <Text style={styles.listItemTitle}>
+                {item.display_name || item.name}
+              </Text>
+              <Text style={styles.listItemBadge}>{item.domain}</Text>
+              <Text
+                style={[
+                  styles.listItemBadge,
+                  {
+                    backgroundColor:
+                      item.is_global !== false ? "#1565C0" : "#6A1B9A",
+                  },
+                ]}
+              >
+                {item.is_global !== false ? "🌐 Global" : "🎸 Per-Inst"}
+              </Text>
+            </View>
+            <View style={styles.listItemDetails}>
+              <Text style={styles.listItemDetail}>
+                Bit: {item.bit_index ?? "N/A"}
+              </Text>
+              <Text style={styles.listItemDetail}>
+                Tier: {item.difficulty_tier || 1}
+              </Text>
+              <Text style={styles.listItemDetail}>
+                Type: {item.requirement_type || "required"}
+              </Text>
+              <Text
+                style={[
+                  styles.listItemDetail,
+                  { color: item.is_active !== false ? "#4CAF50" : "#f44336" },
+                ]}
+              >
+                {item.is_active !== false ? "Active" : "Inactive"}
+              </Text>
+            </View>
+            {item.prerequisite_names?.length > 0 && (
+              <Text style={styles.listItemSubtext}>
+                Prerequisites: {item.prerequisite_names.join(", ")}
               </Text>
             )}
-        </TouchableOpacity>
-        {domainFilter !== "all" && (
-          <View style={styles.reorderButtons}>
-            <TouchableOpacity
-              style={[
-                styles.reorderButton,
-                !canMoveUp && styles.reorderButtonDisabled,
-              ]}
-              onPress={() => canMoveUp && handleMoveCapability(item, "up")}
-              disabled={!canMoveUp}
-            >
-              <Text style={styles.reorderButtonText}>▲</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.reorderButton,
-                !canMoveDown && styles.reorderButtonDisabled,
-              ]}
-              onPress={() => canMoveDown && handleMoveCapability(item, "down")}
-              disabled={!canMoveDown}
-            >
-              <Text style={styles.reorderButtonText}>▼</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    );
-  }, [capabilities, domainFilter, capabilitiesWithContent, viewCapabilityDetail, handleMoveCapability]);
+            {item.soft_gate_requirements &&
+              Object.keys(item.soft_gate_requirements).length > 0 && (
+                <Text style={[styles.listItemSubtext, { color: "#9C27B0" }]}>
+                  Soft Gates:{" "}
+                  {Object.entries(item.soft_gate_requirements)
+                    .map(([k, v]) => `${k}: ${v}`)
+                    .join(", ")}
+                </Text>
+              )}
+          </TouchableOpacity>
+          {domainFilter !== "all" && (
+            <View style={styles.reorderButtons}>
+              <TouchableOpacity
+                style={[
+                  styles.reorderButton,
+                  !canMoveUp && styles.reorderButtonDisabled,
+                ]}
+                onPress={() => canMoveUp && handleMoveCapability(item, "up")}
+                disabled={!canMoveUp}
+              >
+                <Text style={styles.reorderButtonText}>▲</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.reorderButton,
+                  !canMoveDown && styles.reorderButtonDisabled,
+                ]}
+                onPress={() =>
+                  canMoveDown && handleMoveCapability(item, "down")
+                }
+                disabled={!canMoveDown}
+              >
+                <Text style={styles.reorderButtonText}>▼</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      );
+    },
+    [
+      capabilities,
+      domainFilter,
+      capabilitiesWithContent,
+      viewCapabilityDetail,
+      handleMoveCapability,
+    ],
+  );
 
   if (loading) {
     return (
@@ -349,7 +382,13 @@ function CapabilityExplorer() {
 
       {/* Results */}
       <Text style={styles.resultCount}>
-        {filteredCapabilities.length} capabilities ({filteredCapabilities.filter(c => capabilitiesWithContent.has(c.name)).length} with modules <Text style={{color: '#4CAF50'}}>●</Text>)
+        {filteredCapabilities.length} capabilities (
+        {
+          filteredCapabilities.filter((c) =>
+            capabilitiesWithContent.has(c.name),
+          ).length
+        }{" "}
+        with modules <Text style={{ color: "#4CAF50" }}>●</Text>)
       </Text>
 
       <FlatList

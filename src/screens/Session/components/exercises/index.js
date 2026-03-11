@@ -19,6 +19,11 @@ import QuarterRestLessonExercise from "./QuarterRestLessonExercise";
 import TimeSignatureBasicsExercise from "./TimeSignatureBasicsExercise";
 import TimeSignature44Exercise from "./TimeSignature44Exercise";
 import Fragment2LessonExercise from "./Fragment2LessonExercise";
+import NoteNamePatternExercise from "./NoteNamePatternExercise";
+import NoteNameQuizExercise from "./NoteNameQuizExercise";
+import OctaveConceptExercise from "./OctaveConceptExercise";
+import OctaveMatchingExercise from "./OctaveMatchingExercise";
+import OctavePlayExercise from "./OctavePlayExercise";
 
 // Map template IDs to exercise components
 export const EXERCISE_COMPONENTS = {
@@ -52,6 +57,15 @@ export const EXERCISE_COMPONENTS = {
   time_signature_44_lesson: TimeSignature44Exercise, // alias
   fragment_2_lesson: Fragment2LessonExercise,
   diatonic_scale_fragment_2: Fragment2LessonExercise, // alias for capability name
+  // Note name recognition exercises
+  note_name_pattern: NoteNamePatternExercise,
+  note_name_quiz: NoteNameQuizExercise,
+  note_name_recognition: NoteNamePatternExercise, // alias for capability name
+  // Octave equivalence exercises
+  octave_concept: OctaveConceptExercise,
+  octave_matching: OctaveMatchingExercise,
+  octave_play: OctavePlayExercise,
+  octave_equivalence: OctaveConceptExercise, // alias for capability name
 };
 
 export {
@@ -72,6 +86,11 @@ export {
   TimeSignatureBasicsExercise,
   TimeSignature44Exercise,
   Fragment2LessonExercise,
+  NoteNamePatternExercise,
+  NoteNameQuizExercise,
+  OctaveConceptExercise,
+  OctaveMatchingExercise,
+  OctavePlayExercise,
 };
 
 /**
