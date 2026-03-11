@@ -212,12 +212,25 @@ export default function SessionScreenContent() {
           correct_count: result.correctCount || 8,
         });
 
+        // Include key for multi-key tracking (e.g., fragment exercises)
+        if (result.key) {
+          params.append("key", result.key);
+          console.log("[Session] Including key:", result.key);
+        }
+
         const url = `${baseUrl}/modules/user/${userId}/lesson/${mini.lesson_id}/complete?${params}`;
         console.log("[Session] Calling:", url);
 
         const response = await fetch(url, { method: "POST" });
         const data = await response.json();
         console.log("[Session] Complete response:", JSON.stringify(data));
+
+        // Log multi-key progress if present
+        if (data.keys_completed) {
+          console.log(
+            `[Session] Keys completed: ${data.keys_completed.length}/${data.keys_required}`,
+          );
+        }
 
         // Check if this was a range expansion exercise and update user's range
         if (result.direction && result.targetNote && selectedInstrument) {

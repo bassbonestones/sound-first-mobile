@@ -18,6 +18,7 @@ import QuarterNoteLessonExercise from "./QuarterNoteLessonExercise";
 import QuarterRestLessonExercise from "./QuarterRestLessonExercise";
 import TimeSignatureBasicsExercise from "./TimeSignatureBasicsExercise";
 import TimeSignature44Exercise from "./TimeSignature44Exercise";
+import Fragment2LessonExercise from "./Fragment2LessonExercise";
 
 // Map template IDs to exercise components
 export const EXERCISE_COMPONENTS = {
@@ -49,6 +50,8 @@ export const EXERCISE_COMPONENTS = {
   time_signature_basics_lesson: TimeSignatureBasicsExercise, // alias
   time_signature_4_4: TimeSignature44Exercise,
   time_signature_44_lesson: TimeSignature44Exercise, // alias
+  fragment_2_lesson: Fragment2LessonExercise,
+  diatonic_scale_fragment_2: Fragment2LessonExercise, // alias for capability name
 };
 
 export {
@@ -68,6 +71,7 @@ export {
   QuarterRestLessonExercise,
   TimeSignatureBasicsExercise,
   TimeSignature44Exercise,
+  Fragment2LessonExercise,
 };
 
 /**

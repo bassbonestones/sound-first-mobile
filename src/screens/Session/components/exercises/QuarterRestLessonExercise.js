@@ -207,6 +207,40 @@ function createClickSound(audioContext, isAccent = false) {
   source.start(audioContext.currentTime);
 }
 
+// Create a softer subdivision click for eighth notes
+function createSubdivisionClick(audioContext) {
+  const sampleRate = audioContext.sampleRate;
+  const duration = 0.02;
+  const bufferSize = Math.floor(sampleRate * duration);
+  const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
+  const data = buffer.getChannelData(0);
+
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = Math.random() * 2 - 1;
+  }
+
+  const source = audioContext.createBufferSource();
+  source.buffer = buffer;
+
+  const filter = audioContext.createBiquadFilter();
+  filter.type = "highpass";
+  filter.frequency.value = 2000; // Higher pitch for subdivision
+  filter.Q.value = 0.5;
+
+  const gainNode = audioContext.createGain();
+  gainNode.gain.setValueAtTime(0.25, audioContext.currentTime); // Softer
+  gainNode.gain.exponentialRampToValueAtTime(
+    0.001,
+    audioContext.currentTime + duration,
+  );
+
+  source.connect(filter);
+  filter.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+
+  source.start(audioContext.currentTime);
+}
+
 export default function QuarterRestLessonExercise({
   config,
   mastery,
@@ -219,6 +253,7 @@ export default function QuarterRestLessonExercise({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentBeat, setCurrentBeat] = useState(0);
   const [currentMeasure, setCurrentMeasure] = useState(1);
+  const [isSubdivision, setIsSubdivision] = useState(false);
   const [showNotation, setShowNotation] = useState(false);
   const [singResult, setSingResult] = useState(null);
   const [playResult, setPlayResult] = useState(null);
@@ -365,10 +400,13 @@ export default function QuarterRestLessonExercise({
       setIsPlaying(true);
       setCurrentBeat(-4);
       setCurrentMeasure(1);
+      setIsSubdivision(false);
 
       const beatMs = (60 / bpm) * 1000;
+      const eighthMs = beatMs / 2;
       let beat = -4;
       let absoluteBeat = -4;
+      let isAnd = true; // First interval tick is subdivision after initial beat
 
       const playQuarterNote = () => {
         const osc = ctx.createOscillator();
@@ -407,6 +445,7 @@ export default function QuarterRestLessonExercise({
       };
 
       createClickSound(ctx, true);
+      setIsSubdivision(false);
 
       beatIntervalRef.current = setInterval(() => {
         if (unmountedRef.current) {
@@ -414,52 +453,63 @@ export default function QuarterRestLessonExercise({
           return;
         }
 
-        beat++;
-        absoluteBeat++;
-        if (beat === 0) {
-          beat = 1;
-          absoluteBeat = 1;
-        }
-
-        if (beat >= -3 && beat <= -1) {
-          createClickSound(ctx, false);
-          setCurrentBeat(beat);
-        } else if (absoluteBeat >= 1 && absoluteBeat <= 8) {
-          // Determine if this is an accent (beat 1 of each measure)
-          const measureBeat = ((absoluteBeat - 1) % 4) + 1;
-          const isAccent = measureBeat === 1;
-          createClickSound(ctx, isAccent);
-
-          // Update measure
-          if (absoluteBeat <= 4) {
-            setCurrentMeasure(1);
-            setCurrentBeat(measureBeat);
-          } else {
-            setCurrentMeasure(2);
-            setCurrentBeat(measureBeat);
-          }
-
-          // Play note on odd beats (1, 3, 5, 7 = absoluteBeat 1, 3, 5, 7)
-          if (absoluteBeat % 2 === 1) {
-            playQuarterNote();
-          }
-        } else if (absoluteBeat === 9) {
-          // The final ONE - pattern ends
-          createClickSound(ctx, true);
-          setCurrentMeasure(2);
-          setCurrentBeat(5); // "Next" beat
+        if (isAnd) {
+          // This is the "&" subdivision
+          createSubdivisionClick(ctx);
+          setIsSubdivision(true);
+          isAnd = false;
         } else {
-          clearInterval(beatIntervalRef.current);
-          beatIntervalRef.current = null;
-          setIsPlaying(false);
-          setCurrentBeat(0);
-          setCurrentMeasure(1);
-          if (onCompleteRef.current) {
-            onCompleteRef.current();
-            onCompleteRef.current = null;
+          // This is a main beat
+          beat++;
+          absoluteBeat++;
+          if (beat === 0) {
+            beat = 1;
+            absoluteBeat = 1;
           }
+          setIsSubdivision(false);
+
+          if (beat >= -3 && beat <= -1) {
+            createClickSound(ctx, false);
+            setCurrentBeat(beat);
+          } else if (absoluteBeat >= 1 && absoluteBeat <= 8) {
+            // Determine if this is an accent (beat 1 of each measure)
+            const measureBeat = ((absoluteBeat - 1) % 4) + 1;
+            const isAccent = measureBeat === 1;
+            createClickSound(ctx, isAccent);
+
+            // Update measure and beat (use absoluteBeat for UI)
+            if (absoluteBeat <= 4) {
+              setCurrentMeasure(1);
+            } else {
+              setCurrentMeasure(2);
+            }
+            setCurrentBeat(absoluteBeat);
+
+            // Play note on odd beats (1, 3, 5, 7 = absoluteBeat 1, 3, 5, 7)
+            if (absoluteBeat % 2 === 1) {
+              playQuarterNote();
+            }
+          } else if (absoluteBeat === 9) {
+            // The final ONE - pattern ends
+            createClickSound(ctx, true);
+            setCurrentMeasure(2);
+            setCurrentBeat(9); // End beat
+          } else {
+            clearInterval(beatIntervalRef.current);
+            beatIntervalRef.current = null;
+            setIsPlaying(false);
+            setCurrentBeat(0);
+            setCurrentMeasure(1);
+            setIsSubdivision(false);
+            if (onCompleteRef.current) {
+              onCompleteRef.current();
+              onCompleteRef.current = null;
+            }
+            return;
+          }
+          isAnd = true; // Next tick will be subdivision
         }
-      }, beatMs);
+      }, eighthMs);
     },
     [bpm, targetFrequency, isPlaying],
   );
@@ -501,12 +551,15 @@ export default function QuarterRestLessonExercise({
       setIsPlaying(true);
       setCurrentBeat(-4);
       setCurrentMeasure(1);
+      setIsSubdivision(false);
       soundingOnBeatsRef.current = [0, 0, 0, 0, 0, 0, 0, 0];
       startedEarlyRef.current = false;
 
       const beatMs = (60 / bpm) * 1000;
+      const eighthMs = beatMs / 2;
       let beat = -4;
       let absoluteBeat = -4;
+      let isAnd = true; // First interval tick is subdivision after initial beat
 
       let beatSoundingSamples = { beat: 0, samples: 0, soundingCount: 0 };
       let earlySoundingSamples = 0;
@@ -559,6 +612,7 @@ export default function QuarterRestLessonExercise({
       samplingIntervalRef.current = samplingInterval;
 
       createClickSound(ctx, true);
+      setIsSubdivision(false);
 
       beatIntervalRef.current = setInterval(() => {
         if (unmountedRef.current) {
@@ -567,57 +621,68 @@ export default function QuarterRestLessonExercise({
           return;
         }
 
-        beat++;
-        absoluteBeat++;
-        if (beat === 0) {
-          beat = 1;
-          absoluteBeat = 1;
-        }
-
-        if (beat >= -3 && beat <= -1) {
-          createClickSound(ctx, false);
-          setCurrentBeat(beat);
-        } else if (absoluteBeat >= 1 && absoluteBeat <= 8) {
-          const measureBeat = ((absoluteBeat - 1) % 4) + 1;
-          const isAccent = measureBeat === 1;
-          createClickSound(ctx, isAccent);
-
-          if (absoluteBeat <= 4) {
-            setCurrentMeasure(1);
-            setCurrentBeat(measureBeat);
-          } else {
-            setCurrentMeasure(2);
-            setCurrentBeat(measureBeat);
-          }
-        } else if (absoluteBeat === 9) {
-          createClickSound(ctx, true);
-          setCurrentBeat(5);
+        if (isAnd) {
+          // This is the "&" subdivision
+          createSubdivisionClick(ctx);
+          setIsSubdivision(true);
+          isAnd = false;
         } else {
-          if (
-            beatSoundingSamples.beat >= 1 &&
-            beatSoundingSamples.samples > 0
-          ) {
-            const percentage =
-              beatSoundingSamples.soundingCount / beatSoundingSamples.samples;
-            const idx = beatSoundingSamples.beat - 1;
-            soundingOnBeatsRef.current[idx] = Math.max(
-              soundingOnBeatsRef.current[idx],
-              percentage,
-            );
+          // This is a main beat
+          beat++;
+          absoluteBeat++;
+          if (beat === 0) {
+            beat = 1;
+            absoluteBeat = 1;
           }
-          clearInterval(beatIntervalRef.current);
-          clearInterval(samplingInterval);
-          beatIntervalRef.current = null;
-          samplingIntervalRef.current = null;
-          setIsPlaying(false);
-          setCurrentBeat(0);
-          setCurrentMeasure(1);
-          if (onCompleteRef.current) {
-            onCompleteRef.current();
-            onCompleteRef.current = null;
+          setIsSubdivision(false);
+
+          if (beat >= -3 && beat <= -1) {
+            createClickSound(ctx, false);
+            setCurrentBeat(beat);
+          } else if (absoluteBeat >= 1 && absoluteBeat <= 8) {
+            const measureBeat = ((absoluteBeat - 1) % 4) + 1;
+            const isAccent = measureBeat === 1;
+            createClickSound(ctx, isAccent);
+
+            if (absoluteBeat <= 4) {
+              setCurrentMeasure(1);
+            } else {
+              setCurrentMeasure(2);
+            }
+            setCurrentBeat(absoluteBeat);
+          } else if (absoluteBeat === 9) {
+            createClickSound(ctx, true);
+            setCurrentBeat(9);
+          } else {
+            if (
+              beatSoundingSamples.beat >= 1 &&
+              beatSoundingSamples.samples > 0
+            ) {
+              const percentage =
+                beatSoundingSamples.soundingCount / beatSoundingSamples.samples;
+              const idx = beatSoundingSamples.beat - 1;
+              soundingOnBeatsRef.current[idx] = Math.max(
+                soundingOnBeatsRef.current[idx],
+                percentage,
+              );
+            }
+            clearInterval(beatIntervalRef.current);
+            clearInterval(samplingInterval);
+            beatIntervalRef.current = null;
+            samplingIntervalRef.current = null;
+            setIsPlaying(false);
+            setCurrentBeat(0);
+            setCurrentMeasure(1);
+            setIsSubdivision(false);
+            if (onCompleteRef.current) {
+              onCompleteRef.current();
+              onCompleteRef.current = null;
+            }
+            return;
           }
+          isAnd = true; // Next tick will be subdivision
         }
-      }, beatMs);
+      }, eighthMs);
     },
     [bpm, isPlaying],
   );
@@ -649,8 +714,8 @@ export default function QuarterRestLessonExercise({
     const successRatio = pitchCount / totalCount;
     const pitchOk = hitTarget && successRatio >= 0.3;
 
-    const SUSTAIN_THRESHOLD = 0.5; // Quarter notes are short
-    const SILENCE_THRESHOLD = 0.3;
+    const SUSTAIN_THRESHOLD = 0.4; // Quarter notes - need to be sounding on note beats
+    const SILENCE_THRESHOLD = 0.5; // More forgiving - allow some spillover on rest beats
 
     // Odd beats (0,2,4,6 indexes = beats 1,3,5,7) should have sound
     // Even beats (1,3,5,7 indexes = beats 2,4,6,8) should be silent (rests)
@@ -678,9 +743,9 @@ export default function QuarterRestLessonExercise({
     } else if (startedEarly) {
       message = "Wait for beat ONE to start";
     } else if (!noteBeatsOk) {
-      message = "Play on beats 1, 3 (each measure)";
+      message = "Play on beats 1, 3, 5, 7 (the notes)";
     } else if (!restBeatsOk) {
-      message = "Be silent on beats 2, 4 (the rests)";
+      message = "Be silent on beats 2, 4, 6, 8 (the rests)";
     }
 
     return { success, pitchOk, rhythmOk, message };
@@ -825,7 +890,7 @@ export default function QuarterRestLessonExercise({
     );
   };
 
-  // Beat indicator for quarter rest pattern (8 beats across 2 measures)
+  // Beat indicator for quarter rest pattern (8 beats across 2 measures) with eighth note subdivision
   const BeatIndicator = () => {
     return (
       <View style={styles.beatIndicatorContainer}>
@@ -833,27 +898,28 @@ export default function QuarterRestLessonExercise({
           <Text style={styles.countInLabel}>Count in:</Text>
           <View style={styles.countInBeats}>
             {[-4, -3, -2, -1].map((beat, index) => (
-              <View
-                key={beat}
-                style={[
-                  styles.countInDot,
-                  beat <= currentBeat &&
-                    currentBeat < 0 &&
-                    styles.countInDotActive,
-                  beat === -4 && styles.countInDotAccent,
-                ]}
-              >
-                <Text
+              <React.Fragment key={beat}>
+                <View
                   style={[
-                    styles.countInNumber,
+                    styles.countInDot,
                     beat <= currentBeat &&
                       currentBeat < 0 &&
-                      styles.countInNumberActive,
+                      styles.countInDotActive,
+                    beat === -4 && styles.countInDotAccent,
                   ]}
                 >
-                  {index + 1}
-                </Text>
-              </View>
+                  <Text
+                    style={[
+                      styles.countInNumber,
+                      beat <= currentBeat &&
+                        currentBeat < 0 &&
+                        styles.countInNumberActive,
+                    ]}
+                  >
+                    {index + 1}
+                  </Text>
+                </View>
+              </React.Fragment>
             ))}
           </View>
         </View>
@@ -865,45 +931,67 @@ export default function QuarterRestLessonExercise({
         <View style={styles.singRow}>
           <Text style={styles.singLabel}>Play:</Text>
           <View style={styles.beatIndicator}>
-            {/* Show 4 beats for current measure */}
-            {[1, 2, 3, 4].map((beat) => {
-              const isNote = beat % 2 === 1; // Beats 1, 3 are notes; 2, 4 are rests
+            {/* Show all 8 beats across both measures */}
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((beat) => {
+              const isNote = beat % 2 === 1; // Beats 1, 3, 5, 7 are notes; 2, 4, 6, 8 are rests
               const isActive = currentBeat >= beat && currentBeat > 0;
+              const isMeasureStart = beat === 1 || beat === 5;
 
               return (
-                <View
-                  key={beat}
-                  style={[
-                    styles.beatDot,
-                    beat === 1 && styles.beatDotAccent,
-                    !isNote && styles.beatDotRest,
-                    isActive &&
-                      (isNote
-                        ? styles.beatDotActive
-                        : styles.beatDotRestActive),
-                  ]}
-                >
-                  <Text
+                <React.Fragment key={beat}>
+                  <View
                     style={[
-                      styles.beatNumber,
+                      styles.beatDot,
+                      isMeasureStart && styles.beatDotAccent,
+                      !isNote && styles.beatDotRest,
                       isActive &&
                         (isNote
-                          ? styles.beatNumberActive
-                          : styles.beatNumberRestActive),
+                          ? styles.beatDotActive
+                          : styles.beatDotRestActive),
                     ]}
                   >
-                    {beat}
-                  </Text>
-                </View>
+                    <Text
+                      style={[
+                        styles.beatNumber,
+                        isActive &&
+                          (isNote
+                            ? styles.beatNumberActive
+                            : styles.beatNumberRestActive),
+                      ]}
+                    >
+                      {((beat - 1) % 4) + 1}
+                    </Text>
+                  </View>
+                </React.Fragment>
               );
             })}
           </View>
         </View>
 
         <View style={styles.patternHint}>
-          <Text style={styles.patternHintText}>🎵 · 🤫 · 🎵 · 🤫</Text>
+          <View style={styles.patternHintRow}>
+            {/* Spacer to align with Play: label above */}
+            <View style={styles.patternHintSpacer} />
+            {/* All 8 beats: note-rest-note-rest x 2 */}
+            <View style={styles.patternHintNote} />
+            <View style={styles.patternHintRest}>
+              <Text style={styles.patternHintRestText}>🤫</Text>
+            </View>
+            <View style={styles.patternHintNote} />
+            <View style={styles.patternHintRest}>
+              <Text style={styles.patternHintRestText}>🤫</Text>
+            </View>
+            <View style={styles.patternHintNote} />
+            <View style={styles.patternHintRest}>
+              <Text style={styles.patternHintRestText}>🤫</Text>
+            </View>
+            <View style={styles.patternHintNote} />
+            <View style={styles.patternHintRest}>
+              <Text style={styles.patternHintRestText}>🤫</Text>
+            </View>
+          </View>
           <Text style={styles.patternHintSubtext}>
-            note - rest - note - rest
+            note-rest-note-rest × 2 measures
           </Text>
         </View>
       </View>
@@ -1231,7 +1319,16 @@ export default function QuarterRestLessonExercise({
           {isPlaying && <BeatIndicator />}
 
           <View style={styles.imagineVisual}>
-            <Text style={styles.imagineEmoji}>🎵 🤫 🎵 🤫</Text>
+            <View style={styles.imaginePatternRow}>
+              <View style={styles.imaginePatternNote} />
+              <View style={styles.imaginePatternRest}>
+                <Text style={styles.imaginePatternRestText}>🤫</Text>
+              </View>
+              <View style={styles.imaginePatternNote} />
+              <View style={styles.imaginePatternRest}>
+                <Text style={styles.imaginePatternRestText}>🤫</Text>
+              </View>
+            </View>
             <Text style={styles.imagineHint}>Play - Rest - Play - Rest</Text>
           </View>
 
@@ -1749,12 +1846,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
   },
   beatDot: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: "#2d241a",
     borderWidth: 2,
     borderColor: "#3b2c1a",
@@ -1777,7 +1874,7 @@ const styles = StyleSheet.create({
     borderColor: "#8a7a6a",
   },
   beatNumber: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
     color: "#666",
   },
@@ -1787,9 +1884,66 @@ const styles = StyleSheet.create({
   beatNumberRestActive: {
     color: "#c4b5a0",
   },
+  // Subdivision dots (eighth notes)
+  subdivisionDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#2d241a",
+    borderWidth: 1,
+    borderColor: "#3b2c1a",
+    marginHorizontal: 4,
+    alignSelf: "center",
+  },
+  subdivisionDotActive: {
+    backgroundColor: "#8b7355",
+    borderColor: "#8b7355",
+  },
   patternHint: {
     marginTop: 12,
     alignItems: "center",
+  },
+  patternHintRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  patternHintSpacer: {
+    width: 60,
+    marginRight: 12,
+  },
+  patternHintNote: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#d4a574",
+  },
+  patternHintRest: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#2d241a",
+    borderWidth: 2,
+    borderColor: "#8a7a6a",
+    borderStyle: "dashed",
+    position: "relative",
+  },
+  patternHintRestText: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    fontSize: 18,
+    textAlign: "center",
+    lineHeight: 28,
+  },
+  patternHintSeparator: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#5a4a3a",
+    marginHorizontal: 4,
   },
   patternHintText: {
     fontSize: 18,
@@ -1852,6 +2006,38 @@ const styles = StyleSheet.create({
   imagineVisual: {
     alignItems: "center",
     marginVertical: 24,
+  },
+  imaginePatternRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+  },
+  imaginePatternNote: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#d4a574",
+  },
+  imaginePatternRest: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#2d241a",
+    borderWidth: 2,
+    borderColor: "#8a7a6a",
+    borderStyle: "dashed",
+    position: "relative",
+  },
+  imaginePatternRestText: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    fontSize: 24,
+    textAlign: "center",
+    lineHeight: 36,
   },
   imagineEmoji: {
     fontSize: 40,

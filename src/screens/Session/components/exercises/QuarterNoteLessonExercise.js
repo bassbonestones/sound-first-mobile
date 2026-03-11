@@ -205,6 +205,40 @@ function createClickSound(audioContext, isAccent = false) {
   source.start(audioContext.currentTime);
 }
 
+// Create a softer subdivision click for eighth notes
+function createSubdivisionClick(audioContext) {
+  const sampleRate = audioContext.sampleRate;
+  const duration = 0.02;
+  const bufferSize = Math.floor(sampleRate * duration);
+  const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
+  const data = buffer.getChannelData(0);
+
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = Math.random() * 2 - 1;
+  }
+
+  const source = audioContext.createBufferSource();
+  source.buffer = buffer;
+
+  const filter = audioContext.createBiquadFilter();
+  filter.type = "highpass";
+  filter.frequency.value = 2000; // Higher pitch for subdivision
+  filter.Q.value = 0.5;
+
+  const gainNode = audioContext.createGain();
+  gainNode.gain.setValueAtTime(0.25, audioContext.currentTime); // Softer
+  gainNode.gain.exponentialRampToValueAtTime(
+    0.001,
+    audioContext.currentTime + duration,
+  );
+
+  source.connect(filter);
+  filter.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+
+  source.start(audioContext.currentTime);
+}
+
 export default function QuarterNoteLessonExercise({
   config,
   mastery,
@@ -216,6 +250,7 @@ export default function QuarterNoteLessonExercise({
   const [phase, setPhase] = useState(PHASE.FOCUS_CARD);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentBeat, setCurrentBeat] = useState(0);
+  const [isSubdivision, setIsSubdivision] = useState(false);
   const [showNotation, setShowNotation] = useState(false);
   const [singResult, setSingResult] = useState(null);
   const [playResult, setPlayResult] = useState(null);
@@ -362,9 +397,12 @@ export default function QuarterNoteLessonExercise({
 
       setIsPlaying(true);
       setCurrentBeat(-4);
+      setIsSubdivision(false);
 
       const beatMs = (60 / bpm) * 1000;
+      const eighthMs = beatMs / 2;
       let beat = -4;
+      let isAnd = true; // First interval tick is subdivision after initial beat
 
       const playNote = () => {
         const osc = ctx.createOscillator();
@@ -403,6 +441,7 @@ export default function QuarterNoteLessonExercise({
       };
 
       createClickSound(ctx, true);
+      setIsSubdivision(false);
 
       beatIntervalRef.current = setInterval(() => {
         if (unmountedRef.current) {
@@ -410,31 +449,43 @@ export default function QuarterNoteLessonExercise({
           return;
         }
 
-        beat++;
-        if (beat === 0) beat = 1;
-
-        if (beat >= -3 && beat <= -1) {
-          createClickSound(ctx, false);
-          setCurrentBeat(beat);
-        } else if (beat === 1) {
-          createClickSound(ctx, true);
-          playNote();
-          setCurrentBeat(1);
-        } else if (beat === 2) {
-          // The next beat - note ends here
-          createClickSound(ctx, false);
-          setCurrentBeat(2);
+        if (isAnd) {
+          // This is the "&" subdivision
+          createSubdivisionClick(ctx);
+          setIsSubdivision(true);
+          isAnd = false;
         } else {
-          clearInterval(beatIntervalRef.current);
-          beatIntervalRef.current = null;
-          setIsPlaying(false);
-          setCurrentBeat(0);
-          if (onCompleteRef.current) {
-            onCompleteRef.current();
-            onCompleteRef.current = null;
+          // This is a main beat
+          beat++;
+          if (beat === 0) beat = 1;
+          setIsSubdivision(false);
+
+          if (beat >= -3 && beat <= -1) {
+            createClickSound(ctx, false);
+            setCurrentBeat(beat);
+          } else if (beat === 1) {
+            createClickSound(ctx, true);
+            playNote();
+            setCurrentBeat(1);
+          } else if (beat === 2) {
+            // The next beat - note ends here
+            createClickSound(ctx, false);
+            setCurrentBeat(2);
+          } else {
+            clearInterval(beatIntervalRef.current);
+            beatIntervalRef.current = null;
+            setIsPlaying(false);
+            setCurrentBeat(0);
+            setIsSubdivision(false);
+            if (onCompleteRef.current) {
+              onCompleteRef.current();
+              onCompleteRef.current = null;
+            }
+            return;
           }
+          isAnd = true; // Next tick will be subdivision
         }
-      }, beatMs);
+      }, eighthMs);
     },
     [bpm, targetFrequency, isPlaying],
   );
@@ -474,12 +525,15 @@ export default function QuarterNoteLessonExercise({
 
       setIsPlaying(true);
       setCurrentBeat(-4);
+      setIsSubdivision(false);
       soundingOnBeatsRef.current = [0, 0];
       startedEarlyRef.current = false;
       setSoundingOnBeats([false, false]);
 
       const beatMs = (60 / bpm) * 1000;
+      const eighthMs = beatMs / 2;
       let beat = -4;
+      let isAnd = true; // First interval tick is subdivision after initial beat
 
       let beatSoundingSamples = { beat: 0, samples: 0, soundingCount: 0 };
       let earlySoundingSamples = 0;
@@ -526,6 +580,7 @@ export default function QuarterNoteLessonExercise({
       samplingIntervalRef.current = samplingInterval;
 
       createClickSound(ctx, true);
+      setIsSubdivision(false);
 
       beatIntervalRef.current = setInterval(() => {
         if (unmountedRef.current) {
@@ -534,44 +589,56 @@ export default function QuarterNoteLessonExercise({
           return;
         }
 
-        beat++;
-        if (beat === 0) beat = 1;
-
-        if (beat >= -3 && beat <= -1) {
-          createClickSound(ctx, false);
-          setCurrentBeat(beat);
-        } else if (beat === 1) {
-          createClickSound(ctx, true);
-          setCurrentBeat(1);
-        } else if (beat === 2) {
-          createClickSound(ctx, false);
-          setCurrentBeat(2);
+        if (isAnd) {
+          // This is the "&" subdivision
+          createSubdivisionClick(ctx);
+          setIsSubdivision(true);
+          isAnd = false;
         } else {
-          if (
-            beatSoundingSamples.beat >= 1 &&
-            beatSoundingSamples.samples > 0
-          ) {
-            const percentage =
-              beatSoundingSamples.soundingCount / beatSoundingSamples.samples;
-            const idx = beatSoundingSamples.beat - 1;
-            soundingOnBeatsRef.current[idx] = Math.max(
-              soundingOnBeatsRef.current[idx],
-              percentage,
-            );
+          // This is a main beat
+          beat++;
+          if (beat === 0) beat = 1;
+          setIsSubdivision(false);
+
+          if (beat >= -3 && beat <= -1) {
+            createClickSound(ctx, false);
+            setCurrentBeat(beat);
+          } else if (beat === 1) {
+            createClickSound(ctx, true);
+            setCurrentBeat(1);
+          } else if (beat === 2) {
+            createClickSound(ctx, false);
+            setCurrentBeat(2);
+          } else {
+            if (
+              beatSoundingSamples.beat >= 1 &&
+              beatSoundingSamples.samples > 0
+            ) {
+              const percentage =
+                beatSoundingSamples.soundingCount / beatSoundingSamples.samples;
+              const idx = beatSoundingSamples.beat - 1;
+              soundingOnBeatsRef.current[idx] = Math.max(
+                soundingOnBeatsRef.current[idx],
+                percentage,
+              );
+            }
+            clearInterval(beatIntervalRef.current);
+            clearInterval(samplingInterval);
+            beatIntervalRef.current = null;
+            samplingIntervalRef.current = null;
+            setIsPlaying(false);
+            setCurrentBeat(0);
+            setIsSubdivision(false);
+            setSoundingOnBeats([...soundingOnBeatsRef.current]);
+            if (onCompleteRef.current) {
+              onCompleteRef.current();
+              onCompleteRef.current = null;
+            }
+            return;
           }
-          clearInterval(beatIntervalRef.current);
-          clearInterval(samplingInterval);
-          beatIntervalRef.current = null;
-          samplingIntervalRef.current = null;
-          setIsPlaying(false);
-          setCurrentBeat(0);
-          setSoundingOnBeats([...soundingOnBeatsRef.current]);
-          if (onCompleteRef.current) {
-            onCompleteRef.current();
-            onCompleteRef.current = null;
-          }
+          isAnd = true; // Next tick will be subdivision
         }
-      }, beatMs);
+      }, eighthMs);
     },
     [bpm, isPlaying],
   );
@@ -775,7 +842,7 @@ export default function QuarterNoteLessonExercise({
     );
   };
 
-  // Beat indicator for quarter note (1 beat + stop on 2)
+  // Beat indicator for quarter note (1 beat + stop on 2) with eighth note subdivision
   const BeatIndicator = () => {
     const isInCountIn = currentBeat < 0;
 
@@ -785,27 +852,28 @@ export default function QuarterNoteLessonExercise({
           <Text style={styles.countInLabel}>Count in:</Text>
           <View style={styles.countInBeats}>
             {[-4, -3, -2, -1].map((beat, index) => (
-              <View
-                key={beat}
-                style={[
-                  styles.countInDot,
-                  beat <= currentBeat &&
-                    currentBeat < 0 &&
-                    styles.countInDotActive,
-                  beat === -4 && styles.countInDotAccent,
-                ]}
-              >
-                <Text
+              <React.Fragment key={beat}>
+                <View
                   style={[
-                    styles.countInNumber,
+                    styles.countInDot,
                     beat <= currentBeat &&
                       currentBeat < 0 &&
-                      styles.countInNumberActive,
+                      styles.countInDotActive,
+                    beat === -4 && styles.countInDotAccent,
                   ]}
                 >
-                  {index + 1}
-                </Text>
-              </View>
+                  <Text
+                    style={[
+                      styles.countInNumber,
+                      beat <= currentBeat &&
+                        currentBeat < 0 &&
+                        styles.countInNumberActive,
+                    ]}
+                  >
+                    {index + 1}
+                  </Text>
+                </View>
+              </React.Fragment>
             ))}
           </View>
         </View>
@@ -1760,6 +1828,21 @@ const styles = StyleSheet.create({
   },
   beatNumberStopActive: {
     color: "#fff",
+  },
+  // Subdivision dots (eighth notes)
+  subdivisionDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#2d241a",
+    borderWidth: 1,
+    borderColor: "#3b2c1a",
+    marginHorizontal: 4,
+    alignSelf: "center",
+  },
+  subdivisionDotActive: {
+    backgroundColor: "#8b7355",
+    borderColor: "#8b7355",
   },
 
   // Volume/visualizer

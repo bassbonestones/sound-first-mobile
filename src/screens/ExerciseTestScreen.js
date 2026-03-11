@@ -28,6 +28,7 @@ import {
   QuarterRestLessonExercise,
   TimeSignatureBasicsExercise,
   TimeSignature44Exercise,
+  Fragment2LessonExercise,
 } from "./Session/components/exercises";
 import {
   getAvailablePatterns,
@@ -331,6 +332,22 @@ const EXERCISES = [
     config: { bpm: 60, use_first_note: true },
     mastery: { correct_streak: 3 },
     extraProps: {
+      clef: "treble",
+    },
+  },
+  {
+    id: "fragment_2_lesson",
+    name: "Fragment 2 (2-Note)",
+    icon: "🎵",
+    description:
+      "2-note diatonic scale fragments: learn to connect two adjacent scale tones",
+    component: Fragment2LessonExercise,
+    config: { bpm: 60, use_first_note: true },
+    mastery: { correct_streak: 4 },
+    extraProps: {
+      userFirstNote: "F3",
+      userRangeLow: "F3",
+      userRangeHigh: "A3", // F3 to A3 = 5 semitones, allows F-G, F#-G#, G-A starts
       clef: "treble",
     },
   },

@@ -27,9 +27,11 @@ export default function NotationDisplay({
   showTimeSignature = false,
   fixedMeasureWidthPixels = null,
   zoom = 0.7,
+  currentNoteIndex = null, // Which note to highlight (0-based), null = no cursor
 }) {
   const containerRef = useRef(null);
   const osmdRef = useRef(null);
+  const webViewRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -99,6 +101,15 @@ export default function NotationDisplay({
           drawTimeSignatures: showTimeSignature,
           renderSingleHorizontalStaffline: true,
           fixedMeasureWidth: !!fixedMeasureWidthPixels,
+          followCursor: false,
+          cursorsOptions: [
+            {
+              type: 3, // type 3 = highlight cursor (colors the notes)
+              color: "#4CAF50",
+              alpha: 0.7,
+              follow: false,
+            },
+          ],
         });
 
         // Set rendering options for dark theme
@@ -139,10 +150,6 @@ export default function NotationDisplay({
             svgElement.style.height = `${height}px`;
             svgElement.style.maxWidth = `${width}px`;
             svgElement.style.maxHeight = `${height}px`;
-            // Fix position at top-left with small left padding for clef
-            svgElement.style.position = "absolute";
-            svgElement.style.top = "5px";
-            svgElement.style.left = "5px";
           }
         }
 
@@ -162,6 +169,27 @@ export default function NotationDisplay({
       }
     };
   }, [musicxml, showTitle, showTimeSignature, fixedMeasureWidthPixels, zoom]);
+
+  // Update cursor position when currentNoteIndex changes (web only)
+  useEffect(() => {
+    if (Platform.OS !== "web" || !osmdRef.current || !osmdRef.current.cursor)
+      return;
+
+    const cursor = osmdRef.current.cursor;
+
+    if (currentNoteIndex === null || currentNoteIndex < 0) {
+      cursor.hide();
+      return;
+    }
+
+    // Reset cursor to start and advance to the target note
+    cursor.reset();
+    cursor.show();
+
+    for (let i = 0; i < currentNoteIndex && !cursor.Iterator.EndReached; i++) {
+      cursor.next();
+    }
+  }, [currentNoteIndex]);
 
   // Generate HTML for WebView (mobile)
   const webviewHtml = useMemo(() => {
@@ -235,6 +263,13 @@ export default function NotationDisplay({
           drawTimeSignatures: ${showTimeSignature},
           renderSingleHorizontalStaffline: true,
           fixedMeasureWidth: ${!!fixedMeasureWidthPixels},
+          followCursor: false,
+          cursorsOptions: [{
+            type: 3,
+            color: "#4CAF50",
+            alpha: 0.7,
+            follow: false,
+          }],
         });
         
         osmd.EngravingRules.PageBackgroundColor = "transparent";
@@ -255,6 +290,41 @@ export default function NotationDisplay({
         osmd.zoom = ${zoom};
         osmd.render();
         
+        // Listen for cursor commands from React Native
+        window.osmdInstance = osmd;
+        document.addEventListener('message', function(e) {
+          try {
+            const data = JSON.parse(e.data);
+            if (data.type === 'cursor' && osmd.cursor) {
+              if (data.noteIndex === null || data.noteIndex < 0) {
+                osmd.cursor.hide();
+              } else {
+                osmd.cursor.reset();
+                osmd.cursor.show();
+                for (let i = 0; i < data.noteIndex && !osmd.cursor.Iterator.EndReached; i++) {
+                  osmd.cursor.next();
+                }
+              }
+            }
+          } catch (err) {}
+        });
+        window.addEventListener('message', function(e) {
+          try {
+            const data = JSON.parse(e.data);
+            if (data.type === 'cursor' && osmd.cursor) {
+              if (data.noteIndex === null || data.noteIndex < 0) {
+                osmd.cursor.hide();
+              } else {
+                osmd.cursor.reset();
+                osmd.cursor.show();
+                for (let i = 0; i < data.noteIndex && !osmd.cursor.Iterator.EndReached; i++) {
+                  osmd.cursor.next();
+                }
+              }
+            }
+          } catch (err) {}
+        });
+        
         if (loadingDiv) loadingDiv.remove();
       } catch (e) {
         document.getElementById('osmd-container').innerHTML = 
@@ -272,6 +342,17 @@ export default function NotationDisplay({
     fixedMeasureWidthPixels,
     zoom,
   ]);
+
+  // Update cursor position when currentNoteIndex changes (mobile WebView)
+  useEffect(() => {
+    if (Platform.OS === "web" || !webViewRef.current) return;
+
+    const message = JSON.stringify({
+      type: "cursor",
+      noteIndex: currentNoteIndex,
+    });
+    webViewRef.current.postMessage(message);
+  }, [currentNoteIndex]);
 
   // Mobile: use WebView
   if (Platform.OS !== "web") {
@@ -305,6 +386,7 @@ export default function NotationDisplay({
         }}
       >
         <WebView
+          ref={webViewRef}
           source={{ html: webviewHtml }}
           style={{
             width,
@@ -383,7 +465,7 @@ export default function NotationDisplay({
           height,
           backgroundColor: "#fffbe6",
           borderRadius: 8,
-          overflow: "hidden",
+          overflow: "visible",
         }}
       />
     </View>
