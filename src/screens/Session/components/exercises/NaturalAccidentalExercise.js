@@ -1,19 +1,12 @@
 /**
- * OctaveConceptExercise - Teaches that octaves are the same note at different heights
+ * NaturalAccidentalExercise - Teaches the natural sign (♮)
  *
- * Flow: Intro → Listen to octaves → Quiz
  * Key concepts:
- * - An octave is the same note, higher or lower
- * - Notes an octave apart share the same letter name
- * - Octaves sound "the same but different"
+ * - The natural sign (♮) cancels a sharp or flat
+ * - Returns a note to its "natural" (white key) state
+ * - Used when a previous sharp/flat needs to be cancelled
  */
-import React, {
-  useState,
-  useCallback,
-  useMemo,
-  useRef,
-  useEffect,
-} from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -23,7 +16,8 @@ import {
   Platform,
 } from "react-native";
 
-// Audio context for playing notes - works on web, iOS, and Android
+// Audio context
+// Audio context - works on web, iOS, and Android
 let AudioContextClass = null;
 if (Platform.OS === "web") {
   AudioContextClass = typeof window !== "undefined"
@@ -43,64 +37,73 @@ if (Platform.OS === "web") {
 
 const PHASES = {
   INTRO: "intro",
-  LISTEN: "listen",
+  CANCELLING: "cancelling",
+  EXAMPLES: "examples",
   QUIZ: "quiz",
   RESULT: "result",
 };
 
-// Note to frequency conversion
+// Note frequencies
 const NOTE_FREQUENCIES = {
-  C3: 130.81,
-  D3: 146.83,
-  E3: 164.81,
-  F3: 174.61,
-  G3: 196.0,
-  A3: 220.0,
-  B3: 246.94,
   C4: 261.63,
+  "C#4": 277.18,
   D4: 293.66,
+  "Db4": 277.18,
+  "D#4": 311.13,
+  Eb4: 311.13,
   E4: 329.63,
   F4: 349.23,
+  "F#4": 369.99,
+  Gb4: 369.99,
   G4: 392.0,
+  "G#4": 415.3,
+  Ab4: 415.3,
   A4: 440.0,
+  "A#4": 466.16,
+  Bb4: 466.16,
   B4: 493.88,
-  C5: 523.25,
 };
-
-// Example octave pairs
-const OCTAVE_PAIRS = [
-  { low: "C3", high: "C4", name: "C" },
-  { low: "D3", high: "D4", name: "D" },
-  { low: "E3", high: "E4", name: "E" },
-  { low: "G3", high: "G4", name: "G" },
-  { low: "A3", high: "A4", name: "A" },
-];
 
 // Quiz questions
 const QUIZ_QUESTIONS = [
   {
-    question: "Notes that are an octave apart share the same ___.",
-    correctAnswer: "Letter name",
-    options: ["Letter name", "Frequency", "Volume", "Duration"],
-  },
-  {
-    question: "If you play C, then play C an octave higher, they are...",
-    correctAnswer: "Both called C",
+    question: "What does the natural sign (♮) do?",
+    correctAnswer: "Cancels a sharp or flat",
     options: [
-      "Different notes",
-      "Both called C",
-      "In different keys",
-      "Unrelated",
+      "Raises a note by a half step",
+      "Lowers a note by a half step",
+      "Cancels a sharp or flat",
+      "Makes a note louder",
     ],
   },
   {
-    question: "An octave sounds like...",
-    correctAnswer: "The same note, higher/lower",
+    question: "If you see F# then F♮, the F♮ is...",
+    correctAnswer: "Regular F (white key)",
     options: [
-      "A completely different note",
-      "The same note, higher/lower",
-      "Two random notes",
-      "A chord",
+      "Still F# (black key)",
+      "Regular F (white key)",
+      "Lower than F",
+      "The same as F#",
+    ],
+  },
+  {
+    question: "B♭ followed by B♮ means play...",
+    correctAnswer: "Regular B (white key)",
+    options: [
+      "B♭ again",
+      "Regular B (white key)",
+      "B# (higher)",
+      "Any B you want",
+    ],
+  },
+  {
+    question: "The natural sign returns a note to its _____ state.",
+    correctAnswer: "white key / unaltered",
+    options: [
+      "black key",
+      "white key / unaltered",
+      "sharped",
+      "flatted",
     ],
   },
 ];
@@ -109,7 +112,7 @@ const QUIZ_QUESTIONS = [
 // MAIN COMPONENT
 // ============================================================
 
-export default function OctaveConceptExercise({
+export default function NaturalAccidentalExercise({
   mini = {},
   sessionState = {},
   onComplete,
@@ -120,12 +123,11 @@ export default function OctaveConceptExercise({
   const [score, setScore] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [showResult, setShowResult] = useState(false);
-  const [currentPairIndex, setCurrentPairIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
   const audioContextRef = useRef(null);
 
-  // Initialize audio context
+  // Initialize audio
   useEffect(() => {
     if (AudioContextClass && !audioContextRef.current) {
       audioContextRef.current = new AudioContextClass();
@@ -137,8 +139,8 @@ export default function OctaveConceptExercise({
     };
   }, []);
 
-  // Play a single note
-  const playNote = useCallback((frequency, duration = 0.8) => {
+  // Play a note
+  const playNote = useCallback((frequency, duration = 0.5) => {
     const ctx = audioContextRef.current;
     if (!ctx) return Promise.resolve();
 
@@ -162,28 +164,22 @@ export default function OctaveConceptExercise({
     });
   }, []);
 
-  // Play an octave pair
-  const playOctavePair = useCallback(
-    async (pair) => {
+  // Play cancellation example
+  const playCancellation = useCallback(
+    async (altered, natural) => {
       if (isPlaying) return;
       setIsPlaying(true);
 
-      const lowFreq = NOTE_FREQUENCIES[pair.low];
-      const highFreq = NOTE_FREQUENCIES[pair.high];
+      // Play altered note
+      await playNote(NOTE_FREQUENCIES[altered], 0.6);
+      await new Promise((r) => setTimeout(r, 300));
 
-      // Play low note
-      await playNote(lowFreq, 0.7);
-      await new Promise((r) => setTimeout(r, 200));
-      // Play high note
-      await playNote(highFreq, 0.7);
-      await new Promise((r) => setTimeout(r, 200));
-      // Play together
-      playNote(lowFreq, 1.0);
-      playNote(highFreq, 1.0);
+      // Play natural note
+      await playNote(NOTE_FREQUENCIES[natural], 0.6);
 
-      setTimeout(() => setIsPlaying(false), 1000);
+      setIsPlaying(false);
     },
-    [isPlaying, playNote],
+    [isPlaying, playNote]
   );
 
   // Handle quiz answer
@@ -195,10 +191,10 @@ export default function OctaveConceptExercise({
         setScore((s) => s + 1);
       }
     },
-    [quizIndex],
+    [quizIndex]
   );
 
-  // Move to next question
+  // Next question
   const handleNext = useCallback(() => {
     setSelectedAnswer(null);
     setShowResult(false);
@@ -211,137 +207,148 @@ export default function OctaveConceptExercise({
 
   // Complete exercise
   const handleComplete = useCallback(() => {
-    const passed = score === QUIZ_QUESTIONS.length; // Need 100%
+    const passed = score === QUIZ_QUESTIONS.length; // 100% required
     if (onComplete) {
       onComplete({ success: passed, score });
     }
   }, [onComplete, score]);
 
-  const currentPair = OCTAVE_PAIRS[currentPairIndex];
-
   // ============================================================
   // RENDER PHASES
   // ============================================================
 
-  // Intro phase
+  // Intro
   if (phase === PHASES.INTRO) {
     return (
       <View style={styles.container}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.title}>The Octave</Text>
-          <Text style={styles.subtitle}>Same Note, Different Height</Text>
+          <Text style={styles.title}>The Natural Sign</Text>
+          <Text style={styles.bigSymbol}>♮</Text>
 
           <View style={styles.card}>
-            <Text style={styles.emoji}>🎹</Text>
             <Text style={styles.cardText}>
-              You know that music uses 7 note names:{"\n"}
-              <Text style={styles.highlight}>A B C D E F G</Text>
+              The <Text style={styles.highlight}>natural sign (♮)</Text> cancels
+              a sharp or flat.
             </Text>
           </View>
 
           <View style={styles.card}>
             <Text style={styles.cardText}>
-              But a piano has 88 keys! How can 7 letters cover them all?
+              It returns a note to its{" "}
+              <Text style={styles.highlight}>original, unaltered</Text> state —
+              the white key on a piano.
             </Text>
-            <Text style={styles.emoji}>🤔</Text>
           </View>
 
           <View style={styles.card}>
             <Text style={styles.cardText}>
-              The answer:{" "}
-              <Text style={styles.highlight}>The names repeat!</Text>
-            </Text>
-            <Text style={styles.cardText}>
-              There's a low C, a middle C, a high C...{"\n"}
-              They're all called "C" because they sound{" "}
-              <Text style={styles.highlight}>like the same note</Text> – just
-              higher or lower.
+              Think of it as an <Text style={styles.highlight}>"undo"</Text>{" "}
+              button for sharps and flats!
             </Text>
           </View>
         </ScrollView>
 
         <TouchableOpacity
           style={styles.primaryButton}
-          onPress={() => setPhase(PHASES.LISTEN)}
+          onPress={() => setPhase(PHASES.CANCELLING)}
         >
-          <Text style={styles.primaryButtonText}>Hear It →</Text>
+          <Text style={styles.primaryButtonText}>See How It Works →</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  // Listen phase - hear octave examples
-  if (phase === PHASES.LISTEN) {
+  // Cancelling sharps/flats
+  if (phase === PHASES.CANCELLING) {
     return (
       <View style={styles.container}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.title}>Listen to Octaves</Text>
+          <Text style={styles.title}>Cancelling Accidentals</Text>
 
           <View style={styles.card}>
+            <Text style={styles.cardTitle}>Cancelling a Sharp:</Text>
             <Text style={styles.cardText}>
-              Tap to hear two notes that are an{" "}
-              <Text style={styles.highlight}>octave</Text> apart:
+              <Text style={styles.highlightSharp}>F#</Text> → <Text style={styles.highlightNatural}>F♮</Text>
+              {"\n\n"}
+              The F♮ goes back down to regular F (white key)
             </Text>
-          </View>
-
-          <View style={styles.pairDisplay}>
-            <View style={styles.noteColumn}>
-              <Text style={styles.noteLabel}>Low {currentPair.name}</Text>
-              <View style={styles.noteBadgeLow}>
-                <Text style={styles.noteBadgeText}>{currentPair.low}</Text>
-              </View>
-            </View>
-
-            <Text style={styles.plusSign}>+</Text>
-
-            <View style={styles.noteColumn}>
-              <Text style={styles.noteLabel}>High {currentPair.name}</Text>
-              <View style={styles.noteBadgeHigh}>
-                <Text style={styles.noteBadgeText}>{currentPair.high}</Text>
-              </View>
-            </View>
           </View>
 
           <TouchableOpacity
             style={[styles.playButton, isPlaying && styles.playButtonDisabled]}
-            onPress={() => playOctavePair(currentPair)}
+            onPress={() => playCancellation("F#4", "F4")}
             disabled={isPlaying}
           >
             <Text style={styles.playButtonText}>
-              {isPlaying ? "Playing..." : "▶ Play Octave"}
+              {isPlaying ? "Playing..." : "▶ Hear F# → F♮"}
             </Text>
           </TouchableOpacity>
 
-          <Text style={styles.helperText}>
-            Notice how they sound like the{" "}
-            <Text style={styles.highlight}>same note</Text>, just at different
-            heights?
-          </Text>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Cancelling a Flat:</Text>
+            <Text style={styles.cardText}>
+              <Text style={styles.highlightFlat}>B♭</Text> → <Text style={styles.highlightNatural}>B♮</Text>
+              {"\n\n"}
+              The B♮ goes back up to regular B (white key)
+            </Text>
+          </View>
 
-          {/* Other pairs to try */}
-          <View style={styles.pairSelector}>
-            <Text style={styles.selectorLabel}>Try other octaves:</Text>
-            <View style={styles.pairButtons}>
-              {OCTAVE_PAIRS.map((pair, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={[
-                    styles.pairButton,
-                    idx === currentPairIndex && styles.pairButtonActive,
-                  ]}
-                  onPress={() => setCurrentPairIndex(idx)}
-                >
-                  <Text
-                    style={[
-                      styles.pairButtonText,
-                      idx === currentPairIndex && styles.pairButtonTextActive,
-                    ]}
-                  >
-                    {pair.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+          <TouchableOpacity
+            style={[styles.playButton, isPlaying && styles.playButtonDisabled]}
+            onPress={() => playCancellation("Bb4", "B4")}
+            disabled={isPlaying}
+          >
+            <Text style={styles.playButtonText}>
+              {isPlaying ? "Playing..." : "▶ Hear B♭ → B♮"}
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => setPhase(PHASES.EXAMPLES)}
+        >
+          <Text style={styles.primaryButtonText}>More Examples →</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // More examples
+  if (phase === PHASES.EXAMPLES) {
+    return (
+      <View style={styles.container}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.title}>When You'll See Naturals</Text>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>In Key Signatures:</Text>
+            <Text style={styles.cardText}>
+              If a piece is in a key with sharps or flats, naturals are used to
+              temporarily cancel them.
+              {"\n\n"}
+              Example: In G major (1 sharp: F#), you might see F♮ to play a
+              regular F.
+            </Text>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>After an Accidental:</Text>
+            <Text style={styles.cardText}>
+              If a sharp or flat appears earlier in the same measure, a natural
+              cancels it.
+              {"\n\n"}
+              Example: C# ... C♮ (back to regular C)
+            </Text>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardText}>
+              🎯 <Text style={styles.highlight}>Remember:</Text>
+              {"\n\n"}• ♮ cancels # (sharp)
+              {"\n"}• ♮ cancels ♭ (flat)
+              {"\n"}• ♮ = "go back to normal" white key
+            </Text>
           </View>
         </ScrollView>
 
@@ -349,7 +356,7 @@ export default function OctaveConceptExercise({
           style={styles.primaryButton}
           onPress={() => setPhase(PHASES.QUIZ)}
         >
-          <Text style={styles.primaryButtonText}>Got it! Quiz me →</Text>
+          <Text style={styles.primaryButtonText}>Quiz Me →</Text>
         </TouchableOpacity>
       </View>
     );
@@ -358,15 +365,14 @@ export default function OctaveConceptExercise({
   // Quiz phase
   if (phase === PHASES.QUIZ) {
     const currentQ = QUIZ_QUESTIONS[quizIndex];
+
     return (
       <View style={styles.container}>
         <View style={styles.progressBar}>
           <View
             style={[
               styles.progressFill,
-              {
-                width: `${((quizIndex + 1) / QUIZ_QUESTIONS.length) * 100}%`,
-              },
+              { width: `${((quizIndex + 1) / QUIZ_QUESTIONS.length) * 100}%` },
             ]}
           />
         </View>
@@ -444,12 +450,13 @@ export default function OctaveConceptExercise({
   // Result phase
   if (phase === PHASES.RESULT) {
     const passed = score === QUIZ_QUESTIONS.length;
+
     return (
       <View style={styles.container}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text style={styles.resultEmoji}>{passed ? "🎉" : "📚"}</Text>
           <Text style={styles.resultTitle}>
-            {passed ? "You understand octaves!" : "Let's review"}
+            {passed ? "You understand naturals!" : "Let's review"}
           </Text>
           <Text style={styles.resultScore}>
             {score} / {QUIZ_QUESTIONS.length} correct
@@ -457,10 +464,11 @@ export default function OctaveConceptExercise({
 
           <View style={styles.card}>
             <Text style={styles.cardText}>
-              <Text style={styles.highlight}>Key concept:</Text>
-              {"\n\n"}
-              An octave is the same note at a different height.{"\n\n"}C and
-              high C are both "C" – just one is higher!
+              <Text style={styles.highlight}>Key points:</Text>
+              {"\n\n"}• ♮ = natural sign
+              {"\n"}• Cancels sharps and flats
+              {"\n"}• Returns note to white key
+              {"\n"}• Like an "undo" for accidentals
             </Text>
           </View>
         </ScrollView>
@@ -497,17 +505,23 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 8,
   },
-  subtitle: {
-    fontSize: 18,
-    color: "#a0a0c0",
+  bigSymbol: {
+    fontSize: 72,
     textAlign: "center",
-    marginBottom: 24,
+    marginVertical: 20,
+    color: "#9c9cff", // Purple-ish for natural
   },
   card: {
     backgroundColor: "#252545",
     borderRadius: 12,
     padding: 20,
     marginBottom: 16,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#9c9cff",
+    marginBottom: 12,
   },
   cardText: {
     fontSize: 17,
@@ -516,103 +530,19 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   highlight: {
+    color: "#9c9cff",
+    fontWeight: "bold",
+  },
+  highlightSharp: {
+    color: "#ff9800",
+    fontWeight: "bold",
+  },
+  highlightFlat: {
     color: "#4fc3f7",
     fontWeight: "bold",
   },
-  emoji: {
-    fontSize: 48,
-    textAlign: "center",
-    marginVertical: 12,
-  },
-  pairDisplay: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginVertical: 24,
-    gap: 20,
-  },
-  noteColumn: {
-    alignItems: "center",
-  },
-  noteLabel: {
-    fontSize: 14,
-    color: "#808090",
-    marginBottom: 8,
-  },
-  noteBadgeLow: {
-    width: 70,
-    height: 70,
-    backgroundColor: "#7986cb",
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  noteBadgeHigh: {
-    width: 70,
-    height: 70,
-    backgroundColor: "#4fc3f7",
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  noteBadgeText: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#1a1a2e",
-  },
-  plusSign: {
-    fontSize: 24,
-    color: "#808090",
-  },
-  playButton: {
-    backgroundColor: "#4fc3f7",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    alignSelf: "center",
-    marginBottom: 24,
-  },
-  playButtonDisabled: {
-    backgroundColor: "#4fc3f780",
-  },
-  playButtonText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#1a1a2e",
-  },
-  helperText: {
-    fontSize: 15,
-    color: "#a0a0c0",
-    textAlign: "center",
-    marginBottom: 32,
-  },
-  pairSelector: {
-    alignItems: "center",
-  },
-  selectorLabel: {
-    fontSize: 14,
-    color: "#808090",
-    marginBottom: 12,
-  },
-  pairButtons: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  pairButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    backgroundColor: "#353565",
-    borderRadius: 8,
-  },
-  pairButtonActive: {
-    backgroundColor: "#4fc3f7",
-  },
-  pairButtonText: {
-    fontSize: 16,
-    color: "#a0a0c0",
-  },
-  pairButtonTextActive: {
-    color: "#1a1a2e",
+  highlightNatural: {
+    color: "#9c9cff",
     fontWeight: "bold",
   },
   primaryButton: {
@@ -620,7 +550,7 @@ const styles = StyleSheet.create({
     bottom: 20,
     left: 20,
     right: 20,
-    backgroundColor: "#4fc3f7",
+    backgroundColor: "#9c9cff",
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
@@ -630,13 +560,29 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#1a1a2e",
   },
+  playButton: {
+    backgroundColor: "#9c9cff",
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 10,
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  playButtonDisabled: {
+    backgroundColor: "#9c9cff80",
+  },
+  playButtonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#1a1a2e",
+  },
   progressBar: {
     height: 4,
     backgroundColor: "#353565",
   },
   progressFill: {
     height: "100%",
-    backgroundColor: "#4fc3f7",
+    backgroundColor: "#9c9cff",
   },
   quizProgress: {
     fontSize: 14,
@@ -664,7 +610,7 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   optionSelected: {
-    borderColor: "#4fc3f7",
+    borderColor: "#9c9cff",
   },
   optionCorrect: {
     backgroundColor: "#2e7d32",

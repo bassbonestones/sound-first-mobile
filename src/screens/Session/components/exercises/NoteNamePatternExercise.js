@@ -7,14 +7,31 @@
  * - After G, it wraps back to A
  * - The pattern repeats forever
  */
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Platform,
 } from "react-native";
+
+// Audio context for playing notes - works on web, iOS, and Android
+let AudioContextClass = null;
+if (Platform.OS === "web") {
+  // Web: use standard Web Audio API
+  AudioContextClass = typeof window !== "undefined" 
+    ? (window.AudioContext || window.webkitAudioContext) 
+    : null;
+} else {
+  // Native: use react-native-audio-api
+  try {
+    AudioContextClass = require("react-native-audio-api").AudioContext;
+  } catch (e) {
+    console.warn("react-native-audio-api not available");
+  }
+}
 
 // ============================================================
 // CONSTANTS
@@ -28,6 +45,25 @@ const PHASES = {
 };
 
 const NOTE_NAMES = ["A", "B", "C", "D", "E", "F", "G"];
+
+// Frequencies for 2 octaves ascending (A2 through G4)
+// Shows the pattern continuing upward, not restarting
+const ANIMATION_FREQUENCIES = [
+  110.0,   // A2
+  123.47,  // B2
+  130.81,  // C3
+  146.83,  // D3
+  164.81,  // E3
+  174.61,  // F3
+  196.0,   // G3
+  220.0,   // A3 - same letter, higher pitch!
+  246.94,  // B3
+  261.63,  // C4
+  293.66,  // D4
+  329.63,  // E4
+  349.23,  // F4
+  392.0,   // G4
+];
 
 // Quiz questions
 const QUIZ_QUESTIONS = [
@@ -69,6 +105,56 @@ export default function NoteNamePatternExercise({
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [showResult, setShowResult] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const audioContextRef = useRef(null);
+  const animationRef = useRef(null);
+
+  // Initialize audio context
+  useEffect(() => {
+    if (AudioContextClass && !audioContextRef.current) {
+      audioContextRef.current = new AudioContextClass();
+    }
+    return () => {
+      if (animationRef.current) {
+        clearInterval(animationRef.current);
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+
+  // Play a single note by frequency
+  const playNote = useCallback(async (frequency, duration = 0.35) => {
+    const ctx = audioContextRef.current;
+    if (!ctx) {
+      console.warn("No audio context available");
+      return;
+    }
+
+    // Resume audio context if suspended (required on iOS after user gesture)
+    if (ctx.state === "suspended") {
+      await ctx.resume();
+    }
+
+    if (!frequency) return;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.type = "sine";
+    osc.frequency.value = frequency;
+
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+  }, []);
 
   // Shuffle questions on mount
   const questions = useMemo(() => {
@@ -111,18 +197,35 @@ export default function NoteNamePatternExercise({
     }
   }, [onComplete, score, questions.length]);
 
-  // Animate through the pattern
-  const animatePattern = useCallback(() => {
+  // Animate through the pattern with audio - notes keep ascending!
+  const animatePattern = useCallback(async () => {
+    if (isAnimating) return;
+    setIsAnimating(true);
+
+    // Ensure audio context exists
+    if (AudioContextClass && !audioContextRef.current) {
+      audioContextRef.current = new AudioContextClass();
+    }
+
     let i = 0;
-    const interval = setInterval(() => {
-      setHighlightIndex(i % 14); // Show 2 cycles
+    // Play first note immediately
+    setHighlightIndex(0);
+    await playNote(ANIMATION_FREQUENCIES[0]);
+
+    animationRef.current = setInterval(() => {
       i++;
-      if (i > 14) {
-        clearInterval(interval);
+      if (i >= 14) {
+        clearInterval(animationRef.current);
+        animationRef.current = null;
         setHighlightIndex(-1);
+        setIsAnimating(false);
+        return;
       }
+      setHighlightIndex(i);
+      // Play ascending frequency - notes go UP, showing the pattern continues higher
+      playNote(ANIMATION_FREQUENCIES[i]);
     }, 400);
-  }, []);
+  }, [isAnimating, playNote]);
 
   // ============================================================
   // RENDER PHASES
@@ -208,10 +311,13 @@ export default function NoteNamePatternExercise({
             </View>
 
             <TouchableOpacity
-              style={styles.secondaryButton}
+              style={[styles.secondaryButton, isAnimating && styles.buttonDisabled]}
               onPress={animatePattern}
+              disabled={isAnimating}
             >
-              <Text style={styles.secondaryButtonText}>▶ See it animate</Text>
+              <Text style={styles.secondaryButtonText}>
+                {isAnimating ? "♪ Playing..." : "▶ See & hear it"}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -501,6 +607,9 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 16,
     color: "#4fc3f7",
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   progressBar: {
     height: 4,

@@ -24,6 +24,13 @@ import NoteNameQuizExercise from "./NoteNameQuizExercise";
 import OctaveConceptExercise from "./OctaveConceptExercise";
 import OctaveMatchingExercise from "./OctaveMatchingExercise";
 import OctavePlayExercise from "./OctavePlayExercise";
+import HalfStepsTheoryExercise from "./HalfStepsTheoryExercise";
+import FlatAccidentalExercise from "./FlatAccidentalExercise";
+import SharpAccidentalExercise from "./SharpAccidentalExercise";
+import NaturalAccidentalExercise from "./NaturalAccidentalExercise";
+import WholeStepsTheoryExercise from "./WholeStepsTheoryExercise";
+import DiatonicScalePatternExercise from "./DiatonicScalePatternExercise";
+import KeySignatureBasicsExercise from "./KeySignatureBasicsExercise";
 
 // Map template IDs to exercise components
 export const EXERCISE_COMPONENTS = {
@@ -66,6 +73,18 @@ export const EXERCISE_COMPONENTS = {
   octave_matching: OctaveMatchingExercise,
   octave_play: OctavePlayExercise,
   octave_equivalence: OctaveConceptExercise, // alias for capability name
+  // Half steps theory exercises
+  half_steps_theory: HalfStepsTheoryExercise,
+  // Accidental exercises
+  accidental_flat: FlatAccidentalExercise,
+  accidental_sharp: SharpAccidentalExercise,
+  accidental_natural: NaturalAccidentalExercise,
+  // Whole steps theory
+  whole_steps_theory: WholeStepsTheoryExercise,
+  // Diatonic scale pattern
+  diatonic_scale_pattern: DiatonicScalePatternExercise,
+  // Key signature basics
+  key_signature_basics: KeySignatureBasicsExercise,
 };
 
 export {
@@ -91,6 +110,13 @@ export {
   OctaveConceptExercise,
   OctaveMatchingExercise,
   OctavePlayExercise,
+  HalfStepsTheoryExercise,
+  FlatAccidentalExercise,
+  SharpAccidentalExercise,
+  NaturalAccidentalExercise,
+  WholeStepsTheoryExercise,
+  DiatonicScalePatternExercise,
+  KeySignatureBasicsExercise,
 };
 
 /**

@@ -17,10 +17,15 @@ import {
 } from "react-native";
 
 // Audio context
-let NativeAudioContext = null;
-if (Platform.OS !== "web") {
+// Audio context - works on web, iOS, and Android
+let AudioContextClass = null;
+if (Platform.OS === "web") {
+  AudioContextClass = typeof window !== "undefined"
+    ? (window.AudioContext || window.webkitAudioContext)
+    : null;
+} else {
   try {
-    NativeAudioContext = require("react-native-audio-api").AudioContext;
+    AudioContextClass = require("react-native-audio-api").AudioContext;
   } catch (e) {
     console.warn("react-native-audio-api not available");
   }
@@ -105,8 +110,8 @@ export default function OctaveMatchingExercise({
 
   // Initialize audio
   useEffect(() => {
-    if (NativeAudioContext && !audioContextRef.current) {
-      audioContextRef.current = new NativeAudioContext();
+    if (AudioContextClass && !audioContextRef.current) {
+      audioContextRef.current = new AudioContextClass();
     }
     return () => {
       if (audioContextRef.current) {
