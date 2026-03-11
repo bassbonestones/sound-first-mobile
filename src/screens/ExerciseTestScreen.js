@@ -248,7 +248,8 @@ const EXERCISES = [
     id: "time_signature_basics",
     name: "Time Signature Basics",
     icon: "📊",
-    description: "Learn what time signatures mean: top = beats, bottom = note type",
+    description:
+      "Learn what time signatures mean: top = beats, bottom = note type",
     component: TimeSignatureBasicsExercise,
     config: { use_notation: true },
     mastery: { correct_streak: 4 },
@@ -260,7 +261,8 @@ const EXERCISES = [
     id: "time_signature_4_4",
     name: "4/4 Time Signature",
     icon: "🎵",
-    description: "4/4 time: 4 beats per measure, quarter note beat, common time",
+    description:
+      "4/4 time: 4 beats per measure, quarter note beat, common time",
     component: TimeSignature44Exercise,
     config: { use_notation: true },
     mastery: { correct_streak: 4 },
@@ -272,7 +274,8 @@ const EXERCISES = [
     id: "whole_rest_lesson",
     name: "Whole Rest",
     icon: "🤫",
-    description: "Learn the whole rest: 4 beats of silence that hangs below the line",
+    description:
+      "Learn the whole rest: 4 beats of silence that hangs below the line",
     component: WholeRestLessonExercise,
     config: { bpm: 60, use_first_note: true },
     mastery: { correct_streak: 3 },
@@ -296,7 +299,8 @@ const EXERCISES = [
     id: "half_rest_lesson",
     name: "Half Rest",
     icon: "🤫",
-    description: "Learn the half rest: 2 beats of silence that sits ON TOP of the line",
+    description:
+      "Learn the half rest: 2 beats of silence that sits ON TOP of the line",
     component: HalfRestLessonExercise,
     config: { bpm: 60, use_first_note: true },
     mastery: { correct_streak: 3 },
@@ -308,7 +312,8 @@ const EXERCISES = [
     id: "quarter_note_lesson",
     name: "Quarter Note",
     icon: "🎵",
-    description: "Learn the quarter note: 1 beat, has a stem, filled/solid head",
+    description:
+      "Learn the quarter note: 1 beat, has a stem, filled/solid head",
     component: QuarterNoteLessonExercise,
     config: { bpm: 60, use_first_note: true },
     mastery: { correct_streak: 3 },
@@ -320,7 +325,8 @@ const EXERCISES = [
     id: "quarter_rest_lesson",
     name: "Quarter Rest",
     icon: "🤫",
-    description: "Learn the quarter rest: 1 beat of silence with squiggly shape",
+    description:
+      "Learn the quarter rest: 1 beat of silence with squiggly shape",
     component: QuarterRestLessonExercise,
     config: { bpm: 60, use_first_note: true },
     mastery: { correct_streak: 3 },
@@ -508,7 +514,9 @@ export default function ExerciseTestScreen() {
                 onChange={setSelectedTargetNote}
               />
             </View>
-            <Text style={styles.anchorLabel}>Starting from: {startingPitch}</Text>
+            <Text style={styles.anchorLabel}>
+              Starting from: {startingPitch}
+            </Text>
 
             {/* Pattern Selection */}
             <Text style={styles.sectionLabel}>Exercise Pattern</Text>

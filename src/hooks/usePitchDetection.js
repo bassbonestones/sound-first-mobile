@@ -82,8 +82,6 @@ export function usePitchDetection({
   const webAnimationFrameRef = useRef(null);
   const webSampleRateRef = useRef(SAMPLE_RATE);
   const lastVolumeRef = useRef(0); // Track previous volume to avoid unnecessary state updates
-  
-
 
   // Update target MIDI when prop changes
   useEffect(() => {
@@ -292,8 +290,6 @@ export function usePitchDetection({
       soundingFrequencyRange,
     ],
   );
-
-
 
   // Web audio frame processor
   const processWebAudioFrame = useCallback(() => {

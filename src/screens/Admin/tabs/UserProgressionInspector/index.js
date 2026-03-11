@@ -1152,7 +1152,7 @@ function UserCandidatesTab({ userId }) {
         const data = await response.json();
         setCandidates(data);
       }
-      
+
       // Load available teaching modules
       const modulesResponse = await fetch(
         `${baseUrl}/modules/user/${userId}/available`,
@@ -1194,18 +1194,25 @@ function UserCandidatesTab({ userId }) {
               <View key={idx} style={styles.candidateItem}>
                 <Text style={styles.candidateTitle}>{mod.display_name}</Text>
                 <Text style={styles.candidateReason}>
-                  {mod.capability_name} • {mod.status === 'not_started' ? 'Not started' : mod.status === 'in_progress' ? `In progress (${mod.lessons_completed}/${mod.lesson_count})` : mod.status}
+                  {mod.capability_name} •{" "}
+                  {mod.status === "not_started"
+                    ? "Not started"
+                    : mod.status === "in_progress"
+                      ? `In progress (${mod.lessons_completed}/${mod.lesson_count})`
+                      : mod.status}
                 </Text>
                 {mod.prerequisite_capability_names?.length > 0 && (
                   <Text style={styles.candidateReason}>
-                    Prereqs: {mod.prerequisite_capability_names.join(', ')}
+                    Prereqs: {mod.prerequisite_capability_names.join(", ")}
                   </Text>
                 )}
               </View>
             ))}
           </>
         ) : (
-          <Text style={styles.noDataText}>No teaching modules available (check prerequisites)</Text>
+          <Text style={styles.noDataText}>
+            No teaching modules available (check prerequisites)
+          </Text>
         )}
       </View>
 

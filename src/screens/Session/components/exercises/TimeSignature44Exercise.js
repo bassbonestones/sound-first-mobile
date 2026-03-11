@@ -55,7 +55,8 @@ const QUIZ_QUESTIONS = [
     hint: "Remember: a whole note = 4 beats",
     correctAnswer: "No",
     options: ["Yes", "No"],
-    explanation: "No! Two whole notes = 8 beats, but 4/4 only has 4 beats per measure.",
+    explanation:
+      "No! Two whole notes = 8 beats, but 4/4 only has 4 beats per measure.",
   },
   {
     id: "beats_count",
@@ -91,7 +92,8 @@ const QUIZ_QUESTIONS = [
 function generate44WithWholeNoteMusicXML(clef = "treble") {
   const clefSign = clef === "bass" ? "F" : "G";
   const clefLine = clef === "bass" ? "4" : "2";
-  const pitch = clef === "bass" ? { step: "D", octave: 3 } : { step: "B", octave: 4 };
+  const pitch =
+    clef === "bass" ? { step: "D", octave: 3 } : { step: "B", octave: 4 };
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
@@ -131,7 +133,8 @@ function generate44WithWholeNoteMusicXML(clef = "treble") {
 function generateTwoWholeNotesMusicXML(clef = "treble") {
   const clefSign = clef === "bass" ? "F" : "G";
   const clefLine = clef === "bass" ? "4" : "2";
-  const pitch = clef === "bass" ? { step: "D", octave: 3 } : { step: "B", octave: 4 };
+  const pitch =
+    clef === "bass" ? { step: "D", octave: 3 } : { step: "B", octave: 4 };
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
@@ -199,12 +202,12 @@ export default function TimeSignature44Exercise({
   // Generate MusicXML examples
   const wholeNoteExample = useMemo(
     () => generate44WithWholeNoteMusicXML(clef),
-    [clef]
+    [clef],
   );
 
   const twoWholeNotesExample = useMemo(
     () => generateTwoWholeNotesMusicXML(clef),
-    [clef]
+    [clef],
   );
 
   // Handle answer selection
@@ -214,8 +217,10 @@ export default function TimeSignature44Exercise({
       setSelectedAnswer(answer);
       setShowFeedback(true);
 
-      const isCorrect = answer === question.correctAnswer || 
-        (typeof question.correctAnswer === "number" && answer === question.correctAnswer);
+      const isCorrect =
+        answer === question.correctAnswer ||
+        (typeof question.correctAnswer === "number" &&
+          answer === question.correctAnswer);
 
       if (isCorrect) {
         setCorrectCount((prev) => prev + 1);
@@ -243,7 +248,7 @@ export default function TimeSignature44Exercise({
         }
       }, 2000);
     },
-    [showFeedback, question, currentQuestion, correctCount, onProgress]
+    [showFeedback, question, currentQuestion, correctCount, onProgress],
   );
 
   // Handle restart
@@ -286,7 +291,8 @@ export default function TimeSignature44Exercise({
             </View>
 
             <Text style={styles.introText}>
-              <Text style={styles.highlight}>4/4</Text> is the most common time signature in music.
+              <Text style={styles.highlight}>4/4</Text> is the most common time
+              signature in music.
             </Text>
 
             <View style={styles.meaningBox}>
@@ -298,7 +304,9 @@ export default function TimeSignature44Exercise({
               <View style={styles.meaningRow}>
                 <Text style={styles.meaningNumber}>4</Text>
                 <Text style={styles.meaningEquals}>=</Text>
-                <Text style={styles.meaningText}>Quarter note gets the beat</Text>
+                <Text style={styles.meaningText}>
+                  Quarter note gets the beat
+                </Text>
               </View>
             </View>
           </View>
@@ -401,7 +409,8 @@ export default function TimeSignature44Exercise({
             <Text style={styles.introSubtitle}>Whole Notes in 4/4</Text>
 
             <Text style={styles.introText}>
-              You already know a <Text style={styles.highlight}>whole note</Text> lasts{" "}
+              You already know a{" "}
+              <Text style={styles.highlight}>whole note</Text> lasts{" "}
               <Text style={styles.highlight}>4 beats</Text>.
             </Text>
 
@@ -432,7 +441,8 @@ export default function TimeSignature44Exercise({
             </View>
 
             <Text style={styles.introText}>
-              Just like 4 quarters make a dollar, 4 quarter notes make a whole note!
+              Just like 4 quarters make a dollar, 4 quarter notes make a whole
+              note!
             </Text>
 
             <Text style={styles.tipText}>
@@ -441,9 +451,7 @@ export default function TimeSignature44Exercise({
           </View>
 
           <View style={styles.introCard}>
-            <Text style={styles.readyText}>
-              Ready for a quick quiz?
-            </Text>
+            <Text style={styles.readyText}>Ready for a quick quiz?</Text>
           </View>
         </ScrollView>
 
@@ -469,8 +477,10 @@ export default function TimeSignature44Exercise({
   // QUIZ PHASE
   // ============================================================
   if (phase === PHASES.QUIZ) {
-    const isCorrect = selectedAnswer === question.correctAnswer ||
-      (typeof question.correctAnswer === "number" && selectedAnswer === question.correctAnswer);
+    const isCorrect =
+      selectedAnswer === question.correctAnswer ||
+      (typeof question.correctAnswer === "number" &&
+        selectedAnswer === question.correctAnswer);
 
     return (
       <View style={styles.container}>
@@ -497,16 +507,18 @@ export default function TimeSignature44Exercise({
           </View>
 
           {/* Show notation for the "two whole notes" question */}
-          {question.id === "valid_measure" && NotationDisplay && twoWholeNotesExample && (
-            <View style={styles.quizNotationWrapper}>
-              <NotationDisplay
-                musicxml={twoWholeNotesExample}
-                width={320}
-                height={160}
-                showTimeSignature={true}
-              />
-            </View>
-          )}
+          {question.id === "valid_measure" &&
+            NotationDisplay &&
+            twoWholeNotesExample && (
+              <View style={styles.quizNotationWrapper}>
+                <NotationDisplay
+                  musicxml={twoWholeNotesExample}
+                  width={320}
+                  height={160}
+                  showTimeSignature={true}
+                />
+              </View>
+            )}
 
           {/* Show 4/4 for other questions */}
           {question.id !== "valid_measure" && question.id !== "common_time" && (
@@ -547,9 +559,10 @@ export default function TimeSignature44Exercise({
               }
 
               // Special styling for "C" option
-              const displayOption = question.id === "common_time" && option === "C" 
-                ? option 
-                : option;
+              const displayOption =
+                question.id === "common_time" && option === "C"
+                  ? option
+                  : option;
 
               return (
                 <TouchableOpacity
@@ -567,7 +580,11 @@ export default function TimeSignature44Exercise({
           {/* Feedback */}
           {showFeedback && (
             <View style={styles.feedbackContainer}>
-              <Text style={isCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect}>
+              <Text
+                style={
+                  isCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect
+                }
+              >
                 {isCorrect ? "✓ Correct!" : "✗ Not quite"}
               </Text>
               <Text style={styles.feedbackExplanation}>

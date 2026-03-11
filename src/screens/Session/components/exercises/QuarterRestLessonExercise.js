@@ -116,7 +116,8 @@ function generateQuarterRestPatternMusicXML(noteName, clef = "treble") {
   const clefSign = clef === "bass" ? "F" : "G";
   const clefLine = clef === "bass" ? "4" : "2";
   const alterXML = alter !== 0 ? `        <alter>${alter}</alter>\n` : "";
-  const accidentalXML = alter !== 0 ? `        <accidental>${accidentalName}</accidental>\n` : "";
+  const accidentalXML =
+    alter !== 0 ? `        <accidental>${accidentalName}</accidental>\n` : "";
 
   const quarterNote = `      <note>
         <pitch>
@@ -196,7 +197,7 @@ function createClickSound(audioContext, isAccent = false) {
   gainNode.gain.setValueAtTime(isAccent ? 0.8 : 0.5, audioContext.currentTime);
   gainNode.gain.exponentialRampToValueAtTime(
     0.001,
-    audioContext.currentTime + duration
+    audioContext.currentTime + duration,
   );
 
   source.connect(filter);
@@ -262,41 +263,39 @@ export default function QuarterRestLessonExercise({
 
   const targetFrequency = useMemo(
     () => noteToFrequency(userFirstNote),
-    [userFirstNote]
+    [userFirstNote],
   );
 
   // Generate MusicXML
   const musicXML = useMemo(
     () => generateQuarterRestPatternMusicXML(userFirstNote, clef),
-    [userFirstNote, clef]
+    [userFirstNote, clef],
   );
 
   // Pitch detection
-  const {
-    currentPitch,
-    volume,
-    isSounding,
-  } = usePitchDetection({
-    enabled: (phase === PHASE.SING && !singResult) || 
-             (phase === PHASE.PLAY && !playResult),
+  const { currentPitch, volume, isSounding } = usePitchDetection({
+    enabled:
+      (phase === PHASE.SING && !singResult) ||
+      (phase === PHASE.PLAY && !playResult),
     ...PITCH_DETECTION_OPTIONS,
   });
 
   // Track pitch accuracy
   const targetMidi = useMemo(() => noteToMidi(userFirstNote), [userFirstNote]);
-  
+
   useEffect(() => {
     if (!isSounding || !currentPitch?.noteName) return;
-    
+
     const detectedMidi = noteToMidi(currentPitch.noteName);
     if (detectedMidi === null) return;
-    
+
     const pitchDiff = Math.abs(detectedMidi - targetMidi);
-    
-    const isOnPitch = phase === PHASE.SING 
-      ? (pitchDiff % 12) <= 1 || (pitchDiff % 12) >= 11
-      : pitchDiff <= 1;
-    
+
+    const isOnPitch =
+      phase === PHASE.SING
+        ? pitchDiff % 12 <= 1 || pitchDiff % 12 >= 11
+        : pitchDiff <= 1;
+
     totalSoundingCountRef.current += 1;
     if (isOnPitch) {
       hasHitTargetPitchRef.current = true;
@@ -340,7 +339,9 @@ export default function QuarterRestLessonExercise({
         clearInterval(samplingIntervalRef.current);
       }
       if (oscillatorRef.current) {
-        try { oscillatorRef.current.stop(); } catch (e) {}
+        try {
+          oscillatorRef.current.stop();
+        } catch (e) {}
       }
       if (audioContextRef.current) {
         audioContextRef.current.close();
@@ -353,111 +354,115 @@ export default function QuarterRestLessonExercise({
   }, [phase]);
 
   // Play quarter note-rest pattern (8 beats)
-  const playQuarterNoteRestPattern = useCallback((onComplete) => {
-    const ctx = audioContextRef.current;
-    if (!ctx || isPlaying) return;
-    
-    onCompleteRef.current = typeof onComplete === 'function' ? onComplete : null;
+  const playQuarterNoteRestPattern = useCallback(
+    (onComplete) => {
+      const ctx = audioContextRef.current;
+      if (!ctx || isPlaying) return;
 
-    setIsPlaying(true);
-    setCurrentBeat(-4);
-    setCurrentMeasure(1);
+      onCompleteRef.current =
+        typeof onComplete === "function" ? onComplete : null;
 
-    const beatMs = (60 / bpm) * 1000;
-    let beat = -4;
-    let absoluteBeat = -4;
+      setIsPlaying(true);
+      setCurrentBeat(-4);
+      setCurrentMeasure(1);
 
-    const playQuarterNote = () => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      
-      const now = ctx.currentTime;
-      const duration = (beatMs * 1) / 1000;
-      
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(targetFrequency, now);
-      
-      gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.5, now + 0.02);
-      gain.gain.setValueAtTime(0.4, now + duration - 0.05);
-      gain.gain.linearRampToValueAtTime(0, now + duration);
-      
-      const osc2 = ctx.createOscillator();
-      osc2.frequency.setValueAtTime(targetFrequency * 2, now);
-      const gain2 = ctx.createGain();
-      gain2.gain.setValueAtTime(0.15, now);
-      gain2.gain.linearRampToValueAtTime(0, now + duration);
-      
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      
-      osc.start(now);
-      osc.stop(now + duration + 0.05);
-      osc2.start(now);
-      osc2.stop(now + duration + 0.05);
-      
-      oscillatorRef.current = osc;
-      oscillator2Ref.current = osc2;
-      gainNodeRef.current = gain;
-    };
+      const beatMs = (60 / bpm) * 1000;
+      let beat = -4;
+      let absoluteBeat = -4;
 
-    createClickSound(ctx, true);
+      const playQuarterNote = () => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
 
-    beatIntervalRef.current = setInterval(() => {
-      if (unmountedRef.current) {
-        clearInterval(beatIntervalRef.current);
-        return;
-      }
+        const now = ctx.currentTime;
+        const duration = (beatMs * 1) / 1000;
 
-      beat++;
-      absoluteBeat++;
-      if (beat === 0) { 
-        beat = 1; 
-        absoluteBeat = 1;
-      }
-      
-      if (beat >= -3 && beat <= -1) {
-        createClickSound(ctx, false);
-        setCurrentBeat(beat);
-      } else if (absoluteBeat >= 1 && absoluteBeat <= 8) {
-        // Determine if this is an accent (beat 1 of each measure)
-        const measureBeat = ((absoluteBeat - 1) % 4) + 1;
-        const isAccent = measureBeat === 1;
-        createClickSound(ctx, isAccent);
-        
-        // Update measure
-        if (absoluteBeat <= 4) {
-          setCurrentMeasure(1);
-          setCurrentBeat(measureBeat);
-        } else {
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(targetFrequency, now);
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.5, now + 0.02);
+        gain.gain.setValueAtTime(0.4, now + duration - 0.05);
+        gain.gain.linearRampToValueAtTime(0, now + duration);
+
+        const osc2 = ctx.createOscillator();
+        osc2.frequency.setValueAtTime(targetFrequency * 2, now);
+        const gain2 = ctx.createGain();
+        gain2.gain.setValueAtTime(0.15, now);
+        gain2.gain.linearRampToValueAtTime(0, now + duration);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + duration + 0.05);
+        osc2.start(now);
+        osc2.stop(now + duration + 0.05);
+
+        oscillatorRef.current = osc;
+        oscillator2Ref.current = osc2;
+        gainNodeRef.current = gain;
+      };
+
+      createClickSound(ctx, true);
+
+      beatIntervalRef.current = setInterval(() => {
+        if (unmountedRef.current) {
+          clearInterval(beatIntervalRef.current);
+          return;
+        }
+
+        beat++;
+        absoluteBeat++;
+        if (beat === 0) {
+          beat = 1;
+          absoluteBeat = 1;
+        }
+
+        if (beat >= -3 && beat <= -1) {
+          createClickSound(ctx, false);
+          setCurrentBeat(beat);
+        } else if (absoluteBeat >= 1 && absoluteBeat <= 8) {
+          // Determine if this is an accent (beat 1 of each measure)
+          const measureBeat = ((absoluteBeat - 1) % 4) + 1;
+          const isAccent = measureBeat === 1;
+          createClickSound(ctx, isAccent);
+
+          // Update measure
+          if (absoluteBeat <= 4) {
+            setCurrentMeasure(1);
+            setCurrentBeat(measureBeat);
+          } else {
+            setCurrentMeasure(2);
+            setCurrentBeat(measureBeat);
+          }
+
+          // Play note on odd beats (1, 3, 5, 7 = absoluteBeat 1, 3, 5, 7)
+          if (absoluteBeat % 2 === 1) {
+            playQuarterNote();
+          }
+        } else if (absoluteBeat === 9) {
+          // The final ONE - pattern ends
+          createClickSound(ctx, true);
           setCurrentMeasure(2);
-          setCurrentBeat(measureBeat);
+          setCurrentBeat(5); // "Next" beat
+        } else {
+          clearInterval(beatIntervalRef.current);
+          beatIntervalRef.current = null;
+          setIsPlaying(false);
+          setCurrentBeat(0);
+          setCurrentMeasure(1);
+          if (onCompleteRef.current) {
+            onCompleteRef.current();
+            onCompleteRef.current = null;
+          }
         }
-        
-        // Play note on odd beats (1, 3, 5, 7 = absoluteBeat 1, 3, 5, 7)
-        if (absoluteBeat % 2 === 1) {
-          playQuarterNote();
-        }
-      } else if (absoluteBeat === 9) {
-        // The final ONE - pattern ends
-        createClickSound(ctx, true);
-        setCurrentMeasure(2);
-        setCurrentBeat(5); // "Next" beat
-      } else {
-        clearInterval(beatIntervalRef.current);
-        beatIntervalRef.current = null;
-        setIsPlaying(false);
-        setCurrentBeat(0);
-        setCurrentMeasure(1);
-        if (onCompleteRef.current) {
-          onCompleteRef.current();
-          onCompleteRef.current = null;
-        }
-      }
-    }, beatMs);
-  }, [bpm, targetFrequency, isPlaying]);
+      }, beatMs);
+    },
+    [bpm, targetFrequency, isPlaying],
+  );
 
   // Stop playback
   const stopPlayback = useCallback(() => {
@@ -470,10 +475,14 @@ export default function QuarterRestLessonExercise({
       samplingIntervalRef.current = null;
     }
     if (oscillatorRef.current) {
-      try { oscillatorRef.current.stop(); } catch (e) {}
+      try {
+        oscillatorRef.current.stop();
+      } catch (e) {}
     }
     if (oscillator2Ref.current) {
-      try { oscillator2Ref.current.stop(); } catch (e) {}
+      try {
+        oscillator2Ref.current.stop();
+      } catch (e) {}
     }
     setIsPlaying(false);
     setCurrentBeat(0);
@@ -481,151 +490,186 @@ export default function QuarterRestLessonExercise({
   }, []);
 
   // Play metronome only (for sing/play phases)
-  const playMetronomeOnly = useCallback((onComplete) => {
-    const ctx = audioContextRef.current;
-    if (!ctx || isPlaying) return;
-    
-    onCompleteRef.current = typeof onComplete === 'function' ? onComplete : null;
+  const playMetronomeOnly = useCallback(
+    (onComplete) => {
+      const ctx = audioContextRef.current;
+      if (!ctx || isPlaying) return;
 
-    setIsPlaying(true);
-    setCurrentBeat(-4);
-    setCurrentMeasure(1);
-    soundingOnBeatsRef.current = [0, 0, 0, 0, 0, 0, 0, 0];
-    startedEarlyRef.current = false;
+      onCompleteRef.current =
+        typeof onComplete === "function" ? onComplete : null;
 
-    const beatMs = (60 / bpm) * 1000;
-    let beat = -4;
-    let absoluteBeat = -4;
-    
-    let beatSoundingSamples = { beat: 0, samples: 0, soundingCount: 0 };
-    let earlySoundingSamples = 0;
-    let samplesBeforeChecking = 3;
-    
-    const samplingInterval = setInterval(() => {
-      if (samplesBeforeChecking > 0) {
-        samplesBeforeChecking--;
-        return;
-      }
-      
-      // Check for early start during count-in
-      if (absoluteBeat >= -4 && absoluteBeat <= -1) {
-        if (isSoundingRef.current) {
-          earlySoundingSamples++;
-          if (earlySoundingSamples >= 3) {
-            startedEarlyRef.current = true;
-          }
-        } else {
-          earlySoundingSamples = 0;
+      setIsPlaying(true);
+      setCurrentBeat(-4);
+      setCurrentMeasure(1);
+      soundingOnBeatsRef.current = [0, 0, 0, 0, 0, 0, 0, 0];
+      startedEarlyRef.current = false;
+
+      const beatMs = (60 / bpm) * 1000;
+      let beat = -4;
+      let absoluteBeat = -4;
+
+      let beatSoundingSamples = { beat: 0, samples: 0, soundingCount: 0 };
+      let earlySoundingSamples = 0;
+      let samplesBeforeChecking = 3;
+
+      const samplingInterval = setInterval(() => {
+        if (samplesBeforeChecking > 0) {
+          samplesBeforeChecking--;
+          return;
         }
-      }
-      // Track beats 1-8
-      if (absoluteBeat >= 1 && absoluteBeat <= 8) {
-        if (beatSoundingSamples.beat !== absoluteBeat) {
-          if (beatSoundingSamples.beat >= 1 && beatSoundingSamples.samples > 0) {
-            const percentage = beatSoundingSamples.soundingCount / beatSoundingSamples.samples;
+
+        // Check for early start during count-in
+        if (absoluteBeat >= -4 && absoluteBeat <= -1) {
+          if (isSoundingRef.current) {
+            earlySoundingSamples++;
+            if (earlySoundingSamples >= 3) {
+              startedEarlyRef.current = true;
+            }
+          } else {
+            earlySoundingSamples = 0;
+          }
+        }
+        // Track beats 1-8
+        if (absoluteBeat >= 1 && absoluteBeat <= 8) {
+          if (beatSoundingSamples.beat !== absoluteBeat) {
+            if (
+              beatSoundingSamples.beat >= 1 &&
+              beatSoundingSamples.samples > 0
+            ) {
+              const percentage =
+                beatSoundingSamples.soundingCount / beatSoundingSamples.samples;
+              const idx = beatSoundingSamples.beat - 1;
+              soundingOnBeatsRef.current[idx] = Math.max(
+                soundingOnBeatsRef.current[idx],
+                percentage,
+              );
+            }
+            beatSoundingSamples = {
+              beat: absoluteBeat,
+              samples: 0,
+              soundingCount: 0,
+            };
+          }
+          beatSoundingSamples.samples++;
+          if (isSoundingRef.current) {
+            beatSoundingSamples.soundingCount++;
+          }
+        }
+      }, 50);
+      samplingIntervalRef.current = samplingInterval;
+
+      createClickSound(ctx, true);
+
+      beatIntervalRef.current = setInterval(() => {
+        if (unmountedRef.current) {
+          clearInterval(beatIntervalRef.current);
+          clearInterval(samplingInterval);
+          return;
+        }
+
+        beat++;
+        absoluteBeat++;
+        if (beat === 0) {
+          beat = 1;
+          absoluteBeat = 1;
+        }
+
+        if (beat >= -3 && beat <= -1) {
+          createClickSound(ctx, false);
+          setCurrentBeat(beat);
+        } else if (absoluteBeat >= 1 && absoluteBeat <= 8) {
+          const measureBeat = ((absoluteBeat - 1) % 4) + 1;
+          const isAccent = measureBeat === 1;
+          createClickSound(ctx, isAccent);
+
+          if (absoluteBeat <= 4) {
+            setCurrentMeasure(1);
+            setCurrentBeat(measureBeat);
+          } else {
+            setCurrentMeasure(2);
+            setCurrentBeat(measureBeat);
+          }
+        } else if (absoluteBeat === 9) {
+          createClickSound(ctx, true);
+          setCurrentBeat(5);
+        } else {
+          if (
+            beatSoundingSamples.beat >= 1 &&
+            beatSoundingSamples.samples > 0
+          ) {
+            const percentage =
+              beatSoundingSamples.soundingCount / beatSoundingSamples.samples;
             const idx = beatSoundingSamples.beat - 1;
-            soundingOnBeatsRef.current[idx] = Math.max(soundingOnBeatsRef.current[idx], percentage);
+            soundingOnBeatsRef.current[idx] = Math.max(
+              soundingOnBeatsRef.current[idx],
+              percentage,
+            );
           }
-          beatSoundingSamples = { beat: absoluteBeat, samples: 0, soundingCount: 0 };
-        }
-        beatSoundingSamples.samples++;
-        if (isSoundingRef.current) {
-          beatSoundingSamples.soundingCount++;
-        }
-      }
-    }, 50);
-    samplingIntervalRef.current = samplingInterval;
-
-    createClickSound(ctx, true);
-
-    beatIntervalRef.current = setInterval(() => {
-      if (unmountedRef.current) {
-        clearInterval(beatIntervalRef.current);
-        clearInterval(samplingInterval);
-        return;
-      }
-
-      beat++;
-      absoluteBeat++;
-      if (beat === 0) { 
-        beat = 1; 
-        absoluteBeat = 1;
-      }
-      
-      if (beat >= -3 && beat <= -1) {
-        createClickSound(ctx, false);
-        setCurrentBeat(beat);
-      } else if (absoluteBeat >= 1 && absoluteBeat <= 8) {
-        const measureBeat = ((absoluteBeat - 1) % 4) + 1;
-        const isAccent = measureBeat === 1;
-        createClickSound(ctx, isAccent);
-        
-        if (absoluteBeat <= 4) {
+          clearInterval(beatIntervalRef.current);
+          clearInterval(samplingInterval);
+          beatIntervalRef.current = null;
+          samplingIntervalRef.current = null;
+          setIsPlaying(false);
+          setCurrentBeat(0);
           setCurrentMeasure(1);
-          setCurrentBeat(measureBeat);
-        } else {
-          setCurrentMeasure(2);
-          setCurrentBeat(measureBeat);
+          if (onCompleteRef.current) {
+            onCompleteRef.current();
+            onCompleteRef.current = null;
+          }
         }
-      } else if (absoluteBeat === 9) {
-        createClickSound(ctx, true);
-        setCurrentBeat(5);
-      } else {
-        if (beatSoundingSamples.beat >= 1 && beatSoundingSamples.samples > 0) {
-          const percentage = beatSoundingSamples.soundingCount / beatSoundingSamples.samples;
-          const idx = beatSoundingSamples.beat - 1;
-          soundingOnBeatsRef.current[idx] = Math.max(soundingOnBeatsRef.current[idx], percentage);
-        }
-        clearInterval(beatIntervalRef.current);
-        clearInterval(samplingInterval);
-        beatIntervalRef.current = null;
-        samplingIntervalRef.current = null;
-        setIsPlaying(false);
-        setCurrentBeat(0);
-        setCurrentMeasure(1);
-        if (onCompleteRef.current) {
-          onCompleteRef.current();
-          onCompleteRef.current = null;
-        }
-      }
-    }, beatMs);
-  }, [bpm, isPlaying]);
+      }, beatMs);
+    },
+    [bpm, isPlaying],
+  );
 
   // Analyze performance
   const analyzePerformance = useCallback(() => {
     const totalCount = totalSoundingCountRef.current;
     const pitchCount = onPitchCountRef.current;
     const hitTarget = hasHitTargetPitchRef.current;
-    
+
     const beatSoundPct = soundingOnBeatsRef.current;
     const startedEarly = startedEarlyRef.current;
-    console.log('[QuarterRestLesson] analyzePerformance:', { totalCount, pitchCount, hitTarget, beatSoundPct, startedEarly });
-    
+    console.log("[QuarterRestLesson] analyzePerformance:", {
+      totalCount,
+      pitchCount,
+      hitTarget,
+      beatSoundPct,
+      startedEarly,
+    });
+
     if (totalCount === 0) {
-      return { success: false, pitchOk: false, rhythmOk: false, message: "No sound detected" };
+      return {
+        success: false,
+        pitchOk: false,
+        rhythmOk: false,
+        message: "No sound detected",
+      };
     }
     const successRatio = pitchCount / totalCount;
     const pitchOk = hitTarget && successRatio >= 0.3;
-    
+
     const SUSTAIN_THRESHOLD = 0.5; // Quarter notes are short
     const SILENCE_THRESHOLD = 0.3;
-    
+
     // Odd beats (0,2,4,6 indexes = beats 1,3,5,7) should have sound
     // Even beats (1,3,5,7 indexes = beats 2,4,6,8) should be silent (rests)
-    const noteBeatsOk = beatSoundPct[0] >= SUSTAIN_THRESHOLD && 
-                        beatSoundPct[2] >= SUSTAIN_THRESHOLD &&
-                        beatSoundPct[4] >= SUSTAIN_THRESHOLD &&
-                        beatSoundPct[6] >= SUSTAIN_THRESHOLD;
-    
-    const restBeatsOk = beatSoundPct[1] < SILENCE_THRESHOLD &&
-                        beatSoundPct[3] < SILENCE_THRESHOLD &&
-                        beatSoundPct[5] < SILENCE_THRESHOLD &&
-                        beatSoundPct[7] < SILENCE_THRESHOLD;
-    
+    const noteBeatsOk =
+      beatSoundPct[0] >= SUSTAIN_THRESHOLD &&
+      beatSoundPct[2] >= SUSTAIN_THRESHOLD &&
+      beatSoundPct[4] >= SUSTAIN_THRESHOLD &&
+      beatSoundPct[6] >= SUSTAIN_THRESHOLD;
+
+    const restBeatsOk =
+      beatSoundPct[1] < SILENCE_THRESHOLD &&
+      beatSoundPct[3] < SILENCE_THRESHOLD &&
+      beatSoundPct[5] < SILENCE_THRESHOLD &&
+      beatSoundPct[7] < SILENCE_THRESHOLD;
+
     const rhythmOk = !startedEarly && noteBeatsOk && restBeatsOk;
-    
+
     const success = pitchOk && rhythmOk;
-    
+
     let message = "Great!";
     if (!pitchOk && !rhythmOk) {
       message = "Try to match the pitch and follow the rhythm";
@@ -638,7 +682,7 @@ export default function QuarterRestLessonExercise({
     } else if (!restBeatsOk) {
       message = "Be silent on beats 2, 4 (the rests)";
     }
-    
+
     return { success, pitchOk, rhythmOk, message };
   }, []);
 
@@ -646,7 +690,7 @@ export default function QuarterRestLessonExercise({
     const result = analyzePerformance();
     setSingResult(result);
     if (!result.success) {
-      setSingAttempts(prev => prev + 1);
+      setSingAttempts((prev) => prev + 1);
     }
   }, [analyzePerformance]);
 
@@ -676,7 +720,7 @@ export default function QuarterRestLessonExercise({
     const result = analyzePerformance();
     setPlayResult(result);
     if (!result.success) {
-      setPlayAttempts(prev => prev + 1);
+      setPlayAttempts((prev) => prev + 1);
     }
   }, [analyzePerformance]);
 
@@ -708,9 +752,9 @@ export default function QuarterRestLessonExercise({
 
   const handleAttestConfirm = useCallback(() => {
     setShowAttestModal(false);
-    if (attestPhase === 'sing') {
+    if (attestPhase === "sing") {
       setSingResult({ success: true, attested: true });
-    } else if (attestPhase === 'play') {
+    } else if (attestPhase === "play") {
       setPlayResult({ success: true, attested: true });
     }
     setAttestPhase(null);
@@ -754,9 +798,7 @@ export default function QuarterRestLessonExercise({
           </TouchableOpacity>
         ) : (
           <>
-            <View style={styles.notationWrapper}>
-              {memoizedNotation}
-            </View>
+            <View style={styles.notationWrapper}>{memoizedNotation}</View>
             <TouchableOpacity
               style={styles.hideNotationButton}
               onPress={() => setShowNotation(false)}
@@ -795,25 +837,31 @@ export default function QuarterRestLessonExercise({
                 key={beat}
                 style={[
                   styles.countInDot,
-                  beat <= currentBeat && currentBeat < 0 && styles.countInDotActive,
+                  beat <= currentBeat &&
+                    currentBeat < 0 &&
+                    styles.countInDotActive,
                   beat === -4 && styles.countInDotAccent,
                 ]}
               >
-                <Text style={[
-                  styles.countInNumber,
-                  beat <= currentBeat && currentBeat < 0 && styles.countInNumberActive,
-                ]}>
+                <Text
+                  style={[
+                    styles.countInNumber,
+                    beat <= currentBeat &&
+                      currentBeat < 0 &&
+                      styles.countInNumberActive,
+                  ]}
+                >
                   {index + 1}
                 </Text>
               </View>
             ))}
           </View>
         </View>
-        
+
         <View style={styles.measureLabel}>
           <Text style={styles.measureText}>Measure {currentMeasure}</Text>
         </View>
-        
+
         <View style={styles.singRow}>
           <Text style={styles.singLabel}>Play:</Text>
           <View style={styles.beatIndicator}>
@@ -821,7 +869,7 @@ export default function QuarterRestLessonExercise({
             {[1, 2, 3, 4].map((beat) => {
               const isNote = beat % 2 === 1; // Beats 1, 3 are notes; 2, 4 are rests
               const isActive = currentBeat >= beat && currentBeat > 0;
-              
+
               return (
                 <View
                   key={beat}
@@ -829,13 +877,21 @@ export default function QuarterRestLessonExercise({
                     styles.beatDot,
                     beat === 1 && styles.beatDotAccent,
                     !isNote && styles.beatDotRest,
-                    isActive && (isNote ? styles.beatDotActive : styles.beatDotRestActive),
+                    isActive &&
+                      (isNote
+                        ? styles.beatDotActive
+                        : styles.beatDotRestActive),
                   ]}
                 >
-                  <Text style={[
-                    styles.beatNumber,
-                    isActive && (isNote ? styles.beatNumberActive : styles.beatNumberRestActive),
-                  ]}>
+                  <Text
+                    style={[
+                      styles.beatNumber,
+                      isActive &&
+                        (isNote
+                          ? styles.beatNumberActive
+                          : styles.beatNumberRestActive),
+                    ]}
+                  >
                     {beat}
                   </Text>
                 </View>
@@ -843,11 +899,9 @@ export default function QuarterRestLessonExercise({
             })}
           </View>
         </View>
-        
+
         <View style={styles.patternHint}>
-          <Text style={styles.patternHintText}>
-            🎵 · 🤫 · 🎵 · 🤫
-          </Text>
+          <Text style={styles.patternHintText}>🎵 · 🤫 · 🎵 · 🤫</Text>
           <Text style={styles.patternHintSubtext}>
             note - rest - note - rest
           </Text>
@@ -857,37 +911,42 @@ export default function QuarterRestLessonExercise({
   };
 
   // Attestation Modal
-  const attestationModal = useMemo(() => (
-    <Modal
-      visible={showAttestModal}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={() => setShowAttestModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Confirm</Text>
-          <Text style={styles.modalText}>
-            I attest that I {attestPhase === 'sing' ? 'sang' : 'played'} this correctly, but due to background noise or technical issues it was not able to register.
-          </Text>
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={styles.modalCancelButton}
-              onPress={() => setShowAttestModal(false)}
-            >
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalConfirmButton}
-              onPress={handleAttestConfirm}
-            >
-              <Text style={styles.modalConfirmText}>Confirm</Text>
-            </TouchableOpacity>
+  const attestationModal = useMemo(
+    () => (
+      <Modal
+        visible={showAttestModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowAttestModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Confirm</Text>
+            <Text style={styles.modalText}>
+              I attest that I {attestPhase === "sing" ? "sang" : "played"} this
+              correctly, but due to background noise or technical issues it was
+              not able to register.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setShowAttestModal(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalConfirmButton}
+                onPress={handleAttestConfirm}
+              >
+                <Text style={styles.modalConfirmText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
-    </Modal>
-  ), [showAttestModal, attestPhase, handleAttestConfirm]);
+      </Modal>
+    ),
+    [showAttestModal, attestPhase, handleAttestConfirm],
+  );
 
   // FOCUS CARD PHASE
   if (phase === PHASE.FOCUS_CARD) {
@@ -937,16 +996,16 @@ export default function QuarterRestLessonExercise({
               </View>
             </View>
           </View>
-          
+
           {/* Show actual notation */}
           <View style={styles.notationPreview}>
-            <Text style={styles.notationPreviewLabel}>On the staff (note-rest-note-rest pattern):</Text>
-            <View style={styles.notationWrapper}>
-              {memoizedNotation}
-            </View>
+            <Text style={styles.notationPreviewLabel}>
+              On the staff (note-rest-note-rest pattern):
+            </Text>
+            <View style={styles.notationWrapper}>{memoizedNotation}</View>
           </View>
         </ScrollView>
-        
+
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
             style={styles.primaryButton}
@@ -968,7 +1027,7 @@ export default function QuarterRestLessonExercise({
           contentContainerStyle={styles.scrollContent}
         >
           {renderFocusCardMini()}
-          
+
           <Text style={styles.phaseTitle}>Listen</Text>
           <Text style={styles.noteDisplay}>
             {noteInfo.letter}
@@ -978,12 +1037,12 @@ export default function QuarterRestLessonExercise({
             Listen to: note-rest-note-rest (repeat).{"\n"}
             Each beat alternates between sound and silence.
           </Text>
-          
+
           {isPlaying && <BeatIndicator />}
-          
+
           {renderNotationToggle()}
         </ScrollView>
-        
+
         <View style={styles.fixedBottomButtons}>
           {!hasHeardPattern ? (
             <TouchableOpacity
@@ -1000,7 +1059,10 @@ export default function QuarterRestLessonExercise({
           ) : (
             <>
               <TouchableOpacity
-                style={[styles.secondaryButton, isPlaying && styles.buttonDisabled]}
+                style={[
+                  styles.secondaryButton,
+                  isPlaying && styles.buttonDisabled,
+                ]}
                 onPress={playQuarterNoteRestPattern}
                 disabled={isPlaying}
               >
@@ -1035,7 +1097,7 @@ export default function QuarterRestLessonExercise({
           contentContainerStyle={styles.scrollContent}
         >
           {renderFocusCardMini()}
-          
+
           <Text style={styles.phaseTitle}>Sing</Text>
           <Text style={styles.noteDisplay}>
             {noteInfo.letter}
@@ -1045,27 +1107,33 @@ export default function QuarterRestLessonExercise({
             Sing: note (1) - rest (2) - note (3) - rest (4).{"\n"}
             Be silent on the even beats!
           </Text>
-          
+
           {isPlaying && <BeatIndicator />}
-          
+
           {!singResult && (
             <View style={styles.volumeContainer}>
               <CircularVolumeIndicator volume={volume} size={120} />
               {isSounding && detectedNoteName && (
-                <Text style={styles.hearingText}>Hearing: {detectedNoteName}</Text>
+                <Text style={styles.hearingText}>
+                  Hearing: {detectedNoteName}
+                </Text>
               )}
             </View>
           )}
-          
+
           {singResult && (
-            <Text style={singResult.success ? styles.successText : styles.feedbackError}>
+            <Text
+              style={
+                singResult.success ? styles.successText : styles.feedbackError
+              }
+            >
               {singResult.success ? "✓ Great!" : singResult.message}
             </Text>
           )}
-          
+
           {renderNotationToggle()}
         </ScrollView>
-        
+
         <View style={styles.fixedBottomButtons}>
           {singResult && !singResult.success ? (
             <>
@@ -1078,17 +1146,23 @@ export default function QuarterRestLessonExercise({
               {singAttempts >= 3 && (
                 <TouchableOpacity
                   style={[styles.tertiaryButton, { marginTop: 8 }]}
-                  onPress={() => handleShowAttestModal('sing')}
+                  onPress={() => handleShowAttestModal("sing")}
                 >
-                  <Text style={styles.tertiaryButtonText}>I did it correctly →</Text>
+                  <Text style={styles.tertiaryButtonText}>
+                    I did it correctly →
+                  </Text>
                 </TouchableOpacity>
               )}
             </>
           ) : singResult?.success ? (
             <>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
                 <TouchableOpacity
-                  style={[styles.secondaryButton, { flex: 1 }, isPlaying && styles.buttonDisabled]}
+                  style={[
+                    styles.secondaryButton,
+                    { flex: 1 },
+                    isPlaying && styles.buttonDisabled,
+                  ]}
                   onPress={playQuarterNoteRestPattern}
                   disabled={isPlaying}
                 >
@@ -1097,7 +1171,11 @@ export default function QuarterRestLessonExercise({
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.secondaryButton, { flex: 1 }, isPlaying && styles.buttonDisabled]}
+                  style={[
+                    styles.secondaryButton,
+                    { flex: 1 },
+                    isPlaying && styles.buttonDisabled,
+                  ]}
                   onPress={() => {
                     handleTrySingAgain();
                   }}
@@ -1139,7 +1217,7 @@ export default function QuarterRestLessonExercise({
           contentContainerStyle={styles.scrollContent}
         >
           {renderFocusCardMini()}
-          
+
           <Text style={styles.phaseTitle}>Imagine</Text>
           <Text style={styles.noteDisplay}>
             {noteInfo.letter}
@@ -1149,19 +1227,17 @@ export default function QuarterRestLessonExercise({
             Imagine playing: note-rest-note-rest.{"\n"}
             Feel the alternating sound and silence.
           </Text>
-          
+
           {isPlaying && <BeatIndicator />}
-          
+
           <View style={styles.imagineVisual}>
             <Text style={styles.imagineEmoji}>🎵 🤫 🎵 🤫</Text>
-            <Text style={styles.imagineHint}>
-              Play - Rest - Play - Rest
-            </Text>
+            <Text style={styles.imagineHint}>Play - Rest - Play - Rest</Text>
           </View>
-          
+
           {renderNotationToggle()}
         </ScrollView>
-        
+
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
             style={[styles.secondaryButton, isPlaying && styles.buttonDisabled]}
@@ -1192,7 +1268,7 @@ export default function QuarterRestLessonExercise({
           contentContainerStyle={styles.scrollContent}
         >
           {renderFocusCardMini()}
-          
+
           <Text style={styles.phaseTitle}>Play</Text>
           <Text style={styles.noteDisplay}>
             {noteInfo.letter}
@@ -1202,27 +1278,33 @@ export default function QuarterRestLessonExercise({
             Play: note (1) - rest (2) - note (3) - rest (4).{"\n"}
             Two measures of alternating pattern.
           </Text>
-          
+
           {isPlaying && <BeatIndicator />}
-          
+
           {!playResult && (
             <View style={styles.volumeContainer}>
               <CircularVolumeIndicator volume={volume} size={120} />
               {isSounding && detectedNoteName && (
-                <Text style={styles.hearingText}>Hearing: {detectedNoteName}</Text>
+                <Text style={styles.hearingText}>
+                  Hearing: {detectedNoteName}
+                </Text>
               )}
             </View>
           )}
-          
+
           {playResult && (
-            <Text style={playResult.success ? styles.successText : styles.feedbackError}>
+            <Text
+              style={
+                playResult.success ? styles.successText : styles.feedbackError
+              }
+            >
               {playResult.success ? "✓ Great!" : playResult.message}
             </Text>
           )}
-          
+
           {renderNotationToggle()}
         </ScrollView>
-        
+
         <View style={styles.fixedBottomButtons}>
           {playResult && !playResult.success ? (
             <>
@@ -1235,17 +1317,23 @@ export default function QuarterRestLessonExercise({
               {playAttempts >= 3 && (
                 <TouchableOpacity
                   style={[styles.tertiaryButton, { marginTop: 8 }]}
-                  onPress={() => handleShowAttestModal('play')}
+                  onPress={() => handleShowAttestModal("play")}
                 >
-                  <Text style={styles.tertiaryButtonText}>I did it correctly →</Text>
+                  <Text style={styles.tertiaryButtonText}>
+                    I did it correctly →
+                  </Text>
                 </TouchableOpacity>
               )}
             </>
           ) : playResult?.success ? (
             <>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
                 <TouchableOpacity
-                  style={[styles.secondaryButton, { flex: 1 }, isPlaying && styles.buttonDisabled]}
+                  style={[
+                    styles.secondaryButton,
+                    { flex: 1 },
+                    isPlaying && styles.buttonDisabled,
+                  ]}
                   onPress={playQuarterNoteRestPattern}
                   disabled={isPlaying}
                 >
@@ -1254,7 +1342,11 @@ export default function QuarterRestLessonExercise({
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.secondaryButton, { flex: 1 }, isPlaying && styles.buttonDisabled]}
+                  style={[
+                    styles.secondaryButton,
+                    { flex: 1 },
+                    isPlaying && styles.buttonDisabled,
+                  ]}
                   onPress={() => {
                     handleTryPlayAgain();
                   }}
@@ -1329,26 +1421,34 @@ export default function QuarterRestLessonExercise({
           <Text style={styles.phaseTitle}>
             {overallSuccess ? "Nice Work!" : "Keep Practicing"}
           </Text>
-          
+
           <View style={styles.resultsSummary}>
             <View style={styles.resultRow}>
               <Text style={styles.resultLabel}>Sing:</Text>
-              <Text style={singResult?.success ? styles.resultSuccess : styles.resultFail}>
+              <Text
+                style={
+                  singResult?.success ? styles.resultSuccess : styles.resultFail
+                }
+              >
                 {singResult?.success ? "✓" : "✗"}
               </Text>
             </View>
             <View style={styles.resultRow}>
               <Text style={styles.resultLabel}>Play:</Text>
-              <Text style={playResult?.success ? styles.resultSuccess : styles.resultFail}>
+              <Text
+                style={
+                  playResult?.success ? styles.resultSuccess : styles.resultFail
+                }
+              >
                 {playResult?.success ? "✓" : "✗"}
               </Text>
             </View>
           </View>
-          
+
           <Text style={styles.progressText}>
             Progress: {successfulRounds} / {masteryStreak}
           </Text>
-          
+
           <View style={styles.reminderBox}>
             <Text style={styles.reminderTitle}>Remember:</Text>
             <Text style={styles.reminderText}>
@@ -1358,7 +1458,7 @@ export default function QuarterRestLessonExercise({
             </Text>
           </View>
         </ScrollView>
-        
+
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
             style={styles.primaryButton}

@@ -229,8 +229,10 @@ export default function TeachingModuleSession({
 
   // Get user's instrument for range info
   const { selectedInstrument } = useUser();
-  const userRangeLow = selectedInstrument?.range_low || userResonantNote || "F3";
-  const userRangeHigh = selectedInstrument?.range_high || userResonantNote || "F3";
+  const userRangeLow =
+    selectedInstrument?.range_low || userResonantNote || "F3";
+  const userRangeHigh =
+    selectedInstrument?.range_high || userResonantNote || "F3";
   const userClef = selectedInstrument?.clef || "treble";
 
   // Get the exercise component for this lesson

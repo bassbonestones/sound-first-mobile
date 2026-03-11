@@ -227,11 +227,15 @@ export default function SessionScreenContent() {
           if (result.direction === "up") {
             // Expand range_high to the target note
             rangeUpdate.range_high = result.targetNote;
-            console.log(`[Session] Expanding range_high to: ${result.targetNote}`);
+            console.log(
+              `[Session] Expanding range_high to: ${result.targetNote}`,
+            );
           } else if (result.direction === "down") {
             // Expand range_low to the target note
             rangeUpdate.range_low = result.targetNote;
-            console.log(`[Session] Expanding range_low to: ${result.targetNote}`);
+            console.log(
+              `[Session] Expanding range_low to: ${result.targetNote}`,
+            );
           }
 
           if (Object.keys(rangeUpdate).length > 0) {

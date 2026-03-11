@@ -252,27 +252,28 @@ function generatePatternMusicXML(noteNames, clef = "treble") {
   // to determine when we need to show courtesy accidentals
   const lastAccidentalForLetter = {};
 
-  const notesXML = noteNames.map((noteName, index) => {
-    const parsed = parseNoteName(noteName);
-    if (!parsed) return "";
+  const notesXML = noteNames
+    .map((noteName, index) => {
+      const parsed = parseNoteName(noteName);
+      if (!parsed) return "";
 
-    let alter = 0;
-    let accidentalName = "natural";
-    if (parsed.accidental === "b") {
-      alter = -1;
-      accidentalName = "flat";
-    } else if (parsed.accidental === "#") {
-      alter = 1;
-      accidentalName = "sharp";
-    }
-    
-    const alterXML = alter !== 0 ? `        <alter>${alter}</alter>\n` : "";
-    
-    // Always show accidental explicitly for each note to avoid confusion
-    // when the same letter appears multiple times with different accidentals
-    const accidentalXML = `        <accidental>${accidentalName}</accidental>\n`;
+      let alter = 0;
+      let accidentalName = "natural";
+      if (parsed.accidental === "b") {
+        alter = -1;
+        accidentalName = "flat";
+      } else if (parsed.accidental === "#") {
+        alter = 1;
+        accidentalName = "sharp";
+      }
 
-    return `      <note>
+      const alterXML = alter !== 0 ? `        <alter>${alter}</alter>\n` : "";
+
+      // Always show accidental explicitly for each note to avoid confusion
+      // when the same letter appears multiple times with different accidentals
+      const accidentalXML = `        <accidental>${accidentalName}</accidental>\n`;
+
+      return `      <note>
         <pitch>
           <step>${parsed.letter}</step>
 ${alterXML}          <octave>${parsed.octave}</octave>
@@ -280,7 +281,8 @@ ${alterXML}          <octave>${parsed.octave}</octave>
         <duration>4</duration>
         <type>whole</type>
 ${accidentalXML}      </note>`;
-  }).join("\n");
+    })
+    .join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
@@ -331,13 +333,13 @@ export default function RangeExpansionExercise({
   // Logic: prefer expanding upward first, then alternate or choose based on range balance
   const direction = useMemo(() => {
     if (directionProp !== "auto") return directionProp;
-    
+
     // Simple heuristic: if range is centered or bottom-heavy, go up; if top-heavy, go down
     // Could later be more sophisticated based on instrument typical ranges
     const lowMidi = noteToMidi(userRangeLow);
     const highMidi = noteToMidi(userRangeHigh);
     const rangeMidpoint = (lowMidi + highMidi) / 2;
-    
+
     // For most instruments, middle C (60) is a reasonable reference
     // If user's range midpoint is above middle C, expand down; otherwise expand up
     return rangeMidpoint > 60 ? "down" : "up";
@@ -372,9 +374,17 @@ export default function RangeExpansionExercise({
   const anchorNote = direction === "up" ? userRangeHigh : userRangeLow;
   const anchorMidi = noteToMidi(anchorNote);
   const anchorFreq = noteToFrequency(anchorNote);
-  
-  console.log('[RangeExpansion] Props:', { userRangeLow, userRangeHigh, direction });
-  console.log('[RangeExpansion] Computed:', { anchorNote, anchorMidi, anchorFreq });
+
+  console.log("[RangeExpansion] Props:", {
+    userRangeLow,
+    userRangeHigh,
+    direction,
+  });
+  console.log("[RangeExpansion] Computed:", {
+    anchorNote,
+    anchorMidi,
+    anchorFreq,
+  });
 
   // Target note (the new note being added) - uses pattern's targetInterval
   // For "do di do" (interval 1): target = anchor + 1
@@ -390,16 +400,16 @@ export default function RangeExpansionExercise({
   const [playResult, setPlayResult] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showHeardItButton, setShowHeardItButton] = useState(false);
-  
+
   // Notation display state - on demand
   const [showNotation, setShowNotation] = useState(false);
-  const [notationMode, setNotationMode] = useState('starting'); // 'starting' or 'full'
-  
+  const [notationMode, setNotationMode] = useState("starting"); // 'starting' or 'full'
+
   // Hide notation when phase changes to avoid buggy re-rendering
   useEffect(() => {
     setShowNotation(false);
   }, [phase]);
-  
+
   // Focus card rotation - cycle through cards each round
   const focusCardIndex = successfulRounds % DAY0_FOCUS_CARDS.length;
   const currentFocusCard = DAY0_FOCUS_CARDS[focusCardIndex];
@@ -483,7 +493,7 @@ export default function RangeExpansionExercise({
   // Commit pending pitch when sound stops (fixes bug where last note never gets recorded)
   useEffect(() => {
     if (!isRecording) return;
-    
+
     // When sound stops, commit any pending pitch immediately
     if (!isSounding && pendingPitchRef.current) {
       const elapsed = Date.now() - pendingPitchRef.current.startTime;
@@ -629,29 +639,29 @@ export default function RangeExpansionExercise({
     // For singing, check that they hit each expected pitch in the right order
     // This is more forgiving - allows overtone blips or transition notes between targets
     // Uses pitch class matching to allow octave equivalence (tuba player can sing up an octave)
-    
+
     // Calculate expected pitch classes from pattern intervals (relative to anchor pitch class)
     const anchorPitchClass = anchorMidi % 12;
-    const expectedPitchClasses = pattern.intervals.map((interval) => 
-      (anchorPitchClass + interval + 120) % 12  // +120 to handle negative intervals
+    const expectedPitchClasses = pattern.intervals.map(
+      (interval) => (anchorPitchClass + interval + 120) % 12, // +120 to handle negative intervals
     );
-    
+
     console.log(
       `[RangeExpansion] Expected pitch classes: [${expectedPitchClasses.join(", ")}] (from anchor ${anchorNote})`,
     );
     console.log(
       `[RangeExpansion] Detected notes: [${notes.map((m) => `${midiToNote(m)}(${m % 12})`).join(", ")}]`,
     );
-    
+
     // Scan through detected notes to find each expected pitch class in order
     let searchFrom = 0;
     let allFound = true;
     const foundIndices = [];
-    
+
     for (let i = 0; i < expectedPitchClasses.length; i++) {
       const targetPC = expectedPitchClasses[i];
       let found = false;
-      
+
       // Look for this pitch class starting from where we left off
       for (let j = searchFrom; j < notes.length; j++) {
         const notePC = notes[j] % 12;
@@ -660,23 +670,23 @@ export default function RangeExpansionExercise({
           Math.abs(notePC - targetPC),
           12 - Math.abs(notePC - targetPC),
         );
-        
+
         if (pcDistance < CONTOUR_TOLERANCE_SEMITONES) {
           found = true;
           foundIndices.push(j);
-          searchFrom = j + 1;  // Next search starts after this note
+          searchFrom = j + 1; // Next search starts after this note
           console.log(
             `[RangeExpansion] Found expected pitch ${i + 1}/${expectedPitchClasses.length}: ` +
-            `${midiToNote(notes[j])} (PC ${notePC}) matches target PC ${targetPC}`,
+              `${midiToNote(notes[j])} (PC ${notePC}) matches target PC ${targetPC}`,
           );
           break;
         }
       }
-      
+
       if (!found) {
         console.log(
           `[RangeExpansion] Missing pitch ${i + 1}/${expectedPitchClasses.length}: ` +
-          `couldn't find pitch class ${targetPC} after index ${searchFrom}`,
+            `couldn't find pitch class ${targetPC} after index ${searchFrom}`,
         );
         allFound = false;
         break;
@@ -708,20 +718,29 @@ export default function RangeExpansionExercise({
   // For interval 0, use the anchor note directly to ensure consistency
   const patternNotes = useMemo(() => {
     if (!pattern?.intervals) return [];
-    console.log('[PatternNotes] anchorNote:', anchorNote, 'anchorMidi:', anchorMidi);
-    console.log('[PatternNotes] intervals:', pattern.intervals);
+    console.log(
+      "[PatternNotes] anchorNote:",
+      anchorNote,
+      "anchorMidi:",
+      anchorMidi,
+    );
+    console.log("[PatternNotes] intervals:", pattern.intervals);
     const notes = pattern.intervals.map((interval, idx) => {
       if (interval === 0) {
         // Return anchor note directly for "home" positions
-        console.log(`[PatternNotes] idx ${idx}: interval=0, returning anchorNote=${anchorNote}`);
+        console.log(
+          `[PatternNotes] idx ${idx}: interval=0, returning anchorNote=${anchorNote}`,
+        );
         return anchorNote;
       }
       const midi = anchorMidi + interval;
       const note = midiToNoteInContext(midi, anchorNote);
-      console.log(`[PatternNotes] idx ${idx}: interval=${interval}, midi=${midi}, note=${note}`);
+      console.log(
+        `[PatternNotes] idx ${idx}: interval=${interval}, midi=${midi}, note=${note}`,
+      );
       return note;
     });
-    console.log('[PatternNotes] result:', notes);
+    console.log("[PatternNotes] result:", notes);
     return notes;
   }, [pattern?.intervals, anchorMidi, anchorNote]);
 
@@ -887,11 +906,14 @@ export default function RangeExpansionExercise({
 
   // Staff display component - shows based on notationMode
   const StaffDisplay = ({ compact = false }) => {
-    const musicXML = notationMode === 'full' ? patternMusicXML : anchorMusicXML;
-    const width = notationMode === 'full' ? (compact ? 300 : 350) : (compact ? 200 : 280);
-    
+    const musicXML = notationMode === "full" ? patternMusicXML : anchorMusicXML;
+    const width =
+      notationMode === "full" ? (compact ? 300 : 350) : compact ? 200 : 280;
+
     return (
-      <View style={[styles.staffContainer, compact && styles.staffContainerCompact]}>
+      <View
+        style={[styles.staffContainer, compact && styles.staffContainerCompact]}
+      >
         {NotationDisplay && musicXML ? (
           <NotationDisplay
             musicxml={musicXML}
@@ -902,10 +924,10 @@ export default function RangeExpansionExercise({
         ) : (
           <View style={styles.staffPlaceholder}>
             <Text style={styles.staffNoteText}>
-              {notationMode === 'full' ? patternNotes.join(' → ') : anchorNote}
+              {notationMode === "full" ? patternNotes.join(" → ") : anchorNote}
             </Text>
             <Text style={styles.staffLabel}>
-              {notationMode === 'full' ? 'Full pattern' : 'Starting note'}
+              {notationMode === "full" ? "Full pattern" : "Starting note"}
             </Text>
           </View>
         )}
@@ -929,28 +951,32 @@ export default function RangeExpansionExercise({
             <TouchableOpacity
               style={[
                 styles.notationModeButton,
-                notationMode === 'starting' && styles.notationModeButtonActive,
+                notationMode === "starting" && styles.notationModeButtonActive,
               ]}
-              onPress={() => setNotationMode('starting')}
+              onPress={() => setNotationMode("starting")}
             >
-              <Text style={[
-                styles.notationModeText,
-                notationMode === 'starting' && styles.notationModeTextActive,
-              ]}>
+              <Text
+                style={[
+                  styles.notationModeText,
+                  notationMode === "starting" && styles.notationModeTextActive,
+                ]}
+              >
                 Starting Note
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
                 styles.notationModeButton,
-                notationMode === 'full' && styles.notationModeButtonActive,
+                notationMode === "full" && styles.notationModeButtonActive,
               ]}
-              onPress={() => setNotationMode('full')}
+              onPress={() => setNotationMode("full")}
             >
-              <Text style={[
-                styles.notationModeText,
-                notationMode === 'full' && styles.notationModeTextActive,
-              ]}>
+              <Text
+                style={[
+                  styles.notationModeText,
+                  notationMode === "full" && styles.notationModeTextActive,
+                ]}
+              >
                 Full Pattern
               </Text>
             </TouchableOpacity>
@@ -971,7 +997,9 @@ export default function RangeExpansionExercise({
   const FocusCardDisplay = () => (
     <View style={styles.focusCard}>
       <Text style={styles.focusCardTitle}>{currentFocusCard.name}</Text>
-      <Text style={styles.focusCardDescription}>{currentFocusCard.description}</Text>
+      <Text style={styles.focusCardDescription}>
+        {currentFocusCard.description}
+      </Text>
       <Text style={styles.focusCardCue}>{currentFocusCard.cue}</Text>
     </View>
   );
@@ -996,17 +1024,18 @@ export default function RangeExpansionExercise({
   if (phase === PHASE.LISTEN) {
     return (
       <View style={styles.container}>
-        <ScrollView 
+        <ScrollView
           style={styles.scrollContainer}
           contentContainerStyle={styles.scrollContent}
         >
           <ProgressDots />
-          
+
           <Text style={styles.stageTitle}>Expand Your Range</Text>
-          
+
           <Text style={styles.noteDisplay}>{targetNote}</Text>
           <Text style={styles.subtitle}>
-            {direction === "up" ? "Reaching higher" : "Reaching lower"} from {anchorNote}
+            {direction === "up" ? "Reaching higher" : "Reaching lower"} from{" "}
+            {anchorNote}
           </Text>
 
           <FocusCardDisplay />
@@ -1019,7 +1048,7 @@ export default function RangeExpansionExercise({
           <Text style={styles.instruction}>
             Tap "Hear Pattern" to listen, then confirm when you've got it.
           </Text>
-          
+
           <NotationToggle />
         </ScrollView>
 
@@ -1028,7 +1057,10 @@ export default function RangeExpansionExercise({
             // After hearing once - Hear Again on top, I Heard It at bottom (closest to thumbs)
             <>
               <TouchableOpacity
-                style={[styles.secondaryButton, isPlaying && styles.buttonDisabled]}
+                style={[
+                  styles.secondaryButton,
+                  isPlaying && styles.buttonDisabled,
+                ]}
                 onPress={handlePlayModel}
                 disabled={isPlaying}
               >
@@ -1064,14 +1096,14 @@ export default function RangeExpansionExercise({
   if (phase === PHASE.SING) {
     return (
       <View style={styles.container}>
-        <ScrollView 
+        <ScrollView
           style={styles.scrollContainer}
           contentContainerStyle={styles.scrollContent}
         >
           <ProgressDots />
-          
+
           <Text style={styles.stageTitle}>Sing</Text>
-          
+
           <FocusCardDisplay />
 
           <Text style={styles.instruction}>
@@ -1080,13 +1112,15 @@ export default function RangeExpansionExercise({
 
           {!singResult && (
             <>
-              <EDMVisualizer 
-                volume={volume} 
+              <EDMVisualizer
+                volume={volume}
                 pitchAccuracy={isSounding ? "listening" : null}
               />
 
               {detectedNoteName && (
-                <Text style={styles.hearingText}>Hearing: {detectedNoteName}</Text>
+                <Text style={styles.hearingText}>
+                  Hearing: {detectedNoteName}
+                </Text>
               )}
             </>
           )}
@@ -1094,7 +1128,11 @@ export default function RangeExpansionExercise({
           <Text style={styles.patternSolfegeLarge}>{pattern.solfege}</Text>
 
           {singResult && (
-            <Text style={singResult.success ? styles.successText : styles.feedbackError}>
+            <Text
+              style={
+                singResult.success ? styles.successText : styles.feedbackError
+              }
+            >
               {singResult.success ? "✓ Great!" : singResult.message}
             </Text>
           )}
@@ -1102,7 +1140,7 @@ export default function RangeExpansionExercise({
           <Text style={styles.hint}>
             Sing each syllable clearly: {pattern.solfege}
           </Text>
-          
+
           <NotationToggle />
         </ScrollView>
 
@@ -1120,7 +1158,9 @@ export default function RangeExpansionExercise({
                 style={[styles.secondaryButton, { marginTop: 8 }]}
                 onPress={handleDoneSinging}
               >
-                <Text style={styles.secondaryButtonText}>Continue Anyway →</Text>
+                <Text style={styles.secondaryButtonText}>
+                  Continue Anyway →
+                </Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -1142,14 +1182,14 @@ export default function RangeExpansionExercise({
   if (phase === PHASE.IMAGINE) {
     return (
       <View style={styles.container}>
-        <ScrollView 
+        <ScrollView
           style={styles.scrollContainer}
           contentContainerStyle={styles.scrollContent}
         >
           <ProgressDots />
-          
+
           <Text style={styles.stageTitle}>Imagine</Text>
-          
+
           <FocusCardDisplay />
 
           <Text style={styles.instruction}>
@@ -1168,14 +1208,17 @@ export default function RangeExpansionExercise({
           <Text style={styles.hint}>
             Take a few seconds to really hear it internally...
           </Text>
-          
+
           <NotationToggle />
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>
           <View style={styles.buttonRow}>
             <TouchableOpacity
-              style={[styles.secondaryButton, isPlaying && styles.buttonDisabled]}
+              style={[
+                styles.secondaryButton,
+                isPlaying && styles.buttonDisabled,
+              ]}
               onPress={handlePlayModel}
               disabled={isPlaying}
             >
@@ -1211,14 +1254,14 @@ export default function RangeExpansionExercise({
   if (phase === PHASE.PLAY) {
     return (
       <View style={styles.container}>
-        <ScrollView 
+        <ScrollView
           style={styles.scrollContainer}
           contentContainerStyle={styles.scrollContent}
         >
           <ProgressDots />
-          
+
           <Text style={styles.stageTitle}>Play</Text>
-          
+
           <FocusCardDisplay />
 
           <Text style={styles.instruction}>
@@ -1227,13 +1270,15 @@ export default function RangeExpansionExercise({
 
           {!playResult && (
             <>
-              <EDMVisualizer 
-                volume={volume} 
+              <EDMVisualizer
+                volume={volume}
                 pitchAccuracy={isSounding ? "listening" : null}
               />
 
               {detectedNoteName && (
-                <Text style={styles.hearingText}>Hearing: {detectedNoteName}</Text>
+                <Text style={styles.hearingText}>
+                  Hearing: {detectedNoteName}
+                </Text>
               )}
             </>
           )}
@@ -1241,7 +1286,11 @@ export default function RangeExpansionExercise({
           <Text style={styles.patternSolfegeLarge}>{pattern.solfege}</Text>
 
           {playResult && (
-            <Text style={playResult.success ? styles.successText : styles.feedbackError}>
+            <Text
+              style={
+                playResult.success ? styles.successText : styles.feedbackError
+              }
+            >
               {playResult.success ? "✓ Great!" : playResult.message}
             </Text>
           )}
@@ -1249,7 +1298,7 @@ export default function RangeExpansionExercise({
           <Text style={styles.hint}>
             Play each note of the pattern with focus and intention.
           </Text>
-          
+
           <NotationToggle />
         </ScrollView>
 
@@ -1267,14 +1316,19 @@ export default function RangeExpansionExercise({
                 style={[styles.secondaryButton, { marginTop: 8 }]}
                 onPress={handleDonePlaying}
               >
-                <Text style={styles.secondaryButtonText}>Continue Anyway →</Text>
+                <Text style={styles.secondaryButtonText}>
+                  Continue Anyway →
+                </Text>
               </TouchableOpacity>
             </>
           ) : playResult?.success ? (
             // Success - Hear Again on top, Continue below (closest to thumb)
             <>
               <TouchableOpacity
-                style={[styles.secondaryButton, isPlaying && styles.buttonDisabled]}
+                style={[
+                  styles.secondaryButton,
+                  isPlaying && styles.buttonDisabled,
+                ]}
                 onPress={handlePlayModel}
                 disabled={isPlaying}
               >
@@ -1310,7 +1364,7 @@ export default function RangeExpansionExercise({
     if (showSuccess) {
       return (
         <View style={styles.container}>
-          <ScrollView 
+          <ScrollView
             style={styles.scrollContainer}
             contentContainerStyle={styles.scrollContent}
           >
@@ -1326,12 +1380,12 @@ export default function RangeExpansionExercise({
 
     return (
       <View style={styles.container}>
-        <ScrollView 
+        <ScrollView
           style={styles.scrollContainer}
           contentContainerStyle={styles.scrollContent}
         >
           <ProgressDots />
-          
+
           <Text style={styles.stageTitle}>
             {overallSuccess ? "Well Done!" : "Try Again"}
           </Text>
@@ -1339,22 +1393,31 @@ export default function RangeExpansionExercise({
           <View style={styles.resultSummary}>
             <View style={styles.resultRow}>
               <Text style={styles.resultLabel}>🎤 Sing</Text>
-              <Text style={singResult?.success ? styles.resultSuccess : styles.resultFail}>
+              <Text
+                style={
+                  singResult?.success ? styles.resultSuccess : styles.resultFail
+                }
+              >
                 {singResult?.success ? "✓" : "✗"}
               </Text>
             </View>
             <View style={styles.resultRow}>
               <Text style={styles.resultLabel}>🎺 Play</Text>
-              <Text style={playResult?.success ? styles.resultSuccess : styles.resultFail}>
+              <Text
+                style={
+                  playResult?.success ? styles.resultSuccess : styles.resultFail
+                }
+              >
                 {playResult?.success ? "✓" : "✗"}
               </Text>
             </View>
           </View>
 
           <Text style={styles.progressText}>
-            Round {successfulRounds + (overallSuccess ? 1 : 0)} of {masteryThreshold}
+            Round {successfulRounds + (overallSuccess ? 1 : 0)} of{" "}
+            {masteryThreshold}
           </Text>
-          
+
           <NotationToggle />
         </ScrollView>
 

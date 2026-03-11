@@ -138,7 +138,10 @@ export default function CapabilityEditModal({
           detectionRule && detectionRule.type ? detectionRule : null,
       };
 
-      console.log("[CapabilityEditModal] Saving:", JSON.stringify(requestBody, null, 2));
+      console.log(
+        "[CapabilityEditModal] Saving:",
+        JSON.stringify(requestBody, null, 2),
+      );
 
       const response = await fetch(
         `${baseUrl}/admin/capabilities/${capability.id}`,

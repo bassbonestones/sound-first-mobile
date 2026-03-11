@@ -124,11 +124,16 @@ const QUIZ_QUESTIONS = [
 // ============================================================
 
 // Generate MusicXML for a time signature with a whole note on a staff
-function generateTimeSignatureMusicXML(numerator, denominator, clef = "treble") {
+function generateTimeSignatureMusicXML(
+  numerator,
+  denominator,
+  clef = "treble",
+) {
   const clefSign = clef === "bass" ? "F" : "G";
   const clefLine = clef === "bass" ? "4" : "2";
   // Use a note that looks good on the staff (middle of the staff)
-  const pitch = clef === "bass" ? { step: "D", octave: 3 } : { step: "B", octave: 4 };
+  const pitch =
+    clef === "bass" ? { step: "D", octave: 3 } : { step: "B", octave: 4 };
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
@@ -273,7 +278,9 @@ export default function TimeSignatureBasicsExercise({
   clef = "treble",
 }) {
   const [phase, setPhase] = useState(PHASES.INTRO_1);
-  const [quizQuestions, setQuizQuestions] = useState(() => selectQuizQuestions());
+  const [quizQuestions, setQuizQuestions] = useState(() =>
+    selectQuizQuestions(),
+  );
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [correctCount, setCorrectCount] = useState(0);
@@ -286,18 +293,22 @@ export default function TimeSignatureBasicsExercise({
   // Generate MusicXML for current question
   const questionMusicXML = useMemo(() => {
     if (phase !== PHASES.QUIZ || !question) return null;
-    return generateTimeSignatureMusicXML(question.numerator, question.denominator, clef);
+    return generateTimeSignatureMusicXML(
+      question.numerator,
+      question.denominator,
+      clef,
+    );
   }, [phase, question, clef]);
 
   // Example MusicXML for intro
   const exampleMusicXML = useMemo(
     () => generateTimeSignatureMusicXML(4, 4, clef),
-    [clef]
+    [clef],
   );
 
   const measureExampleMusicXML = useMemo(
     () => generateMeasureExampleMusicXML(clef),
-    [clef]
+    [clef],
   );
 
   // Handle answer selection
@@ -338,7 +349,7 @@ export default function TimeSignatureBasicsExercise({
         }
       }, 1500);
     },
-    [showFeedback, question, currentQuestion, correctCount, onProgress]
+    [showFeedback, question, currentQuestion, correctCount, onProgress],
   );
 
   // Handle restart
@@ -392,10 +403,12 @@ export default function TimeSignatureBasicsExercise({
 
             <View style={styles.bulletList}>
               <Text style={styles.bulletItem}>
-                <Text style={styles.bulletLabel}>TOP NUMBER:</Text> How many beats in each measure
+                <Text style={styles.bulletLabel}>TOP NUMBER:</Text> How many
+                beats in each measure
               </Text>
               <Text style={styles.bulletItem}>
-                <Text style={styles.bulletLabel}>BOTTOM NUMBER:</Text> What kind of note equals one beat
+                <Text style={styles.bulletLabel}>BOTTOM NUMBER:</Text> What kind
+                of note equals one beat
               </Text>
             </View>
           </View>
@@ -514,9 +527,13 @@ export default function TimeSignatureBasicsExercise({
             <Text style={styles.introSubtitle}>The Bottom Number</Text>
 
             <View style={styles.timeSignatureDisplay}>
-              <Text style={[styles.timeSignatureTop, styles.fadedNumber]}>4</Text>
+              <Text style={[styles.timeSignatureTop, styles.fadedNumber]}>
+                4
+              </Text>
               <View style={styles.timeSignatureLine} />
-              <Text style={[styles.timeSignatureBottom, styles.highlightedNumber]}>
+              <Text
+                style={[styles.timeSignatureBottom, styles.highlightedNumber]}
+              >
                 4
               </Text>
             </View>
@@ -584,7 +601,8 @@ export default function TimeSignatureBasicsExercise({
     const MEASURE_WIDTH = 130;
     // Calculate measure center positions
     const measure1Center = CLEF_TIME_SIG_WIDTH + MEASURE_WIDTH / 2;
-    const measure2Center = CLEF_TIME_SIG_WIDTH + MEASURE_WIDTH + MEASURE_WIDTH / 2;
+    const measure2Center =
+      CLEF_TIME_SIG_WIDTH + MEASURE_WIDTH + MEASURE_WIDTH / 2;
 
     return (
       <View style={styles.container}>
@@ -602,8 +620,8 @@ export default function TimeSignatureBasicsExercise({
             </Text>
 
             <Text style={styles.introText}>
-              Each measure contains exactly the number of beats shown in the time
-              signature.
+              Each measure contains exactly the number of beats shown in the
+              time signature.
             </Text>
           </View>
 
@@ -620,11 +638,33 @@ export default function TimeSignatureBasicsExercise({
           )}
 
           {/* Aligned measure labels */}
-          <View style={[styles.measureLabelsAligned, { width: NOTATION_WIDTH }]}>
-            <Text style={[styles.measureLabel, { position: "absolute", left: measure1Center - 40, width: 80, textAlign: "center" }]}>
+          <View
+            style={[styles.measureLabelsAligned, { width: NOTATION_WIDTH }]}
+          >
+            <Text
+              style={[
+                styles.measureLabel,
+                {
+                  position: "absolute",
+                  left: measure1Center - 40,
+                  width: 80,
+                  textAlign: "center",
+                },
+              ]}
+            >
               ↑ Measure 1
             </Text>
-            <Text style={[styles.measureLabel, { position: "absolute", left: measure2Center - 40, width: 80, textAlign: "center" }]}>
+            <Text
+              style={[
+                styles.measureLabel,
+                {
+                  position: "absolute",
+                  left: measure2Center - 40,
+                  width: 80,
+                  textAlign: "center",
+                },
+              ]}
+            >
               ↑ Measure 2
             </Text>
           </View>
@@ -749,8 +789,14 @@ export default function TimeSignatureBasicsExercise({
 
           {/* Feedback */}
           {showFeedback && (
-            <Text style={isCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect}>
-              {isCorrect ? "✓ Correct!" : `✗ The answer is ${question.correctAnswer}`}
+            <Text
+              style={
+                isCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect
+              }
+            >
+              {isCorrect
+                ? "✓ Correct!"
+                : `✗ The answer is ${question.correctAnswer}`}
             </Text>
           )}
         </ScrollView>

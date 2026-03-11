@@ -110,11 +110,12 @@ export default function NotationDisplay({
         osmdRef.current.EngravingRules.PageBottomMargin = 0;
         osmdRef.current.EngravingRules.SheetMinimumDistanceBetweenSystems = 0;
         osmdRef.current.EngravingRules.MinimumDistanceBetweenSystems = 0;
-        
+
         // Set fixed measure width if specified
         if (fixedMeasureWidthPixels) {
           osmdRef.current.EngravingRules.FixedMeasureWidth = true;
-          osmdRef.current.EngravingRules.FixedMeasureWidthFixedValue = fixedMeasureWidthPixels / 10;
+          osmdRef.current.EngravingRules.FixedMeasureWidthFixedValue =
+            fixedMeasureWidthPixels / 10;
         }
 
         // Load and render with fixed width
@@ -241,10 +242,14 @@ export default function NotationDisplay({
         osmd.EngravingRules.PageRightMargin = 0;
         osmd.EngravingRules.PageTopMargin = 0;
         osmd.EngravingRules.PageBottomMargin = 0;
-        ${fixedMeasureWidthPixels ? `
+        ${
+          fixedMeasureWidthPixels
+            ? `
         osmd.EngravingRules.FixedMeasureWidth = true;
         osmd.EngravingRules.FixedMeasureWidthFixedValue = ${fixedMeasureWidthPixels / 10};
-        ` : ''}
+        `
+            : ""
+        }
         const musicxml = \`${escapedXml}\`;
         await osmd.load(musicxml);
         osmd.zoom = ${zoom};
@@ -259,7 +264,14 @@ export default function NotationDisplay({
   </script>
 </body>
 </html>`;
-  }, [musicxml, width, showTitle, showTimeSignature, fixedMeasureWidthPixels, zoom]);
+  }, [
+    musicxml,
+    width,
+    showTitle,
+    showTimeSignature,
+    fixedMeasureWidthPixels,
+    zoom,
+  ]);
 
   // Mobile: use WebView
   if (Platform.OS !== "web") {

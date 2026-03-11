@@ -116,7 +116,8 @@ function generateHalfNoteMusicXML(noteName, clef = "treble") {
   const clefSign = clef === "bass" ? "F" : "G";
   const clefLine = clef === "bass" ? "4" : "2";
   const alterXML = alter !== 0 ? `        <alter>${alter}</alter>\n` : "";
-  const accidentalXML = alter !== 0 ? `        <accidental>${accidentalName}</accidental>\n` : "";
+  const accidentalXML =
+    alter !== 0 ? `        <accidental>${accidentalName}</accidental>\n` : "";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
@@ -184,7 +185,7 @@ function createClickSound(audioContext, isAccent = false) {
   gainNode.gain.setValueAtTime(isAccent ? 0.8 : 0.5, audioContext.currentTime);
   gainNode.gain.exponentialRampToValueAtTime(
     0.001,
-    audioContext.currentTime + duration
+    audioContext.currentTime + duration,
   );
 
   source.connect(filter);
@@ -249,41 +250,39 @@ export default function HalfNoteLessonExercise({
 
   const targetFrequency = useMemo(
     () => noteToFrequency(userFirstNote),
-    [userFirstNote]
+    [userFirstNote],
   );
 
   // Generate MusicXML
   const musicXML = useMemo(
     () => generateHalfNoteMusicXML(userFirstNote, clef),
-    [userFirstNote, clef]
+    [userFirstNote, clef],
   );
 
   // Pitch detection
-  const {
-    currentPitch,
-    volume,
-    isSounding,
-  } = usePitchDetection({
-    enabled: (phase === PHASE.SING && !singResult) || 
-             (phase === PHASE.PLAY && !playResult),
+  const { currentPitch, volume, isSounding } = usePitchDetection({
+    enabled:
+      (phase === PHASE.SING && !singResult) ||
+      (phase === PHASE.PLAY && !playResult),
     ...PITCH_DETECTION_OPTIONS,
   });
 
   // Track pitch accuracy
   const targetMidi = useMemo(() => noteToMidi(userFirstNote), [userFirstNote]);
-  
+
   useEffect(() => {
     if (!isSounding || !currentPitch?.noteName) return;
-    
+
     const detectedMidi = noteToMidi(currentPitch.noteName);
     if (detectedMidi === null) return;
-    
+
     const pitchDiff = Math.abs(detectedMidi - targetMidi);
-    
-    const isOnPitch = phase === PHASE.SING 
-      ? (pitchDiff % 12) <= 1 || (pitchDiff % 12) >= 11
-      : pitchDiff <= 1;
-    
+
+    const isOnPitch =
+      phase === PHASE.SING
+        ? pitchDiff % 12 <= 1 || pitchDiff % 12 >= 11
+        : pitchDiff <= 1;
+
     totalSoundingCountRef.current += 1;
     if (isOnPitch) {
       hasHitTargetPitchRef.current = true;
@@ -328,7 +327,9 @@ export default function HalfNoteLessonExercise({
         clearInterval(samplingIntervalRef.current);
       }
       if (oscillatorRef.current) {
-        try { oscillatorRef.current.stop(); } catch (e) {}
+        try {
+          oscillatorRef.current.stop();
+        } catch (e) {}
       }
       if (audioContextRef.current) {
         audioContextRef.current.close();
@@ -341,91 +342,95 @@ export default function HalfNoteLessonExercise({
   }, [phase]);
 
   // Play a half note with metronome clicks
-  const playHalfNote = useCallback((onComplete) => {
-    const ctx = audioContextRef.current;
-    if (!ctx || isPlaying) return;
-    
-    onCompleteRef.current = typeof onComplete === 'function' ? onComplete : null;
+  const playHalfNote = useCallback(
+    (onComplete) => {
+      const ctx = audioContextRef.current;
+      if (!ctx || isPlaying) return;
 
-    setIsPlaying(true);
-    setCurrentBeat(-4);
+      onCompleteRef.current =
+        typeof onComplete === "function" ? onComplete : null;
 
-    const beatMs = (60 / bpm) * 1000;
-    let beat = -4;
+      setIsPlaying(true);
+      setCurrentBeat(-4);
 
-    const playNote = () => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      
-      const now = ctx.currentTime;
-      const duration = (beatMs * 2) / 1000; // 2 beats
-      
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(targetFrequency, now);
-      
-      gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.5, now + 0.02);
-      gain.gain.setValueAtTime(0.4, now + duration - 0.1);
-      gain.gain.linearRampToValueAtTime(0, now + duration);
-      
-      const osc2 = ctx.createOscillator();
-      osc2.frequency.setValueAtTime(targetFrequency * 2, now);
-      const gain2 = ctx.createGain();
-      gain2.gain.setValueAtTime(0.15, now);
-      gain2.gain.linearRampToValueAtTime(0, now + duration);
-      
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      
-      osc.start(now);
-      osc.stop(now + duration + 0.05);
-      osc2.start(now);
-      osc2.stop(now + duration + 0.05);
-      
-      oscillatorRef.current = osc;
-      oscillator2Ref.current = osc2;
-      gainNodeRef.current = gain;
-    };
+      const beatMs = (60 / bpm) * 1000;
+      let beat = -4;
 
-    createClickSound(ctx, true);
+      const playNote = () => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
 
-    beatIntervalRef.current = setInterval(() => {
-      if (unmountedRef.current) {
-        clearInterval(beatIntervalRef.current);
-        return;
-      }
+        const now = ctx.currentTime;
+        const duration = (beatMs * 2) / 1000; // 2 beats
 
-      beat++;
-      if (beat === 0) beat = 1;
-      
-      if (beat >= -3 && beat <= -1) {
-        createClickSound(ctx, false);
-        setCurrentBeat(beat);
-      } else if (beat === 1) {
-        createClickSound(ctx, true);
-        playNote();
-        setCurrentBeat(1);
-      } else if (beat === 2) {
-        createClickSound(ctx, false);
-        setCurrentBeat(beat);
-      } else if (beat === 3) {
-        // The next ONE - note ends here
-        createClickSound(ctx, true);
-        setCurrentBeat(3);
-      } else {
-        clearInterval(beatIntervalRef.current);
-        beatIntervalRef.current = null;
-        setIsPlaying(false);
-        setCurrentBeat(0);
-        if (onCompleteRef.current) {
-          onCompleteRef.current();
-          onCompleteRef.current = null;
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(targetFrequency, now);
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.5, now + 0.02);
+        gain.gain.setValueAtTime(0.4, now + duration - 0.1);
+        gain.gain.linearRampToValueAtTime(0, now + duration);
+
+        const osc2 = ctx.createOscillator();
+        osc2.frequency.setValueAtTime(targetFrequency * 2, now);
+        const gain2 = ctx.createGain();
+        gain2.gain.setValueAtTime(0.15, now);
+        gain2.gain.linearRampToValueAtTime(0, now + duration);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + duration + 0.05);
+        osc2.start(now);
+        osc2.stop(now + duration + 0.05);
+
+        oscillatorRef.current = osc;
+        oscillator2Ref.current = osc2;
+        gainNodeRef.current = gain;
+      };
+
+      createClickSound(ctx, true);
+
+      beatIntervalRef.current = setInterval(() => {
+        if (unmountedRef.current) {
+          clearInterval(beatIntervalRef.current);
+          return;
         }
-      }
-    }, beatMs);
-  }, [bpm, targetFrequency, isPlaying]);
+
+        beat++;
+        if (beat === 0) beat = 1;
+
+        if (beat >= -3 && beat <= -1) {
+          createClickSound(ctx, false);
+          setCurrentBeat(beat);
+        } else if (beat === 1) {
+          createClickSound(ctx, true);
+          playNote();
+          setCurrentBeat(1);
+        } else if (beat === 2) {
+          createClickSound(ctx, false);
+          setCurrentBeat(beat);
+        } else if (beat === 3) {
+          // The next ONE - note ends here
+          createClickSound(ctx, true);
+          setCurrentBeat(3);
+        } else {
+          clearInterval(beatIntervalRef.current);
+          beatIntervalRef.current = null;
+          setIsPlaying(false);
+          setCurrentBeat(0);
+          if (onCompleteRef.current) {
+            onCompleteRef.current();
+            onCompleteRef.current = null;
+          }
+        }
+      }, beatMs);
+    },
+    [bpm, targetFrequency, isPlaying],
+  );
 
   // Stop playback
   const stopPlayback = useCallback(() => {
@@ -438,140 +443,179 @@ export default function HalfNoteLessonExercise({
       samplingIntervalRef.current = null;
     }
     if (oscillatorRef.current) {
-      try { oscillatorRef.current.stop(); } catch (e) {}
+      try {
+        oscillatorRef.current.stop();
+      } catch (e) {}
     }
     if (oscillator2Ref.current) {
-      try { oscillator2Ref.current.stop(); } catch (e) {}
+      try {
+        oscillator2Ref.current.stop();
+      } catch (e) {}
     }
     setIsPlaying(false);
     setCurrentBeat(0);
   }, []);
 
   // Play just metronome clicks for sing/play phases
-  const playMetronomeOnly = useCallback((onComplete) => {
-    const ctx = audioContextRef.current;
-    if (!ctx || isPlaying) return;
-    
-    onCompleteRef.current = typeof onComplete === 'function' ? onComplete : null;
+  const playMetronomeOnly = useCallback(
+    (onComplete) => {
+      const ctx = audioContextRef.current;
+      if (!ctx || isPlaying) return;
 
-    setIsPlaying(true);
-    setCurrentBeat(-4);
-    soundingOnBeatsRef.current = [0, 0, 0];
-    startedEarlyRef.current = false;
-    setSoundingOnBeats([false, false, false]);
+      onCompleteRef.current =
+        typeof onComplete === "function" ? onComplete : null;
 
-    const beatMs = (60 / bpm) * 1000;
-    let beat = -4;
-    
-    let beatSoundingSamples = { beat: 0, samples: 0, soundingCount: 0 };
-    let earlySoundingSamples = 0;
-    let samplesBeforeChecking = 3;
-    
-    const samplingInterval = setInterval(() => {
-      if (samplesBeforeChecking > 0) {
-        samplesBeforeChecking--;
-        return;
-      }
-      
-      if (beat >= -4 && beat <= -1) {
-        if (isSoundingRef.current) {
-          earlySoundingSamples++;
-          if (earlySoundingSamples >= 3) {
-            startedEarlyRef.current = true;
+      setIsPlaying(true);
+      setCurrentBeat(-4);
+      soundingOnBeatsRef.current = [0, 0, 0];
+      startedEarlyRef.current = false;
+      setSoundingOnBeats([false, false, false]);
+
+      const beatMs = (60 / bpm) * 1000;
+      let beat = -4;
+
+      let beatSoundingSamples = { beat: 0, samples: 0, soundingCount: 0 };
+      let earlySoundingSamples = 0;
+      let samplesBeforeChecking = 3;
+
+      const samplingInterval = setInterval(() => {
+        if (samplesBeforeChecking > 0) {
+          samplesBeforeChecking--;
+          return;
+        }
+
+        if (beat >= -4 && beat <= -1) {
+          if (isSoundingRef.current) {
+            earlySoundingSamples++;
+            if (earlySoundingSamples >= 3) {
+              startedEarlyRef.current = true;
+            }
+          } else {
+            earlySoundingSamples = 0;
           }
+        }
+        if (beat >= 1 && beat <= 3) {
+          if (beatSoundingSamples.beat !== beat) {
+            if (
+              beatSoundingSamples.beat >= 1 &&
+              beatSoundingSamples.samples > 0
+            ) {
+              const percentage =
+                beatSoundingSamples.soundingCount / beatSoundingSamples.samples;
+              const idx = beatSoundingSamples.beat - 1;
+              soundingOnBeatsRef.current[idx] = Math.max(
+                soundingOnBeatsRef.current[idx],
+                percentage,
+              );
+            }
+            beatSoundingSamples = { beat, samples: 0, soundingCount: 0 };
+          }
+          beatSoundingSamples.samples++;
+          if (isSoundingRef.current) {
+            beatSoundingSamples.soundingCount++;
+          }
+        }
+      }, 50);
+      samplingIntervalRef.current = samplingInterval;
+
+      createClickSound(ctx, true);
+
+      beatIntervalRef.current = setInterval(() => {
+        if (unmountedRef.current) {
+          clearInterval(beatIntervalRef.current);
+          clearInterval(samplingInterval);
+          return;
+        }
+
+        beat++;
+        if (beat === 0) beat = 1;
+
+        if (beat >= -3 && beat <= -1) {
+          createClickSound(ctx, false);
+          setCurrentBeat(beat);
+        } else if (beat === 1) {
+          createClickSound(ctx, true);
+          setCurrentBeat(1);
+        } else if (beat === 2) {
+          createClickSound(ctx, false);
+          setCurrentBeat(beat);
+        } else if (beat === 3) {
+          createClickSound(ctx, true);
+          setCurrentBeat(3);
         } else {
-          earlySoundingSamples = 0;
-        }
-      }
-      if (beat >= 1 && beat <= 3) {
-        if (beatSoundingSamples.beat !== beat) {
-          if (beatSoundingSamples.beat >= 1 && beatSoundingSamples.samples > 0) {
-            const percentage = beatSoundingSamples.soundingCount / beatSoundingSamples.samples;
+          if (
+            beatSoundingSamples.beat >= 1 &&
+            beatSoundingSamples.samples > 0
+          ) {
+            const percentage =
+              beatSoundingSamples.soundingCount / beatSoundingSamples.samples;
             const idx = beatSoundingSamples.beat - 1;
-            soundingOnBeatsRef.current[idx] = Math.max(soundingOnBeatsRef.current[idx], percentage);
+            soundingOnBeatsRef.current[idx] = Math.max(
+              soundingOnBeatsRef.current[idx],
+              percentage,
+            );
           }
-          beatSoundingSamples = { beat, samples: 0, soundingCount: 0 };
+          clearInterval(beatIntervalRef.current);
+          clearInterval(samplingInterval);
+          beatIntervalRef.current = null;
+          samplingIntervalRef.current = null;
+          setIsPlaying(false);
+          setCurrentBeat(0);
+          setSoundingOnBeats([...soundingOnBeatsRef.current]);
+          if (onCompleteRef.current) {
+            onCompleteRef.current();
+            onCompleteRef.current = null;
+          }
         }
-        beatSoundingSamples.samples++;
-        if (isSoundingRef.current) {
-          beatSoundingSamples.soundingCount++;
-        }
-      }
-    }, 50);
-    samplingIntervalRef.current = samplingInterval;
-
-    createClickSound(ctx, true);
-
-    beatIntervalRef.current = setInterval(() => {
-      if (unmountedRef.current) {
-        clearInterval(beatIntervalRef.current);
-        clearInterval(samplingInterval);
-        return;
-      }
-
-      beat++;
-      if (beat === 0) beat = 1;
-      
-      if (beat >= -3 && beat <= -1) {
-        createClickSound(ctx, false);
-        setCurrentBeat(beat);
-      } else if (beat === 1) {
-        createClickSound(ctx, true);
-        setCurrentBeat(1);
-      } else if (beat === 2) {
-        createClickSound(ctx, false);
-        setCurrentBeat(beat);
-      } else if (beat === 3) {
-        createClickSound(ctx, true);
-        setCurrentBeat(3);
-      } else {
-        if (beatSoundingSamples.beat >= 1 && beatSoundingSamples.samples > 0) {
-          const percentage = beatSoundingSamples.soundingCount / beatSoundingSamples.samples;
-          const idx = beatSoundingSamples.beat - 1;
-          soundingOnBeatsRef.current[idx] = Math.max(soundingOnBeatsRef.current[idx], percentage);
-        }
-        clearInterval(beatIntervalRef.current);
-        clearInterval(samplingInterval);
-        beatIntervalRef.current = null;
-        samplingIntervalRef.current = null;
-        setIsPlaying(false);
-        setCurrentBeat(0);
-        setSoundingOnBeats([...soundingOnBeatsRef.current]);
-        if (onCompleteRef.current) {
-          onCompleteRef.current();
-          onCompleteRef.current = null;
-        }
-      }
-    }, beatMs);
-  }, [bpm, isPlaying]);
+      }, beatMs);
+    },
+    [bpm, isPlaying],
+  );
 
   // Analyze performance
   const analyzePerformance = useCallback(() => {
     const totalCount = totalSoundingCountRef.current;
     const pitchCount = onPitchCountRef.current;
     const hitTarget = hasHitTargetPitchRef.current;
-    
+
     const beatSoundPct = soundingOnBeatsRef.current;
     const startedEarly = startedEarlyRef.current;
-    console.log('[HalfNoteLesson] analyzePerformance:', { totalCount, pitchCount, hitTarget, beatSoundPct, startedEarly });
-    
+    console.log("[HalfNoteLesson] analyzePerformance:", {
+      totalCount,
+      pitchCount,
+      hitTarget,
+      beatSoundPct,
+      startedEarly,
+    });
+
     if (totalCount === 0) {
-      return { success: false, pitchOk: false, rhythmOk: false, message: "No sound detected" };
+      return {
+        success: false,
+        pitchOk: false,
+        rhythmOk: false,
+        message: "No sound detected",
+      };
     }
     const successRatio = pitchCount / totalCount;
     const pitchOk = hitTarget && successRatio >= 0.3;
-    
+
     const SUSTAIN_THRESHOLD = 0.75;
     const STOP_THRESHOLD = 0.75;
-    
+
     const startedOnBeatOne = beatSoundPct[0] >= SUSTAIN_THRESHOLD;
-    const sustainedBeats = beatSoundPct.slice(0, 2).filter(pct => pct >= SUSTAIN_THRESHOLD).length;
+    const sustainedBeats = beatSoundPct
+      .slice(0, 2)
+      .filter((pct) => pct >= SUSTAIN_THRESHOLD).length;
     const stoppedOnBeatThree = beatSoundPct[2] < STOP_THRESHOLD;
-    
-    const rhythmOk = startedOnBeatOne && !startedEarly && sustainedBeats === 2 && stoppedOnBeatThree;
-    
+
+    const rhythmOk =
+      startedOnBeatOne &&
+      !startedEarly &&
+      sustainedBeats === 2 &&
+      stoppedOnBeatThree;
+
     const success = pitchOk && rhythmOk;
-    
+
     let message = "Great!";
     if (!pitchOk && !rhythmOk) {
       message = "Try to match the pitch and hold for 2 beats";
@@ -586,7 +630,7 @@ export default function HalfNoteLessonExercise({
     } else if (!stoppedOnBeatThree) {
       message = "Stop right on beat 3 - you held too long";
     }
-    
+
     return { success, pitchOk, rhythmOk, message };
   }, []);
 
@@ -594,7 +638,7 @@ export default function HalfNoteLessonExercise({
     const result = analyzePerformance();
     setSingResult(result);
     if (!result.success) {
-      setSingAttempts(prev => prev + 1);
+      setSingAttempts((prev) => prev + 1);
     }
   }, [analyzePerformance]);
 
@@ -626,7 +670,7 @@ export default function HalfNoteLessonExercise({
     const result = analyzePerformance();
     setPlayResult(result);
     if (!result.success) {
-      setPlayAttempts(prev => prev + 1);
+      setPlayAttempts((prev) => prev + 1);
     }
   }, [analyzePerformance]);
 
@@ -660,9 +704,9 @@ export default function HalfNoteLessonExercise({
 
   const handleAttestConfirm = useCallback(() => {
     setShowAttestModal(false);
-    if (attestPhase === 'sing') {
+    if (attestPhase === "sing") {
       setSingResult({ success: true, attested: true });
-    } else if (attestPhase === 'play') {
+    } else if (attestPhase === "play") {
       setPlayResult({ success: true, attested: true });
     }
     setAttestPhase(null);
@@ -706,9 +750,7 @@ export default function HalfNoteLessonExercise({
           </TouchableOpacity>
         ) : (
           <>
-            <View style={styles.notationWrapper}>
-              {memoizedNotation}
-            </View>
+            <View style={styles.notationWrapper}>{memoizedNotation}</View>
             <TouchableOpacity
               style={styles.hideNotationButton}
               onPress={() => setShowNotation(false)}
@@ -741,7 +783,7 @@ export default function HalfNoteLessonExercise({
   // Beat indicator for half note (2 beats + stop on 3)
   const BeatIndicator = () => {
     const isInCountIn = currentBeat < 0;
-    
+
     return (
       <View style={styles.beatIndicatorContainer}>
         <View style={styles.countInRow}>
@@ -752,21 +794,27 @@ export default function HalfNoteLessonExercise({
                 key={beat}
                 style={[
                   styles.countInDot,
-                  beat <= currentBeat && currentBeat < 0 && styles.countInDotActive,
+                  beat <= currentBeat &&
+                    currentBeat < 0 &&
+                    styles.countInDotActive,
                   beat === -4 && styles.countInDotAccent,
                 ]}
               >
-                <Text style={[
-                  styles.countInNumber,
-                  beat <= currentBeat && currentBeat < 0 && styles.countInNumberActive,
-                ]}>
+                <Text
+                  style={[
+                    styles.countInNumber,
+                    beat <= currentBeat &&
+                      currentBeat < 0 &&
+                      styles.countInNumberActive,
+                  ]}
+                >
                   {index + 1}
                 </Text>
               </View>
             ))}
           </View>
         </View>
-        
+
         <View style={styles.singRow}>
           <Text style={styles.singLabel}>Play:</Text>
           <View style={styles.beatIndicator}>
@@ -775,14 +823,20 @@ export default function HalfNoteLessonExercise({
                 key={beat}
                 style={[
                   styles.beatDot,
-                  currentBeat >= beat && currentBeat > 0 && styles.beatDotActive,
+                  currentBeat >= beat &&
+                    currentBeat > 0 &&
+                    styles.beatDotActive,
                   beat === 1 && styles.beatDotAccent,
                 ]}
               >
-                <Text style={[
-                  styles.beatNumber,
-                  currentBeat >= beat && currentBeat > 0 && styles.beatNumberActive,
-                ]}>
+                <Text
+                  style={[
+                    styles.beatNumber,
+                    currentBeat >= beat &&
+                      currentBeat > 0 &&
+                      styles.beatNumberActive,
+                  ]}
+                >
                   {beat}
                 </Text>
               </View>
@@ -794,10 +848,12 @@ export default function HalfNoteLessonExercise({
                 currentBeat === 3 && styles.beatDotStopActive,
               ]}
             >
-              <Text style={[
-                styles.beatNumber,
-                currentBeat === 3 && styles.beatNumberStopActive,
-              ]}>
+              <Text
+                style={[
+                  styles.beatNumber,
+                  currentBeat === 3 && styles.beatNumberStopActive,
+                ]}
+              >
                 3
               </Text>
             </View>
@@ -808,37 +864,42 @@ export default function HalfNoteLessonExercise({
   };
 
   // Attestation Modal
-  const attestationModal = useMemo(() => (
-    <Modal
-      visible={showAttestModal}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={() => setShowAttestModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Confirm</Text>
-          <Text style={styles.modalText}>
-            I attest that I {attestPhase === 'sing' ? 'sang' : 'played'} this correctly, but due to background noise or technical issues it was not able to register.
-          </Text>
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={styles.modalCancelButton}
-              onPress={() => setShowAttestModal(false)}
-            >
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalConfirmButton}
-              onPress={handleAttestConfirm}
-            >
-              <Text style={styles.modalConfirmText}>Confirm</Text>
-            </TouchableOpacity>
+  const attestationModal = useMemo(
+    () => (
+      <Modal
+        visible={showAttestModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowAttestModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Confirm</Text>
+            <Text style={styles.modalText}>
+              I attest that I {attestPhase === "sing" ? "sang" : "played"} this
+              correctly, but due to background noise or technical issues it was
+              not able to register.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setShowAttestModal(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalConfirmButton}
+                onPress={handleAttestConfirm}
+              >
+                <Text style={styles.modalConfirmText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
-    </Modal>
-  ), [showAttestModal, attestPhase, handleAttestConfirm]);
+      </Modal>
+    ),
+    [showAttestModal, attestPhase, handleAttestConfirm],
+  );
 
   // FOCUS CARD PHASE
   if (phase === PHASE.FOCUS_CARD) {
@@ -871,16 +932,14 @@ export default function HalfNoteLessonExercise({
               Count: 1 - 2 - (3) stop!
             </Text>
           </View>
-          
+
           {/* Show actual notation */}
           <View style={styles.notationPreview}>
             <Text style={styles.notationPreviewLabel}>On the staff:</Text>
-            <View style={styles.notationWrapper}>
-              {memoizedNotation}
-            </View>
+            <View style={styles.notationWrapper}>{memoizedNotation}</View>
           </View>
         </ScrollView>
-        
+
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
             style={styles.primaryButton}
@@ -902,7 +961,7 @@ export default function HalfNoteLessonExercise({
           contentContainerStyle={styles.scrollContent}
         >
           {renderFocusCardMini()}
-          
+
           <Text style={styles.phaseTitle}>Listen</Text>
           <Text style={styles.noteDisplay}>
             {noteInfo.letter}
@@ -912,12 +971,12 @@ export default function HalfNoteLessonExercise({
             Listen to the half note.{"\n"}
             Notice how it lasts 2 beats and ends on beat 3.
           </Text>
-          
+
           {isPlaying && <BeatIndicator />}
-          
+
           {renderNotationToggle()}
         </ScrollView>
-        
+
         <View style={styles.fixedBottomButtons}>
           {!hasHeardPattern ? (
             <TouchableOpacity
@@ -934,7 +993,10 @@ export default function HalfNoteLessonExercise({
           ) : (
             <>
               <TouchableOpacity
-                style={[styles.secondaryButton, isPlaying && styles.buttonDisabled]}
+                style={[
+                  styles.secondaryButton,
+                  isPlaying && styles.buttonDisabled,
+                ]}
                 onPress={playHalfNote}
                 disabled={isPlaying}
               >
@@ -969,7 +1031,7 @@ export default function HalfNoteLessonExercise({
           contentContainerStyle={styles.scrollContent}
         >
           {renderFocusCardMini()}
-          
+
           <Text style={styles.phaseTitle}>Sing</Text>
           <Text style={styles.noteDisplay}>
             {noteInfo.letter}
@@ -979,27 +1041,33 @@ export default function HalfNoteLessonExercise({
             Sing the half note on solfege (do).{"\n"}
             Hold it for 2 beats, ending on beat 3.
           </Text>
-          
+
           {isPlaying && <BeatIndicator />}
-          
+
           {!singResult && (
             <View style={styles.volumeContainer}>
               <CircularVolumeIndicator volume={volume} size={120} />
               {isSounding && detectedNoteName && (
-                <Text style={styles.hearingText}>Hearing: {detectedNoteName}</Text>
+                <Text style={styles.hearingText}>
+                  Hearing: {detectedNoteName}
+                </Text>
               )}
             </View>
           )}
-          
+
           {singResult && (
-            <Text style={singResult.success ? styles.successText : styles.feedbackError}>
+            <Text
+              style={
+                singResult.success ? styles.successText : styles.feedbackError
+              }
+            >
               {singResult.success ? "✓ Great!" : singResult.message}
             </Text>
           )}
-          
+
           {renderNotationToggle()}
         </ScrollView>
-        
+
         <View style={styles.fixedBottomButtons}>
           {singResult && !singResult.success ? (
             <>
@@ -1012,17 +1080,23 @@ export default function HalfNoteLessonExercise({
               {singAttempts >= 3 && (
                 <TouchableOpacity
                   style={[styles.tertiaryButton, { marginTop: 8 }]}
-                  onPress={() => handleShowAttestModal('sing')}
+                  onPress={() => handleShowAttestModal("sing")}
                 >
-                  <Text style={styles.tertiaryButtonText}>I did it correctly →</Text>
+                  <Text style={styles.tertiaryButtonText}>
+                    I did it correctly →
+                  </Text>
                 </TouchableOpacity>
               )}
             </>
           ) : singResult?.success ? (
             <>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
                 <TouchableOpacity
-                  style={[styles.secondaryButton, { flex: 1 }, isPlaying && styles.buttonDisabled]}
+                  style={[
+                    styles.secondaryButton,
+                    { flex: 1 },
+                    isPlaying && styles.buttonDisabled,
+                  ]}
                   onPress={playHalfNote}
                   disabled={isPlaying}
                 >
@@ -1031,7 +1105,11 @@ export default function HalfNoteLessonExercise({
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.secondaryButton, { flex: 1 }, isPlaying && styles.buttonDisabled]}
+                  style={[
+                    styles.secondaryButton,
+                    { flex: 1 },
+                    isPlaying && styles.buttonDisabled,
+                  ]}
                   onPress={() => {
                     handleTrySingAgain();
                   }}
@@ -1073,7 +1151,7 @@ export default function HalfNoteLessonExercise({
           contentContainerStyle={styles.scrollContent}
         >
           {renderFocusCardMini()}
-          
+
           <Text style={styles.phaseTitle}>Imagine</Text>
           <Text style={styles.noteDisplay}>
             {noteInfo.letter}
@@ -1083,19 +1161,17 @@ export default function HalfNoteLessonExercise({
             Imagine playing this half note on your instrument.{"\n"}
             Hear the sound in your mind for 2 beats.
           </Text>
-          
+
           {isPlaying && <BeatIndicator />}
-          
+
           <View style={styles.imagineVisual}>
             <Text style={styles.imagineEmoji}>🎵</Text>
-            <Text style={styles.imagineHint}>
-              Hear: 1 - 2 - (3) stop
-            </Text>
+            <Text style={styles.imagineHint}>Hear: 1 - 2 - (3) stop</Text>
           </View>
-          
+
           {renderNotationToggle()}
         </ScrollView>
-        
+
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
             style={[styles.secondaryButton, isPlaying && styles.buttonDisabled]}
@@ -1126,7 +1202,7 @@ export default function HalfNoteLessonExercise({
           contentContainerStyle={styles.scrollContent}
         >
           {renderFocusCardMini()}
-          
+
           <Text style={styles.phaseTitle}>Play</Text>
           <Text style={styles.noteDisplay}>
             {noteInfo.letter}
@@ -1136,27 +1212,33 @@ export default function HalfNoteLessonExercise({
             Play the half note on your instrument.{"\n"}
             Hold for 2 beats, release on beat 3.
           </Text>
-          
+
           {isPlaying && <BeatIndicator />}
-          
+
           {!playResult && (
             <View style={styles.volumeContainer}>
               <CircularVolumeIndicator volume={volume} size={120} />
               {isSounding && detectedNoteName && (
-                <Text style={styles.hearingText}>Hearing: {detectedNoteName}</Text>
+                <Text style={styles.hearingText}>
+                  Hearing: {detectedNoteName}
+                </Text>
               )}
             </View>
           )}
-          
+
           {playResult && (
-            <Text style={playResult.success ? styles.successText : styles.feedbackError}>
+            <Text
+              style={
+                playResult.success ? styles.successText : styles.feedbackError
+              }
+            >
               {playResult.success ? "✓ Great!" : playResult.message}
             </Text>
           )}
-          
+
           {renderNotationToggle()}
         </ScrollView>
-        
+
         <View style={styles.fixedBottomButtons}>
           {playResult && !playResult.success ? (
             <>
@@ -1169,17 +1251,23 @@ export default function HalfNoteLessonExercise({
               {playAttempts >= 3 && (
                 <TouchableOpacity
                   style={[styles.tertiaryButton, { marginTop: 8 }]}
-                  onPress={() => handleShowAttestModal('play')}
+                  onPress={() => handleShowAttestModal("play")}
                 >
-                  <Text style={styles.tertiaryButtonText}>I did it correctly →</Text>
+                  <Text style={styles.tertiaryButtonText}>
+                    I did it correctly →
+                  </Text>
                 </TouchableOpacity>
               )}
             </>
           ) : playResult?.success ? (
             <>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
                 <TouchableOpacity
-                  style={[styles.secondaryButton, { flex: 1 }, isPlaying && styles.buttonDisabled]}
+                  style={[
+                    styles.secondaryButton,
+                    { flex: 1 },
+                    isPlaying && styles.buttonDisabled,
+                  ]}
                   onPress={playHalfNote}
                   disabled={isPlaying}
                 >
@@ -1188,7 +1276,11 @@ export default function HalfNoteLessonExercise({
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.secondaryButton, { flex: 1 }, isPlaying && styles.buttonDisabled]}
+                  style={[
+                    styles.secondaryButton,
+                    { flex: 1 },
+                    isPlaying && styles.buttonDisabled,
+                  ]}
                   onPress={() => {
                     handleTryPlayAgain();
                   }}
@@ -1263,26 +1355,34 @@ export default function HalfNoteLessonExercise({
           <Text style={styles.phaseTitle}>
             {overallSuccess ? "Nice Work!" : "Keep Practicing"}
           </Text>
-          
+
           <View style={styles.resultsSummary}>
             <View style={styles.resultRow}>
               <Text style={styles.resultLabel}>Sing:</Text>
-              <Text style={singResult?.success ? styles.resultSuccess : styles.resultFail}>
+              <Text
+                style={
+                  singResult?.success ? styles.resultSuccess : styles.resultFail
+                }
+              >
                 {singResult?.success ? "✓" : "✗"}
               </Text>
             </View>
             <View style={styles.resultRow}>
               <Text style={styles.resultLabel}>Play:</Text>
-              <Text style={playResult?.success ? styles.resultSuccess : styles.resultFail}>
+              <Text
+                style={
+                  playResult?.success ? styles.resultSuccess : styles.resultFail
+                }
+              >
                 {playResult?.success ? "✓" : "✗"}
               </Text>
             </View>
           </View>
-          
+
           <Text style={styles.progressText}>
             Progress: {successfulRounds} / {masteryStreak}
           </Text>
-          
+
           <View style={styles.reminderBox}>
             <Text style={styles.reminderTitle}>Remember:</Text>
             <Text style={styles.reminderText}>
@@ -1292,7 +1392,7 @@ export default function HalfNoteLessonExercise({
             </Text>
           </View>
         </ScrollView>
-        
+
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
             style={styles.primaryButton}
