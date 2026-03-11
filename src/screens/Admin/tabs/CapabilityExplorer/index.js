@@ -2,7 +2,7 @@
  * CapabilityExplorer - Browse/filter/inspect capabilities
  * Part of Admin console
  */
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -35,6 +35,7 @@ function CapabilityExplorer() {
     domains,
     exporting,
     exportStatus,
+    capabilitiesWithContent,
     loadCapabilities,
     loadDependencyGraph,
     archiveCapability,
@@ -46,6 +47,14 @@ function CapabilityExplorer() {
     renameDomain,
     exportToFile,
   } = useCapabilities();
+
+  // Debug: log capabilitiesWithContent when it updates
+  useEffect(() => {
+    console.log("[CapabilityExplorer] capabilitiesWithContent size:", capabilitiesWithContent.size);
+    if (capabilitiesWithContent.size > 0) {
+      console.log("[CapabilityExplorer] capabilities with content:", [...capabilitiesWithContent]);
+    }
+  }, [capabilitiesWithContent]);
 
   // UI-only state
   const [selectedCapability, setSelectedCapability] = useState(null);
@@ -123,7 +132,7 @@ function CapabilityExplorer() {
     await exportToFile();
   };
 
-  const renderCapabilityItem = ({ item, index }) => {
+  const renderCapabilityItem = useCallback(({ item, index }) => {
     // Get domain capabilities sorted by bit_index for determining if up/down is possible
     const domainCaps =
       domainFilter !== "all"
@@ -136,6 +145,12 @@ function CapabilityExplorer() {
     const canMoveDown =
       domainFilter !== "all" && itemIndex < domainCaps.length - 1;
 
+    // Debug: check matching for day 0 items
+    const day0Names = ['pitch_direction_awareness', 'pulse_tracking', 'rhythm_whole_notes', 'time_signature_basics', 'time_signature_4_4', 'rest_whole', 'rhythm_half_notes', 'rest_half', 'rhythm_quarter_notes', 'rest_quarter'];
+    if (day0Names.includes(item.name)) {
+      console.log(`[render] ${item.name}: has=${capabilitiesWithContent.has(item.name)}, setSize=${capabilitiesWithContent.size}`);
+    }
+
     return (
       <View style={styles.listItem}>
         <TouchableOpacity
@@ -143,6 +158,9 @@ function CapabilityExplorer() {
           onPress={() => viewCapabilityDetail(item)}
         >
           <View style={styles.listItemHeader}>
+            {capabilitiesWithContent.has(item.name) && (
+              <Text style={{ color: '#4CAF50', fontSize: 16, marginRight: 4 }}>●</Text>
+            )}
             <Text style={styles.listItemTitle}>
               {item.display_name || item.name}
             </Text>
@@ -219,7 +237,7 @@ function CapabilityExplorer() {
         )}
       </View>
     );
-  };
+  }, [capabilities, domainFilter, capabilitiesWithContent, viewCapabilityDetail, handleMoveCapability]);
 
   if (loading) {
     return (
@@ -331,7 +349,7 @@ function CapabilityExplorer() {
 
       {/* Results */}
       <Text style={styles.resultCount}>
-        {filteredCapabilities.length} capabilities
+        {filteredCapabilities.length} capabilities ({filteredCapabilities.filter(c => capabilitiesWithContent.has(c.name)).length} with modules <Text style={{color: '#4CAF50'}}>●</Text>)
       </Text>
 
       <FlatList
@@ -339,6 +357,7 @@ function CapabilityExplorer() {
         renderItem={renderCapabilityItem}
         keyExtractor={(item) => String(item.id || item.name)}
         style={styles.list}
+        extraData={capabilitiesWithContent}
       />
 
       {/* Detail Modal */}

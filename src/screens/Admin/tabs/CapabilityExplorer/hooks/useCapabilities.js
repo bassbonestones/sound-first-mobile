@@ -13,6 +13,7 @@ export default function useCapabilities() {
   const [domains, setDomains] = useState([]);
   const [exporting, setExporting] = useState(false);
   const [exportStatus, setExportStatus] = useState(null);
+  const [capabilitiesWithContent, setCapabilitiesWithContent] = useState(new Set());
 
   // Load capabilities on mount
   useEffect(() => {
@@ -27,6 +28,7 @@ export default function useCapabilities() {
   const loadCapabilities = async () => {
     setLoading(true);
     try {
+      // Fetch capabilities
       const response = await fetch(`${baseUrl}/admin/capabilities`);
       if (!response.ok) throw new Error("Failed to load capabilities");
       const data = await response.json();
@@ -36,6 +38,37 @@ export default function useCapabilities() {
         ...new Set((data.capabilities || []).map((c) => c.domain)),
       ].sort();
       setDomains(uniqueDomains);
+
+      // Fetch teaching modules from API to identify which capabilities have modules
+      const withContent = new Set();
+      try {
+        const modulesResponse = await fetch(`${baseUrl}/modules/?active_only=false`);
+        console.log("[useCapabilities] Modules response status:", modulesResponse.status);
+        if (modulesResponse.ok) {
+          const modulesData = await modulesResponse.json();
+          console.log("[useCapabilities] Modules loaded:", modulesData.length);
+          modulesData
+            .filter((m) => m.capability_name)
+            .forEach((m) => withContent.add(m.capability_name));
+        }
+      } catch (moduleErr) {
+        console.log("[useCapabilities] Could not load teaching modules:", moduleErr);
+      }
+      
+      // Also fetch Day 0 capabilities (granted when first note experience completes)
+      try {
+        const day0Response = await fetch(`${baseUrl}/admin/day0-capabilities`);
+        if (day0Response.ok) {
+          const day0Data = await day0Response.json();
+          console.log("[useCapabilities] Day 0 capabilities:", day0Data.all);
+          (day0Data.all || []).forEach((name) => withContent.add(name));
+        }
+      } catch (day0Err) {
+        console.log("[useCapabilities] Could not load Day 0 capabilities:", day0Err);
+      }
+      
+      console.log("[useCapabilities] Total capabilities with content:", [...withContent]);
+      setCapabilitiesWithContent(withContent);
     } catch (err) {
       console.error("[useCapabilities] Load error:", err);
       // Fallback to v2 endpoint
@@ -323,6 +356,7 @@ export default function useCapabilities() {
     domains,
     exporting,
     exportStatus,
+    capabilitiesWithContent,
 
     // Actions
     loadCapabilities,
