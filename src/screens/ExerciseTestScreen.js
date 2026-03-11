@@ -21,6 +21,7 @@ import {
   FeelThePulseExercise,
   RangeExpansionExercise,
   WholeNoteLessonExercise,
+  WholeRestLessonExercise,
   TimeSignatureBasicsExercise,
   TimeSignature44Exercise,
 } from "./Session/components/exercises";
@@ -259,6 +260,18 @@ const EXERCISES = [
     component: TimeSignature44Exercise,
     config: { use_notation: true },
     mastery: { correct_streak: 4 },
+    extraProps: {
+      clef: "treble",
+    },
+  },
+  {
+    id: "whole_rest_lesson",
+    name: "Whole Rest",
+    icon: "🤫",
+    description: "Learn the whole rest: 4 beats of silence that hangs below the line",
+    component: WholeRestLessonExercise,
+    config: { bpm: 60, use_first_note: true },
+    mastery: { correct_streak: 3 },
     extraProps: {
       clef: "treble",
     },

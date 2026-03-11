@@ -1,10 +1,11 @@
 /**
- * WholeNoteLessonExercise - Teaches the whole note concept
+ * WholeRestLessonExercise - Teaches the whole rest concept
  *
  * Flow: Focus Card → Listen → Sing → Imagine → Play → Feedback
  * Key concepts:
- * - A whole note lasts 4 beats
- * - The note ends right on the next ONE
+ * - A whole rest lasts 4 beats (just like a whole note)
+ * - It sits BELOW the middle line because it's "heavy"
+ * - Exercise: whole note (4 beats) → whole rest (4 beats silence) → whole note (4 beats)
  */
 import React, {
   useState,
@@ -96,8 +97,8 @@ function noteToFrequency(noteName) {
   return midiToFrequency(noteToMidi(noteName));
 }
 
-// Generate MusicXML for a single whole note
-function generateWholeNoteMusicXML(noteName, clef = "treble") {
+// Generate MusicXML for whole note + whole rest + whole note
+function generateWholeRestPatternMusicXML(noteName, clef = "treble") {
   const parsed = parseNoteName(noteName);
   if (!parsed) return null;
 
@@ -114,7 +115,7 @@ function generateWholeNoteMusicXML(noteName, clef = "treble") {
   const clefSign = clef === "bass" ? "F" : "G";
   const clefLine = clef === "bass" ? "4" : "2";
   const alterXML = alter !== 0 ? `        <alter>${alter}</alter>\n` : "";
-  const accidentalXML = `        <accidental>${accidentalName}</accidental>\n`;
+  const accidentalXML = alter !== 0 ? `        <accidental>${accidentalName}</accidental>\n` : "";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
@@ -148,6 +149,23 @@ ${alterXML}          <octave>${parsed.octave}</octave>
         <duration>4</duration>
         <type>whole</type>
 ${accidentalXML}      </note>
+    </measure>
+    <measure number="2">
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <type>whole</type>
+      </note>
+    </measure>
+    <measure number="3">
+      <note>
+        <pitch>
+          <step>${parsed.letter}</step>
+${alterXML}          <octave>${parsed.octave}</octave>
+        </pitch>
+        <duration>4</duration>
+        <type>whole</type>
+      </note>
     </measure>
   </part>
 </score-partwise>`;
@@ -188,7 +206,7 @@ function createClickSound(audioContext, isAccent = false) {
   source.start(audioContext.currentTime);
 }
 
-export default function WholeNoteLessonExercise({
+export default function WholeRestLessonExercise({
   config,
   mastery,
   onComplete,
@@ -199,14 +217,13 @@ export default function WholeNoteLessonExercise({
   const [phase, setPhase] = useState(PHASE.FOCUS_CARD);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentBeat, setCurrentBeat] = useState(0);
+  const [currentMeasure, setCurrentMeasure] = useState(0); // 1=note, 2=rest, 3=note
   const [showNotation, setShowNotation] = useState(false);
   const [singResult, setSingResult] = useState(null);
   const [playResult, setPlayResult] = useState(null);
   const [successfulRounds, setSuccessfulRounds] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
   const [hasHeardPattern, setHasHeardPattern] = useState(false);
-  // Rhythm tracking: which beats (1-5) had sound
-  const [soundingOnBeats, setSoundingOnBeats] = useState([false, false, false, false, false]);
   // Attempt tracking for attestation
   const [singAttempts, setSingAttempts] = useState(0);
   const [playAttempts, setPlayAttempts] = useState(0);
@@ -222,12 +239,19 @@ export default function WholeNoteLessonExercise({
   const gainNodeRef = useRef(null);
   const unmountedRef = useRef(false);
   const isSoundingRef = useRef(false); // Track isSounding for interval callbacks
-  // Use refs for pitch tracking (state is async and won't be ready when analyzePerformance is called)
+  
+  // Pitch tracking refs - for both whole notes
   const hasHitTargetPitchRef = useRef(false);
   const onPitchCountRef = useRef(0);
   const totalSoundingCountRef = useRef(0);
-  const soundingOnBeatsRef = useRef([0, 0, 0, 0, 0]); // Percentage (0-1) of each beat that had sound
-  const startedEarlyRef = useRef(false); // Track if they started singing during count-in
+  
+  // Beat-by-beat sound tracking for the 13-beat sequence
+  // Beats 1-4: first whole note (should sound)
+  // Beats 5-8: whole rest (should NOT sound)
+  // Beats 9-12: second whole note (should sound)
+  // Beat 13: end marker
+  const soundingOnBeatsRef = useRef(Array(13).fill(0)); // Percentages (0-1) of each beat with sound
+  const startedEarlyRef = useRef(false); // Track if they started during count-in
 
   // Config
   const bpm = config?.bpm || 60;
@@ -247,7 +271,7 @@ export default function WholeNoteLessonExercise({
 
   // Generate MusicXML
   const musicXML = useMemo(
-    () => generateWholeNoteMusicXML(userFirstNote, clef),
+    () => generateWholeRestPatternMusicXML(userFirstNote, clef),
     [userFirstNote, clef]
   );
 
@@ -300,9 +324,8 @@ export default function WholeNoteLessonExercise({
     hasHitTargetPitchRef.current = false;
     onPitchCountRef.current = 0;
     totalSoundingCountRef.current = 0;
-    soundingOnBeatsRef.current = [0, 0, 0, 0, 0];
+    soundingOnBeatsRef.current = Array(13).fill(0);
     startedEarlyRef.current = false;
-    setSoundingOnBeats([false, false, false, false, false]);
   }, [phase]);
 
   // Detected note name for display (currentPitch is an object from usePitchDetection)
@@ -341,11 +364,48 @@ export default function WholeNoteLessonExercise({
     setShowNotation(false);
   }, [phase]);
 
-  // Store onComplete callback for playWholeNote
+  // Store onComplete callback for playPattern
   const onCompleteRef = useRef(null);
 
-  // Play a note with metronome clicks (includes count-in)
-  const playWholeNote = useCallback((onComplete) => {
+  // Play a note for a specified duration in beats
+  const playNoteSound = useCallback((ctx, durationBeats) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    const now = ctx.currentTime;
+    const beatMs = (60 / bpm) * 1000;
+    const duration = (beatMs * durationBeats) / 1000;
+    
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(targetFrequency, now);
+    
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.5, now + 0.02);
+    gain.gain.setValueAtTime(0.4, now + duration - 0.1);
+    gain.gain.linearRampToValueAtTime(0, now + duration);
+    
+    // Add harmonics for richer sound
+    const osc2 = ctx.createOscillator();
+    osc2.frequency.setValueAtTime(targetFrequency * 2, now);
+    const gain2 = ctx.createGain();
+    gain2.gain.setValueAtTime(0.15, now);
+    gain2.gain.linearRampToValueAtTime(0, now + duration);
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    
+    osc.start(now);
+    osc.stop(now + duration + 0.05);
+    osc2.start(now);
+    osc2.stop(now + duration + 0.05);
+    
+    return { osc, osc2, gain };
+  }, [bpm, targetFrequency]);
+
+  // Play the pattern: whole note → whole rest → whole note (with count-in)
+  const playPattern = useCallback((onComplete) => {
     const ctx = audioContextRef.current;
     if (!ctx || isPlaying) return;
     
@@ -354,53 +414,15 @@ export default function WholeNoteLessonExercise({
 
     setIsPlaying(true);
     setCurrentBeat(-4); // Start at count-in beat 1
+    setCurrentMeasure(0);
 
     const beatMs = (60 / bpm) * 1000;
     let beat = -4;
 
-    // Play the note (called after count-in)
-    const playNote = () => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      
-      // Piano-like envelope
-      const now = ctx.currentTime;
-      const duration = (beatMs * 4) / 1000; // 4 beats
-      
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(targetFrequency, now);
-      
-      gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.5, now + 0.02);
-      gain.gain.setValueAtTime(0.4, now + duration - 0.1);
-      gain.gain.linearRampToValueAtTime(0, now + duration);
-      
-      // Add harmonics for richer sound
-      const osc2 = ctx.createOscillator();
-      osc2.frequency.setValueAtTime(targetFrequency * 2, now);
-      const gain2 = ctx.createGain();
-      gain2.gain.setValueAtTime(0.15, now);
-      gain2.gain.linearRampToValueAtTime(0, now + duration);
-      
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      
-      osc.start(now);
-      osc.stop(now + duration + 0.05);
-      osc2.start(now);
-      osc2.stop(now + duration + 0.05);
-      
-      oscillatorRef.current = osc;
-      oscillator2Ref.current = osc2;
-      gainNodeRef.current = gain;
-    };
-
     // Start with count-in beat 1 (accent click)
     createClickSound(ctx, true);
 
-    // Continue through count-in, then note playback
+    // Continue through count-in, then pattern playback
     beatIntervalRef.current = setInterval(() => {
       if (unmountedRef.current) {
         clearInterval(beatIntervalRef.current);
@@ -416,24 +438,45 @@ export default function WholeNoteLessonExercise({
         createClickSound(ctx, false);
         setCurrentBeat(beat);
       } else if (beat === 1) {
-        // First note beat (accent) - START THE NOTE!
+        // First measure beat 1 (accent) - START first whole note
         createClickSound(ctx, true);
-        playNote();
+        playNoteSound(ctx, 4); // Play for 4 beats
         setCurrentBeat(1);
+        setCurrentMeasure(1);
       } else if (beat >= 2 && beat <= 4) {
-        // Note beats 2, 3, 4 - regular clicks
+        // First measure beats 2, 3, 4
         createClickSound(ctx, false);
         setCurrentBeat(beat);
       } else if (beat === 5) {
-        // The next ONE - accent click, note ends here
+        // Second measure beat 1 (accent) - whole REST starts, first note ends
         createClickSound(ctx, true);
         setCurrentBeat(5);
+        setCurrentMeasure(2);
+      } else if (beat >= 6 && beat <= 8) {
+        // Second measure beats 2, 3, 4 (during rest)
+        createClickSound(ctx, false);
+        setCurrentBeat(beat);
+      } else if (beat === 9) {
+        // Third measure beat 1 (accent) - START second whole note
+        createClickSound(ctx, true);
+        playNoteSound(ctx, 4); // Play for 4 beats
+        setCurrentBeat(9);
+        setCurrentMeasure(3);
+      } else if (beat >= 10 && beat <= 12) {
+        // Third measure beats 2, 3, 4
+        createClickSound(ctx, false);
+        setCurrentBeat(beat);
+      } else if (beat === 13) {
+        // End marker - click to mark the end of the second note
+        createClickSound(ctx, true);
+        setCurrentBeat(13);
       } else {
         // Done
         clearInterval(beatIntervalRef.current);
         beatIntervalRef.current = null;
         setIsPlaying(false);
         setCurrentBeat(0);
+        setCurrentMeasure(0);
         // Call onComplete callback if provided
         if (onCompleteRef.current) {
           onCompleteRef.current();
@@ -441,7 +484,7 @@ export default function WholeNoteLessonExercise({
         }
       }
     }, beatMs);
-  }, [bpm, targetFrequency, isPlaying]);
+  }, [bpm, isPlaying, playNoteSound]);
 
   // Stop playback
   const stopPlayback = useCallback(() => {
@@ -465,10 +508,11 @@ export default function WholeNoteLessonExercise({
     }
     setIsPlaying(false);
     setCurrentBeat(0);
+    setCurrentMeasure(0);
   }, []);
 
-  // Play just metronome clicks (no pitch) for sing/imagine phases
-  // Uses negative beats for count-in: -4, -3, -2, -1, then 1, 2, 3, 4, 5 for singing
+  // Play just metronome clicks (no pitch) for sing/play phases
+  // Sequence: count-in (-4 to -1), then beats 1-13 for whole note, rest, whole note
   const playMetronomeOnly = useCallback((onComplete) => {
     const ctx = audioContextRef.current;
     if (!ctx || isPlaying) return;
@@ -478,9 +522,9 @@ export default function WholeNoteLessonExercise({
 
     setIsPlaying(true);
     setCurrentBeat(-4); // Start at count-in beat 1
-    soundingOnBeatsRef.current = [0, 0, 0, 0, 0];
-    startedEarlyRef.current = false; // Reset early start tracking
-    setSoundingOnBeats([false, false, false, false, false]); // Reset rhythm tracking
+    setCurrentMeasure(0);
+    soundingOnBeatsRef.current = Array(13).fill(0);
+    startedEarlyRef.current = false;
 
     const beatMs = (60 / bpm) * 1000;
     let beat = -4;
@@ -511,7 +555,7 @@ export default function WholeNoteLessonExercise({
           earlySoundingSamples = 0; // Reset if silence detected
         }
       }
-      if (beat >= 1 && beat <= 5) {
+      if (beat >= 1 && beat <= 13) {
         if (beatSoundingSamples.beat !== beat) {
           // New beat - save previous beat's result as percentage
           if (beatSoundingSamples.beat >= 1 && beatSoundingSamples.samples > 0) {
@@ -532,7 +576,7 @@ export default function WholeNoteLessonExercise({
     // Start with count-in beat 1 (accent)
     createClickSound(ctx, true);
 
-    // Continue through count-in (-3, -2, -1), then singing (1, 2, 3, 4, 5)
+    // Continue through count-in, then playing/singing phase
     beatIntervalRef.current = setInterval(() => {
       if (unmountedRef.current) {
         clearInterval(beatIntervalRef.current);
@@ -549,17 +593,36 @@ export default function WholeNoteLessonExercise({
         createClickSound(ctx, false);
         setCurrentBeat(beat);
       } else if (beat === 1) {
-        // First singing beat (accent) - START SINGING!
+        // First measure beat 1 (accent) - START first whole note
         createClickSound(ctx, true);
         setCurrentBeat(1);
+        setCurrentMeasure(1);
       } else if (beat >= 2 && beat <= 4) {
-        // Singing beats 2, 3, 4
+        // First measure beats 2, 3, 4
         createClickSound(ctx, false);
         setCurrentBeat(beat);
       } else if (beat === 5) {
-        // The final ONE (accent) - STOP SINGING!
+        // Second measure beat 1 (accent) - REST starts
         createClickSound(ctx, true);
         setCurrentBeat(5);
+        setCurrentMeasure(2);
+      } else if (beat >= 6 && beat <= 8) {
+        // Second measure beats 2, 3, 4 (during rest)
+        createClickSound(ctx, false);
+        setCurrentBeat(beat);
+      } else if (beat === 9) {
+        // Third measure beat 1 (accent) - START second whole note
+        createClickSound(ctx, true);
+        setCurrentBeat(9);
+        setCurrentMeasure(3);
+      } else if (beat >= 10 && beat <= 12) {
+        // Third measure beats 2, 3, 4
+        createClickSound(ctx, false);
+        setCurrentBeat(beat);
+      } else if (beat === 13) {
+        // End marker
+        createClickSound(ctx, true);
+        setCurrentBeat(13);
       } else {
         // Done - save last beat's result as percentage
         if (beatSoundingSamples.beat >= 1 && beatSoundingSamples.samples > 0) {
@@ -572,8 +635,7 @@ export default function WholeNoteLessonExercise({
         beatIntervalRef.current = null;
         setIsPlaying(false);
         setCurrentBeat(0);
-        // Sync state with ref at the end (for UI if needed)
-        setSoundingOnBeats([...soundingOnBeatsRef.current]);
+        setCurrentMeasure(0);
         // Call onComplete callback if provided
         if (onCompleteRef.current) {
           onCompleteRef.current();
@@ -583,63 +645,84 @@ export default function WholeNoteLessonExercise({
     }, beatMs);
   }, [bpm, isPlaying]);
 
-  // Analyze singing/playing result (pitch AND rhythm)
+  // Analyze singing/playing result (pitch AND rhythm for both notes + silence during rest)
   const analyzePerformance = useCallback(() => {
     // Use refs for immediate values (state is async)
     const totalCount = totalSoundingCountRef.current;
     const pitchCount = onPitchCountRef.current;
     const hitTarget = hasHitTargetPitchRef.current;
     
-    const beatSoundPct = soundingOnBeatsRef.current; // Percentages (0-1) of each beat with sound
+    const beatSoundPct = soundingOnBeatsRef.current; // Percentages (0-1) for beats 1-13
     const startedEarly = startedEarlyRef.current;
-    console.log('[WholeNoteLesson] analyzePerformance:', { totalCount, pitchCount, hitTarget, beatSoundPct, startedEarly });
+    console.log('[WholeRestLesson] analyzePerformance:', { totalCount, pitchCount, hitTarget, beatSoundPct, startedEarly });
+    
+    // Thresholds
+    const SUSTAIN_THRESHOLD = 0.75; // Must sustain through 75%+ of each beat
+    const STOP_THRESHOLD = 0.75; // Allow up to 75% of stop beat (silence detection delay)
+    const SILENCE_THRESHOLD = 0.25; // Rest beats should have less than 25% sound
+    
+    // Beat mapping:
+    // Beats 0-3 (index 0-3): First whole note - should sound
+    // Beats 4-7 (index 4-7): Whole rest - should NOT sound
+    // Beats 8-11 (index 8-11): Second whole note - should sound
+    // Beat 12 (index 12): End marker - should stop
+    
+    // Check first whole note (beats 1-4, index 0-3)
+    const firstNoteBeats = beatSoundPct.slice(0, 4);
+    const firstNoteStarted = firstNoteBeats[0] >= SUSTAIN_THRESHOLD;
+    const firstNoteSustained = firstNoteBeats.filter(pct => pct >= SUSTAIN_THRESHOLD).length;
+    
+    // Check rest (beats 5-8, index 4-7)
+    const restBeats = beatSoundPct.slice(4, 8);
+    const restSilent = restBeats.filter(pct => pct < SILENCE_THRESHOLD).length;
+    const restOk = restSilent >= 3; // At least 3 of 4 rest beats should be silent (allow some transition)
+    
+    // Check second whole note (beats 9-12, index 8-11)
+    const secondNoteBeats = beatSoundPct.slice(8, 12);
+    const secondNoteStarted = secondNoteBeats[0] >= SUSTAIN_THRESHOLD;
+    const secondNoteSustained = secondNoteBeats.filter(pct => pct >= SUSTAIN_THRESHOLD).length;
+    
+    // Check ending (beat 13, index 12)
+    const stoppedAtEnd = beatSoundPct[12] < STOP_THRESHOLD;
     
     // Check if they produced sound at the correct pitch for at least some of the time
     if (totalCount === 0) {
-      // No sound detected
       return { success: false, pitchOk: false, rhythmOk: false, message: "No sound detected" };
     }
     const successRatio = pitchCount / totalCount;
-    // Pitch success if they were on pitch at least 30% of the time AND hit it at least once
     const pitchOk = hitTarget && successRatio >= 0.3;
     
-    // Rhythm analysis using percentages (0-1 scale)
-    // Beats 1-4 should have at least 75% sound (sustained through most of each beat)
-    // Beat 5 allows up to 75% due to silence detection delay (300ms) + natural release
-    // But if they hold through all of beat 5, it would be ~100%
-    const SUSTAIN_THRESHOLD = 0.75; // Must sustain through 75%+ of each beat
-    const STOP_THRESHOLD = 0.75; // Allow up to 75% of beat 5 (silence detection delay + release)
-    
-    const startedOnBeatOne = beatSoundPct[0] >= SUSTAIN_THRESHOLD;
-    const sustainedBeats = beatSoundPct.slice(0, 4).filter(pct => pct >= SUSTAIN_THRESHOLD).length;
-    const stoppedOnBeatFive = beatSoundPct[4] < STOP_THRESHOLD;
-    
-    // For rhythm to be "ok", they need precise timing:
-    // - Start on beat 1 with sustained sound
-    // - Not start early during count-in
-    // - Sustain through all 4 beats (75%+ coverage each)
-    // - Stop by beat 5 (allows silence detection delay + natural release)
-    const rhythmOk = startedOnBeatOne && !startedEarly && sustainedBeats === 4 && stoppedOnBeatFive;
+    // Rhythm analysis - need to pass all checks
+    const firstNoteOk = firstNoteStarted && firstNoteSustained === 4;
+    const secondNoteOk = secondNoteStarted && secondNoteSustained === 4;
+    const rhythmOk = !startedEarly && firstNoteOk && restOk && secondNoteOk && stoppedAtEnd;
     
     const success = pitchOk && rhythmOk;
     
+    // Generate appropriate message
     let message = "Great!";
     if (!pitchOk && !rhythmOk) {
-      message = "Try to match the pitch and hold for all 4 beats";
+      message = "Try to match the pitch and follow the rhythm";
     } else if (!pitchOk) {
       message = "Good rhythm! Try to match the pitch better";
     } else if (startedEarly) {
-      message = "Wait for beat ONE to start singing";
-    } else if (!startedOnBeatOne) {
-      message = "Start singing right on beat ONE (not late)";
-    } else if (sustainedBeats < 4) {
-      message = `Hold longer - you stopped early (sustained ${sustainedBeats} of 4 beats)`;
-    } else if (!stoppedOnBeatFive) {
-      message = "Stop right on the next ONE - you held too long";
+      message = "Wait for beat ONE to start";
+    } else if (!firstNoteStarted) {
+      message = "Start the first note right on beat ONE";
+    } else if (firstNoteSustained < 4) {
+      message = `First note too short - hold for all 4 beats`;
+    } else if (!restOk) {
+      message = "Stay silent during the REST (4 beats of silence)";
+    } else if (!secondNoteStarted) {
+      message = "Start the second note right on beat 9";
+    } else if (secondNoteSustained < 4) {
+      message = `Second note too short - hold for all 4 beats`;
+    } else if (!stoppedAtEnd) {
+      message = "Stop right on the final ONE";
     }
     
-    return { success, pitchOk, rhythmOk, message };
-  }, []); // All values now come from refs
+    return { success, pitchOk, rhythmOk, message, firstNoteOk, restOk, secondNoteOk };
+  }, []);
 
   // Handle done singing - show result, user clicks Continue to proceed
   const handleDoneSinging = useCallback(() => {
@@ -648,7 +731,6 @@ export default function WholeNoteLessonExercise({
     if (!result.success) {
       setSingAttempts(prev => prev + 1);
     }
-    // Don't auto-advance - let user see feedback and click Continue
   }, [analyzePerformance]);
 
   // Handle try again singing
@@ -657,9 +739,8 @@ export default function WholeNoteLessonExercise({
     hasHitTargetPitchRef.current = false;
     onPitchCountRef.current = 0;
     totalSoundingCountRef.current = 0;
-    soundingOnBeatsRef.current = [0, 0, 0, 0, 0];
+    soundingOnBeatsRef.current = Array(13).fill(0);
     startedEarlyRef.current = false;
-    setSoundingOnBeats([false, false, false, false, false]);
     // Delay to allow pitch detection to re-enable after state change
     setTimeout(() => {
       playMetronomeOnly(handleDoneSinging);
@@ -673,9 +754,8 @@ export default function WholeNoteLessonExercise({
     hasHitTargetPitchRef.current = false;
     onPitchCountRef.current = 0;
     totalSoundingCountRef.current = 0;
-    soundingOnBeatsRef.current = [0, 0, 0, 0, 0];
+    soundingOnBeatsRef.current = Array(13).fill(0);
     startedEarlyRef.current = false;
-    setSoundingOnBeats([false, false, false, false, false]);
     setPhase(PHASE.PLAY);
   }, [stopPlayback]);
 
@@ -686,7 +766,6 @@ export default function WholeNoteLessonExercise({
     if (!result.success) {
       setPlayAttempts(prev => prev + 1);
     }
-    // Don't auto-advance - let user see feedback and click Continue
   }, [analyzePerformance]);
 
   // Handle try again playing
@@ -695,9 +774,8 @@ export default function WholeNoteLessonExercise({
     hasHitTargetPitchRef.current = false;
     onPitchCountRef.current = 0;
     totalSoundingCountRef.current = 0;
-    soundingOnBeatsRef.current = [0, 0, 0, 0, 0];
+    soundingOnBeatsRef.current = Array(13).fill(0);
     startedEarlyRef.current = false;
-    setSoundingOnBeats([false, false, false, false, false]);
     // Delay to allow pitch detection to re-enable after state change
     setTimeout(() => {
       playMetronomeOnly(handleDonePlaying);
@@ -712,9 +790,8 @@ export default function WholeNoteLessonExercise({
     hasHitTargetPitchRef.current = false;
     onPitchCountRef.current = 0;
     totalSoundingCountRef.current = 0;
-    soundingOnBeatsRef.current = [0, 0, 0, 0, 0];
+    soundingOnBeatsRef.current = Array(13).fill(0);
     startedEarlyRef.current = false;
-    setSoundingOnBeats([false, false, false, false, false]);
     setHasHeardPattern(false);
     setSingAttempts(0);
     setPlayAttempts(0);
@@ -746,15 +823,15 @@ export default function WholeNoteLessonExercise({
     });
   }, [successfulRounds, masteryStreak, onProgress]);
 
-  // Memoized notation content to prevent flickering on beat changes
-  // Always render the notation, just hide it when not needed
+  // Memoized notation content
   const memoizedNotation = useMemo(() => {
     if (!NotationDisplay) return null;
     return (
       <NotationDisplay
         musicxml={musicXML}
-        width={320}
-        height={250}
+        width={360}
+        height={180}
+        showTimeSignature={true}
       />
     );
   }, [musicXML]);
@@ -794,27 +871,33 @@ export default function WholeNoteLessonExercise({
     return (
       <View style={styles.focusCardMini}>
         <View style={styles.focusCardMiniLeft}>
-          <View style={styles.wholeNoteOvalMini} />
+          <View style={styles.wholeRestRectangleMini} />
         </View>
         <View style={styles.focusCardMiniRight}>
-          <Text style={styles.focusCardMiniTitle}>Whole Note</Text>
-          <Text style={styles.focusCardMiniText}>4 beats → ends on next ONE</Text>
+          <Text style={styles.focusCardMiniTitle}>Whole Rest</Text>
+          <Text style={styles.focusCardMiniText}>4 beats of silence → hangs below the line</Text>
         </View>
       </View>
     );
   };
 
-  // Beat indicator component with count-in above
+  // Beat indicator component with count-in above - for 12 beats + ending
   const BeatIndicator = () => {
     // Count-in uses negative beats: -4, -3, -2, -1
     const isInCountIn = currentBeat < 0;
     
+    // Map display beat to 1-4 within each measure
+    const getDisplayBeat = (beat) => {
+      if (beat <= 0) return 0;
+      return ((beat - 1) % 4) + 1;
+    };
+    
     return (
       <View style={styles.beatIndicatorContainer}>
-        {/* Count-in row (above) */}
-        <View style={styles.countInRow}>
-          <Text style={styles.countInLabel}>Count in:</Text>
-          <View style={styles.countInBeats}>
+        {/* Count-in row */}
+        <View style={styles.indicatorRow}>
+          <Text style={styles.indicatorLabel}>Count in:</Text>
+          <View style={styles.indicatorBeats}>
             {[-4, -3, -2, -1].map((beat, index) => (
               <View
                 key={beat}
@@ -835,10 +918,10 @@ export default function WholeNoteLessonExercise({
           </View>
         </View>
         
-        {/* Sing row (below) */}
-        <View style={styles.singRow}>
-          <Text style={styles.singLabel}>Sing:</Text>
-          <View style={styles.beatIndicator}>
+        {/* Measure 1: First whole note */}
+        <View style={styles.indicatorRow}>
+          <Text style={[styles.indicatorLabel, styles.playLabel]}>Note:</Text>
+          <View style={styles.indicatorBeats}>
             {[1, 2, 3, 4].map((beat) => (
               <View
                 key={beat}
@@ -856,16 +939,65 @@ export default function WholeNoteLessonExercise({
                 </Text>
               </View>
             ))}
+          </View>
+        </View>
+        
+        {/* Measure 2: Whole rest */}
+        <View style={styles.indicatorRow}>
+          <Text style={[styles.indicatorLabel, styles.restLabel]}>Rest:</Text>
+          <View style={styles.indicatorBeats}>
+            {[5, 6, 7, 8].map((beat) => (
+              <View
+                key={beat}
+                style={[
+                  styles.restDot,
+                  currentBeat >= beat && styles.restDotActive,
+                  beat === 5 && styles.restDotAccent,
+                ]}
+              >
+                <Text style={[
+                  styles.restNumber,
+                  currentBeat >= beat && styles.restNumberActive,
+                ]}>
+                  {getDisplayBeat(beat)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+        
+        {/* Measure 3: Second whole note */}
+        <View style={styles.indicatorRow}>
+          <Text style={[styles.indicatorLabel, styles.playLabel]}>Note:</Text>
+          <View style={styles.indicatorBeats}>
+            {[9, 10, 11, 12].map((beat) => (
+              <View
+                key={beat}
+                style={[
+                  styles.beatDot,
+                  currentBeat >= beat && styles.beatDotActive,
+                  beat === 9 && styles.beatDotAccent,
+                ]}
+              >
+                <Text style={[
+                  styles.beatNumber,
+                  currentBeat >= beat && styles.beatNumberActive,
+                ]}>
+                  {getDisplayBeat(beat)}
+                </Text>
+              </View>
+            ))}
+            {/* End marker */}
             <View
               style={[
                 styles.beatDot,
                 styles.beatDotStop,
-                currentBeat === 5 && styles.beatDotStopActive,
+                currentBeat === 13 && styles.beatDotStopActive,
               ]}
             >
               <Text style={[
                 styles.beatNumber,
-                currentBeat === 5 && styles.beatNumberStopActive,
+                currentBeat === 13 && styles.beatNumberStopActive,
               ]}>
                 1
               </Text>
@@ -876,7 +1008,7 @@ export default function WholeNoteLessonExercise({
     );
   };
 
-  // Attestation Modal - memoized to prevent flicker
+  // Attestation Modal
   const attestationModal = useMemo(() => (
     <Modal
       visible={showAttestModal}
@@ -918,22 +1050,26 @@ export default function WholeNoteLessonExercise({
           contentContainerStyle={styles.scrollContent}
         >
           <View style={styles.focusCard}>
-            <Text style={styles.focusCardTitle}>Whole Note</Text>
-            <View style={styles.wholeNoteSymbol}>
-              <View style={styles.wholeNoteOval} />
+            <Text style={styles.focusCardTitle}>Whole Rest</Text>
+            <View style={styles.wholeRestSymbol}>
+              {/* Staff line representation */}
+              <View style={styles.staffLineContainer}>
+                <View style={styles.staffLine} />
+                <View style={styles.wholeRestRectangle} />
+              </View>
             </View>
             <Text style={styles.focusCardDescription}>
-              A whole note lasts for 4 beats.
+              A whole rest lasts for 4 beats of silence.
             </Text>
             <View style={styles.focusCardDivider} />
             <Text style={styles.focusCardCue}>
-              The note ends right on the next ONE.
+              It hangs BELOW the line because it's heavy.
             </Text>
             <Text style={styles.focusCardDetail}>
-              Count: 1 - 2 - 3 - 4 - (1)
+              Think of it as a heavy weight that needs to hang down.
             </Text>
-            <Text style={styles.focusCardDetail}>
-              The sound stops exactly when the next "1" arrives.
+            <Text style={styles.focusCardMnemonic}>
+              🏋️ "Heavy rest hangs low"
             </Text>
           </View>
         </ScrollView>
@@ -966,8 +1102,8 @@ export default function WholeNoteLessonExercise({
             {noteInfo.accidental}
           </Text>
           <Text style={styles.instruction}>
-            Listen to the whole note.{"\n"}
-            Notice how it lasts 4 beats and ends on the next ONE.
+            Listen to: whole note, whole rest (silence), whole note.{"\n"}
+            Notice the 4 beats of silence in the middle.
           </Text>
           
           {isPlaying && <BeatIndicator />}
@@ -977,11 +1113,10 @@ export default function WholeNoteLessonExercise({
         
         <View style={styles.fixedBottomButtons}>
           {!hasHeardPattern ? (
-            // First time - just show Hear Pattern as primary
             <TouchableOpacity
               style={[styles.primaryButton, isPlaying && styles.buttonDisabled]}
               onPress={() => {
-                playWholeNote(() => setHasHeardPattern(true));
+                playPattern(() => setHasHeardPattern(true));
               }}
               disabled={isPlaying}
             >
@@ -990,11 +1125,10 @@ export default function WholeNoteLessonExercise({
               </Text>
             </TouchableOpacity>
           ) : (
-            // After hearing - Hear Again on top (secondary), I Heard It at bottom (primary)
             <>
               <TouchableOpacity
                 style={[styles.secondaryButton, isPlaying && styles.buttonDisabled]}
-                onPress={playWholeNote}
+                onPress={playPattern}
                 disabled={isPlaying}
               >
                 <Text style={styles.secondaryButtonText}>
@@ -1035,8 +1169,8 @@ export default function WholeNoteLessonExercise({
             {noteInfo.accidental}
           </Text>
           <Text style={styles.instruction}>
-            Sing the whole note on solfege (do).{"\n"}
-            Hold it for 4 beats, ending on the next ONE.
+            Sing: whole note (4 beats), then REST (4 beats silent), then whole note (4 beats).{"\n"}
+            Stay completely silent during the rest!
           </Text>
           
           {isPlaying && <BeatIndicator />}
@@ -1082,7 +1216,7 @@ export default function WholeNoteLessonExercise({
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <TouchableOpacity
                   style={[styles.secondaryButton, { flex: 1 }, isPlaying && styles.buttonDisabled]}
-                  onPress={playWholeNote}
+                  onPress={playPattern}
                   disabled={isPlaying}
                 >
                   <Text style={styles.secondaryButtonText}>
@@ -1140,16 +1274,16 @@ export default function WholeNoteLessonExercise({
             {noteInfo.accidental}
           </Text>
           <Text style={styles.instruction}>
-            Imagine playing this whole note on your instrument.{"\n"}
-            Hear the sound in your mind lasting 4 beats, ending on the next ONE.
+            Imagine playing: note (4 beats), rest (silence!), note (4 beats).{"\n"}
+            Hear the silence clearly in your mind.
           </Text>
           
           {isPlaying && <BeatIndicator />}
           
           <View style={styles.imagineVisual}>
-            <Text style={styles.imagineEmoji}>🎵</Text>
+            <Text style={styles.imagineEmoji}>🎵 🤫 🎵</Text>
             <Text style={styles.imagineHint}>
-              Hear your instrument: 1 - 2 - 3 - 4 - (1)
+              Note → Silence → Note
             </Text>
           </View>
           
@@ -1193,8 +1327,8 @@ export default function WholeNoteLessonExercise({
             {noteInfo.accidental}
           </Text>
           <Text style={styles.instruction}>
-            Play the whole note on your instrument.{"\n"}
-            Hold for 4 beats, release on the next ONE.
+            Play: whole note (4 beats), whole rest (silent!), whole note (4 beats).{"\n"}
+            Make the rest completely silent!
           </Text>
           
           {isPlaying && <BeatIndicator />}
@@ -1240,7 +1374,7 @@ export default function WholeNoteLessonExercise({
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <TouchableOpacity
                   style={[styles.secondaryButton, { flex: 1 }, isPlaying && styles.buttonDisabled]}
-                  onPress={playWholeNote}
+                  onPress={playPattern}
                   disabled={isPlaying}
                 >
                   <Text style={styles.secondaryButtonText}>
@@ -1309,7 +1443,7 @@ export default function WholeNoteLessonExercise({
             <Text style={styles.successEmoji}>🎉</Text>
             <Text style={styles.successTitle}>Mastered!</Text>
             <Text style={styles.successSubtitle}>
-              You've learned the whole note
+              You've learned the whole rest
             </Text>
           </View>
         </View>
@@ -1348,8 +1482,8 @@ export default function WholeNoteLessonExercise({
           <View style={styles.reminderBox}>
             <Text style={styles.reminderTitle}>Remember:</Text>
             <Text style={styles.reminderText}>
-              A whole note = 4 beats{"\n"}
-              It ends right on the next ONE
+              Whole rest = 4 beats of SILENCE{"\n"}
+              It hangs BELOW the line (heavy!)
             </Text>
           </View>
         </ScrollView>
@@ -1399,19 +1533,32 @@ const styles = StyleSheet.create({
     color: "#f5e6d3",
     marginBottom: 16,
   },
-  wholeNoteSymbol: {
+  wholeRestSymbol: {
     marginBottom: 16,
     alignItems: "center",
     justifyContent: "center",
   },
-  wholeNoteOval: {
-    width: 56,
-    height: 40,
-    borderRadius: 28,
-    borderWidth: 4,
-    borderColor: "#d4a574",
-    backgroundColor: "transparent",
-    transform: [{ rotate: "-15deg" }],
+  staffLineContainer: {
+    position: "relative",
+    width: 80,
+    height: 60,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  staffLine: {
+    position: "absolute",
+    top: "50%",
+    width: 80,
+    height: 3,
+    backgroundColor: "#d4a574",
+  },
+  wholeRestRectangle: {
+    position: "absolute",
+    top: "50%", // Starts at the line
+    width: 24,
+    height: 16,
+    backgroundColor: "#d4a574",
+    borderRadius: 2,
   },
   focusCardDescription: {
     fontSize: 20,
@@ -1438,8 +1585,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 8,
   },
+  focusCardMnemonic: {
+    fontSize: 18,
+    color: "#d4a574",
+    textAlign: "center",
+    marginTop: 16,
+    fontWeight: "600",
+  },
 
-  // Focus Card Mini - shown throughout lesson
+  // Focus Card Mini
   focusCardMini: {
     flexDirection: "row",
     backgroundColor: "#2d241a",
@@ -1454,15 +1608,13 @@ const styles = StyleSheet.create({
     marginRight: 12,
     justifyContent: "center",
     alignItems: "center",
+    width: 40,
   },
-  wholeNoteOvalMini: {
-    width: 32,
-    height: 24,
-    borderRadius: 16,
-    borderWidth: 3,
-    borderColor: "#d4a574",
-    backgroundColor: "transparent",
-    transform: [{ rotate: "-15deg" }],
+  wholeRestRectangleMini: {
+    width: 20,
+    height: 12,
+    backgroundColor: "#d4a574",
+    borderRadius: 2,
   },
   focusCardMiniRight: {
     flex: 1,
@@ -1507,26 +1659,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   
-  // Count-in row
-  countInRow: {
+  // Generic indicator row
+  indicatorRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  countInLabel: {
-    fontSize: 14,
+  indicatorLabel: {
+    fontSize: 13,
     color: "#8a7a6a",
-    marginRight: 12,
-    width: 60,
+    marginRight: 10,
+    width: 65,
+    textAlign: "right",
   },
-  countInBeats: {
+  indicatorBeats: {
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
   },
+  playLabel: {
+    color: "#d4a574",
+    fontWeight: "600",
+  },
+  restLabel: {
+    color: "#8a9a8a",
+    fontWeight: "600",
+  },
+  
+  // Count-in dots
   countInDot: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: "#2d241a",
     borderWidth: 2,
     borderColor: "#3b2c1a",
@@ -1549,30 +1712,11 @@ const styles = StyleSheet.create({
     color: "#1a1410",
   },
   
-  // Sing row
-  singRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  singLabel: {
-    fontSize: 14,
-    color: "#d4a574",
-    marginRight: 12,
-    width: 60,
-    fontWeight: "600",
-  },
-  
-  // Beat indicator
-  beatIndicator: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-  },
+  // Beat dots (for notes)
   beatDot: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "#2d241a",
     borderWidth: 2,
     borderColor: "#3b2c1a",
@@ -1594,7 +1738,7 @@ const styles = StyleSheet.create({
     borderColor: "#e57373",
   },
   beatNumber: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "600",
     color: "#666",
   },
@@ -1603,6 +1747,34 @@ const styles = StyleSheet.create({
   },
   beatNumberStopActive: {
     color: "#fff",
+  },
+  
+  // Rest dots
+  restDot: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#1a201a",
+    borderWidth: 2,
+    borderColor: "#2a3a2a",
+    borderStyle: "dashed",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  restDotActive: {
+    backgroundColor: "#3a4a3a",
+    borderColor: "#5a6a5a",
+  },
+  restDotAccent: {
+    borderColor: "#4a5a4a",
+  },
+  restNumber: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#5a6a5a",
+  },
+  restNumberActive: {
+    color: "#9aba9a",
   },
 
   // Volume/visualizer
@@ -1637,7 +1809,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 8,
     marginBottom: 8,
-    minHeight: 266,
+    minHeight: 200,
     overflow: "visible",
   },
   hideNotationButton: {
@@ -1658,7 +1830,7 @@ const styles = StyleSheet.create({
     marginVertical: 24,
   },
   imagineEmoji: {
-    fontSize: 64,
+    fontSize: 48,
     marginBottom: 16,
   },
   imagineHint: {
