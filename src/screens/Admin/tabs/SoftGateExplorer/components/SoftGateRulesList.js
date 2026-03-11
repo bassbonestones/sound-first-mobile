@@ -38,23 +38,25 @@ export default function SoftGateRulesList() {
         setShowEditModal(true);
       }}
     >
-      <View style={styles.listItemHeader}>
-        <Text style={styles.listItemTitle}>{item.dimension_name}</Text>
-      </View>
-      <View style={styles.listItemDetails}>
-        <Text style={styles.listItemDetail}>
-          Buffer: {item.frontier_buffer}
+      <View style={styles.listItemContent}>
+        <View style={styles.listItemHeader}>
+          <Text style={styles.listItemTitle}>{item.dimension_name}</Text>
+        </View>
+        <View style={styles.listItemDetails}>
+          <Text style={styles.listItemDetail}>
+            Buffer: {item.frontier_buffer}
+          </Text>
+          <Text style={styles.listItemDetail}>Step: {item.promotion_step}</Text>
+          <Text style={styles.listItemDetail}>
+            Min Attempts: {item.min_attempts}
+          </Text>
+        </View>
+        <Text style={styles.listItemSubtext}>
+          Success: {item.success_required_count} of{" "}
+          {item.success_window_count || "all"} @ rating ≥{" "}
+          {item.success_rating_threshold}
         </Text>
-        <Text style={styles.listItemDetail}>Step: {item.promotion_step}</Text>
-        <Text style={styles.listItemDetail}>
-          Min Attempts: {item.min_attempts}
-        </Text>
       </View>
-      <Text style={styles.listItemSubtext}>
-        Success: {item.success_required_count} of{" "}
-        {item.success_window_count || "all"} @ rating ≥{" "}
-        {item.success_rating_threshold}
-      </Text>
     </TouchableOpacity>
   );
 

@@ -13,6 +13,7 @@ import {
   Modal,
 } from "react-native";
 import { getExerciseComponent } from "./exercises";
+import { useUser } from "../../../context/UserContext";
 
 /**
  * Intro screen shown before starting the exercise
@@ -226,6 +227,12 @@ export default function TeachingModuleSession({
   const [result, setResult] = useState(null);
   const [progress, setProgress] = useState({ streak: 0, masteryRequired: 8 });
 
+  // Get user's instrument for range info
+  const { selectedInstrument } = useUser();
+  const userRangeLow = selectedInstrument?.range_low || userResonantNote || "F3";
+  const userRangeHigh = selectedInstrument?.range_high || userResonantNote || "F3";
+  const userClef = selectedInstrument?.clef || "treble";
+
   // Get the exercise component for this lesson
   const ExerciseComponent = getExerciseComponent(mini.exercise_template_id);
 
@@ -362,6 +369,10 @@ export default function TeachingModuleSession({
         onComplete={handleExerciseComplete}
         onProgress={handleProgress}
         userFirstNote={userResonantNote || "F3"}
+        userRangeLow={userRangeLow}
+        userRangeHigh={userRangeHigh}
+        clef={userClef}
+        direction={mini.exercise_config?.expansion_direction || "up"}
       />
     </SafeAreaView>
   );

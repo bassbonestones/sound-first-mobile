@@ -1138,17 +1138,28 @@ function UserSoftGatesTab({ userData, userId, onRefresh }) {
 
 function UserCandidatesTab({ userId }) {
   const [candidates, setCandidates] = useState(null);
+  const [availableModules, setAvailableModules] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const loadCandidates = async () => {
     setLoading(true);
     try {
+      // Load material candidates
       const response = await fetch(
         `${baseUrl}/admin/users/${userId}/session-candidates`,
       );
       if (response.ok) {
         const data = await response.json();
         setCandidates(data);
+      }
+      
+      // Load available teaching modules
+      const modulesResponse = await fetch(
+        `${baseUrl}/modules/user/${userId}/available`,
+      );
+      if (modulesResponse.ok) {
+        const modulesData = await modulesResponse.json();
+        setAvailableModules(modulesData);
       }
     } catch (err) {
       console.error("[AdminScreen] Load candidates error:", err);
@@ -1170,6 +1181,34 @@ function UserCandidatesTab({ userId }) {
 
   return (
     <View>
+      <View style={styles.detailSection}>
+        <Text style={styles.detailSectionTitle}>
+          Available Teaching Modules
+        </Text>
+        {availableModules?.length > 0 ? (
+          <>
+            <Text style={styles.candidateCount}>
+              {availableModules.length} modules available
+            </Text>
+            {availableModules.map((mod, idx) => (
+              <View key={idx} style={styles.candidateItem}>
+                <Text style={styles.candidateTitle}>{mod.display_name}</Text>
+                <Text style={styles.candidateReason}>
+                  {mod.capability_name} • {mod.status === 'not_started' ? 'Not started' : mod.status === 'in_progress' ? `In progress (${mod.lessons_completed}/${mod.lesson_count})` : mod.status}
+                </Text>
+                {mod.prerequisite_capability_names?.length > 0 && (
+                  <Text style={styles.candidateReason}>
+                    Prereqs: {mod.prerequisite_capability_names.join(', ')}
+                  </Text>
+                )}
+              </View>
+            ))}
+          </>
+        ) : (
+          <Text style={styles.noDataText}>No teaching modules available (check prerequisites)</Text>
+        )}
+      </View>
+
       <View style={styles.detailSection}>
         <Text style={styles.detailSectionTitle}>
           Candidate Pool for Next Session

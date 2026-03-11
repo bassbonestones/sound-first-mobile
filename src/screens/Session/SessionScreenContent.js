@@ -15,6 +15,7 @@ import HelpMenu from "../../components/HelpMenu";
 import MiniLesson from "../../components/MiniLesson";
 import ResetButton from "../../components/ResetButton";
 import { useSession } from "./context/SessionContext";
+import { useUser } from "../../context/UserContext";
 import useTools from "./hooks/useTools";
 import FocusCard from "./components/FocusCard";
 import MaterialCard from "./components/MaterialCard";
@@ -102,6 +103,9 @@ export default function SessionScreenContent() {
     cancelMuteLongPress,
     handleMutePress,
   } = useTools(current);
+
+  // Get user context for range updates
+  const { selectedInstrument, updateInstrument, userId } = useUser();
 
   // Loading state
   if (loading) {
@@ -208,12 +212,37 @@ export default function SessionScreenContent() {
           correct_count: result.correctCount || 8,
         });
 
-        const url = `${baseUrl}/modules/user/1/lesson/${mini.lesson_id}/complete?${params}`;
+        const url = `${baseUrl}/modules/user/${userId}/lesson/${mini.lesson_id}/complete?${params}`;
         console.log("[Session] Calling:", url);
 
         const response = await fetch(url, { method: "POST" });
         const data = await response.json();
         console.log("[Session] Complete response:", JSON.stringify(data));
+
+        // Check if this was a range expansion exercise and update user's range
+        if (result.direction && result.targetNote && selectedInstrument) {
+          console.log("[Session] Range expansion detected, updating range");
+          const rangeUpdate = {};
+
+          if (result.direction === "up") {
+            // Expand range_high to the target note
+            rangeUpdate.range_high = result.targetNote;
+            console.log(`[Session] Expanding range_high to: ${result.targetNote}`);
+          } else if (result.direction === "down") {
+            // Expand range_low to the target note
+            rangeUpdate.range_low = result.targetNote;
+            console.log(`[Session] Expanding range_low to: ${result.targetNote}`);
+          }
+
+          if (Object.keys(rangeUpdate).length > 0) {
+            try {
+              await updateInstrument(selectedInstrument.id, rangeUpdate);
+              console.log("[Session] Range updated successfully:", rangeUpdate);
+            } catch (rangeErr) {
+              console.warn("[Session] Failed to update range:", rangeErr);
+            }
+          }
+        }
       } catch (err) {
         console.warn("[Session] Failed to record lesson completion:", err);
       }

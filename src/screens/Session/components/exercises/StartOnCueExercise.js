@@ -445,25 +445,29 @@ export default function StartOnCueExercise({
 
     setIsPlayingNote(true);
     const freq = noteToFrequency(userFirstNote);
-    const duration = 1.0;
+    const duration = 1.5;
+    const attackTime = 0.05; // Smooth fade-in to avoid click
+    const releaseTime = 0.3; // Smooth fade-out
+    const ctx = audioContextRef.current;
+    const now = ctx.currentTime;
 
-    const oscillator = audioContextRef.current.createOscillator();
-    const gainNode = audioContextRef.current.createGain();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
 
     oscillator.connect(gainNode);
-    gainNode.connect(audioContextRef.current.destination);
+    gainNode.connect(ctx.destination);
 
     oscillator.frequency.value = freq;
     oscillator.type = "sine";
 
-    gainNode.gain.setValueAtTime(0.5, audioContextRef.current.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(
-      0.001,
-      audioContextRef.current.currentTime + duration,
-    );
+    // Smooth envelope: fade in, sustain, fade out (avoids clicks)
+    gainNode.gain.setValueAtTime(0.0001, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.4, now + attackTime);
+    gainNode.gain.setValueAtTime(0.4, now + duration - releaseTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
-    oscillator.start(audioContextRef.current.currentTime);
-    oscillator.stop(audioContextRef.current.currentTime + duration);
+    oscillator.start(now);
+    oscillator.stop(now + duration);
 
     safeTimeout(() => setIsPlayingNote(false), duration * 1000);
   }, [userFirstNote, noteToFrequency, isPlayingNote, safeTimeout]);

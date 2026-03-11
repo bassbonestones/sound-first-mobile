@@ -20,6 +20,7 @@ import {
   StartOnCueExercise,
   FeelThePulseExercise,
   RangeExpansionExercise,
+  WholeNoteLessonExercise,
 } from "./Session/components/exercises";
 import {
   getAvailablePatterns,
@@ -73,6 +74,27 @@ function noteToMidi(noteName) {
   if (parsed.accidental === "#") noteIndex += 1;
   if (parsed.accidental === "b") noteIndex -= 1;
   return (parsed.octave + 1) * 12 + noteIndex;
+}
+
+/**
+ * Lower a note chromatically while preserving the letter name.
+ * Used for "di" → "do" relationships where di is a raised do.
+ * B → Bb, C# → C, D → Db, etc.
+ */
+function chromaticLower(noteName) {
+  const parsed = parseNoteName(noteName);
+  if (!parsed) return noteName;
+
+  let newAccidental;
+  if (parsed.accidental === "#") {
+    newAccidental = ""; // sharp becomes natural
+  } else if (parsed.accidental === "b") {
+    newAccidental = "bb"; // flat becomes double-flat (rare)
+  } else {
+    newAccidental = "b"; // natural becomes flat
+  }
+
+  return `${parsed.letter}${newAccidental}${parsed.octave}`;
 }
 
 function midiToNote(midi, preferFlats = true) {
@@ -203,6 +225,18 @@ const EXERCISES = [
       clef: "treble",
     },
   },
+  {
+    id: "whole_note_lesson",
+    name: "Whole Note Lesson",
+    icon: "🎵",
+    description: "Learn the whole note: 4 beats, ends on the next ONE",
+    component: WholeNoteLessonExercise,
+    config: { bpm: 60 },
+    mastery: { correct_streak: 3 },
+    extraProps: {
+      userFirstNote: "F3",
+    },
+  },
 ];
 
 export default function ExerciseTestScreen() {
@@ -242,6 +276,16 @@ export default function ExerciseTestScreen() {
   // The anchor is calculated by subtracting the pattern's targetInterval
   const anchorNote = useMemo(() => {
     if (!selectedPattern) return selectedTargetNote;
+
+    // Special case: for chromatic raising patterns (di = raised do),
+    // use chromaticLower to preserve the letter name (B → Bb, not A#)
+    if (
+      selectedPattern.direction === "up" &&
+      selectedPattern.targetInterval === 1
+    ) {
+      return chromaticLower(selectedTargetNote);
+    }
+
     const targetMidi = noteToMidi(selectedTargetNote);
     // targetInterval is positive for up patterns (e.g., 1, 2), negative for down (e.g., -1, -2)
     // anchor = target - targetInterval
@@ -255,10 +299,13 @@ export default function ExerciseTestScreen() {
   // This uses anchor + first interval
   const startingPitch = useMemo(() => {
     if (!selectedPattern) return anchorNote;
-    const anchorMidi = noteToMidi(anchorNote);
     const firstInterval = selectedPattern.intervals[0] || 0;
-    return midiToNoteInContext(anchorMidi + firstInterval, selectedTargetNote);
-  }, [anchorNote, selectedPattern, selectedTargetNote]);
+    // If starting on the anchor (interval 0), use anchorNote directly
+    // to preserve its spelling (e.g., Bb not A#)
+    if (firstInterval === 0) return anchorNote;
+    const anchorMidi = noteToMidi(anchorNote);
+    return midiToNoteInContext(anchorMidi + firstInterval, anchorNote);
+  }, [anchorNote, selectedPattern]);
 
   const handleComplete = (exerciseResult) => {
     console.log("[ExerciseTest] Complete:", exerciseResult);
@@ -324,92 +371,96 @@ export default function ExerciseTestScreen() {
           <Text style={styles.headerTitle}>Configure Exercise</Text>
         </View>
 
-        <ScrollView
-          style={styles.configScroll}
-          contentContainerStyle={styles.configContent}
-        >
-          <Text style={styles.configTitle}>
-            {pendingExercise.icon} {pendingExercise.name}
-          </Text>
-
-          {/* Clef Selection */}
-          <Text style={styles.sectionLabel}>Clef</Text>
-          <View style={styles.optionRow}>
-            <TouchableOpacity
-              style={[
-                styles.optionButton,
-                selectedClef === "treble" && styles.optionButtonSelected,
-              ]}
-              onPress={() => setSelectedClef("treble")}
-            >
-              <Text style={styles.optionSymbol}>𝄞</Text>
-              <Text style={styles.optionLabel}>Treble</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.optionButton,
-                selectedClef === "bass" && styles.optionButtonSelected,
-              ]}
-              onPress={() => setSelectedClef("bass")}
-            >
-              <Text style={styles.optionSymbol}>𝄢</Text>
-              <Text style={styles.optionLabel}>Bass</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Target Pitch Selection with Staff */}
-          <Text style={styles.sectionLabel}>
-            Target Pitch (new note to reach)
-          </Text>
-          <View style={styles.staffPickerContainer}>
-            <StaffNotePicker
-              clef={selectedClef}
-              value={selectedTargetNote}
-              onChange={setSelectedTargetNote}
-            />
-          </View>
-          <Text style={styles.anchorLabel}>Starting from: {startingPitch}</Text>
-
-          {/* Pattern Selection */}
-          <Text style={styles.sectionLabel}>Exercise Pattern</Text>
-          <View style={styles.patternList}>
-            {availablePatterns.map((pattern) => (
-              <TouchableOpacity
-                key={pattern.id}
-                style={[
-                  styles.patternCard,
-                  selectedPatternId === pattern.id &&
-                    styles.patternCardSelected,
-                ]}
-                onPress={() => setSelectedPatternId(pattern.id)}
-              >
-                <View style={styles.patternHeader}>
-                  <Text style={styles.patternName}>{pattern.name}</Text>
-                  <Text style={styles.patternSolfege}>{pattern.solfege}</Text>
-                </View>
-                <Text style={styles.patternDescription}>
-                  {pattern.description}
-                </Text>
-                <Text style={styles.patternIntervals}>
-                  Intervals: [{pattern.intervals.join(", ")}]
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Start Button */}
-          <TouchableOpacity
-            style={[
-              styles.startButton,
-              !selectedPatternId && styles.startButtonDisabled,
-            ]}
-            onPress={handleStartWithConfig}
-            disabled={!selectedPatternId}
+        <View style={{ flex: 1 }}>
+          <ScrollView
+            style={styles.configScroll}
+            contentContainerStyle={styles.configContent}
           >
-            <Text style={styles.startButtonText}>Start Exercise</Text>
-          </TouchableOpacity>
-        </ScrollView>
+            <Text style={styles.configTitle}>
+              {pendingExercise.icon} {pendingExercise.name}
+            </Text>
+
+            {/* Clef Selection */}
+            <Text style={styles.sectionLabel}>Clef</Text>
+            <View style={styles.optionRow}>
+              <TouchableOpacity
+                style={[
+                  styles.optionButton,
+                  selectedClef === "treble" && styles.optionButtonSelected,
+                ]}
+                onPress={() => setSelectedClef("treble")}
+              >
+                <Text style={styles.optionSymbol}>𝄞</Text>
+                <Text style={styles.optionLabel}>Treble</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.optionButton,
+                  selectedClef === "bass" && styles.optionButtonSelected,
+                ]}
+                onPress={() => setSelectedClef("bass")}
+              >
+                <Text style={styles.optionSymbol}>𝄢</Text>
+                <Text style={styles.optionLabel}>Bass</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Target Pitch Selection with Staff */}
+            <Text style={styles.sectionLabel}>
+              Target Pitch (new note to reach)
+            </Text>
+            <View style={styles.staffPickerContainer}>
+              <StaffNotePicker
+                clef={selectedClef}
+                value={selectedTargetNote}
+                onChange={setSelectedTargetNote}
+              />
+            </View>
+            <Text style={styles.anchorLabel}>Starting from: {startingPitch}</Text>
+
+            {/* Pattern Selection */}
+            <Text style={styles.sectionLabel}>Exercise Pattern</Text>
+            <View style={styles.patternList}>
+              {availablePatterns.map((pattern) => (
+                <TouchableOpacity
+                  key={pattern.id}
+                  style={[
+                    styles.patternCard,
+                    selectedPatternId === pattern.id &&
+                      styles.patternCardSelected,
+                  ]}
+                  onPress={() => setSelectedPatternId(pattern.id)}
+                >
+                  <View style={styles.patternHeader}>
+                    <Text style={styles.patternName}>{pattern.name}</Text>
+                    <Text style={styles.patternSolfege}>{pattern.solfege}</Text>
+                  </View>
+                  <Text style={styles.patternDescription}>
+                    {pattern.description}
+                  </Text>
+                  <Text style={styles.patternIntervals}>
+                    Intervals: [{pattern.intervals.join(", ")}]
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+
+          {/* Fixed Start Button */}
+          <View style={styles.fixedBottomButton}>
+            <TouchableOpacity
+              style={[
+                styles.startButton,
+                !selectedPatternId && styles.startButtonDisabled,
+              ]}
+              onPress={handleStartWithConfig}
+              disabled={!selectedPatternId}
+            >
+              <Text style={styles.startButtonText}>Start Exercise</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </SafeAreaView>
     );
   }
@@ -650,8 +701,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 48,
     paddingVertical: 16,
     borderRadius: 12,
-    marginTop: 24,
-    marginBottom: 40,
+    alignItems: "center",
   },
   startButtonDisabled: {
     backgroundColor: "#555",
@@ -660,6 +710,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#fff",
+  },
+  fixedBottomButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingBottom: 24,
+    backgroundColor: "#1a1410",
+    borderTopWidth: 1,
+    borderTopColor: "#3b2c1a",
+    alignItems: "center",
   },
   // Config picker styles
   configScroll: {

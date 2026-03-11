@@ -73,6 +73,7 @@ export function usePitchDetection({
   const bufferIndexRef = useRef(0);
   const targetMidiRef = useRef(noteNameToMidi(targetNote));
   const isListeningRef = useRef(false);
+  const lastPitchNoteRef = useRef(null); // Track previous pitch to avoid unnecessary state updates
 
   // Web-specific refs
   const webAudioContextRef = useRef(null);
@@ -80,6 +81,9 @@ export function usePitchDetection({
   const webAnalyserRef = useRef(null);
   const webAnimationFrameRef = useRef(null);
   const webSampleRateRef = useRef(SAMPLE_RATE);
+  const lastVolumeRef = useRef(0); // Track previous volume to avoid unnecessary state updates
+  
+
 
   // Update target MIDI when prop changes
   useEffect(() => {
@@ -138,7 +142,11 @@ export function usePitchDetection({
         const result = autoCorrelate(audioBufferRef.current, SAMPLE_RATE);
         const normalizedVolume = Math.min(1, result.rms * 15);
 
-        setVolume(normalizedVolume);
+        // Only update state if volume changed significantly (avoid excessive re-renders)
+        if (Math.abs(normalizedVolume - lastVolumeRef.current) > 0.01) {
+          lastVolumeRef.current = normalizedVolume;
+          setVolume(normalizedVolume);
+        }
         onVolumeChange?.(normalizedVolume);
 
         const isAboveThreshold = normalizedVolume > volumeThreshold;
@@ -166,7 +174,11 @@ export function usePitchDetection({
               // Only set currentPitch if in soundingFrequencyRange (when specified) to filter out metronome etc
               if (inDefaultRange && inSoundingRange) {
                 console.log("[Audio Processing]", result, noteInfo, "IN RANGE");
-                setCurrentPitch(noteInfo);
+                // Only update state if note changed (avoid excessive re-renders)
+                if (noteInfo.noteName !== lastPitchNoteRef.current) {
+                  lastPitchNoteRef.current = noteInfo.noteName;
+                  setCurrentPitch(noteInfo);
+                }
               }
 
               // Only count as valid pitch for isSounding if in the specified range
@@ -253,7 +265,10 @@ export function usePitchDetection({
 
               pitchBufferRef.current = [];
               // Only clear currentPitch if not sounding
-              if (!isSounding) setCurrentPitch(null);
+              if (!isSounding) {
+                lastPitchNoteRef.current = null;
+                setCurrentPitch(null);
+              }
               onSoundEnd?.();
             }, silenceDuration);
           }
@@ -278,6 +293,8 @@ export function usePitchDetection({
     ],
   );
 
+
+
   // Web audio frame processor
   const processWebAudioFrame = useCallback(() => {
     if (!isListeningRef.current || !webAnalyserRef.current) return;
@@ -295,7 +312,11 @@ export function usePitchDetection({
       const rms = Math.sqrt(sum / dataArray.length);
       const normalizedVolume = Math.min(1, rms * 15);
 
-      setVolume(normalizedVolume);
+      // Only update state if volume changed significantly (avoid excessive re-renders)
+      if (Math.abs(normalizedVolume - lastVolumeRef.current) > 0.01) {
+        lastVolumeRef.current = normalizedVolume;
+        setVolume(normalizedVolume);
+      }
       onVolumeChange?.(normalizedVolume);
 
       const isAboveThreshold = normalizedVolume > volumeThreshold;
@@ -325,7 +346,11 @@ export function usePitchDetection({
 
               // Only set currentPitch if in soundingFrequencyRange (when specified) to filter out metronome etc
               if (inSoundingRange) {
-                setCurrentPitch(noteInfo);
+                // Only update state if note changed (avoid excessive re-renders)
+                if (noteInfo.noteName !== lastPitchNoteRef.current) {
+                  lastPitchNoteRef.current = noteInfo.noteName;
+                  setCurrentPitch(noteInfo);
+                }
                 onRealtimePitch?.(noteInfo);
               }
 
@@ -386,6 +411,7 @@ export function usePitchDetection({
           silenceTimerRef.current = setTimeout(() => {
             soundStartedRef.current = false;
             setIsSounding(false);
+            lastPitchNoteRef.current = null;
             setCurrentPitch(null);
             onSoundEnd?.();
           }, silenceDuration);
@@ -526,6 +552,8 @@ export function usePitchDetection({
 
     setIsListening(false);
     setVolume(0);
+    lastPitchNoteRef.current = null;
+    lastVolumeRef.current = 0;
     setCurrentPitch(null);
     setIsSounding(false);
     soundStartedRef.current = false;
@@ -584,6 +612,8 @@ export function usePitchDetection({
       LiveAudioStream.stop();
       setIsListening(false);
       setVolume(0);
+      lastPitchNoteRef.current = null;
+      lastVolumeRef.current = 0;
       setCurrentPitch(null);
       setIsSounding(false);
       soundStartedRef.current = false;

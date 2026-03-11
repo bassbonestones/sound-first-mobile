@@ -143,6 +143,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     backgroundColor: "#fff",
   },
+  // Create button
+  createButton: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginHorizontal: 12,
+    marginTop: 12,
+    marginBottom: 8,
+    alignItems: "center",
+  },
+  createButtonText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
   list: {
     flex: 1,
   },
@@ -165,11 +181,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  listItemContent: {
+    flex: 1,
+  },
   listItemHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 6,
+    marginBottom: 8,
   },
   listItemTitle: {
     fontSize: 15,
@@ -190,17 +209,22 @@ const styles = StyleSheet.create({
   listItemDetails: {
     flexDirection: "row",
     flexWrap: "wrap",
+    marginTop: 6,
   },
   listItemDetail: {
     fontSize: 12,
     color: "#666",
     marginRight: 12,
-    marginBottom: 2,
+    marginBottom: 4,
+    backgroundColor: "#f5f5f5",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
   },
   listItemSubtext: {
     fontSize: 12,
     color: "#888",
-    marginTop: 6,
+    marginTop: 8,
     fontStyle: "italic",
   },
   // Detail View Styles

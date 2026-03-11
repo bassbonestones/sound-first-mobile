@@ -43,7 +43,6 @@ export default function AdminScreen({ navigation }) {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Admin Console</Text>
-        <ResetButton />
       </View>
 
       {/* Tab Bar */}
@@ -76,6 +75,9 @@ export default function AdminScreen({ navigation }) {
         {activeTab === "engine" && <EngineSettings />}
         {activeTab === "sessions" && <SessionDiagnostics />}
       </View>
+
+      {/* Dev Menu - at root level so overlay covers everything */}
+      <ResetButton />
     </View>
   );
 }
