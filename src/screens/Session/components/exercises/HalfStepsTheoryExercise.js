@@ -21,9 +21,10 @@ import {
 // Audio context - works on web, iOS, and Android
 let AudioContextClass = null;
 if (Platform.OS === "web") {
-  AudioContextClass = typeof window !== "undefined"
-    ? (window.AudioContext || window.webkitAudioContext)
-    : null;
+  AudioContextClass =
+    typeof window !== "undefined"
+      ? window.AudioContext || window.webkitAudioContext
+      : null;
 } else {
   try {
     AudioContextClass = require("react-native-audio-api").AudioContext;
@@ -120,7 +121,11 @@ const QUIZ_QUESTIONS = [
 // MINI KEYBOARD COMPONENT
 // ============================================================
 
-function MiniKeyboard({ highlightNotes = [], onKeyPress, interactive = false }) {
+function MiniKeyboard({
+  highlightNotes = [],
+  onKeyPress,
+  interactive = false,
+}) {
   const whiteKeys = PIANO_KEYS.filter((k) => !k.isBlack);
   const blackKeys = PIANO_KEYS.filter((k) => k.isBlack);
 
@@ -175,7 +180,8 @@ function MiniKeyboard({ highlightNotes = [], onKeyPress, interactive = false }) 
             if (whiteIdx === undefined) return null;
 
             // Position: center of gap between white keys
-            const leftPos = (whiteIdx + 1) * WHITE_KEY_WIDTH - BLACK_KEY_WIDTH / 2;
+            const leftPos =
+              (whiteIdx + 1) * WHITE_KEY_WIDTH - BLACK_KEY_WIDTH / 2;
 
             return (
               <TouchableOpacity
@@ -360,7 +366,7 @@ export default function HalfStepsTheoryExercise({
         setHighlightedNotes([]);
       }, 900);
     },
-    [isPlaying, playNote]
+    [isPlaying, playNote],
   );
 
   // Handle quiz answer
@@ -372,7 +378,7 @@ export default function HalfStepsTheoryExercise({
         setScore((s) => s + 1);
       }
     },
-    [quizIndex]
+    [quizIndex],
   );
 
   // Next question
@@ -460,8 +466,7 @@ export default function HalfStepsTheoryExercise({
             <Text style={styles.cardText}>
               To go a half step from C, you move to the{" "}
               <Text style={styles.highlightOrange}>black key</Text> (C#).
-              {"\n\n"}
-              C → C# = half step
+              {"\n\n"}C → C# = half step
             </Text>
           </View>
 

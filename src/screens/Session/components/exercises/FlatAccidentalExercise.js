@@ -20,9 +20,10 @@ import {
 // Audio context - works on web, iOS, and Android
 let AudioContextClass = null;
 if (Platform.OS === "web") {
-  AudioContextClass = typeof window !== "undefined"
-    ? (window.AudioContext || window.webkitAudioContext)
-    : null;
+  AudioContextClass =
+    typeof window !== "undefined"
+      ? window.AudioContext || window.webkitAudioContext
+      : null;
 } else {
   try {
     AudioContextClass = require("react-native-audio-api").AudioContext;
@@ -86,7 +87,13 @@ const FLAT_EXAMPLES = [
   { natural: "E4", flat: "Eb4", label: "E → E♭" },
   { natural: "B4", flat: "Bb4", label: "B → B♭" },
   { natural: "A4", flat: "Ab4", label: "A → A♭" },
-  { natural: "C5", flat: "Cb5", flatKey: "B4", label: "C → C♭ (=B)", isWhiteToWhite: true },
+  {
+    natural: "C5",
+    flat: "Cb5",
+    flatKey: "B4",
+    label: "C → C♭ (=B)",
+    isWhiteToWhite: true,
+  },
 ];
 
 // Quiz questions
@@ -137,7 +144,12 @@ const QUIZ_QUESTIONS = [
 // MINI KEYBOARD COMPONENT
 // ============================================================
 
-function MiniKeyboard({ highlightNotes = [], highlightFlat = null, onKeyPress, interactive = false }) {
+function MiniKeyboard({
+  highlightNotes = [],
+  highlightFlat = null,
+  onKeyPress,
+  interactive = false,
+}) {
   const whiteKeys = PIANO_KEYS.filter((k) => !k.isBlack);
   const blackKeys = PIANO_KEYS.filter((k) => k.isBlack);
 
@@ -167,7 +179,8 @@ function MiniKeyboard({ highlightNotes = [], highlightFlat = null, onKeyPress, i
                 <Text
                   style={[
                     keyboardStyles.whiteKeyLabel,
-                    (isHighlighted || isFlatHighlight) && keyboardStyles.keyLabelHighlighted,
+                    (isHighlighted || isFlatHighlight) &&
+                      keyboardStyles.keyLabelHighlighted,
                   ]}
                 >
                   {key.label}
@@ -192,7 +205,8 @@ function MiniKeyboard({ highlightNotes = [], highlightFlat = null, onKeyPress, i
             const whiteIdx = whiteKeyIndices[key.note];
             if (whiteIdx === undefined) return null;
 
-            const leftPos = (whiteIdx + 1) * WHITE_KEY_WIDTH - BLACK_KEY_WIDTH / 2;
+            const leftPos =
+              (whiteIdx + 1) * WHITE_KEY_WIDTH - BLACK_KEY_WIDTH / 2;
 
             return (
               <TouchableOpacity
@@ -209,7 +223,8 @@ function MiniKeyboard({ highlightNotes = [], highlightFlat = null, onKeyPress, i
                 <Text
                   style={[
                     keyboardStyles.blackKeyLabel,
-                    (isHighlighted || isFlatHighlight) && keyboardStyles.keyLabelHighlighted,
+                    (isHighlighted || isFlatHighlight) &&
+                      keyboardStyles.keyLabelHighlighted,
                   ]}
                 >
                   {key.label}
@@ -384,7 +399,7 @@ export default function FlatAccidentalExercise({
         setHighlightFlat(null);
       }, 700);
     },
-    [isPlaying, playNote]
+    [isPlaying, playNote],
   );
 
   // Handle quiz answer
@@ -396,7 +411,7 @@ export default function FlatAccidentalExercise({
         setScore((s) => s + 1);
       }
     },
-    [quizIndex]
+    [quizIndex],
   );
 
   // Next question
@@ -440,7 +455,8 @@ export default function FlatAccidentalExercise({
 
           <View style={styles.card}>
             <Text style={styles.cardText}>
-              When you see D<Text style={styles.highlightPurple}>♭</Text>, it means:{"\n\n"}
+              When you see D<Text style={styles.highlightPurple}>♭</Text>, it
+              means:{"\n\n"}
               "Play the note that is{"\n"}
               <Text style={styles.highlight}>one half step below D</Text>"
             </Text>
@@ -471,10 +487,7 @@ export default function FlatAccidentalExercise({
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text style={styles.title}>D♭ on the Keyboard</Text>
 
-          <MiniKeyboard
-            highlightNotes={["D4"]}
-            highlightFlat="Db4"
-          />
+          <MiniKeyboard highlightNotes={["D4"]} highlightFlat="Db4" />
 
           <View style={styles.card}>
             <Text style={styles.cardText}>
@@ -549,7 +562,10 @@ export default function FlatAccidentalExercise({
             <Text style={styles.cardText}>
               🎯 <Text style={styles.highlight}>Pattern:</Text>
               {"\n\n"}The flat is always the key{" "}
-              <Text style={styles.highlightPurple}>immediately to the left</Text>.
+              <Text style={styles.highlightPurple}>
+                immediately to the left
+              </Text>
+              .
             </Text>
           </View>
         </ScrollView>
@@ -747,8 +763,8 @@ export default function FlatAccidentalExercise({
               <Text style={styles.highlight}>Key concepts:</Text>
               {"\n\n"}• Flat (♭) = lower by half step
               {"\n"}• Moves one key LEFT on keyboard
-              {"\n"}• D♭ is one half step below D
-              {"\n"}• Every note can be flatted
+              {"\n"}• D♭ is one half step below D{"\n"}• Every note can be
+              flatted
             </Text>
           </View>
         </ScrollView>

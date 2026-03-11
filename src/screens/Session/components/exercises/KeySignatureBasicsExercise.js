@@ -7,7 +7,13 @@
  * - Key signatures tell us what scale the music is based on
  * - No sharps/flats = C major (or A minor)
  */
-import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import React, {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useMemo,
+} from "react";
 import {
   View,
   Text,
@@ -21,9 +27,10 @@ import NotationDisplay from "../../../../components/NotationDisplay";
 // Audio context - works on web, iOS, and Android
 let AudioContextClass = null;
 if (Platform.OS === "web") {
-  AudioContextClass = typeof window !== "undefined"
-    ? (window.AudioContext || window.webkitAudioContext)
-    : null;
+  AudioContextClass =
+    typeof window !== "undefined"
+      ? window.AudioContext || window.webkitAudioContext
+      : null;
 } else {
   try {
     AudioContextClass = require("react-native-audio-api").AudioContext;
@@ -136,22 +143,12 @@ const QUIZ_QUESTIONS = [
   {
     question: "C Major has:",
     correctAnswer: "No sharps or flats",
-    options: [
-      "1 sharp",
-      "1 flat",
-      "No sharps or flats",
-      "2 sharps",
-    ],
+    options: ["1 sharp", "1 flat", "No sharps or flats", "2 sharps"],
   },
   {
     question: "G Major has:",
     correctAnswer: "1 sharp (F#)",
-    options: [
-      "No sharps or flats",
-      "1 sharp (F#)",
-      "1 flat (B♭)",
-      "2 sharps",
-    ],
+    options: ["No sharps or flats", "1 sharp (F#)", "1 flat (B♭)", "2 sharps"],
   },
 ];
 
@@ -246,7 +243,7 @@ export default function KeySignatureBasicsExercise({
         setScore((s) => s + 1);
       }
     },
-    [quizIndex]
+    [quizIndex],
   );
 
   const handleNext = useCallback(() => {
@@ -281,8 +278,8 @@ export default function KeySignatureBasicsExercise({
 
           <View style={styles.card}>
             <Text style={styles.cardText}>
-              A <Text style={styles.highlight}>key signature</Text> is the
-              group of sharps (♯) or flats (♭) at the beginning of a piece.
+              A <Text style={styles.highlight}>key signature</Text> is the group
+              of sharps (♯) or flats (♭) at the beginning of a piece.
             </Text>
           </View>
 

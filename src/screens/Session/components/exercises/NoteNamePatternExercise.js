@@ -7,7 +7,13 @@
  * - After G, it wraps back to A
  * - The pattern repeats forever
  */
-import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+} from "react";
 import {
   View,
   Text,
@@ -21,9 +27,10 @@ import {
 let AudioContextClass = null;
 if (Platform.OS === "web") {
   // Web: use standard Web Audio API
-  AudioContextClass = typeof window !== "undefined" 
-    ? (window.AudioContext || window.webkitAudioContext) 
-    : null;
+  AudioContextClass =
+    typeof window !== "undefined"
+      ? window.AudioContext || window.webkitAudioContext
+      : null;
 } else {
   // Native: use react-native-audio-api
   try {
@@ -49,20 +56,20 @@ const NOTE_NAMES = ["A", "B", "C", "D", "E", "F", "G"];
 // Frequencies for 2 octaves ascending (A2 through G4)
 // Shows the pattern continuing upward, not restarting
 const ANIMATION_FREQUENCIES = [
-  110.0,   // A2
-  123.47,  // B2
-  130.81,  // C3
-  146.83,  // D3
-  164.81,  // E3
-  174.61,  // F3
-  196.0,   // G3
-  220.0,   // A3 - same letter, higher pitch!
-  246.94,  // B3
-  261.63,  // C4
-  293.66,  // D4
-  329.63,  // E4
-  349.23,  // F4
-  392.0,   // G4
+  110.0, // A2
+  123.47, // B2
+  130.81, // C3
+  146.83, // D3
+  164.81, // E3
+  174.61, // F3
+  196.0, // G3
+  220.0, // A3 - same letter, higher pitch!
+  246.94, // B3
+  261.63, // C4
+  293.66, // D4
+  329.63, // E4
+  349.23, // F4
+  392.0, // G4
 ];
 
 // Quiz questions
@@ -311,7 +318,10 @@ export default function NoteNamePatternExercise({
             </View>
 
             <TouchableOpacity
-              style={[styles.secondaryButton, isAnimating && styles.buttonDisabled]}
+              style={[
+                styles.secondaryButton,
+                isAnimating && styles.buttonDisabled,
+              ]}
               onPress={animatePattern}
               disabled={isAnimating}
             >

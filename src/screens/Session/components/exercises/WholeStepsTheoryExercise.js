@@ -21,9 +21,10 @@ import {
 // Audio context - works on web, iOS, and Android
 let AudioContextClass = null;
 if (Platform.OS === "web") {
-  AudioContextClass = typeof window !== "undefined"
-    ? (window.AudioContext || window.webkitAudioContext)
-    : null;
+  AudioContextClass =
+    typeof window !== "undefined"
+      ? window.AudioContext || window.webkitAudioContext
+      : null;
 } else {
   try {
     AudioContextClass = require("react-native-audio-api").AudioContext;
@@ -63,11 +64,41 @@ const NOTE_FREQUENCIES = {
 
 // Whole step examples
 const WHOLE_STEP_EXAMPLES = [
-  { note1: "C4", note2: "D4", label: "C → D", skips: "C#", type: "white→white" },
-  { note1: "D4", note2: "E4", label: "D → E", skips: "D#", type: "white→white" },
-  { note1: "E4", note2: "F#4", label: "E → F#", skips: "F", type: "white→black" },
-  { note1: "F4", note2: "G4", label: "F → G", skips: "F#", type: "white→white" },
-  { note1: "A#4", note2: "C5", label: "A# → C", skips: "B", type: "black→white" },
+  {
+    note1: "C4",
+    note2: "D4",
+    label: "C → D",
+    skips: "C#",
+    type: "white→white",
+  },
+  {
+    note1: "D4",
+    note2: "E4",
+    label: "D → E",
+    skips: "D#",
+    type: "white→white",
+  },
+  {
+    note1: "E4",
+    note2: "F#4",
+    label: "E → F#",
+    skips: "F",
+    type: "white→black",
+  },
+  {
+    note1: "F4",
+    note2: "G4",
+    label: "F → G",
+    skips: "F#",
+    type: "white→white",
+  },
+  {
+    note1: "A#4",
+    note2: "C5",
+    label: "A# → C",
+    skips: "B",
+    type: "black→white",
+  },
 ];
 
 // Quiz questions
@@ -189,7 +220,8 @@ function MiniKeyboard({ highlightNotes = [], skippedNote = null }) {
                 <Text
                   style={[
                     keyboardStyles.blackKeyLabel,
-                    (isHighlighted || isSkipped) && keyboardStyles.keyLabelHighlighted,
+                    (isHighlighted || isSkipped) &&
+                      keyboardStyles.keyLabelHighlighted,
                   ]}
                 >
                   {isSkipped ? "skip" : key.label}
@@ -373,7 +405,7 @@ export default function WholeStepsTheoryExercise({
         setSkippedNote(null);
       }, 900);
     },
-    [isPlaying, playNote]
+    [isPlaying, playNote],
   );
 
   const handleAnswer = useCallback(
@@ -384,7 +416,7 @@ export default function WholeStepsTheoryExercise({
         setScore((s) => s + 1);
       }
     },
-    [quizIndex]
+    [quizIndex],
   );
 
   const handleNext = useCallback(() => {
@@ -483,9 +515,7 @@ export default function WholeStepsTheoryExercise({
 
             <View style={styles.comparisonCard}>
               <Text style={styles.comparisonTitle}>Whole Step</Text>
-              <Text style={styles.comparisonText}>
-                C → D{"\n"}(skip C#)
-              </Text>
+              <Text style={styles.comparisonText}>C → D{"\n"}(skip C#)</Text>
               <TouchableOpacity
                 style={styles.smallPlayButton}
                 onPress={async () => {
@@ -508,7 +538,9 @@ export default function WholeStepsTheoryExercise({
 
           <View style={styles.card}>
             <Text style={styles.cardText}>
-              Notice the <Text style={styles.highlight}>whole step sounds bigger</Text> — because it covers more distance!
+              Notice the{" "}
+              <Text style={styles.highlight}>whole step sounds bigger</Text> —
+              because it covers more distance!
             </Text>
           </View>
         </ScrollView>

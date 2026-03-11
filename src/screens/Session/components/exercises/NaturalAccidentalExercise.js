@@ -20,9 +20,10 @@ import {
 // Audio context - works on web, iOS, and Android
 let AudioContextClass = null;
 if (Platform.OS === "web") {
-  AudioContextClass = typeof window !== "undefined"
-    ? (window.AudioContext || window.webkitAudioContext)
-    : null;
+  AudioContextClass =
+    typeof window !== "undefined"
+      ? window.AudioContext || window.webkitAudioContext
+      : null;
 } else {
   try {
     AudioContextClass = require("react-native-audio-api").AudioContext;
@@ -48,7 +49,7 @@ const NOTE_FREQUENCIES = {
   C4: 261.63,
   "C#4": 277.18,
   D4: 293.66,
-  "Db4": 277.18,
+  Db4: 277.18,
   "D#4": 311.13,
   Eb4: 311.13,
   E4: 329.63,
@@ -99,12 +100,7 @@ const QUIZ_QUESTIONS = [
   {
     question: "The natural sign returns a note to its _____ state.",
     correctAnswer: "white key / unaltered",
-    options: [
-      "black key",
-      "white key / unaltered",
-      "sharped",
-      "flatted",
-    ],
+    options: ["black key", "white key / unaltered", "sharped", "flatted"],
   },
 ];
 
@@ -179,7 +175,7 @@ export default function NaturalAccidentalExercise({
 
       setIsPlaying(false);
     },
-    [isPlaying, playNote]
+    [isPlaying, playNote],
   );
 
   // Handle quiz answer
@@ -191,7 +187,7 @@ export default function NaturalAccidentalExercise({
         setScore((s) => s + 1);
       }
     },
-    [quizIndex]
+    [quizIndex],
   );
 
   // Next question
@@ -268,7 +264,8 @@ export default function NaturalAccidentalExercise({
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Cancelling a Sharp:</Text>
             <Text style={styles.cardText}>
-              <Text style={styles.highlightSharp}>F#</Text> → <Text style={styles.highlightNatural}>F♮</Text>
+              <Text style={styles.highlightSharp}>F#</Text> →{" "}
+              <Text style={styles.highlightNatural}>F♮</Text>
               {"\n\n"}
               The F♮ goes back down to regular F (white key)
             </Text>
@@ -287,7 +284,8 @@ export default function NaturalAccidentalExercise({
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Cancelling a Flat:</Text>
             <Text style={styles.cardText}>
-              <Text style={styles.highlightFlat}>B♭</Text> → <Text style={styles.highlightNatural}>B♮</Text>
+              <Text style={styles.highlightFlat}>B♭</Text> →{" "}
+              <Text style={styles.highlightNatural}>B♮</Text>
               {"\n\n"}
               The B♮ goes back up to regular B (white key)
             </Text>

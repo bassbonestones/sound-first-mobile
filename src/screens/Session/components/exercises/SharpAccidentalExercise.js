@@ -20,9 +20,10 @@ import {
 // Audio context - works on web, iOS, and Android
 let AudioContextClass = null;
 if (Platform.OS === "web") {
-  AudioContextClass = typeof window !== "undefined"
-    ? (window.AudioContext || window.webkitAudioContext)
-    : null;
+  AudioContextClass =
+    typeof window !== "undefined"
+      ? window.AudioContext || window.webkitAudioContext
+      : null;
 } else {
   try {
     AudioContextClass = require("react-native-audio-api").AudioContext;
@@ -87,7 +88,13 @@ const SHARP_EXAMPLES = [
   { natural: "C4", sharp: "C#4", label: "C → C♯" },
   { natural: "G4", sharp: "G#4", label: "G → G♯" },
   { natural: "A4", sharp: "A#4", label: "A → A♯" },
-  { natural: "E4", sharp: "E#4", sharpKey: "F4", label: "E → E♯ (=F)", isWhiteToWhite: true },
+  {
+    natural: "E4",
+    sharp: "E#4",
+    sharpKey: "F4",
+    label: "E → E♯ (=F)",
+    isWhiteToWhite: true,
+  },
 ];
 
 // Quiz questions
@@ -168,7 +175,8 @@ function MiniKeyboard({
                 <Text
                   style={[
                     keyboardStyles.whiteKeyLabel,
-                    (isHighlighted || isSharpHighlight) && keyboardStyles.keyLabelHighlighted,
+                    (isHighlighted || isSharpHighlight) &&
+                      keyboardStyles.keyLabelHighlighted,
                   ]}
                 >
                   {key.label}
@@ -193,7 +201,8 @@ function MiniKeyboard({
             const whiteIdx = whiteKeyIndices[key.note];
             if (whiteIdx === undefined) return null;
 
-            const leftPos = (whiteIdx + 1) * WHITE_KEY_WIDTH - BLACK_KEY_WIDTH / 2;
+            const leftPos =
+              (whiteIdx + 1) * WHITE_KEY_WIDTH - BLACK_KEY_WIDTH / 2;
 
             return (
               <TouchableOpacity
@@ -386,7 +395,7 @@ export default function SharpAccidentalExercise({
         setHighlightSharp(null);
       }, 700);
     },
-    [isPlaying, playNote]
+    [isPlaying, playNote],
   );
 
   // Handle quiz answer
@@ -398,7 +407,7 @@ export default function SharpAccidentalExercise({
         setScore((s) => s + 1);
       }
     },
-    [quizIndex]
+    [quizIndex],
   );
 
   // Next question
@@ -496,8 +505,8 @@ export default function SharpAccidentalExercise({
             <Text style={styles.cardText}>
               <Text style={styles.highlightPurple}>Flat (♭)</Text> and{" "}
               <Text style={styles.highlightOrange}>Sharp (♯)</Text> are{" "}
-              <Text style={styles.highlight}>opposites</Text>!
-              {"\n\n"}• Flat = lower by half step (← left)
+              <Text style={styles.highlight}>opposites</Text>!{"\n\n"}• Flat =
+              lower by half step (← left)
               {"\n"}• Sharp = raise by half step (→ right)
             </Text>
           </View>

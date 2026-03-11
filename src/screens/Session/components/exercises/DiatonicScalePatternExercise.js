@@ -21,9 +21,10 @@ import {
 // Audio context - works on web, iOS, and Android
 let AudioContextClass = null;
 if (Platform.OS === "web") {
-  AudioContextClass = typeof window !== "undefined"
-    ? (window.AudioContext || window.webkitAudioContext)
-    : null;
+  AudioContextClass =
+    typeof window !== "undefined"
+      ? window.AudioContext || window.webkitAudioContext
+      : null;
 } else {
   try {
     AudioContextClass = require("react-native-audio-api").AudioContext;
@@ -74,7 +75,12 @@ const QUIZ_QUESTIONS = [
   {
     question: "The major scale pattern is:",
     correctAnswer: "W-W-H-W-W-W-H",
-    options: ["W-H-W-W-W-H-W", "W-W-H-W-W-W-H", "H-W-W-W-H-W-W", "W-W-W-H-W-W-H"],
+    options: [
+      "W-H-W-W-W-H-W",
+      "W-W-H-W-W-W-H",
+      "H-W-W-W-H-W-W",
+      "W-W-W-H-W-W-H",
+    ],
   },
   {
     question: "MI to FA is a:",
@@ -274,7 +280,7 @@ export default function DiatonicScalePatternExercise({
         setHasPlayedOnPhase(true);
       }, 300);
     },
-    [isPlaying, playNote]
+    [isPlaying, playNote],
   );
 
   const playInterval = useCallback(
@@ -291,7 +297,7 @@ export default function DiatonicScalePatternExercise({
       setIsPlaying(false);
       setIntervalsPlayed((prev) => new Set([...prev, idx]));
     },
-    [isPlaying, playNote]
+    [isPlaying, playNote],
   );
 
   const handleAnswer = useCallback(
@@ -302,7 +308,7 @@ export default function DiatonicScalePatternExercise({
         setScore((s) => s + 1);
       }
     },
-    [quizIndex]
+    [quizIndex],
   );
 
   const handleNext = useCallback(() => {
@@ -402,14 +408,22 @@ export default function DiatonicScalePatternExercise({
         </ScrollView>
 
         <TouchableOpacity
-          style={[styles.primaryButton, !hasPlayedOnPhase && styles.primaryButtonDisabled]}
+          style={[
+            styles.primaryButton,
+            !hasPlayedOnPhase && styles.primaryButtonDisabled,
+          ]}
           onPress={() => {
             setHasPlayedOnPhase(false);
             setPhase(PHASES.PATTERN);
           }}
           disabled={!hasPlayedOnPhase}
         >
-          <Text style={[styles.primaryButtonText, !hasPlayedOnPhase && styles.primaryButtonTextDisabled]}>
+          <Text
+            style={[
+              styles.primaryButtonText,
+              !hasPlayedOnPhase && styles.primaryButtonTextDisabled,
+            ]}
+          >
             {hasPlayedOnPhase ? "See the Pattern →" : "Play to continue..."}
           </Text>
         </TouchableOpacity>
@@ -423,7 +437,10 @@ export default function DiatonicScalePatternExercise({
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text style={styles.title}>The Pattern Revealed</Text>
 
-          <ScaleSteps currentStep={isPlaying ? currentStep : 7} showPattern={true} />
+          <ScaleSteps
+            currentStep={isPlaying ? currentStep : 7}
+            showPattern={true}
+          />
 
           <View style={styles.patternDisplay}>
             <Text style={styles.patternText}>
@@ -460,7 +477,10 @@ export default function DiatonicScalePatternExercise({
         </ScrollView>
 
         <TouchableOpacity
-          style={[styles.primaryButton, !hasPlayedOnPhase && styles.primaryButtonDisabled]}
+          style={[
+            styles.primaryButton,
+            !hasPlayedOnPhase && styles.primaryButtonDisabled,
+          ]}
           onPress={() => {
             setHasPlayedOnPhase(false);
             setIntervalsPlayed(new Set());
@@ -468,7 +488,12 @@ export default function DiatonicScalePatternExercise({
           }}
           disabled={!hasPlayedOnPhase}
         >
-          <Text style={[styles.primaryButtonText, !hasPlayedOnPhase && styles.primaryButtonTextDisabled]}>
+          <Text
+            style={[
+              styles.primaryButtonText,
+              !hasPlayedOnPhase && styles.primaryButtonTextDisabled,
+            ]}
+          >
             {hasPlayedOnPhase ? "Hear Each Step →" : "Play to continue..."}
           </Text>
         </TouchableOpacity>
@@ -484,9 +509,7 @@ export default function DiatonicScalePatternExercise({
 
           <ScaleSteps currentStep={currentStep} showPattern={true} />
 
-          <Text style={styles.helperText}>
-            Tap any interval to hear it:
-          </Text>
+          <Text style={styles.helperText}>Tap any interval to hear it:</Text>
 
           <View style={styles.intervalGrid}>
             {PATTERN_LABELS.map((item, idx) => (
@@ -525,12 +548,22 @@ export default function DiatonicScalePatternExercise({
         </ScrollView>
 
         <TouchableOpacity
-          style={[styles.primaryButton, intervalsPlayed.size < 2 && styles.primaryButtonDisabled]}
+          style={[
+            styles.primaryButton,
+            intervalsPlayed.size < 2 && styles.primaryButtonDisabled,
+          ]}
           onPress={() => setPhase(PHASES.QUIZ)}
           disabled={intervalsPlayed.size < 2}
         >
-          <Text style={[styles.primaryButtonText, intervalsPlayed.size < 2 && styles.primaryButtonTextDisabled]}>
-            {intervalsPlayed.size >= 2 ? "Quiz Me →" : `Tap ${2 - intervalsPlayed.size} more interval${2 - intervalsPlayed.size > 1 ? "s" : ""}...`}
+          <Text
+            style={[
+              styles.primaryButtonText,
+              intervalsPlayed.size < 2 && styles.primaryButtonTextDisabled,
+            ]}
+          >
+            {intervalsPlayed.size >= 2
+              ? "Quiz Me →"
+              : `Tap ${2 - intervalsPlayed.size} more interval${2 - intervalsPlayed.size > 1 ? "s" : ""}...`}
           </Text>
         </TouchableOpacity>
       </View>
