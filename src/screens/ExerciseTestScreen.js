@@ -22,6 +22,7 @@ import {
   RangeExpansionExercise,
   WholeNoteLessonExercise,
   TimeSignatureBasicsExercise,
+  TimeSignature44Exercise,
 } from "./Session/components/exercises";
 import {
   getAvailablePatterns,
@@ -244,6 +245,18 @@ const EXERCISES = [
     icon: "📊",
     description: "Learn what time signatures mean: top = beats, bottom = note type",
     component: TimeSignatureBasicsExercise,
+    config: { use_notation: true },
+    mastery: { correct_streak: 4 },
+    extraProps: {
+      clef: "treble",
+    },
+  },
+  {
+    id: "time_signature_4_4",
+    name: "4/4 Time Signature",
+    icon: "🎵",
+    description: "4/4 time: 4 beats per measure, quarter note beat, common time",
+    component: TimeSignature44Exercise,
     config: { use_notation: true },
     mastery: { correct_streak: 4 },
     extraProps: {
