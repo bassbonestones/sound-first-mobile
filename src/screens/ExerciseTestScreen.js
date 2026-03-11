@@ -21,6 +21,7 @@ import {
   FeelThePulseExercise,
   RangeExpansionExercise,
   WholeNoteLessonExercise,
+  TimeSignatureBasicsExercise,
 } from "./Session/components/exercises";
 import {
   getAvailablePatterns,
@@ -235,6 +236,18 @@ const EXERCISES = [
     mastery: { correct_streak: 3 },
     extraProps: {
       userFirstNote: "F3",
+    },
+  },
+  {
+    id: "time_signature_basics",
+    name: "Time Signature Basics",
+    icon: "📊",
+    description: "Learn what time signatures mean: top = beats, bottom = note type",
+    component: TimeSignatureBasicsExercise,
+    config: { use_notation: true },
+    mastery: { correct_streak: 4 },
+    extraProps: {
+      clef: "treble",
     },
   },
 ];

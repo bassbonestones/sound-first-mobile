@@ -11,6 +11,7 @@ import StartOnCueExercise from "./StartOnCueExercise";
 import FeelThePulseExercise from "./FeelThePulseExercise";
 import RangeExpansionExercise from "./RangeExpansionExercise";
 import WholeNoteLessonExercise from "./WholeNoteLessonExercise";
+import TimeSignatureBasicsExercise from "./TimeSignatureBasicsExercise";
 
 // Map template IDs to exercise components
 export const EXERCISE_COMPONENTS = {
@@ -28,6 +29,8 @@ export const EXERCISE_COMPONENTS = {
   expand_range_down: RangeExpansionExercise,
   whole_note_lesson: WholeNoteLessonExercise,
   rhythm_whole_notes: WholeNoteLessonExercise, // alias for capability name
+  time_signature_basics: TimeSignatureBasicsExercise,
+  time_signature_basics_lesson: TimeSignatureBasicsExercise, // alias
 };
 
 export {
@@ -40,6 +43,7 @@ export {
   FeelThePulseExercise,
   RangeExpansionExercise,
   WholeNoteLessonExercise,
+  TimeSignatureBasicsExercise,
 };
 
 /**

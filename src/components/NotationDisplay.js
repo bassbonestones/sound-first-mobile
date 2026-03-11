@@ -24,6 +24,8 @@ export default function NotationDisplay({
   width = 320,
   height = 200,
   showTitle = false,
+  showTimeSignature = false,
+  fixedMeasureWidthPixels = null,
   zoom = 0.7,
 }) {
   const containerRef = useRef(null);
@@ -94,20 +96,26 @@ export default function NotationDisplay({
           drawPartNames: false,
           drawPartAbbreviations: false,
           drawMeasureNumbers: false,
-          drawTimeSignatures: false,
+          drawTimeSignatures: showTimeSignature,
           renderSingleHorizontalStaffline: true,
-          fixedMeasureWidth: true,
+          fixedMeasureWidth: !!fixedMeasureWidthPixels,
         });
 
         // Set rendering options for dark theme
         osmdRef.current.EngravingRules.PageBackgroundColor = "transparent";
         // Fix the staff size to prevent jumping
-        osmdRef.current.EngravingRules.PageLeftMargin = 0;
+        osmdRef.current.EngravingRules.PageLeftMargin = 1;
         osmdRef.current.EngravingRules.PageRightMargin = 0;
         osmdRef.current.EngravingRules.PageTopMargin = 0;
         osmdRef.current.EngravingRules.PageBottomMargin = 0;
         osmdRef.current.EngravingRules.SheetMinimumDistanceBetweenSystems = 0;
         osmdRef.current.EngravingRules.MinimumDistanceBetweenSystems = 0;
+        
+        // Set fixed measure width if specified
+        if (fixedMeasureWidthPixels) {
+          osmdRef.current.EngravingRules.FixedMeasureWidth = true;
+          osmdRef.current.EngravingRules.FixedMeasureWidthFixedValue = fixedMeasureWidthPixels / 10;
+        }
 
         // Load and render with fixed width
         if (musicxml) {
@@ -125,17 +133,15 @@ export default function NotationDisplay({
           if (!containerRef.current) return; // Guard after render
           const svgElement = containerRef.current.querySelector("svg");
           if (svgElement) {
-            // Fix size
-            svgElement.style.width = `${width - 20}px`;
+            // Fix size - use full width, just small margins
+            svgElement.style.width = `${width}px`;
             svgElement.style.height = `${height}px`;
-            svgElement.style.maxWidth = `${width - 20}px`;
+            svgElement.style.maxWidth = `${width}px`;
             svgElement.style.maxHeight = `${height}px`;
-            // Fix position at top-left
+            // Fix position at top-left with small left padding for clef
             svgElement.style.position = "absolute";
-            svgElement.style.top = "10px";
-            svgElement.style.left = "10px";
-            // Ensure no overflow creates sizing issues
-            svgElement.style.overflow = "hidden";
+            svgElement.style.top = "5px";
+            svgElement.style.left = "5px";
           }
         }
 
@@ -154,7 +160,7 @@ export default function NotationDisplay({
         osmdRef.current = null;
       }
     };
-  }, [musicxml, showTitle, zoom]);
+  }, [musicxml, showTitle, showTimeSignature, fixedMeasureWidthPixels, zoom]);
 
   // Generate HTML for WebView (mobile)
   const webviewHtml = useMemo(() => {
@@ -180,10 +186,11 @@ export default function NotationDisplay({
       justify-content: center;
       align-items: center;
       min-height: 100vh;
+      padding-left: 8px;
     }
     #osmd-container { 
       width: 100%; 
-      max-width: ${width - 20}px;
+      max-width: ${width}px;
     }
     #osmd-container svg {
       width: 100% !important;
@@ -224,16 +231,20 @@ export default function NotationDisplay({
           drawPartNames: false,
           drawPartAbbreviations: false,
           drawMeasureNumbers: false,
-          drawTimeSignatures: false,
+          drawTimeSignatures: ${showTimeSignature},
           renderSingleHorizontalStaffline: true,
+          fixedMeasureWidth: ${!!fixedMeasureWidthPixels},
         });
         
         osmd.EngravingRules.PageBackgroundColor = "transparent";
-        osmd.EngravingRules.PageLeftMargin = 0;
+        osmd.EngravingRules.PageLeftMargin = 1;
         osmd.EngravingRules.PageRightMargin = 0;
         osmd.EngravingRules.PageTopMargin = 0;
         osmd.EngravingRules.PageBottomMargin = 0;
-        
+        ${fixedMeasureWidthPixels ? `
+        osmd.EngravingRules.FixedMeasureWidth = true;
+        osmd.EngravingRules.FixedMeasureWidthFixedValue = ${fixedMeasureWidthPixels / 10};
+        ` : ''}
         const musicxml = \`${escapedXml}\`;
         await osmd.load(musicxml);
         osmd.zoom = ${zoom};
@@ -248,7 +259,7 @@ export default function NotationDisplay({
   </script>
 </body>
 </html>`;
-  }, [musicxml, width, showTitle, zoom]);
+  }, [musicxml, width, showTitle, showTimeSignature, fixedMeasureWidthPixels, zoom]);
 
   // Mobile: use WebView
   if (Platform.OS !== "web") {

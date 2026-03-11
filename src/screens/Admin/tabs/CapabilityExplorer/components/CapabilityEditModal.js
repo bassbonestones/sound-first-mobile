@@ -138,6 +138,8 @@ export default function CapabilityEditModal({
           detectionRule && detectionRule.type ? detectionRule : null,
       };
 
+      console.log("[CapabilityEditModal] Saving:", JSON.stringify(requestBody, null, 2));
+
       const response = await fetch(
         `${baseUrl}/admin/capabilities/${capability.id}`,
         {
@@ -148,11 +150,28 @@ export default function CapabilityEditModal({
       );
 
       const result = await response.json();
+      console.log("[CapabilityEditModal] Response:", response.status, result);
 
       if (!response.ok) {
-        throw new Error(
-          result.detail || result.message || "Failed to save capability",
-        );
+        // Handle validation errors from the API
+        let errorMessage = "Failed to save capability";
+        if (result.detail) {
+          if (typeof result.detail === "object") {
+            // API returns { message: "...", errors: [...] }
+            if (result.detail.errors && Array.isArray(result.detail.errors)) {
+              errorMessage = result.detail.errors.join("\n");
+            } else if (result.detail.message) {
+              errorMessage = result.detail.message;
+            } else {
+              errorMessage = JSON.stringify(result.detail);
+            }
+          } else {
+            errorMessage = result.detail;
+          }
+        } else if (result.message) {
+          errorMessage = result.message;
+        }
+        throw new Error(errorMessage);
       }
 
       setSaveSuccess(true);
