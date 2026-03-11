@@ -253,6 +253,7 @@ export default function WholeRestLessonExercise({
   // Beat 13: end marker
   const soundingOnBeatsRef = useRef(Array(13).fill(0)); // Percentages (0-1) of each beat with sound
   const startedEarlyRef = useRef(false); // Track if they started during count-in
+  const scrollViewRef = useRef(null);
 
   // Config
   const bpm = config?.bpm || 60;
@@ -886,27 +887,65 @@ export default function WholeRestLessonExercise({
     );
   }, [musicXML]);
 
+  // Compute cursor position (3 whole notes/rests: beats 1-4, 5-8, 9-12)
+  const cursorNoteIndex = useMemo(() => {
+    if (!showNotation || currentBeat < 1 || currentBeat > 12) return null;
+    return Math.floor((currentBeat - 1) / 4); // 0-2
+  }, [showNotation, currentBeat]);
+
+  // Scroll to top when notation is opened
+  const handleShowNotation = useCallback(() => {
+    setShowNotation(true);
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    }, 100);
+  }, []);
+
   // Notation toggle - render inline JSX to avoid component recreation
   const renderNotationToggle = () => {
     if (!NotationDisplay) return null;
+
+    // 3 whole note/rest positions across 3 measures (shifted past bar lines)
+    const notePositions = [95, 210, 290];
+    const highlightLeft = cursorNoteIndex !== null ? notePositions[cursorNoteIndex] : null;
+    const highlightWidth = 60;
 
     return (
       <View style={styles.notationContainer}>
         {!showNotation ? (
           <TouchableOpacity
             style={styles.showNotationButton}
-            onPress={() => setShowNotation(true)}
+            onPress={handleShowNotation}
           >
-            <Text style={styles.showNotationText}>Show Notation</Text>
+            <Text style={styles.showNotationText}>Show Notation 📝</Text>
           </TouchableOpacity>
         ) : (
           <>
-            <View style={styles.notationWrapper}>{memoizedNotation}</View>
+            <View style={[styles.notationWrapper, { position: 'relative' }]}>
+              {memoizedNotation}
+              {/* Green highlight overlay */}
+              {highlightLeft !== null && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    left: highlightLeft,
+                    top: 30,
+                    width: highlightWidth,
+                    height: 100,
+                    backgroundColor: 'rgba(76, 175, 80, 0.25)',
+                    borderRadius: 4,
+                    borderWidth: 2,
+                    borderColor: 'rgba(76, 175, 80, 0.6)',
+                    pointerEvents: 'none',
+                  }}
+                />
+              )}
+            </View>
             <TouchableOpacity
               style={styles.hideNotationButton}
               onPress={() => setShowNotation(false)}
             >
-              <Text style={styles.hideNotationText}>Hide</Text>
+              <Text style={styles.hideNotationText}>Hide Notation</Text>
             </TouchableOpacity>
           </>
         )}
@@ -1164,6 +1203,7 @@ export default function WholeRestLessonExercise({
     return (
       <View style={styles.container}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
@@ -1179,9 +1219,13 @@ export default function WholeRestLessonExercise({
             Notice the 4 beats of silence in the middle.
           </Text>
 
+          {/* Show notation at top when open */}
+          {showNotation && renderNotationToggle()}
+
           {isPlaying && <BeatIndicator />}
 
-          {renderNotationToggle()}
+          {/* Show notation button at bottom when closed */}
+          {!showNotation && renderNotationToggle()}
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>
@@ -1234,6 +1278,7 @@ export default function WholeRestLessonExercise({
     return (
       <View style={styles.container}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
@@ -1249,6 +1294,9 @@ export default function WholeRestLessonExercise({
             note (4 beats).{"\n"}
             Stay completely silent during the rest!
           </Text>
+
+          {/* Show notation at top when open */}
+          {showNotation && renderNotationToggle()}
 
           {isPlaying && <BeatIndicator />}
 
@@ -1273,7 +1321,8 @@ export default function WholeRestLessonExercise({
             </Text>
           )}
 
-          {renderNotationToggle()}
+          {/* Show notation button at bottom when closed */}
+          {!showNotation && renderNotationToggle()}
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>
@@ -1356,6 +1405,7 @@ export default function WholeRestLessonExercise({
     return (
       <View style={styles.container}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
@@ -1372,6 +1422,9 @@ export default function WholeRestLessonExercise({
             Hear the silence clearly in your mind.
           </Text>
 
+          {/* Show notation at top when open */}
+          {showNotation && renderNotationToggle()}
+
           {isPlaying && <BeatIndicator />}
 
           <View style={styles.imagineVisual}>
@@ -1379,7 +1432,8 @@ export default function WholeRestLessonExercise({
             <Text style={styles.imagineHint}>Note → Silence → Note</Text>
           </View>
 
-          {renderNotationToggle()}
+          {/* Show notation button at bottom when closed */}
+          {!showNotation && renderNotationToggle()}
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>
@@ -1408,6 +1462,7 @@ export default function WholeRestLessonExercise({
     return (
       <View style={styles.container}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
@@ -1423,6 +1478,9 @@ export default function WholeRestLessonExercise({
             beats).{"\n"}
             Make the rest completely silent!
           </Text>
+
+          {/* Show notation at top when open */}
+          {showNotation && renderNotationToggle()}
 
           {isPlaying && <BeatIndicator />}
 
@@ -1447,7 +1505,8 @@ export default function WholeRestLessonExercise({
             </Text>
           )}
 
-          {renderNotationToggle()}
+          {/* Show notation button at bottom when closed */}
+          {!showNotation && renderNotationToggle()}
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>

@@ -278,6 +278,7 @@ export default function QuarterNoteLessonExercise({
   // Beat 1 should have sound, beat 2 should not (note ends on 2)
   const soundingOnBeatsRef = useRef([0, 0]);
   const startedEarlyRef = useRef(false);
+  const scrollViewRef = useRef(null);
 
   // Store onComplete callback
   const onCompleteRef = useRef(null);
@@ -798,26 +799,63 @@ export default function QuarterNoteLessonExercise({
     );
   }, [musicXML]);
 
+  // Compute cursor position (single quarter note - cursor on when beat >= 1)
+  const cursorNoteIndex = useMemo(() => {
+    if (!showNotation || currentBeat < 1) return null;
+    return 0; // Single note
+  }, [showNotation, currentBeat]);
+
+  // Scroll to top when notation is opened
+  const handleShowNotation = useCallback(() => {
+    setShowNotation(true);
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    }, 100);
+  }, []);
+
   const renderNotationToggle = () => {
     if (!NotationDisplay) return null;
+
+    // Single quarter note highlight position
+    const highlightLeft = cursorNoteIndex !== null ? 105 : null;
+    const highlightWidth = 60;
 
     return (
       <View style={styles.notationContainer}>
         {!showNotation ? (
           <TouchableOpacity
             style={styles.showNotationButton}
-            onPress={() => setShowNotation(true)}
+            onPress={handleShowNotation}
           >
-            <Text style={styles.showNotationText}>Show Notation</Text>
+            <Text style={styles.showNotationText}>Show Notation 📝</Text>
           </TouchableOpacity>
         ) : (
           <>
-            <View style={styles.notationWrapper}>{memoizedNotation}</View>
+            <View style={[styles.notationWrapper, { position: 'relative' }]}>
+              {memoizedNotation}
+              {/* Green highlight overlay */}
+              {highlightLeft !== null && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    left: highlightLeft,
+                    top: 40,
+                    width: highlightWidth,
+                    height: 120,
+                    backgroundColor: 'rgba(76, 175, 80, 0.25)',
+                    borderRadius: 4,
+                    borderWidth: 2,
+                    borderColor: 'rgba(76, 175, 80, 0.6)',
+                    pointerEvents: 'none',
+                  }}
+                />
+              )}
+            </View>
             <TouchableOpacity
               style={styles.hideNotationButton}
               onPress={() => setShowNotation(false)}
             >
-              <Text style={styles.hideNotationText}>Hide</Text>
+              <Text style={styles.hideNotationText}>Hide Notation</Text>
             </TouchableOpacity>
           </>
         )}
@@ -1031,6 +1069,7 @@ export default function QuarterNoteLessonExercise({
     return (
       <View style={styles.container}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
@@ -1046,9 +1085,13 @@ export default function QuarterNoteLessonExercise({
             Notice how SHORT it is - just 1 beat!
           </Text>
 
+          {/* Show notation at top when open */}
+          {showNotation && renderNotationToggle()}
+
           {isPlaying && <BeatIndicator />}
 
-          {renderNotationToggle()}
+          {/* Show notation button at bottom when closed */}
+          {!showNotation && renderNotationToggle()}
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>
@@ -1101,6 +1144,7 @@ export default function QuarterNoteLessonExercise({
     return (
       <View style={styles.container}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
@@ -1115,6 +1159,9 @@ export default function QuarterNoteLessonExercise({
             Sing the quarter note on solfege (do).{"\n"}
             Just 1 beat - short and quick!
           </Text>
+
+          {/* Show notation at top when open */}
+          {showNotation && renderNotationToggle()}
 
           {isPlaying && <BeatIndicator />}
 
@@ -1139,7 +1186,8 @@ export default function QuarterNoteLessonExercise({
             </Text>
           )}
 
-          {renderNotationToggle()}
+          {/* Show notation button at bottom when closed */}
+          {!showNotation && renderNotationToggle()}
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>
@@ -1221,6 +1269,7 @@ export default function QuarterNoteLessonExercise({
     return (
       <View style={styles.container}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
@@ -1236,13 +1285,17 @@ export default function QuarterNoteLessonExercise({
             Quick attack, short release!
           </Text>
 
+          {/* Show notation at top when open */}
+          {showNotation && renderNotationToggle()}
+
           {isPlaying && <BeatIndicator />}
 
           <View style={styles.imagineVisual}>
             <Text style={styles.imagineHint}>Hear: 1 - (2) stop</Text>
           </View>
 
-          {renderNotationToggle()}
+          {/* Show notation button at bottom when closed */}
+          {!showNotation && renderNotationToggle()}
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>
@@ -1271,6 +1324,7 @@ export default function QuarterNoteLessonExercise({
     return (
       <View style={styles.container}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
@@ -1285,6 +1339,9 @@ export default function QuarterNoteLessonExercise({
             Play the quarter note on your instrument.{"\n"}
             Just 1 beat - release quickly!
           </Text>
+
+          {/* Show notation at top when open */}
+          {showNotation && renderNotationToggle()}
 
           {isPlaying && <BeatIndicator />}
 
@@ -1309,7 +1366,8 @@ export default function QuarterNoteLessonExercise({
             </Text>
           )}
 
-          {renderNotationToggle()}
+          {/* Show notation button at bottom when closed */}
+          {!showNotation && renderNotationToggle()}
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>

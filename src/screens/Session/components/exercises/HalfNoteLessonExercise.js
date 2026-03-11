@@ -233,6 +233,7 @@ export default function HalfNoteLessonExercise({
   // Beats 1, 2 should have sound, beat 3 should not (note ends on 3)
   const soundingOnBeatsRef = useRef([0, 0, 0]);
   const startedEarlyRef = useRef(false);
+  const scrollViewRef = useRef(null);
 
   // Store onComplete callback
   const onCompleteRef = useRef(null);
@@ -736,26 +737,63 @@ export default function HalfNoteLessonExercise({
     );
   }, [musicXML]);
 
+  // Compute cursor position (single half note - cursor on when beat >= 1)
+  const cursorNoteIndex = useMemo(() => {
+    if (!showNotation || currentBeat < 1) return null;
+    return 0; // Single note
+  }, [showNotation, currentBeat]);
+
+  // Scroll to top when notation is opened
+  const handleShowNotation = useCallback(() => {
+    setShowNotation(true);
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    }, 100);
+  }, []);
+
   const renderNotationToggle = () => {
     if (!NotationDisplay) return null;
+
+    // Single half note highlight position
+    const highlightLeft = cursorNoteIndex !== null ? 135 : null;
+    const highlightWidth = 60;
 
     return (
       <View style={styles.notationContainer}>
         {!showNotation ? (
           <TouchableOpacity
             style={styles.showNotationButton}
-            onPress={() => setShowNotation(true)}
+            onPress={handleShowNotation}
           >
-            <Text style={styles.showNotationText}>Show Notation</Text>
+            <Text style={styles.showNotationText}>Show Notation 📝</Text>
           </TouchableOpacity>
         ) : (
           <>
-            <View style={styles.notationWrapper}>{memoizedNotation}</View>
+            <View style={[styles.notationWrapper, { position: 'relative' }]}>
+              {memoizedNotation}
+              {/* Green highlight overlay */}
+              {highlightLeft !== null && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    left: highlightLeft,
+                    top: 40,
+                    width: highlightWidth,
+                    height: 120,
+                    backgroundColor: 'rgba(76, 175, 80, 0.25)',
+                    borderRadius: 4,
+                    borderWidth: 2,
+                    borderColor: 'rgba(76, 175, 80, 0.6)',
+                    pointerEvents: 'none',
+                  }}
+                />
+              )}
+            </View>
             <TouchableOpacity
               style={styles.hideNotationButton}
               onPress={() => setShowNotation(false)}
             >
-              <Text style={styles.hideNotationText}>Hide</Text>
+              <Text style={styles.hideNotationText}>Hide Notation</Text>
             </TouchableOpacity>
           </>
         )}
@@ -957,6 +995,7 @@ export default function HalfNoteLessonExercise({
     return (
       <View style={styles.container}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
@@ -972,9 +1011,13 @@ export default function HalfNoteLessonExercise({
             Notice how it lasts 2 beats and ends on beat 3.
           </Text>
 
+          {/* Show notation at top when open */}
+          {showNotation && renderNotationToggle()}
+
           {isPlaying && <BeatIndicator />}
 
-          {renderNotationToggle()}
+          {/* Show notation button at bottom when closed */}
+          {!showNotation && renderNotationToggle()}
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>
@@ -1027,6 +1070,7 @@ export default function HalfNoteLessonExercise({
     return (
       <View style={styles.container}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
@@ -1041,6 +1085,9 @@ export default function HalfNoteLessonExercise({
             Sing the half note on solfege (do).{"\n"}
             Hold it for 2 beats, ending on beat 3.
           </Text>
+
+          {/* Show notation at top when open */}
+          {showNotation && renderNotationToggle()}
 
           {isPlaying && <BeatIndicator />}
 
@@ -1065,7 +1112,8 @@ export default function HalfNoteLessonExercise({
             </Text>
           )}
 
-          {renderNotationToggle()}
+          {/* Show notation button at bottom when closed */}
+          {!showNotation && renderNotationToggle()}
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>
@@ -1147,6 +1195,7 @@ export default function HalfNoteLessonExercise({
     return (
       <View style={styles.container}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
@@ -1162,6 +1211,9 @@ export default function HalfNoteLessonExercise({
             Hear the sound in your mind for 2 beats.
           </Text>
 
+          {/* Show notation at top when open */}
+          {showNotation && renderNotationToggle()}
+
           {isPlaying && <BeatIndicator />}
 
           <View style={styles.imagineVisual}>
@@ -1169,7 +1221,8 @@ export default function HalfNoteLessonExercise({
             <Text style={styles.imagineHint}>Hear: 1 - 2 - (3) stop</Text>
           </View>
 
-          {renderNotationToggle()}
+          {/* Show notation button at bottom when closed */}
+          {!showNotation && renderNotationToggle()}
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>
@@ -1198,6 +1251,7 @@ export default function HalfNoteLessonExercise({
     return (
       <View style={styles.container}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
@@ -1212,6 +1266,9 @@ export default function HalfNoteLessonExercise({
             Play the half note on your instrument.{"\n"}
             Hold for 2 beats, release on beat 3.
           </Text>
+
+          {/* Show notation at top when open */}
+          {showNotation && renderNotationToggle()}
 
           {isPlaying && <BeatIndicator />}
 
@@ -1236,7 +1293,8 @@ export default function HalfNoteLessonExercise({
             </Text>
           )}
 
-          {renderNotationToggle()}
+          {/* Show notation button at bottom when closed */}
+          {!showNotation && renderNotationToggle()}
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>
