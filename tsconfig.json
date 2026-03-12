@@ -2,9 +2,7 @@
   "compilerOptions": {
     "target": "esnext",
     "module": "commonjs",
-    "lib": [
-      "es2019"
-    ],
+    "lib": ["es2019", "dom"],
     "jsx": "react-native",
     "strict": true,
     "noEmit": true,
@@ -15,22 +13,10 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "src/*"
-      ]
+      "@/*": ["src/*"]
     },
-    "types": [
-      "react-native",
-      "jest"
-    ]
+    "types": ["react-native", "jest"]
   },
-  "include": [
-    "src/**/*",
-    "__tests__/**/*",
-    "App.js"
-  ],
-  "exclude": [
-    "node_modules"
-  ],
-  "extends": "expo/tsconfig.base"
+  "include": ["src/**/*", "__tests__/**/*", "App.js"],
+  "exclude": ["node_modules"]
 }
