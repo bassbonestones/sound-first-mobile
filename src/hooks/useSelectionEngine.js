@@ -150,34 +150,37 @@ export function useSelectionEngine(data) {
       return null;
     }
 
-    // Find the lowest key score across ALL mastered tunes
-    let lowestPick = null;
-    let lowestScore = Infinity;
-
+    // Collect all mastered tune/key combinations
+    const allMasteredCombos = [];
     for (const analysis of masteredTunes) {
       for (const keyData of analysis.keyScores) {
-        if (keyData.score < lowestScore) {
-          lowestScore = keyData.score;
-          lowestPick = {
-            tuneId: analysis.tune.id,
-            key: keyData.key,
-            pickType: "reinforcement",
-          };
-        }
+        allMasteredCombos.push({
+          tuneId: analysis.tune.id,
+          key: keyData.key,
+          score: keyData.score,
+        });
       }
     }
 
-    if (lowestPick) {
-      devLog(
-        "[useSelectionEngine] Reinforcement pick:",
-        lowestPick.tuneId,
-        lowestPick.key,
-        "score:",
-        lowestScore,
-      );
-    }
+    // Pick completely random from mastered combinations
+    const randomIndex = Math.floor(Math.random() * allMasteredCombos.length);
+    const randomPick = allMasteredCombos[randomIndex];
 
-    return lowestPick;
+    const pick = {
+      tuneId: randomPick.tuneId,
+      key: randomPick.key,
+      pickType: "reinforcement",
+    };
+
+    devLog(
+      "[useSelectionEngine] Reinforcement pick (random):",
+      pick.tuneId,
+      pick.key,
+      "score:",
+      randomPick.score,
+    );
+
+    return pick;
   }, [masteredTunes]);
 
   /**

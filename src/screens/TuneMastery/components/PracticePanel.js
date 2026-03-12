@@ -192,19 +192,46 @@ export default function PracticePanel({
   onSubmitRating,
   onCancel,
   settings,
+  tuneSettings,
 }) {
   const [rating, setRating] = useState(currentScore || 50);
 
-  // Tool visibility states
+  // Tool visibility states - auto-expand based on settings
   const [tunerExpanded, setTunerExpanded] = useState(false);
   const [metronomeExpanded, setMetronomeExpanded] = useState(false);
   const [droneExpanded, setDroneExpanded] = useState(false);
+
+  // Track if tools are active (playing) - separate from expanded state
+  const [metronomeActive, setMetronomeActive] = useState(
+    settings?.autoMetronome || false,
+  );
+  const [droneActive, setDroneActive] = useState(settings?.autoDrone || false);
 
   // Audio controls
   const [audioMuted, setAudioMuted] = useState(false);
   const [showVolumeModal, setShowVolumeModal] = useState(false);
   const [metronomeVolume, setMetronomeVolume] = useState(0.5);
   const [droneVolume, setDroneVolume] = useState(0.5);
+
+  // Get metronome settings from tune or use defaults
+  const metronomeBpm = tuneSettings?.bpm || 120;
+  const metronomeTimeSignature = tuneSettings?.timeSignature || "4/4";
+  const metronomeSubdivisionNum = tuneSettings?.subdivision || 1;
+
+  // Map numeric subdivision to Metronome string keys
+  const SUBDIVISION_MAP = {
+    1: "none",
+    2: "halves",
+    3: "triplet",
+    4: "quarters",
+  };
+  const metronomeSubdivision =
+    SUBDIVISION_MAP[metronomeSubdivisionNum] || "none";
+
+  // Parse time signature into beats and note value
+  const [beatsPerMeasure, noteValue] = metronomeTimeSignature
+    .split("/")
+    .map(Number);
 
   // Pick a random focus card when tune/key changes
   const focusCard = useMemo(() => {
@@ -233,7 +260,7 @@ export default function PracticePanel({
           <Text style={styles.practiceKey}>in {tuneKey}</Text>
         </View>
         {/* Mute and Volume buttons in header - always visible when tools are on */}
-        {(metronomeExpanded || droneExpanded) ? (
+        {metronomeExpanded || droneExpanded ? (
           <View style={styles.headerButtonsContainer}>
             {/* Volume button */}
             <TouchableOpacity
@@ -252,7 +279,7 @@ export default function PracticePanel({
                 audioMuted && styles.headerMuteButtonActive,
               ]}
               onPress={() => {
-                setAudioMuted(prev => !prev);
+                setAudioMuted((prev) => !prev);
               }}
               activeOpacity={0.5}
               accessibilityLabel={audioMuted ? "Unmute" : "Mute"}
@@ -308,9 +335,22 @@ export default function PracticePanel({
           <TouchableOpacity
             style={[
               styles.toolCircle,
-              metronomeExpanded && styles.toolCircleMetronomeActive,
+              (metronomeExpanded || metronomeActive) &&
+                styles.toolCircleMetronomeActive,
             ]}
-            onPress={() => setMetronomeExpanded(!metronomeExpanded)}
+            onPress={() => {
+              if (!metronomeActive) {
+                setMetronomeActive(true);
+                setMetronomeExpanded(true);
+              } else {
+                setMetronomeExpanded(!metronomeExpanded);
+              }
+            }}
+            onLongPress={() => {
+              // Long press to stop metronome
+              setMetronomeActive(false);
+              setMetronomeExpanded(false);
+            }}
             accessibilityLabel={
               metronomeExpanded ? "Collapse metronome" : "Expand metronome"
             }
@@ -320,7 +360,8 @@ export default function PracticePanel({
             <Text
               style={[
                 styles.toolCircleLabel,
-                metronomeExpanded && styles.toolCircleLabelActive,
+                (metronomeExpanded || metronomeActive) &&
+                  styles.toolCircleLabelActive,
               ]}
             >
               Metro
@@ -331,9 +372,21 @@ export default function PracticePanel({
           <TouchableOpacity
             style={[
               styles.toolCircle,
-              droneExpanded && styles.toolCircleDroneActive,
+              (droneExpanded || droneActive) && styles.toolCircleDroneActive,
             ]}
-            onPress={() => setDroneExpanded(!droneExpanded)}
+            onPress={() => {
+              if (!droneActive) {
+                setDroneActive(true);
+                setDroneExpanded(true);
+              } else {
+                setDroneExpanded(!droneExpanded);
+              }
+            }}
+            onLongPress={() => {
+              // Long press to stop drone
+              setDroneActive(false);
+              setDroneExpanded(false);
+            }}
             accessibilityLabel={
               droneExpanded ? "Collapse drone" : "Expand drone"
             }
@@ -343,7 +396,7 @@ export default function PracticePanel({
             <Text
               style={[
                 styles.toolCircleLabel,
-                droneExpanded && styles.toolCircleLabelActive,
+                (droneExpanded || droneActive) && styles.toolCircleLabelActive,
               ]}
             >
               Drone
@@ -361,10 +414,20 @@ export default function PracticePanel({
           </View>
         )}
 
-        {metronomeExpanded && (
-          <View style={[styles.toolPanel, styles.toolPanelMetronome]}>
+        {metronomeActive && (
+          <View
+            style={[
+              styles.toolPanel,
+              styles.toolPanelMetronome,
+              !metronomeExpanded && styles.toolPanelCollapsed,
+            ]}
+          >
             <Metronome
-              initialBpm={120}
+              initialBpm={metronomeBpm}
+              beatsPerMeasure={beatsPerMeasure}
+              initialNoteValue={noteValue}
+              initialSubdivision={metronomeSubdivision}
+              autoStart={settings?.autoMetronome}
               showControls={true}
               showTimeSignature={true}
               showSubdivision={true}
@@ -375,10 +438,17 @@ export default function PracticePanel({
           </View>
         )}
 
-        {droneExpanded && (
-          <View style={[styles.toolPanel, styles.toolPanelDrone]}>
+        {droneActive && (
+          <View
+            style={[
+              styles.toolPanel,
+              styles.toolPanelDrone,
+              !droneExpanded && styles.toolPanelCollapsed,
+            ]}
+          >
             <PitchDrone
               initialNote={tuneKey}
+              autoStart={settings?.autoDrone}
               muted={audioMuted}
               volume={droneVolume}
               hideInternalMute={true}
@@ -700,6 +770,14 @@ const styles = StyleSheet.create({
     padding: 0,
     borderColor: "#00BCD4",
     overflow: "hidden",
+  },
+  toolPanelCollapsed: {
+    height: 0,
+    padding: 0,
+    margin: 0,
+    overflow: "hidden",
+    opacity: 0,
+    position: "absolute",
   },
 
   // Rating

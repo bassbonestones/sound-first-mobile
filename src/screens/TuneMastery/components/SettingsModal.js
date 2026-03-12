@@ -28,6 +28,10 @@ export default function SettingsModal({
   const [temperament, setTemperament] = useState(
     settings?.temperament || "equal",
   );
+  const [autoMetronome, setAutoMetronome] = useState(
+    settings?.autoMetronome || false,
+  );
+  const [autoDrone, setAutoDrone] = useState(settings?.autoDrone || false);
 
   // Sync with settings when modal opens
   useEffect(() => {
@@ -35,6 +39,8 @@ export default function SettingsModal({
       setEmaAlpha(String(settings?.emaAlpha || 0.3));
       setTunerMode(settings?.tunerMode || "needle");
       setTemperament(settings?.temperament || "equal");
+      setAutoMetronome(settings?.autoMetronome || false);
+      setAutoDrone(settings?.autoDrone || false);
     }
   }, [visible, settings]);
 
@@ -49,6 +55,8 @@ export default function SettingsModal({
       emaAlpha: alpha,
       tunerMode,
       temperament,
+      autoMetronome,
+      autoDrone,
     });
     onClose();
   };
@@ -184,6 +192,50 @@ export default function SettingsModal({
             </View>
           </View>
 
+          {/* Auto-start Tools */}
+          <View style={styles.section}>
+            <Text style={styles.label}>Auto-start Tools</Text>
+            <Text style={styles.hint}>
+              Automatically expand when entering practice
+            </Text>
+            <View style={styles.toggleRow}>
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  autoMetronome && styles.toggleButtonActive,
+                ]}
+                onPress={() => setAutoMetronome(!autoMetronome)}
+              >
+                <Text style={styles.toggleButtonText}>🥁 Metronome</Text>
+                <Text
+                  style={[
+                    styles.toggleStatus,
+                    autoMetronome && styles.toggleStatusActive,
+                  ]}
+                >
+                  {autoMetronome ? "ON" : "OFF"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  autoDrone && styles.toggleButtonActive,
+                ]}
+                onPress={() => setAutoDrone(!autoDrone)}
+              >
+                <Text style={styles.toggleButtonText}>🎵 Pitch Drone</Text>
+                <Text
+                  style={[
+                    styles.toggleStatus,
+                    autoDrone && styles.toggleStatusActive,
+                  ]}
+                >
+                  {autoDrone ? "ON" : "OFF"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Seed Default Tunes */}
           <View style={styles.section}>
             <Text style={styles.label}>Tune Library</Text>
@@ -220,6 +272,8 @@ SettingsModal.propTypes = {
     emaAlpha: PropTypes.number,
     tunerMode: PropTypes.oneOf(["needle", "text"]),
     temperament: PropTypes.oneOf(["equal", "just"]),
+    autoMetronome: PropTypes.bool,
+    autoDrone: PropTypes.bool,
   }),
   onUpdateSettings: PropTypes.func.isRequired,
   onSeedTunes: PropTypes.func,
@@ -337,5 +391,38 @@ const styles = StyleSheet.create({
     color: "#FFD700",
     fontSize: 14,
     fontWeight: "600",
+  },
+  toggleRow: {
+    flexDirection: "column",
+    gap: 8,
+    marginTop: 8,
+  },
+  toggleButton: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#3a3a4e",
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  toggleButtonActive: {
+    borderColor: "#4CAF50",
+    backgroundColor: "rgba(76, 175, 80, 0.1)",
+  },
+  toggleButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  toggleStatus: {
+    color: "#888",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  toggleStatusActive: {
+    color: "#4CAF50",
   },
 });

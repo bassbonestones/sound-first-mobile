@@ -328,6 +328,16 @@ export default function TuneMasteryScreen({ navigation }) {
                 selectedKey
               ]?.score || 0
             }
+            tuneSettings={(() => {
+              const tune = data.activeTunes.find(
+                (t) => t.id === selectedTuneId,
+              );
+              return {
+                bpm: tune?.bpm || null,
+                timeSignature: tune?.timeSignature || "4/4",
+                subdivision: tune?.subdivision || 1,
+              };
+            })()}
             onSubmitRating={handleSubmitRating}
             onCancel={handleCancelPractice}
             settings={data.settings}

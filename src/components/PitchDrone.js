@@ -47,6 +47,8 @@ export default function PitchDrone({
   metronomeVolume = 0.5, // For cross-component volume control
   onVolumeChange, // Callback to change drone volume
   onMetronomeVolumeChange, // Callback to change metronome volume
+  initialNote = null, // Note name to start playing (e.g., "C", "Bb", "F#")
+  autoStart = false, // Auto-start drone on mount
 }) {
   const [temperament, setTemperament] = useState("equal"); // "equal" or "just"
   const [pitchCenter, setPitchCenter] = useState(0); // Semitone offset for just intonation root (0 = C)
@@ -438,6 +440,36 @@ export default function PitchDrone({
       }
     });
     devLog("[Drone] Stopped all drones");
+  }, []);
+
+  // Auto-start drone on mount if autoStart is true and initialNote is provided
+  useEffect(() => {
+    if (autoStart && initialNote && audioContextRef.current) {
+      // Convert note name to semitone (handle flats and sharps)
+      const noteNameToSemitone = (noteName) => {
+        if (!noteName) return null;
+        // Normalize note name: Bb -> A#, Db -> C#, etc.
+        const flatToSharp = {
+          Bb: "A#",
+          Db: "C#",
+          Eb: "D#",
+          Gb: "F#",
+          Ab: "G#",
+        };
+        const normalized = flatToSharp[noteName] || noteName;
+        const noteIndex = NOTES.findIndex((n) => n.name === normalized);
+        return noteIndex >= 0 ? noteIndex : null;
+      };
+
+      const semitone = noteNameToSemitone(initialNote);
+      if (semitone !== null) {
+        // Start drone in default octave (4)
+        startDrone(semitone, octave);
+        devLog(`[Drone] Auto-started ${initialNote} in octave ${octave}`);
+      }
+    }
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle sustain toggle

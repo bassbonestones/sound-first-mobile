@@ -98,16 +98,16 @@ describe("useSelectionEngine", () => {
   });
 
   describe("reinforcement picks", () => {
-    it("selects lowest key across all mastered tunes", () => {
-      // Create tunes with all keys at 98, then make specific keys lower
+    it("selects random key from mastered tunes", () => {
+      // Create tunes with all keys at 98 (all mastered)
       const tune1Keys = {};
       const tune2Keys = {};
       ALL_KEYS.forEach((key) => {
         tune1Keys[key] = 98;
         tune2Keys[key] = 98;
       });
-      tune1Keys.C = 95; // Make C the lowest overall
-      tune2Keys.D = 96; // D is second lowest
+      tune1Keys.C = 95; // Various scores but all above threshold
+      tune2Keys.D = 96;
 
       const tune1 = createTune("tune1", "First", tune1Keys);
       const tune2 = createTune("tune2", "Second", tune2Keys);
@@ -120,8 +120,9 @@ describe("useSelectionEngine", () => {
       const { result } = renderHook(() => useSelectionEngine(data));
 
       const pick = result.current.getReinforcementPick();
-      expect(pick.tuneId).toBe("tune1");
-      expect(pick.key).toBe("C");
+      // Should return a valid pick from mastered tunes (random)
+      expect(["tune1", "tune2"]).toContain(pick.tuneId);
+      expect(ALL_KEYS).toContain(pick.key);
       expect(pick.pickType).toBe("reinforcement");
     });
 

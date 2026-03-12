@@ -109,6 +109,8 @@ const DEFAULT_DATA = {
     emaAlpha: 0.3,
     tunerMode: "needle", // 'needle' | 'text'
     temperament: "equal", // 'equal' | 'just'
+    autoMetronome: false, // Auto-start metronome when entering practice
+    autoDrone: false, // Auto-start drone when entering practice
   },
   activeTunes: [],
   archivedTunes: [],

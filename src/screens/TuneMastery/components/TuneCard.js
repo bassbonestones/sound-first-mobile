@@ -91,7 +91,9 @@ export default function TuneCard({
           onPress={onToggleExpand}
           onLongPress={handleLongPress}
           accessibilityLabel={`${tune.name}, ${masteredCount} of 12 keys mastered`}
-          accessibilityHint={isExpanded ? "Collapse" : "Expand to see key scores"}
+          accessibilityHint={
+            isExpanded ? "Collapse" : "Expand to see key scores"
+          }
           accessibilityRole="button"
         >
           <Text style={styles.expandIcon}>{isExpanded ? "▼" : "▶"}</Text>

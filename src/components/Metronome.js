@@ -55,6 +55,7 @@ export default function Metronome({
   onMuteChange,
   beatsPerMeasure: initialBeats = 4,
   initialNoteValue = 4,
+  initialSubdivision = "none", // Subdivision key: "none", "halves", "triplet", "quarters"
   accentFirst = true,
   showControls = true,
   autoStart = false,
@@ -79,7 +80,7 @@ export default function Metronome({
   const [showTimeSigPicker, setShowTimeSigPicker] = useState(false);
 
   // Subdivision state
-  const [subdivision, setSubdivision] = useState("none");
+  const [subdivision, setSubdivision] = useState(initialSubdivision);
   const [showSubdivisionPicker, setShowSubdivisionPicker] = useState(false);
 
   // Volume modal state
