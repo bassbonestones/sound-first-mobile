@@ -7,9 +7,10 @@ module.exports = {
   moduleFileExtensions: ["ts", "tsx", "js", "jsx"],
   testMatch: ["**/__tests__/**/*.[jt]s?(x)", "**/?(*.)+(spec|test).[jt]s?(x)"],
   collectCoverageFrom: [
-    "src/components/**/*.{js,jsx}",
-    "src/screens/**/*.{js,jsx}",
-    "src/hooks/**/*.{js,jsx}",
+    "src/components/**/*.{js,jsx,ts,tsx}",
+    "src/screens/**/*.{js,jsx,ts,tsx}",
+    "src/hooks/**/*.{js,jsx,ts,tsx}",
+    "src/types/**/*.{ts,tsx}",
     "!**/node_modules/**",
     "!**/__tests__/**",
   ],

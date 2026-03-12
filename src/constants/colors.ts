@@ -4,7 +4,67 @@
  * Centralized color definitions for consistent theming across the app.
  */
 
-export const colors = {
+export interface MasteryColors {
+  level0: string;
+  level1: string;
+  level2: string;
+  level3: string;
+  level4: string;
+  level5: string;
+}
+
+export interface Colors {
+  // Primary colors
+  primary: string;
+  primaryDark: string;
+  primaryLight: string;
+
+  // Admin/Header colors
+  headerBg: string;
+
+  // Session/Practice colors (dark theme)
+  sessionBg: string;
+  sessionGold: string;
+  sessionText: string;
+
+  // Semantic colors
+  success: string;
+  successLight: string;
+  warning: string;
+  warningLight: string;
+  error: string;
+  errorLight: string;
+  errorDark: string;
+
+  // Grayscale
+  white: string;
+  background: string;
+  surfaceLight: string;
+  surface: string;
+  border: string;
+  borderDark: string;
+  divider: string;
+
+  // Text colors
+  textPrimary: string;
+  textSecondary: string;
+  textTertiary: string;
+  textDisabled: string;
+  textLight: string;
+
+  // Specific UI elements
+  inputBg: string;
+  chipBg: string;
+  chipActiveBg: string;
+
+  // Mastery level colors
+  mastery: MasteryColors;
+
+  // Soft gate specific
+  softGate: string;
+}
+
+export const colors: Colors = {
   // Primary colors
   primary: "#2196F3", // Blue - primary actions, links
   primaryDark: "#1976D2", // Darker blue for pressed states
@@ -62,8 +122,17 @@ export const colors = {
   softGate: "#9C27B0", // Purple for soft gate indicators
 };
 
+export interface Spacing {
+  xs: number;
+  sm: number;
+  md: number;
+  lg: number;
+  xl: number;
+  xxl: number;
+}
+
 // Spacing scale
-export const spacing = {
+export const spacing: Spacing = {
   xs: 4,
   sm: 8,
   md: 12,
@@ -72,8 +141,20 @@ export const spacing = {
   xxl: 24,
 };
 
+export interface FontSizes {
+  xs: number;
+  sm: number;
+  md: number;
+  base: number;
+  lg: number;
+  xl: number;
+  xxl: number;
+  title: number;
+  header: number;
+}
+
 // Font sizes
-export const fontSizes = {
+export const fontSizes: FontSizes = {
   xs: 11,
   sm: 12,
   md: 13,
@@ -85,8 +166,17 @@ export const fontSizes = {
   header: 22,
 };
 
+export interface BorderRadius {
+  sm: number;
+  md: number;
+  lg: number;
+  xl: number;
+  round: number;
+  full: number;
+}
+
 // Border radii
-export const borderRadius = {
+export const borderRadius: BorderRadius = {
   sm: 4,
   md: 6,
   lg: 8,
