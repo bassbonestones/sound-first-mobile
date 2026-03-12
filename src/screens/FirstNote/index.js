@@ -38,7 +38,8 @@ import styles from "./styles";
  * Main content component that uses context
  */
 const FirstNoteContent = () => {
-  const { stage, skippableStages, error, setError, scrollToEndRef } = useFirstNote();
+  const { stage, skippableStages, error, setError, scrollToEndRef } =
+    useFirstNote();
   const scrollViewRef = React.useRef(null);
 
   // Set the scrollToEnd callback in context so child components can trigger scroll

@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">85.36% </span>
+                <span class="strong">86.04% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>35/41</span>
+                <span class='fraction'>37/43</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">84.61% </span>
+                <span class="strong">85.36% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>33/39</span>
+                <span class='fraction'>35/41</span>
             </div>
         
             
@@ -334,7 +334,11 @@
 <a name='L269'></a><a href='#L269'>269</a>
 <a name='L270'></a><a href='#L270'>270</a>
 <a name='L271'></a><a href='#L271'>271</a>
-<a name='L272'></a><a href='#L272'>272</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L272'></a><a href='#L272'>272</a>
+<a name='L273'></a><a href='#L273'>273</a>
+<a name='L274'></a><a href='#L274'>274</a>
+<a name='L275'></a><a href='#L275'>275</a>
+<a name='L276'></a><a href='#L276'>276</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -363,7 +367,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -489,6 +493,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -522,6 +529,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -634,7 +642,7 @@ const COLORS = {
   peak: "#FFC107", // Yellow - peak indicator
 };
 &nbsp;
-export default function VolumeBar({
+const VolumeBar = React.memo(function VolumeBar({
   volume = <span class="branch-0 cbranch-no" title="branch not covered" >0,</span>
   pitchAccuracy = null,
   label = null,
@@ -741,7 +749,7 @@ export default function VolumeBar({
       )}
     &lt;/View&gt;
   );
-}
+});
 &nbsp;
 VolumeBar.propTypes = {
   volume: PropTypes.number,
@@ -753,68 +761,72 @@ VolumeBar.propTypes = {
   style: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
 };
 &nbsp;
+export default VolumeBar;
+&nbsp;
 /**
  * CircularVolumeIndicator - Alternative circular volume display
  *
  * Shows volume as a pulsing circle that changes color with pitch accuracy.
  */
-export function CircularVolumeIndicator({
-  volume = <span class="branch-0 cbranch-no" title="branch not covered" >0,</span>
-  pitchAccuracy = null,
-  size = 100,
-  style,
-}) {
-  const animatedScale = useRef(new Animated.Value(0.5)).current;
+export const CircularVolumeIndicator = React.memo(
+  function CircularVolumeIndicator({
+    volume = <span class="branch-0 cbranch-no" title="branch not covered" >0,</span>
+    pitchAccuracy = null,
+    size = 100,
+    style,
+  }) {
+    const animatedScale = useRef(new Animated.Value(0.5)).current;
 &nbsp;
-  useEffect(() =&gt; {
-    // Pulse animation based on volume
-    const baseScale = 0.5;
-    const maxScale = 1.0;
-    const targetScale = baseScale + volume * (maxScale - baseScale);
+    useEffect(() =&gt; {
+      // Pulse animation based on volume
+      const baseScale = 0.5;
+      const maxScale = 1.0;
+      const targetScale = baseScale + volume * (maxScale - baseScale);
 &nbsp;
-    Animated.spring(animatedScale, {
-      toValue: targetScale,
-      friction: 5,
-      tension: 100,
-      useNativeDriver: Platform.OS !== "web",
-    }).start();
-  }, [volume]);
+      Animated.spring(animatedScale, {
+        toValue: targetScale,
+        friction: 5,
+        tension: 100,
+        useNativeDriver: Platform.OS !== "web",
+      }).start();
+    }, [volume]);
 &nbsp;
-  const getColor = () =&gt; {
-    if (volume &lt; 0.02) return COLORS.inactive;
-    switch (pitchAccuracy) {
-      case "correct":
-        return COLORS.correct;
-      case "off":
-        return COLORS.off;
-      default:
-        return COLORS.listening;
-    }
-  };
+    const getColor = () =&gt; {
+      if (volume &lt; 0.02) return COLORS.inactive;
+      switch (pitchAccuracy) {
+        case "correct":
+          return COLORS.correct;
+        case "off":
+          return COLORS.off;
+        default:
+          return COLORS.listening;
+      }
+    };
 &nbsp;
-  return (
-    &lt;View
-      style={[styles.circularContainer, { width: size, height: size }, style]}
-    &gt;
-      &lt;Animated.View
-        style={[
-          styles.circularIndicator,
-          {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            backgroundColor: getColor(),
-            transform: [{ scale: animatedScale }],
-            opacity: volume &gt; 0.02 ? 0.8 : 0.3,
-          },
-        ]}
-      /&gt;
-      {volume &gt; 0.02 &amp;&amp; pitchAccuracy === "correct" &amp;&amp; (
-        &lt;Text style={styles.circularText}&gt;&lt;/Text&gt;
-      )}
-    &lt;/View&gt;
-  );
-}
+    return (
+      &lt;View
+        style={[styles.circularContainer, { width: size, height: size }, style]}
+      &gt;
+        &lt;Animated.View
+          style={[
+            styles.circularIndicator,
+            {
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              backgroundColor: getColor(),
+              transform: [{ scale: animatedScale }],
+              opacity: volume &gt; 0.02 ? 0.8 : 0.3,
+            },
+          ]}
+        /&gt;
+        {volume &gt; 0.02 &amp;&amp; pitchAccuracy === "correct" &amp;&amp; (
+          &lt;Text style={styles.circularText}&gt;&lt;/Text&gt;
+        )}
+      &lt;/View&gt;
+    );
+  },
+);
 &nbsp;
 CircularVolumeIndicator.propTypes = {
   volume: PropTypes.number,
@@ -883,7 +895,7 @@ const styles = StyleSheet.create({
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-11T20:51:02.253Z
+                at 2026-03-12T16:32:37.152Z
             </div>
         <script src="../prettify.js"></script>
         <script>

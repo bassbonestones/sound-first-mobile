@@ -6,7 +6,7 @@ import PropTypes from "prop-types";
 import { View, Text, StyleSheet } from "react-native";
 import TuneCard from "./TuneCard";
 
-export default function TuneList({
+const TuneList = React.memo(function TuneList({
   tunes,
   isArchive = false,
   onReorder,
@@ -75,7 +75,7 @@ export default function TuneList({
       ))}
     </View>
   );
-}
+});
 
 TuneList.propTypes = {
   tunes: PropTypes.arrayOf(
@@ -94,6 +94,8 @@ TuneList.propTypes = {
   onUpdateSettings: PropTypes.func,
   masteryThreshold: PropTypes.number,
 };
+
+export default TuneList;
 
 const styles = StyleSheet.create({
   container: {

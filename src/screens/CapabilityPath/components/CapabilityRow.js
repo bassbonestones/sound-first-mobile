@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import styles from "../styles";
 
-export default function CapabilityRow({
+const CapabilityRow = React.memo(function CapabilityRow({
   item,
   index,
   isEditing,
@@ -147,7 +147,7 @@ export default function CapabilityRow({
       )}
     </View>
   );
-}
+});
 
 CapabilityRow.propTypes = {
   item: PropTypes.shape({
@@ -162,3 +162,5 @@ CapabilityRow.propTypes = {
   onMoveItem: PropTypes.func.isRequired,
   onDeleteItem: PropTypes.func.isRequired,
 };
+
+export default CapabilityRow;

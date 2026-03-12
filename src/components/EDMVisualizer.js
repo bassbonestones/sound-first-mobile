@@ -181,7 +181,7 @@ function PulseRing({ volume, colorScheme, size }) {
   );
 }
 
-export default function EDMVisualizer({
+const EDMVisualizer = React.memo(function EDMVisualizer({
   volume = 0,
   pitchAccuracy = null,
   barCount = 16,
@@ -253,7 +253,7 @@ export default function EDMVisualizer({
       />
     </View>
   );
-}
+});
 
 EDMVisualizer.propTypes = {
   volume: PropTypes.number,
@@ -262,8 +262,10 @@ EDMVisualizer.propTypes = {
   style: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
 };
 
+export default EDMVisualizer;
+
 // Medium version - smaller but keeps pulse rings and orb
-export function EDMVisualizerMedium({
+export const EDMVisualizerMedium = React.memo(function EDMVisualizerMedium({
   volume = 0,
   pitchAccuracy = null,
   barCount = 12,
@@ -333,7 +335,7 @@ export function EDMVisualizerMedium({
       />
     </View>
   );
-}
+});
 
 EDMVisualizerMedium.propTypes = {
   volume: PropTypes.number,
@@ -343,7 +345,7 @@ EDMVisualizerMedium.propTypes = {
 };
 
 // Compact version for inline use
-export function EDMVisualizerCompact({
+export const EDMVisualizerCompact = React.memo(function EDMVisualizerCompact({
   volume = 0,
   pitchAccuracy = null,
   barCount = 8,
@@ -388,7 +390,7 @@ export function EDMVisualizerCompact({
       </View>
     </View>
   );
-}
+});
 
 EDMVisualizerCompact.propTypes = {
   volume: PropTypes.number,

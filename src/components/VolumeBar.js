@@ -27,7 +27,7 @@ const COLORS = {
   peak: "#FFC107", // Yellow - peak indicator
 };
 
-export default function VolumeBar({
+const VolumeBar = React.memo(function VolumeBar({
   volume = 0,
   pitchAccuracy = null,
   label = null,
@@ -134,7 +134,7 @@ export default function VolumeBar({
       )}
     </View>
   );
-}
+});
 
 VolumeBar.propTypes = {
   volume: PropTypes.number,
@@ -146,68 +146,72 @@ VolumeBar.propTypes = {
   style: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
 };
 
+export default VolumeBar;
+
 /**
  * CircularVolumeIndicator - Alternative circular volume display
  *
  * Shows volume as a pulsing circle that changes color with pitch accuracy.
  */
-export function CircularVolumeIndicator({
-  volume = 0,
-  pitchAccuracy = null,
-  size = 100,
-  style,
-}) {
-  const animatedScale = useRef(new Animated.Value(0.5)).current;
+export const CircularVolumeIndicator = React.memo(
+  function CircularVolumeIndicator({
+    volume = 0,
+    pitchAccuracy = null,
+    size = 100,
+    style,
+  }) {
+    const animatedScale = useRef(new Animated.Value(0.5)).current;
 
-  useEffect(() => {
-    // Pulse animation based on volume
-    const baseScale = 0.5;
-    const maxScale = 1.0;
-    const targetScale = baseScale + volume * (maxScale - baseScale);
+    useEffect(() => {
+      // Pulse animation based on volume
+      const baseScale = 0.5;
+      const maxScale = 1.0;
+      const targetScale = baseScale + volume * (maxScale - baseScale);
 
-    Animated.spring(animatedScale, {
-      toValue: targetScale,
-      friction: 5,
-      tension: 100,
-      useNativeDriver: Platform.OS !== "web",
-    }).start();
-  }, [volume]);
+      Animated.spring(animatedScale, {
+        toValue: targetScale,
+        friction: 5,
+        tension: 100,
+        useNativeDriver: Platform.OS !== "web",
+      }).start();
+    }, [volume]);
 
-  const getColor = () => {
-    if (volume < 0.02) return COLORS.inactive;
-    switch (pitchAccuracy) {
-      case "correct":
-        return COLORS.correct;
-      case "off":
-        return COLORS.off;
-      default:
-        return COLORS.listening;
-    }
-  };
+    const getColor = () => {
+      if (volume < 0.02) return COLORS.inactive;
+      switch (pitchAccuracy) {
+        case "correct":
+          return COLORS.correct;
+        case "off":
+          return COLORS.off;
+        default:
+          return COLORS.listening;
+      }
+    };
 
-  return (
-    <View
-      style={[styles.circularContainer, { width: size, height: size }, style]}
-    >
-      <Animated.View
-        style={[
-          styles.circularIndicator,
-          {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            backgroundColor: getColor(),
-            transform: [{ scale: animatedScale }],
-            opacity: volume > 0.02 ? 0.8 : 0.3,
-          },
-        ]}
-      />
-      {volume > 0.02 && pitchAccuracy === "correct" && (
-        <Text style={styles.circularText}></Text>
-      )}
-    </View>
-  );
-}
+    return (
+      <View
+        style={[styles.circularContainer, { width: size, height: size }, style]}
+      >
+        <Animated.View
+          style={[
+            styles.circularIndicator,
+            {
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              backgroundColor: getColor(),
+              transform: [{ scale: animatedScale }],
+              opacity: volume > 0.02 ? 0.8 : 0.3,
+            },
+          ]}
+        />
+        {volume > 0.02 && pitchAccuracy === "correct" && (
+          <Text style={styles.circularText}></Text>
+        )}
+      </View>
+    );
+  },
+);
 
 CircularVolumeIndicator.propTypes = {
   volume: PropTypes.number,

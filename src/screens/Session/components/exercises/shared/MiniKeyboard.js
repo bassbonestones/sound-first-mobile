@@ -69,7 +69,7 @@ const BLACK_KEY_WIDTH = 28;
  * @param {boolean} interactive - Whether keys are pressable
  * @param {boolean} useFlatNames - Use flat note names (Db, Eb) vs sharp (C#, D#)
  */
-function MiniKeyboard({
+const MiniKeyboard = React.memo(function MiniKeyboard({
   highlightNotes = [],
   highlightFlat = null,
   highlightSharp = null,
@@ -194,7 +194,7 @@ function MiniKeyboard({
       </View>
     </View>
   );
-}
+});
 
 MiniKeyboard.propTypes = {
   highlightNotes: PropTypes.arrayOf(PropTypes.string),

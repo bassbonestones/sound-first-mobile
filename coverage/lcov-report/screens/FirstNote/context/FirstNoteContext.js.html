@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">81.96% </span>
+                <span class="strong">80% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>50/61</span>
+                <span class='fraction'>52/65</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">48.27% </span>
+                <span class="strong">45.16% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>14/29</span>
+                <span class='fraction'>14/31</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">75% </span>
+                <span class="strong">69.23% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>9/12</span>
+                <span class='fraction'>9/13</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">83.05% </span>
+                <span class="strong">80.95% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>49/59</span>
+                <span class='fraction'>51/63</span>
             </div>
         
             
@@ -309,7 +309,19 @@
 <a name='L244'></a><a href='#L244'>244</a>
 <a name='L245'></a><a href='#L245'>245</a>
 <a name='L246'></a><a href='#L246'>246</a>
-<a name='L247'></a><a href='#L247'>247</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L247'></a><a href='#L247'>247</a>
+<a name='L248'></a><a href='#L248'>248</a>
+<a name='L249'></a><a href='#L249'>249</a>
+<a name='L250'></a><a href='#L250'>250</a>
+<a name='L251'></a><a href='#L251'>251</a>
+<a name='L252'></a><a href='#L252'>252</a>
+<a name='L253'></a><a href='#L253'>253</a>
+<a name='L254'></a><a href='#L254'>254</a>
+<a name='L255'></a><a href='#L255'>255</a>
+<a name='L256'></a><a href='#L256'>256</a>
+<a name='L257'></a><a href='#L257'>257</a>
+<a name='L258'></a><a href='#L258'>258</a>
+<a name='L259'></a><a href='#L259'>259</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -373,6 +385,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">32x</span>
 <span class="cline-any cline-yes">32x</span>
+<span class="cline-any cline-yes">32x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">32x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">32x</span>
@@ -455,6 +475,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">32x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -619,6 +643,14 @@ export function FirstNoteProvider({ children, navigation, route }) {
   // Refs
   const gotCorrectPitchRef = useRef(false);
   const focusListenStartedRef = useRef(false);
+  const scrollToEndRef = useRef(null);
+&nbsp;
+  // Scroll helper - call this to scroll the main ScrollView to the end
+  const scrollToEnd = useCallback(<span class="fstat-no" title="function not covered" >()</span> =&gt; {
+<span class="cstat-no" title="statement not covered" >    if (scrollToEndRef.current) {</span>
+<span class="cstat-no" title="statement not covered" >      scrollToEndRef.current();</span>
+    }
+  }, []);
 &nbsp;
   // Derived values
   const noteInfo = useMemo(() =&gt; parseNoteName(resonantNote), [resonantNote]);
@@ -754,6 +786,10 @@ export function FirstNoteProvider({ children, navigation, route }) {
     // Refs
     gotCorrectPitchRef,
     focusListenStartedRef,
+    scrollToEndRef,
+&nbsp;
+    // Scroll helpers
+    scrollToEnd,
 &nbsp;
     // Audio handlers (from hook)
     playNote: audio.playNote,
@@ -808,7 +844,7 @@ export function useFirstNote() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-11T20:51:02.253Z
+                at 2026-03-12T16:32:37.152Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

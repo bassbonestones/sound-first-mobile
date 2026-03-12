@@ -22,7 +22,7 @@ import { COLORS } from "./lessonStyles";
  * @param {Function} onRetry - Callback to retry audio initialization
  * @param {string} message - Custom loading message
  */
-export function AudioLoadingState({
+export const AudioLoadingState = React.memo(function AudioLoadingState({
   isLoading = true,
   error = null,
   onRetry,
@@ -65,7 +65,7 @@ export function AudioLoadingState({
   }
 
   return null;
-}
+});
 
 /**
  * Wrapper component that shows loading state while audio initializes
@@ -74,7 +74,7 @@ export function AudioLoadingState({
  * @param {Function} onRetry - Retry callback
  * @param {React.ReactNode} children - Content to render when ready
  */
-export function WithAudioLoading({
+export const WithAudioLoading = React.memo(function WithAudioLoading({
   isAudioReady,
   audioError,
   onRetry,
@@ -91,7 +91,7 @@ export function WithAudioLoading({
   }
 
   return children;
-}
+});
 
 const styles = StyleSheet.create({
   container: {

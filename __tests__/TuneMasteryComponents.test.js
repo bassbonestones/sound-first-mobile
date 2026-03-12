@@ -627,7 +627,9 @@ describe("PracticePanel", () => {
 
     // Should show some focus card content - category text
     expect(
-      getByText(/Ear & Pitch|Resonance & Tone|Rhythm & Time|Musical Shape/),
+      getByText(
+        /Ear & Pitch|Resonance & Tone|Rhythm & Time|Musical Shape|Articulation & Communication|Ease & Efficiency/,
+      ),
     ).toBeTruthy();
   });
 

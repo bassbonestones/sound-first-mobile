@@ -12,8 +12,14 @@ import styles from "../styles";
  * Stage 7 Content - Show the note on the staff
  */
 export const Stage7Content = () => {
-  const { noteInfo, clefType, stage6MusicXML, showSummary, setShowSummary, scrollToEnd } =
-    useFirstNote();
+  const {
+    noteInfo,
+    clefType,
+    stage6MusicXML,
+    showSummary,
+    setShowSummary,
+    scrollToEnd,
+  } = useFirstNote();
 
   const handleShowSummary = () => {
     setShowSummary(true);
