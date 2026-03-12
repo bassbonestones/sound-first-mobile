@@ -7,9 +7,10 @@ import {
   Platform,
   ScrollView,
   Modal,
+  ViewStyle,
+  TextStyle,
 } from "react-native";
 import Slider from "@react-native-community/slider";
-import PropTypes from "prop-types";
 import { devLog, devWarn } from "../utils/devLogger";
 
 // Import constants and utilities from extracted module
@@ -24,10 +25,21 @@ import {
 // Import styles
 import { styles, colors } from "./Metronome/styles";
 
+// AudioContext types
+interface AudioContextType {
+  currentTime: number;
+  state: string;
+  resume: () => Promise<void>;
+  close: () => Promise<void>;
+}
+
+type NativeAudioContextConstructor = new () => AudioContextType;
+
 // Import AudioContext from react-native-audio-api for native platforms
-let NativeAudioContext = null;
+let NativeAudioContext: NativeAudioContextConstructor | null = null;
 if (Platform.OS !== "web") {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     NativeAudioContext = require("react-native-audio-api").AudioContext;
   } catch (e) {
     devWarn("react-native-audio-api not available:", e);
@@ -46,7 +58,30 @@ if (Platform.OS !== "web") {
  * - Swing patterns only available for /4 time
  */
 
-export default function Metronome({
+interface MetronomeProps {
+  initialBpm?: number;
+  minBpm?: number;
+  maxBpm?: number;
+  onBpmChange?: (bpm: number) => void;
+  onPlayingChange?: (playing: boolean) => void;
+  onMuteChange?: (muted: boolean) => void;
+  beatsPerMeasure?: number;
+  initialNoteValue?: number;
+  initialSubdivision?: string;
+  accentFirst?: boolean;
+  showControls?: boolean;
+  autoStart?: boolean;
+  showTimeSignature?: boolean;
+  showSubdivision?: boolean;
+  muted?: boolean;
+  volume?: number;
+  hideInternalMute?: boolean;
+  droneVolume?: number;
+  onVolumeChange?: (volume: number) => void;
+  onDroneVolumeChange?: (volume: number) => void;
+}
+
+const Metronome: React.FC<MetronomeProps> = ({
   initialBpm = 80,
   minBpm = 40,
   maxBpm = 350,
@@ -55,20 +90,19 @@ export default function Metronome({
   onMuteChange,
   beatsPerMeasure: initialBeats = 4,
   initialNoteValue = 4,
-  initialSubdivision = "none", // Subdivision key: "none", "halves", "triplet", "quarters"
+  initialSubdivision = "none",
   accentFirst = true,
   showControls = true,
   autoStart = false,
   showTimeSignature = true,
   showSubdivision = true,
   muted = false,
-  volume = 1.0, // Master volume multiplier (0-1)
-  hideInternalMute = false, // Hide internal mute button when controlled externally
-  // Volume controls for cross-component modal
+  volume = 1.0,
+  hideInternalMute = false,
   droneVolume = 0.5,
   onVolumeChange,
   onDroneVolumeChange,
-}) {
+}) => {
   const [bpm, setBpm] = useState(initialBpm);
   const [isPlaying, setIsPlaying] = useState(autoStart);
   const [currentBeat, setCurrentBeat] = useState(0);
@@ -93,11 +127,11 @@ export default function Metronome({
     }
   }, [noteValue, subdivision]);
 
-  const audioContextRef = useRef(null);
-  const intervalRef = useRef(null);
-  const subIntervalRef = useRef(null);
+  const audioContextRef = useRef<AudioContextType | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const subIntervalRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const nextBeatTimeRef = useRef(0);
-  const schedulerRef = useRef(null);
+  const schedulerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mutedRef = useRef(muted);
   const volumeRef = useRef(volume);
 
@@ -114,9 +148,14 @@ export default function Metronome({
   // Initialize AudioContext (all platforms)
   useEffect(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (AudioContext) {
-        audioContextRef.current = new AudioContext();
+      const WebAudioContext = (window as typeof window & {
+        AudioContext?: typeof AudioContext;
+        webkitAudioContext?: typeof AudioContext;
+      }).AudioContext || (window as typeof window & {
+        webkitAudioContext?: typeof AudioContext;
+      }).webkitAudioContext;
+      if (WebAudioContext) {
+        audioContextRef.current = new WebAudioContext() as unknown as AudioContextType;
       }
     } else if (NativeAudioContext) {
       // Use react-native-audio-api on native platforms
@@ -141,12 +180,12 @@ export default function Metronome({
 
   // Scheduler for precise timing
   const scheduleNote = useCallback(
-    (beatNumber, time) => {
+    (beatNumber: number, time: number) => {
       if (audioContextRef.current) {
         // Accent on beat 1 if enabled
         const isAccent = accentFirst && beatNumber === 0;
         const frequency = isAccent ? 1200 : 800;
-        createClickSound(audioContextRef.current, frequency, 0.05);
+        createClickSound(audioContextRef.current as unknown as AudioContext, frequency, 0.05);
       }
     },
     [accentFirst],
@@ -170,15 +209,15 @@ export default function Metronome({
 
   // Play subdivision clicks within a beat
   const playSubdivisionClicks = useCallback(
-    (beatCounter, msPerBeat, isFirstBeat) => {
+    (beatCounter: number, msPerBeat: number, isFirstBeat: boolean): ReturnType<typeof setTimeout>[] => {
       const subdivisionPattern = SUBDIVISIONS[subdivision];
       if (!subdivisionPattern || !audioContextRef.current) return [];
 
-      const timeouts = [];
+      const timeouts: ReturnType<typeof setTimeout>[] = [];
       const pattern = subdivisionPattern.pattern;
       const accents = subdivisionPattern.accent;
 
-      pattern.forEach((timing, index) => {
+      pattern.forEach((timing: number, index: number) => {
         const delayMs = timing * msPerBeat;
         const timeout = setTimeout(() => {
           if (audioContextRef.current && !mutedRef.current) {
@@ -193,7 +232,7 @@ export default function Metronome({
               `[Metronome] Beat ${beatCounter + 1}/${beatsPerMeasure}, sub=${index + 1}/${pattern.length}, freq=${frequency}Hz, vol=${finalVolume.toFixed(2)}`,
             );
             createClickSound(
-              audioContextRef.current,
+              audioContextRef.current as unknown as AudioContext,
               frequency,
               0.04,
               finalVolume,
@@ -273,7 +312,7 @@ export default function Metronome({
     };
   }, [isPlaying, bpm, beatsPerMeasure, subdivision, playSubdivisionClicks]);
 
-  const handleBpmChange = (newBpm) => {
+  const handleBpmChange = (newBpm: number): void => {
     const clampedBpm = Math.max(minBpm, Math.min(maxBpm, newBpm));
     setBpm(clampedBpm);
     if (onBpmChange) {
@@ -281,7 +320,7 @@ export default function Metronome({
     }
   };
 
-  const togglePlay = () => {
+  const togglePlay = (): void => {
     const newPlaying = !isPlaying;
     setIsPlaying(newPlaying);
     if (onPlayingChange) {
@@ -289,15 +328,15 @@ export default function Metronome({
     }
   };
 
-  const toggleMute = () => {
+  const toggleMute = (): void => {
     if (onMuteChange) {
       onMuteChange(!muted);
     }
   };
 
   // Tap tempo feature
-  const tapTimesRef = useRef([]);
-  const handleTapTempo = () => {
+  const tapTimesRef = useRef<number[]>([]);
+  const handleTapTempo = (): void => {
     const now = Date.now();
     tapTimesRef.current.push(now);
 
@@ -308,7 +347,7 @@ export default function Metronome({
 
     // Calculate average BPM from taps
     if (tapTimesRef.current.length >= 2) {
-      const intervals = [];
+      const intervals: number[] = [];
       for (let i = 1; i < tapTimesRef.current.length; i++) {
         intervals.push(tapTimesRef.current[i] - tapTimesRef.current[i - 1]);
       }
@@ -377,9 +416,6 @@ export default function Metronome({
                   : styles.timeSigButtonInactive,
                 { opacity: showSubdivisionPicker ? 0.5 : 1 },
               ]}
-              {...(Platform.OS === "web"
-                ? { title: "Select time signature" }
-                : {})}
             >
               <Text
                 style={[
@@ -410,9 +446,6 @@ export default function Metronome({
                   : styles.subdivisionButtonInactive,
                 { opacity: showTimeSigPicker ? 0.5 : 1 },
               ]}
-              {...(Platform.OS === "web"
-                ? { title: "Select subdivision pattern" }
-                : {})}
             >
               <Text
                 style={[
@@ -464,7 +497,7 @@ export default function Metronome({
           <View>
             <Text style={styles.pickerLabel}>Beat note value:</Text>
             <View style={styles.noteValueGrid}>
-              {NOTE_VALUES.map((val) => (
+              {NOTE_VALUES.map((val: number) => (
                 <TouchableOpacity
                   key={val}
                   onPress={() => setNoteValue(val)}
@@ -523,7 +556,7 @@ export default function Metronome({
             showsVerticalScrollIndicator={true}
           >
             {Object.entries(SUBDIVISIONS)
-              .filter(([key, sub]) => !sub.swingOnly || noteValue === 4)
+              .filter(([key, sub]) => !(sub as { swingOnly?: boolean }).swingOnly || noteValue === 4)
               .map(([key, sub]) => (
                 <TouchableOpacity
                   key={key}
@@ -557,7 +590,7 @@ export default function Metronome({
                           : styles.subdivisionOptionDescInactive,
                       ]}
                     >
-                      {sub.description}
+                      {(sub as { description: string }).description}
                     </Text>
                   </View>
                   {subdivision === key && (
@@ -602,7 +635,7 @@ export default function Metronome({
       {/* Subdivision indicator (small dots under current beat) */}
       {subdivision !== "none" && isPlaying && (
         <View style={styles.subIndicatorRow}>
-          {currentSubdivision.pattern.map((_, i) => (
+          {currentSubdivision.pattern.map((_: number, i: number) => (
             <View
               key={i}
               style={[
@@ -654,8 +687,8 @@ export default function Metronome({
             <TouchableOpacity
               onPress={togglePlay}
               style={[
-                styles.playButton,
-                isPlaying ? styles.playButtonStop : styles.playButtonStart,
+                styles.playButtonStart,
+                isPlaying && styles.playButtonStop,
               ]}
               accessibilityLabel={
                 isPlaying ? "Stop metronome" : "Start metronome"
@@ -708,7 +741,7 @@ export default function Metronome({
       )}
 
       {Platform.OS !== "web" && !NativeAudioContext && (
-        <Text style={styles.audioWarning}>
+        <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 12, textAlign: "center" }}>
           Audio playback unavailable - react-native-audio-api not loaded
         </Text>
       )}
@@ -722,7 +755,7 @@ export default function Metronome({
       >
         <View style={styles.volumeModalOverlay}>
           <View
-            style={[styles.volumeModalContent, styles.volumeModalContentShadow]}
+            style={[styles.volumeModalContent]}
           >
             <Text style={styles.volumeModalTitle}>🔊 Volume Controls</Text>
 
@@ -736,7 +769,7 @@ export default function Metronome({
                 minimumValue={0}
                 maximumValue={1}
                 value={volume}
-                onValueChange={(val) => onVolumeChange && onVolumeChange(val)}
+                onValueChange={(val: number) => onVolumeChange && onVolumeChange(val)}
                 minimumTrackTintColor="#9C27B0"
                 maximumTrackTintColor="#444"
                 thumbTintColor="#9C27B0"
@@ -753,7 +786,7 @@ export default function Metronome({
                 minimumValue={0}
                 maximumValue={1}
                 value={droneVolume}
-                onValueChange={(val) =>
+                onValueChange={(val: number) =>
                   onDroneVolumeChange && onDroneVolumeChange(val)
                 }
                 minimumTrackTintColor="#00BCD4"
@@ -774,50 +807,45 @@ export default function Metronome({
       </Modal>
     </View>
   );
-}
+};
 
 // Compact metronome for inline use (e.g., in session screen)
-export function CompactMetronome({
+interface CompactMetronomeProps {
+  bpm: number;
+  isPlaying: boolean;
+  currentBeat: number;
+  beatsPerMeasure?: number;
+}
+
+export const CompactMetronome: React.FC<CompactMetronomeProps> = ({
   bpm,
   isPlaying,
   currentBeat,
   beatsPerMeasure = 4,
-}) {
+}) => {
   return (
-    <View style={styles.compactContainer}>
-      <Text style={styles.compactBpmText}>{bpm} BPM</Text>
+    <View style={{ flexDirection: "row", alignItems: "center" }}>
+      <Text style={{ color: colors.gold, fontWeight: "bold", marginRight: 8 }}>{bpm} BPM</Text>
       {Array.from({ length: beatsPerMeasure }, (_, i) => (
         <View
           key={i}
           style={[
-            styles.compactBeatDot,
+            {
+              width: 12,
+              height: 12,
+              borderRadius: 6,
+              marginHorizontal: 2,
+              borderWidth: 1,
+              borderColor: colors.gold,
+            } as ViewStyle,
             isPlaying && currentBeat === i
-              ? styles.beatDotActive
-              : styles.beatDotInactive,
+              ? { backgroundColor: colors.gold }
+              : { backgroundColor: colors.surface },
           ]}
         />
       ))}
     </View>
   );
-}
-
-Metronome.propTypes = {
-  initialBpm: PropTypes.number,
-  minBpm: PropTypes.number,
-  maxBpm: PropTypes.number,
-  onBpmChange: PropTypes.func,
-  onPlayingChange: PropTypes.func,
-  onMuteChange: PropTypes.func,
-  beatsPerMeasure: PropTypes.number,
-  initialNoteValue: PropTypes.number,
-  accentFirst: PropTypes.bool,
-  showControls: PropTypes.bool,
-  autoStart: PropTypes.bool,
-  showTimeSignature: PropTypes.bool,
-  showSubdivision: PropTypes.bool,
-  muted: PropTypes.bool,
-  volume: PropTypes.number,
-  droneVolume: PropTypes.number,
-  onVolumeChange: PropTypes.func,
-  onDroneVolumeChange: PropTypes.func,
 };
+
+export default Metronome;

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import PropTypes from "prop-types";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Platform,
+  ViewStyle,
+  TextStyle,
 } from "react-native";
 import NotationDisplay from "./NotationDisplay";
 import {
@@ -24,18 +25,33 @@ import {
  * 1. Tap up/down arrows to move the note chromatically
  * 2. Use +/- buttons to change octave
  * 3. Use "I'll play it" mode to detect pitch from microphone
- *
- * Props:
- * - clef: "treble" | "bass" (determines which clef to show)
- * - value: Current note name (e.g., "Bb3")
- * - onChange: Callback when note changes
- * - onPlayToSelect: Callback to enable microphone pitch detection
- * - instrument: Instrument name for context
  */
 
+interface ParsedNote {
+  letter: string;
+  accidental: string;
+  octave: number;
+}
+
+interface MusicXMLPitch {
+  step: string;
+  octave: number;
+  alter: number;
+}
+
+type ClefType = "treble" | "bass";
+
+interface StaffNotePickerProps {
+  clef?: ClefType;
+  value?: string;
+  onChange?: (note: string) => void;
+  onPlayToSelect?: () => void;
+  instrument?: string;
+}
+
 // Get both enharmonic names for display
-function getEnharmonicDisplay(noteName) {
-  const parsed = parseNoteName(noteName);
+function getEnharmonicDisplay(noteName: string): string {
+  const parsed = parseNoteName(noteName) as ParsedNote | null;
   if (!parsed) return noteName;
 
   const base = parsed.letter + parsed.accidental;
@@ -54,13 +70,13 @@ function getEnharmonicDisplay(noteName) {
 }
 
 // Convert note name to MusicXML pitch representation
-function noteToMusicXMLPitch(noteName) {
-  const parsed = parseNoteName(noteName);
+function noteToMusicXMLPitch(noteName: string): MusicXMLPitch {
+  const parsed = parseNoteName(noteName) as ParsedNote | null;
   if (!parsed) return { step: "C", octave: 4, alter: 0 };
 
   // Handle flats: convert to natural letter with alter=-1
   // Handle sharps: convert to natural letter with alter=1
-  let step = parsed.letter;
+  const step = parsed.letter;
   let alter = 0;
 
   if (parsed.accidental === "b") {
@@ -73,7 +89,7 @@ function noteToMusicXMLPitch(noteName) {
 }
 
 // Generate MusicXML for a single note on a staff
-function generateSingleNoteMusicXML(noteName, clef = "treble") {
+function generateSingleNoteMusicXML(noteName: string, clef: ClefType = "treble"): string {
   const pitch = noteToMusicXMLPitch(noteName);
   const clefSign = clef === "bass" ? "F" : "G";
   const clefLine = clef === "bass" ? "4" : "2";
@@ -121,14 +137,14 @@ ${alterXML}          <octave>${pitch.octave}</octave>
 </score-partwise>`;
 }
 
-export default function StaffNotePicker({
+const StaffNotePicker: React.FC<StaffNotePickerProps> = ({
   clef = "treble",
   value,
   onChange,
   onPlayToSelect,
   instrument = "",
-}) {
-  const [currentNote, setCurrentNote] = useState(
+}) => {
+  const [currentNote, setCurrentNote] = useState<string>(
     value || (clef === "bass" ? "F3" : "G4"),
   );
 
@@ -136,7 +152,7 @@ export default function StaffNotePicker({
     if (value && value !== currentNote) {
       setCurrentNote(value);
     }
-  }, [value]);
+  }, [value, currentNote]);
 
   // Generate MusicXML for current note
   const musicxml = useMemo(() => {
@@ -144,7 +160,7 @@ export default function StaffNotePicker({
   }, [currentNote, clef]);
 
   const moveNote = useCallback(
-    (direction) => {
+    (direction: number) => {
       // direction: 1 = up (semitone), -1 = down (semitone)
       const midi = noteToMidi(currentNote);
       const newMidi = Math.max(24, Math.min(96, midi + direction)); // C1 to C7
@@ -156,7 +172,7 @@ export default function StaffNotePicker({
   );
 
   const changeOctave = useCallback(
-    (direction) => {
+    (direction: number) => {
       const midi = noteToMidi(currentNote);
       const newMidi = Math.max(24, Math.min(96, midi + direction * 12));
       const newNote = midiToNote(newMidi, true);
@@ -243,17 +259,27 @@ export default function StaffNotePicker({
       <Text style={styles.hint}>Use arrows to move, +/- to change octave</Text>
     </View>
   );
-}
-
-StaffNotePicker.propTypes = {
-  clef: PropTypes.oneOf(["treble", "bass"]),
-  value: PropTypes.string,
-  onChange: PropTypes.func,
-  onPlayToSelect: PropTypes.func,
-  instrument: PropTypes.string,
 };
 
-const styles = StyleSheet.create({
+interface Styles {
+  container: ViewStyle;
+  modeToggle: ViewStyle;
+  playToSelectButton: ViewStyle;
+  playToSelectText: TextStyle;
+  staffWrapper: ViewStyle;
+  notationContainer: ViewStyle;
+  notationInner: ViewStyle;
+  arrowButton: ViewStyle;
+  arrowText: TextStyle;
+  noteNameContainer: ViewStyle;
+  noteNameBox: ViewStyle;
+  noteName: TextStyle;
+  octaveButton: ViewStyle;
+  octaveText: TextStyle;
+  hint: TextStyle;
+}
+
+const styles = StyleSheet.create<Styles>({
   container: {
     alignItems: "center",
     padding: 16,
@@ -278,7 +304,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     width: 280,
-  },
+  } as ViewStyle,
   notationContainer: {
     width: 260,
     height: 420,
@@ -351,3 +377,5 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 });
+
+export default StaffNotePicker;

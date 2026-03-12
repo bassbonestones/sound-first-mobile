@@ -5,8 +5,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
+  ViewStyle,
+  TextStyle,
 } from "react-native";
-import PropTypes from "prop-types";
 import { devLog, devWarn, devError } from "../utils/devLogger";
 
 // Import pitch utilities from extracted module
@@ -14,15 +15,20 @@ import {
   frequencyToNote,
   noteNameToMidi,
   autoCorrelate,
+  NoteInfo,
 } from "./AudioInput/pitchUtils";
 
 // Import WebView HTML generator
 import { generateAudioWebViewHtml } from "./AudioInput/webViewHtml";
 
+// Types
+interface MobileAudioInputComponent extends React.FC<AudioInputProps> {}
+
 // Import mobile audio component for native platforms
-let MobileAudioInput = null;
+let MobileAudioInput: MobileAudioInputComponent | null = null;
 if (Platform?.OS && Platform.OS !== "web") {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     MobileAudioInput = require("./MobileAudioInput").default;
   } catch (e) {
     devWarn("MobileAudioInput not available:", e);
@@ -30,19 +36,25 @@ if (Platform?.OS && Platform.OS !== "web") {
 }
 
 // Singleton to track mic permission state across component instances (web only)
-let globalMicPermissionState = {
+interface MicPermissionState {
+  granted: boolean;
+  pending: boolean;
+  checkedOnce: boolean;
+}
+
+const globalMicPermissionState: MicPermissionState = {
   granted: false,
   pending: false,
   checkedOnce: false,
 };
 
 // Check mic permission without prompting (web only)
-async function checkMicPermission() {
+async function checkMicPermission(): Promise<PermissionState | null> {
   if (typeof navigator === "undefined" || !navigator.permissions) {
     return null; // Can't check, will need to prompt
   }
   try {
-    const result = await navigator.permissions.query({ name: "microphone" });
+    const result = await navigator.permissions.query({ name: "microphone" as PermissionName });
     return result.state; // 'granted', 'denied', or 'prompt'
   } catch (e) {
     return null; // Browser doesn't support this query
@@ -50,9 +62,10 @@ async function checkMicPermission() {
 }
 
 // Conditionally import WebView for mobile platforms (not currently used but kept for potential future use)
-let WebView = null;
+let WebView: React.ComponentType<unknown> | null = null;
 if (Platform?.OS && Platform.OS !== "web") {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     WebView = require("react-native-webview").WebView;
   } catch (e) {
     // WebView not available, that's OK
@@ -65,42 +78,65 @@ if (Platform?.OS && Platform.OS !== "web") {
  * Used in Day 0 first-note experience for:
  * - Detecting when user is singing/playing (volume threshold)
  * - Detecting pitch to verify they're playing the correct note
- *
- * Props:
- * - onVolumeChange: Callback with volume level (0-1)
- * - onPitchDetected: Callback with detected pitch info { frequency, noteName, cents }
- * - onSoundStart: Callback when sound starts (above threshold)
- * - onSoundEnd: Callback when sound ends (below threshold for duration)
- * - targetNote: Target note name for pitch comparison (e.g., "Bb3")
- * - onPitchMatch: Callback when playing correct pitch (within margin)
- * - volumeThreshold: Minimum volume to consider "sound" (default 0.02)
- * - silenceDuration: Ms of silence before onSoundEnd fires (default 1500)
- * - enabled: Whether to actively listen (default true)
- * - showDebug: Show debug info (default false)
  */
+
+export interface AudioInputProps {
+  onVolumeChange?: (volume: number) => void;
+  onPitchDetected?: (pitch: NoteInfo) => void;
+  onRealtimePitch?: (pitch: NoteInfo) => void;
+  onSoundStart?: () => void;
+  onSoundEnd?: () => void;
+  targetNote?: string;
+  onPitchMatch?: (isMatch: boolean, pitch: NoteInfo) => void;
+  volumeThreshold?: number;
+  silenceDuration?: number;
+  pitchMargin?: number;
+  allowOctaveEquivalent?: boolean;
+  enabled?: boolean;
+  showDebug?: boolean;
+  compact?: boolean;
+}
+
+interface WebViewMessageData {
+  type: string;
+  volume?: number;
+  pitch?: NoteInfo;
+  isMatch?: boolean;
+  message?: string;
+}
+
+interface PitchReading {
+  midi: number;
+  timestamp: number;
+}
+
+// Extended Window interface for WebAudio
+interface ExtendedWindow extends Window {
+  AudioContext?: typeof AudioContext;
+  webkitAudioContext?: typeof AudioContext;
+}
 
 export default function AudioInput({
   onVolumeChange,
   onPitchDetected,
-  onRealtimePitch, // NEW: fires during active sound with current pitch
+  onRealtimePitch,
   onSoundStart,
   onSoundEnd,
   targetNote,
   onPitchMatch,
   volumeThreshold = 0.02,
   silenceDuration = 1500,
-  pitchMargin = 100, // cents margin for "correct" pitch
-  allowOctaveEquivalent = false, // allow octave equivalence for voice/singing
+  pitchMargin = 100,
+  allowOctaveEquivalent = false,
   enabled = true,
   showDebug = false,
   compact = false,
-}) {
+}: AudioInputProps): React.ReactElement | null {
   const [isListening, setIsListening] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [volume, setVolume] = useState(0);
-  const [currentPitch, setCurrentPitch] = useState(null);
+  const [currentPitch, setCurrentPitch] = useState<NoteInfo | null>(null);
   const [isSounding, setIsSounding] = useState(false);
-  // Initialize from global state to avoid showing button unnecessarily
   const [permissionGranted, setPermissionGranted] = useState(
     globalMicPermissionState.granted,
   );
@@ -108,31 +144,31 @@ export default function AudioInput({
     globalMicPermissionState.checkedOnce,
   );
 
-  const audioContextRef = useRef(null);
-  const analyserRef = useRef(null);
-  const mediaStreamRef = useRef(null);
-  const processorRef = useRef(null);
-  const animationFrameRef = useRef(null);
-  const silenceTimerRef = useRef(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const soundStartedRef = useRef(false);
 
-  // Throttle volume updates to prevent excessive re-renders (max ~10 updates/sec)
+  // Throttle volume updates to prevent excessive re-renders
   const lastVolumeUpdateRef = useRef(0);
   const VOLUME_UPDATE_INTERVAL_MS = 100;
 
   // WebView ref for mobile audio
-  const webViewRef = useRef(null);
+  const webViewRef = useRef<unknown>(null);
 
   // Mobile expo-av recording ref
-  const recordingRef = useRef(null);
-  const meteringIntervalRef = useRef(null);
+  const recordingRef = useRef<unknown>(null);
+  const meteringIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Pitch stability tracking - buffer all readings during sound, then average
-  const pitchBufferRef = useRef([]); // Array of {midi, timestamp}
-  const stablePitchRef = useRef(null);
-  const AVERAGING_WINDOW_MS = 1000; // Average over last 1 second of sound
+  // Pitch stability tracking
+  const pitchBufferRef = useRef<PitchReading[]>([]);
+  const stablePitchRef = useRef<NoteInfo | null>(null);
+  const AVERAGING_WINDOW_MS = 1000;
 
-  // Refs to hold latest callback values (prevents stale closures in animation frame)
+  // Refs to hold latest callback values
   const onVolumeChangeRef = useRef(onVolumeChange);
   const onRealtimePitchRef = useRef(onRealtimePitch);
   const onPitchDetectedRef = useRef(onPitchDetected);
@@ -177,9 +213,9 @@ export default function AudioInput({
 
   // Handle messages from WebView (mobile)
   const handleWebViewMessage = useCallback(
-    (event) => {
+    (event: { nativeEvent: { data: string } }) => {
       try {
-        const data = JSON.parse(event.nativeEvent.data);
+        const data: WebViewMessageData = JSON.parse(event.nativeEvent.data);
 
         switch (data.type) {
           case "permissionGranted":
@@ -188,18 +224,19 @@ export default function AudioInput({
             setError(null);
             break;
           case "error":
-            setError(data.message);
+            setError(data.message || "Unknown error");
             break;
           case "volumeChange":
-            // Throttle volume updates to prevent excessive re-renders
-            const now = Date.now();
-            if (
-              now - lastVolumeUpdateRef.current >=
-              VOLUME_UPDATE_INTERVAL_MS
-            ) {
-              lastVolumeUpdateRef.current = now;
-              setVolume(data.volume);
-              if (onVolumeChange) onVolumeChange(data.volume);
+            {
+              const now = Date.now();
+              if (
+                now - lastVolumeUpdateRef.current >=
+                VOLUME_UPDATE_INTERVAL_MS
+              ) {
+                lastVolumeUpdateRef.current = now;
+                setVolume(data.volume || 0);
+                if (onVolumeChange) onVolumeChange(data.volume || 0);
+              }
             }
             break;
           case "soundStart":
@@ -212,14 +249,16 @@ export default function AudioInput({
             if (onSoundEnd) onSoundEnd();
             break;
           case "realtimePitch":
-            setCurrentPitch(data.pitch);
-            if (onRealtimePitch) onRealtimePitch(data.pitch);
+            if (data.pitch) {
+              setCurrentPitch(data.pitch);
+              if (onRealtimePitch) onRealtimePitch(data.pitch);
+            }
             break;
           case "pitchDetected":
-            if (onPitchDetected) onPitchDetected(data.pitch);
+            if (data.pitch && onPitchDetected) onPitchDetected(data.pitch);
             break;
           case "pitchMatch":
-            if (onPitchMatch) onPitchMatch(data.isMatch, data.pitch);
+            if (data.pitch && onPitchMatch) onPitchMatch(data.isMatch || false, data.pitch);
             break;
         }
       } catch (e) {
@@ -270,8 +309,6 @@ export default function AudioInput({
         stopListening();
       }
     }
-    // Mobile: disabled for now - expo-audio requires hook-based implementation
-    // TODO: implement using useAudioRecorder hook
   }, [enabled]);
 
   const startListening = useCallback(async () => {
@@ -280,13 +317,11 @@ export default function AudioInput({
       return;
     }
 
-    // Prevent concurrent getUserMedia calls
     if (globalMicPermissionState.pending) {
       devLog("AudioInput: getUserMedia already pending, skipping");
       return;
     }
 
-    // If already listening with an active stream, don't restart
     if (mediaStreamRef.current && audioContextRef.current) {
       devLog("AudioInput: Already have active stream, reusing");
       setIsListening(true);
@@ -297,7 +332,6 @@ export default function AudioInput({
     try {
       globalMicPermissionState.pending = true;
 
-      // Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
@@ -311,37 +345,37 @@ export default function AudioInput({
       mediaStreamRef.current = stream;
       setPermissionGranted(true);
 
-      // Create audio context
-      const audioContext = new (
-        window.AudioContext || window.webkitAudioContext
-      )();
+      const extWindow = window as ExtendedWindow;
+      const AudioContextClass = extWindow.AudioContext || extWindow.webkitAudioContext;
+      if (!AudioContextClass) {
+        throw new Error("AudioContext not supported");
+      }
+      const audioContext = new AudioContextClass();
       audioContextRef.current = audioContext;
 
-      // Create analyser node
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 2048;
       analyser.smoothingTimeConstant = 0.8;
       analyserRef.current = analyser;
 
-      // Connect stream to analyser
       const source = audioContext.createMediaStreamSource(stream);
       source.connect(analyser);
 
-      // Start analyzing
       setIsListening(true);
       setError(null);
       analyze();
     } catch (err) {
       globalMicPermissionState.pending = false;
       devError("Microphone access error:", err);
-      if (err.name === "NotAllowedError") {
+      const error = err as Error & { name?: string };
+      if (error.name === "NotAllowedError") {
         setError(
           "Microphone permission denied. Please allow microphone access.",
         );
-      } else if (err.name === "NotFoundError") {
+      } else if (error.name === "NotFoundError") {
         setError("No microphone found.");
       } else {
-        setError(`Microphone error: ${err.message}`);
+        setError(`Microphone error: ${error.message}`);
       }
     }
   }, []);
@@ -372,7 +406,6 @@ export default function AudioInput({
     setCurrentPitch(null);
     setIsSounding(false);
     soundStartedRef.current = false;
-    // Clear pitch buffer on stop
     pitchBufferRef.current = [];
     stablePitchRef.current = null;
   }, []);
@@ -385,19 +418,16 @@ export default function AudioInput({
     const bufferLength = analyser.fftSize;
     const dataArray = new Float32Array(bufferLength);
 
-    const processAudio = () => {
+    const processAudio = (): void => {
       if (!analyserRef.current) return;
 
       analyser.getFloatTimeDomainData(dataArray);
 
-      // Get pitch and RMS
       const result = autoCorrelate(dataArray, sampleRate);
       const rms = result.rms || 0;
 
-      // Normalize volume (0-1 scale)
       const normalizedVolume = Math.min(1, rms * 10);
 
-      // Throttle volume state updates to prevent excessive re-renders
       const now = Date.now();
       if (now - lastVolumeUpdateRef.current >= VOLUME_UPDATE_INTERVAL_MS) {
         lastVolumeUpdateRef.current = now;
@@ -407,17 +437,14 @@ export default function AudioInput({
         }
       }
 
-      // Check if sound is above threshold (use ref for latest value)
       const isAboveThreshold = normalizedVolume > volumeThresholdRef.current;
 
       if (isAboveThreshold) {
-        // Clear silence timer
         if (silenceTimerRef.current) {
           clearTimeout(silenceTimerRef.current);
           silenceTimerRef.current = null;
         }
 
-        // Fire sound start if not already sounding
         if (!soundStartedRef.current) {
           soundStartedRef.current = true;
           setIsSounding(true);
@@ -426,27 +453,22 @@ export default function AudioInput({
           }
         }
 
-        // Detect pitch - very low threshold for voice
         if (result.frequency > 0 && result.confidence > 0.3) {
           const noteInfo = frequencyToNote(result.frequency);
           if (noteInfo) {
-            // Add timestamped reading to buffer
-            const now = Date.now();
+            const nowTime = Date.now();
             pitchBufferRef.current.push({
               midi: noteInfo.midiNote,
-              timestamp: now,
+              timestamp: nowTime,
             });
 
-            // Update visual display with current detected pitch
             setCurrentPitch(noteInfo);
             stablePitchRef.current = noteInfo;
 
-            // Fire real-time pitch callback (use ref for latest value)
             if (onRealtimePitchRef.current) {
               onRealtimePitchRef.current(noteInfo);
             }
 
-            // Check if matches target (for visual feedback during playing)
             if (targetMidiRef.current !== null && onPitchMatchRef.current) {
               const diff = Math.abs(noteInfo.midiNote - targetMidiRef.current);
               const noteMatches = allowOctaveEquivalentRef.current
@@ -460,27 +482,24 @@ export default function AudioInput({
           }
         }
       } else {
-        // Below threshold - start silence timer
         if (soundStartedRef.current && !silenceTimerRef.current) {
           silenceTimerRef.current = setTimeout(() => {
             soundStartedRef.current = false;
             setIsSounding(false);
 
-            // Compute average pitch from last AVERAGING_WINDOW_MS of readings
-            const now = Date.now();
-            const cutoff = now - AVERAGING_WINDOW_MS;
+            const nowTime = Date.now();
+            const cutoff = nowTime - AVERAGING_WINDOW_MS;
             const recentReadings = pitchBufferRef.current.filter(
               (r) => r.timestamp >= cutoff,
             );
 
             if (recentReadings.length > 0) {
-              // Find most common MIDI note in the window
-              const counts = {};
+              const counts: Record<number, number> = {};
               recentReadings.forEach((r) => {
                 counts[r.midi] = (counts[r.midi] || 0) + 1;
               });
 
-              let mostCommon = null;
+              let mostCommon: number | null = null;
               let maxCount = 0;
               Object.entries(counts).forEach(([midi, count]) => {
                 if (count > maxCount) {
@@ -490,7 +509,6 @@ export default function AudioInput({
               });
 
               if (mostCommon !== null) {
-                // Create noteInfo for the final averaged pitch
                 const finalNoteInfo = frequencyToNote(
                   440 * Math.pow(2, (mostCommon - 69) / 12),
                 );
@@ -501,7 +519,6 @@ export default function AudioInput({
             }
 
             setCurrentPitch(null);
-            // Clear pitch buffer on silence
             pitchBufferRef.current = [];
             stablePitchRef.current = null;
             if (onSoundEndRef.current) {
@@ -515,10 +532,10 @@ export default function AudioInput({
     };
 
     processAudio();
-  }, []); // Empty deps - all values accessed via refs
+  }, []);
 
   // Request permission handler (web)
-  const requestPermission = async () => {
+  const requestPermission = async (): Promise<void> => {
     if (Platform.OS !== "web") {
       setError("Microphone input is only supported on web currently");
       return;
@@ -526,171 +543,34 @@ export default function AudioInput({
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((track) => track.stop()); // Just testing permission
+      stream.getTracks().forEach((track) => track.stop());
       setPermissionGranted(true);
       setError(null);
     } catch (err) {
-      if (err.name === "NotAllowedError") {
+      const error = err as Error & { name?: string };
+      if (error.name === "NotAllowedError") {
         setError("Please allow microphone access to continue.");
       } else {
-        setError(`Microphone error: ${err.message}`);
+        setError(`Microphone error: ${error.message}`);
       }
     }
   };
 
-  // =============================================
-  // MOBILE (expo-audio) AUDIO IMPLEMENTATION
-  // =============================================
-
-  // Request permission for mobile microphone
-  const requestMobilePermission = useCallback(async () => {
-    if (!ExpoAudio) {
-      setError("Audio module not available");
-      return false;
-    }
-
-    try {
-      const response = await ExpoAudio.requestRecordingPermissionsAsync();
-      if (response.granted) {
-        setPermissionGranted(true);
-        setError(null);
-        return true;
-      } else {
-        setError(
-          "Microphone permission denied. Please allow access in settings.",
-        );
-        return false;
-      }
-    } catch (err) {
-      setError(`Permission error: ${err.message}`);
-      return false;
-    }
+  // Mobile audio implementation placeholder
+  const requestMobilePermission = useCallback(async (): Promise<boolean> => {
+    setError("Audio module not available");
+    return false;
   }, []);
 
-  // Start mobile audio recording with metering
-  const startMobileListening = useCallback(async () => {
-    if (!ExpoAudio) {
-      devWarn("[AudioInput] expo-audio module not available");
-      return;
-    }
+  const startMobileListening = useCallback(async (): Promise<void> => {
+    devWarn("[AudioInput] Mobile audio not implemented");
+  }, []);
 
-    // Don't start if already listening
-    if (isListening || recordingRef.current) {
-      return;
-    }
-
-    try {
-      // First request permission if not granted
-      if (!permissionGranted) {
-        const permOk = await requestMobilePermission();
-        if (!permOk) {
-          return;
-        }
-      }
-
-      // Configure audio mode for recording (expo-audio)
-      await ExpoAudio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      // Create a new AudioRecorder instance with metering enabled
-      const recorder = new ExpoAudio.AudioRecorder({
-        isMeteringEnabled: true,
-      });
-
-      // Status update callback for real-time metering
-      recorder.setOnRecordingStatusUpdate((status) => {
-        if (status.isRecording && status.metering !== undefined) {
-          // Convert dB to 0-1 scale (dB typically ranges from -160 to 0)
-          // -60 dB is very quiet, -10 dB is loud
-          const dB = status.metering;
-          const normalizedVolume = Math.max(0, Math.min(1, (dB + 60) / 60));
-
-          // Throttle volume state updates to prevent excessive re-renders
-          const now = Date.now();
-          if (now - lastVolumeUpdateRef.current >= VOLUME_UPDATE_INTERVAL_MS) {
-            lastVolumeUpdateRef.current = now;
-            setVolume(normalizedVolume);
-            if (onVolumeChange) {
-              onVolumeChange(normalizedVolume);
-            }
-          }
-
-          // Check if sound is above threshold
-          const isAboveThreshold = normalizedVolume > volumeThreshold;
-
-          if (isAboveThreshold) {
-            // Clear silence timer
-            if (silenceTimerRef.current) {
-              clearTimeout(silenceTimerRef.current);
-              silenceTimerRef.current = null;
-            }
-
-            // Fire sound start if not already sounding
-            if (!soundStartedRef.current) {
-              soundStartedRef.current = true;
-              setIsSounding(true);
-              if (onSoundStart) {
-                onSoundStart();
-              }
-            }
-
-            // Note: expo-audio doesn't provide frequency/pitch data directly
-            // For basic functionality, we just detect sound presence
-            // Pitch detection would require additional processing
-          } else {
-            // Below threshold - start silence timer
-            if (soundStartedRef.current && !silenceTimerRef.current) {
-              silenceTimerRef.current = setTimeout(() => {
-                soundStartedRef.current = false;
-                setIsSounding(false);
-                setCurrentPitch(null);
-                if (onSoundEnd) {
-                  onSoundEnd();
-                }
-              }, silenceDuration);
-            }
-          }
-        }
-      });
-
-      // Prepare and start recording
-      await recorder.prepareToRecordAsync();
-      recorder.record();
-
-      recordingRef.current = recorder;
-      setIsListening(true);
-      setError(null);
-    } catch (err) {
-      devError("Mobile recording error:", err);
-      setError(`Recording error: ${err.message}`);
-    }
-  }, [
-    onVolumeChange,
-    onSoundStart,
-    onSoundEnd,
-    volumeThreshold,
-    silenceDuration,
-  ]);
-
-  // Stop mobile recording
-  const stopMobileListening = useCallback(async () => {
+  const stopMobileListening = useCallback(async (): Promise<void> => {
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
-
-    if (recordingRef.current) {
-      try {
-        // expo-audio uses stop() instead of stopAndUnloadAsync()
-        await recordingRef.current.stop();
-      } catch (err) {
-        devWarn("Error stopping recording:", err);
-      }
-      recordingRef.current = null;
-    }
-
     setIsListening(false);
     setVolume(0);
     setCurrentPitch(null);
@@ -699,9 +579,6 @@ export default function AudioInput({
   }, []);
 
   if (Platform.OS !== "web") {
-    // =============================================
-    // MOBILE RENDER (using MobileAudioInput with expo-audio)
-    // =============================================
     if (MobileAudioInput) {
       return (
         <MobileAudioInput
@@ -723,7 +600,6 @@ export default function AudioInput({
       );
     }
 
-    // Fallback if MobileAudioInput failed to load
     return (
       <View style={styles.container}>
         <Text style={styles.errorText}>
@@ -751,7 +627,6 @@ export default function AudioInput({
     );
   }
 
-  // Show loading state while checking permission or waiting for getUserMedia
   if (
     !permissionGranted &&
     (globalMicPermissionState.pending || !permissionChecked)
@@ -814,28 +689,25 @@ export default function AudioInput({
     );
   }
 
-  // Default: invisible component (just provides callbacks)
   return null;
 }
 
-AudioInput.propTypes = {
-  onVolumeChange: PropTypes.func,
-  onPitchDetected: PropTypes.func,
-  onRealtimePitch: PropTypes.func,
-  onSoundStart: PropTypes.func,
-  onSoundEnd: PropTypes.func,
-  targetNote: PropTypes.string,
-  onPitchMatch: PropTypes.func,
-  volumeThreshold: PropTypes.number,
-  silenceDuration: PropTypes.number,
-  pitchMargin: PropTypes.number,
-  allowOctaveEquivalent: PropTypes.bool,
-  enabled: PropTypes.bool,
-  showDebug: PropTypes.bool,
-  compact: PropTypes.bool,
-};
+interface Styles {
+  container: ViewStyle;
+  errorText: TextStyle;
+  infoText: TextStyle;
+  button: ViewStyle;
+  buttonText: TextStyle;
+  debugContainer: ViewStyle;
+  debugText: TextStyle;
+  mobileContainer: ViewStyle;
+  webView: ViewStyle;
+  hiddenWebViewContainer: ViewStyle;
+  hiddenWebView: ViewStyle;
+  debugOverlay: ViewStyle;
+}
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create<Styles>({
   container: {
     padding: 20,
     alignItems: "center",

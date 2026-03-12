@@ -3,13 +3,8 @@
  * Re-exports for clean imports
  */
 
-// Main component - exported from original file
-export { default } from "../Metronome";
-
-// CompactMetronome is a named export from Metronome.js
-import MetronomeModule from "../Metronome";
-// @ts-ignore - CompactMetronome is exported from JS file
-export const CompactMetronome = (MetronomeModule as any).CompactMetronome;
+// Main component and CompactMetronome
+export { default, CompactMetronome } from "../Metronome";
 
 // Constants and utilities
 export {

@@ -5,8 +5,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
+  GestureResponderEvent,
+  ViewStyle,
+  TextStyle,
 } from "react-native";
-import PropTypes from "prop-types";
 import { getBackendUrl } from "../api/client";
 
 /**
@@ -15,19 +17,25 @@ import { getBackendUrl } from "../api/client";
  * Plays audio model phrases for ear-first learning.
  * Fetches audio from backend which generates from MusicXML.
  * Uses HTML5 Audio on web, shows placeholder on native until expo-av is added.
- *
- * Props:
- * - materialId: ID of the material (required)
- * - targetKey: Target key for transposition (e.g., "Bb major")
- * - instrument: User's instrument for soundfont (default: "piano")
- * - title: Display title for the audio
- * - onComplete: Callback when audio finishes playing
- * - autoPlay: Auto-start playback when component mounts
- * - showProgress: Show progress bar
- * - accentColor: Theme accent color
  */
 
-export default function AudioPlayer({
+interface AudioStatus {
+  can_render_audio: boolean;
+  can_render_midi: boolean;
+}
+
+interface AudioPlayerProps {
+  materialId: string;
+  targetKey?: string;
+  instrument?: string;
+  title?: string;
+  onComplete?: () => void;
+  autoPlay?: boolean;
+  showProgress?: boolean;
+  accentColor?: string;
+}
+
+const AudioPlayer: React.FC<AudioPlayerProps> = ({
   materialId,
   targetKey,
   instrument = "piano",
@@ -36,16 +44,16 @@ export default function AudioPlayer({
   autoPlay = false,
   showProgress = true,
   accentColor = "#4A90D9",
-}) {
+}) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [error, setError] = useState(null);
-  const [audioStatus, setAudioStatus] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [audioStatus, setAudioStatus] = useState<AudioStatus | null>(null);
 
-  const audioRef = useRef(null);
-  const progressIntervalRef = useRef(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Build audio URL from material ID and key
   const audioUrl =
@@ -57,7 +65,7 @@ export default function AudioPlayer({
   useEffect(() => {
     fetch(`${getBackendUrl()}/audio/status`)
       .then((res) => res.json())
-      .then((data) => setAudioStatus(data))
+      .then((data: AudioStatus) => setAudioStatus(data))
       .catch(() =>
         setAudioStatus({ can_render_audio: false, can_render_midi: false }),
       );
@@ -81,7 +89,7 @@ export default function AudioPlayer({
         if (onComplete) onComplete();
       });
 
-      audio.addEventListener("error", (e) => {
+      audio.addEventListener("error", () => {
         setError("Audio failed to load");
         setIsLoaded(false);
       });
@@ -102,7 +110,8 @@ export default function AudioPlayer({
         }
       };
     }
-  }, [audioUrl]);
+    return undefined;
+  }, [audioUrl, autoPlay, onComplete]);
 
   // Update progress while playing
   useEffect(() => {
@@ -123,7 +132,7 @@ export default function AudioPlayer({
     };
   }, [isPlaying]);
 
-  const togglePlayback = () => {
+  const togglePlayback = (): void => {
     if (Platform.OS !== "web") {
       // Native: just show placeholder
       return;
@@ -142,14 +151,14 @@ export default function AudioPlayer({
     }
   };
 
-  const seekTo = (percent) => {
+  const seekTo = (percent: number): void => {
     if (Platform.OS !== "web" || !audioRef.current || !isLoaded) return;
     const newTime = (percent / 100) * duration;
     audioRef.current.currentTime = newTime;
     setCurrentTime(newTime);
   };
 
-  const formatTime = (seconds) => {
+  const formatTime = (seconds: number): string => {
     if (!seconds || isNaN(seconds)) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -197,6 +206,15 @@ export default function AudioPlayer({
     );
   }
 
+  const handleProgressTap = (e: GestureResponderEvent): void => {
+    const { nativeEvent } = e;
+    // Type assertion for web-specific properties
+    const webEvent = nativeEvent as unknown as { offsetX: number };
+    const target = e.target as unknown as { clientWidth: number };
+    const percent = (webEvent.offsetX / target.clientWidth) * 100;
+    seekTo(percent);
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -234,12 +252,7 @@ export default function AudioPlayer({
           {showProgress && (
             <TouchableOpacity
               style={styles.progressContainer}
-              onPress={(e) => {
-                const { nativeEvent } = e;
-                const percent =
-                  (nativeEvent.offsetX / e.target.clientWidth) * 100;
-                seekTo(percent);
-              }}
+              onPress={handleProgressTap}
               activeOpacity={0.8}
               accessibilityLabel={`Audio progress: ${Math.round(progressPercent)} percent`}
               accessibilityRole="adjustable"
@@ -271,20 +284,32 @@ export default function AudioPlayer({
       </Text>
     </View>
   );
-}
-
-AudioPlayer.propTypes = {
-  materialId: PropTypes.string.isRequired,
-  targetKey: PropTypes.string,
-  instrument: PropTypes.string,
-  title: PropTypes.string,
-  onComplete: PropTypes.func,
-  autoPlay: PropTypes.bool,
-  showProgress: PropTypes.bool,
-  accentColor: PropTypes.string,
 };
 
-const styles = StyleSheet.create({
+interface Styles {
+  container: ViewStyle;
+  header: ViewStyle;
+  icon: TextStyle;
+  title: TextStyle;
+  controls: ViewStyle;
+  playButton: ViewStyle;
+  playButtonText: TextStyle;
+  timeContainer: ViewStyle;
+  timeText: TextStyle;
+  progressContainer: ViewStyle;
+  progressTrack: ViewStyle;
+  progressFill: ViewStyle;
+  placeholderBox: ViewStyle;
+  placeholderIcon: TextStyle;
+  placeholderText: TextStyle;
+  placeholderSubtext: TextStyle;
+  errorBox: ViewStyle;
+  errorText: TextStyle;
+  loadingText: TextStyle;
+  hint: TextStyle;
+}
+
+const styles = StyleSheet.create<Styles>({
   container: {
     padding: 16,
     backgroundColor: "#F8F9FA",
@@ -317,14 +342,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     ...Platform.select({
-      web: { boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.2)" },
+      web: { boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.2)" } as ViewStyle,
       default: {
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 4,
         elevation: 4,
-      },
+      } as ViewStyle,
     }),
   },
   playButtonText: {
@@ -342,7 +367,7 @@ const styles = StyleSheet.create({
   progressContainer: {
     marginBottom: 12,
     cursor: "pointer",
-  },
+  } as ViewStyle,
   progressTrack: {
     height: 8,
     backgroundColor: "#E0E0E0",
@@ -401,3 +426,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
+
+export default AudioPlayer;

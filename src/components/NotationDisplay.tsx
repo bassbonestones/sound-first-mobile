@@ -1,22 +1,83 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
-import PropTypes from "prop-types";
+import React, { useEffect, useRef, useState, useMemo, RefObject } from "react";
 import {
   View,
   Text,
   Platform,
   ActivityIndicator,
   StyleSheet,
+  ViewStyle,
+  TextStyle,
 } from "react-native";
 import { devError } from "../utils/devLogger";
 
 // Conditionally import WebView for native platforms
-let WebView = null;
+interface WebViewType {
+  postMessage: (message: string) => void;
+}
+
+interface WebViewProps {
+  ref?: RefObject<WebViewType>;
+  source: { html: string };
+  style: ViewStyle | ViewStyle[];
+  scrollEnabled?: boolean;
+  showsHorizontalScrollIndicator?: boolean;
+  showsVerticalScrollIndicator?: boolean;
+  originWhitelist?: string[];
+  javaScriptEnabled?: boolean;
+  domStorageEnabled?: boolean;
+  mixedContentMode?: "always" | "never" | "compatibility";
+}
+
+type WebViewComponent = React.ComponentType<WebViewProps>;
+
+let WebView: WebViewComponent | null = null;
 if (Platform?.OS && Platform.OS !== "web") {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const RNWebView = require("react-native-webview");
     WebView = RNWebView?.WebView || null;
   } catch (e) {
     // WebView not available, that's OK
+  }
+}
+
+// Global type for OSMD
+interface OSMDCursor {
+  hide: () => void;
+  show: () => void;
+  reset: () => void;
+  next: () => void;
+  Iterator: { EndReached: boolean };
+}
+
+interface OSMDEngravingRules {
+  PageBackgroundColor: string;
+  PageLeftMargin: number;
+  PageRightMargin: number;
+  PageTopMargin: number;
+  PageBottomMargin: number;
+  SheetMinimumDistanceBetweenSystems: number;
+  MinimumDistanceBetweenSystems: number;
+  FixedMeasureWidth: boolean;
+  FixedMeasureWidthFixedValue: number;
+}
+
+interface OSMDInstance {
+  cursor: OSMDCursor;
+  EngravingRules: OSMDEngravingRules;
+  zoom: number;
+  load: (musicxml: string) => Promise<void>;
+  render: () => void;
+}
+
+declare global {
+  interface Window {
+    opensheetmusicdisplay?: {
+      OpenSheetMusicDisplay: new (
+        container: HTMLElement,
+        options: Record<string, unknown>
+      ) => OSMDInstance;
+    };
   }
 }
 
@@ -27,7 +88,18 @@ if (Platform?.OS && Platform.OS !== "web") {
  * Uses WebView on mobile, direct DOM on web.
  */
 
-export default function NotationDisplay({
+interface NotationDisplayProps {
+  musicxml?: string;
+  width?: number;
+  height?: number;
+  showTitle?: boolean;
+  showTimeSignature?: boolean;
+  fixedMeasureWidthPixels?: number | null;
+  zoom?: number;
+  currentNoteIndex?: number | null;
+}
+
+const NotationDisplay: React.FC<NotationDisplayProps> = ({
   musicxml,
   width = 320,
   height = 200,
@@ -35,13 +107,13 @@ export default function NotationDisplay({
   showTimeSignature = false,
   fixedMeasureWidthPixels = null,
   zoom = 0.7,
-  currentNoteIndex = null, // Which note to highlight (0-based), null = no cursor
-}) {
-  const containerRef = useRef(null);
-  const osmdRef = useRef(null);
-  const webViewRef = useRef(null);
+  currentNoteIndex = null,
+}) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const osmdRef = useRef<OSMDInstance | null>(null);
+  const webViewRef = useRef<WebViewType | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (Platform.OS !== "web") {
@@ -50,7 +122,7 @@ export default function NotationDisplay({
     }
 
     // Load OSMD script dynamically
-    const loadOSMD = async () => {
+    const loadOSMD = async (): Promise<void> => {
       if (typeof window === "undefined") return;
 
       // Check if OSMD is already loaded
@@ -74,7 +146,7 @@ export default function NotationDisplay({
       document.head.appendChild(script);
     };
 
-    const initializeOSMD = async () => {
+    const initializeOSMD = async (): Promise<void> => {
       if (!containerRef.current || !window.opensheetmusicdisplay) {
         setLoading(false);
         return;
@@ -176,7 +248,7 @@ export default function NotationDisplay({
         osmdRef.current = null;
       }
     };
-  }, [musicxml, showTitle, showTimeSignature, fixedMeasureWidthPixels, zoom]);
+  }, [musicxml, showTitle, showTimeSignature, fixedMeasureWidthPixels, zoom, width, height]);
 
   // Update cursor position when currentNoteIndex changes (web only)
   useEffect(() => {
@@ -200,7 +272,7 @@ export default function NotationDisplay({
   }, [currentNoteIndex]);
 
   // Generate HTML for WebView (mobile)
-  const webviewHtml = useMemo(() => {
+  const webviewHtml = useMemo<string>(() => {
     if (Platform.OS === "web" || !musicxml) return "";
 
     // Escape the MusicXML for embedding in JavaScript
@@ -372,10 +444,31 @@ export default function NotationDisplay({
       );
     }
 
+    const WebViewComponent = WebView as React.ComponentType<{
+      ref: React.RefObject<WebViewType>;
+      source: { html: string };
+      style: ViewStyle | ViewStyle[];
+      scrollEnabled: boolean;
+      showsHorizontalScrollIndicator: boolean;
+      showsVerticalScrollIndicator: boolean;
+      originWhitelist: string[];
+      javaScriptEnabled: boolean;
+      domStorageEnabled: boolean;
+      mixedContentMode: "always" | "never" | "compatibility";
+    }>;
+
+    if (!WebViewComponent) {
+      return (
+        <View style={[styles.emptyContainer, { width, height }]}>
+          <Text style={styles.emptyText}>WebView not available</Text>
+        </View>
+      );
+    }
+
     return (
       <View style={[styles.webViewWrapper, { width, height }]}>
-        <WebView
-          ref={webViewRef}
+        <WebViewComponent
+          ref={webViewRef as React.RefObject<WebViewType>}
           source={{ html: webviewHtml }}
           style={[styles.webView, { width, height }]}
           scrollEnabled={false}
@@ -408,43 +501,50 @@ export default function NotationDisplay({
         </View>
       )}
       <View
-        ref={containerRef}
+        ref={containerRef as unknown as React.RefObject<View>}
         style={[styles.notationContainer, { width, height }]}
       />
     </View>
   );
-}
-
-NotationDisplay.propTypes = {
-  musicxml: PropTypes.string,
-  width: PropTypes.number,
-  height: PropTypes.number,
-  showTitle: PropTypes.bool,
-  showTimeSignature: PropTypes.bool,
-  fixedMeasureWidthPixels: PropTypes.number,
-  zoom: PropTypes.number,
-  currentNoteIndex: PropTypes.number,
 };
+
+export default NotationDisplay;
 
 /**
  * Simple notation placeholder when show_notation is false
  */
-export function NotationPlaceholder({
+interface NotationPlaceholderProps {
+  message?: string;
+}
+
+export const NotationPlaceholder: React.FC<NotationPlaceholderProps> = ({
   message = "Notation hidden - practice by ear",
-}) {
+}) => {
   return (
     <View style={styles.placeholderContainer}>
       <Text style={styles.placeholderIcon}>🎧</Text>
       <Text style={styles.placeholderText}>{message}</Text>
     </View>
   );
-}
-
-NotationPlaceholder.propTypes = {
-  message: PropTypes.string,
 };
 
-const styles = StyleSheet.create({
+interface Styles {
+  emptyContainer: ViewStyle;
+  emptyText: TextStyle;
+  webViewWrapper: ViewStyle;
+  webView: ViewStyle;
+  errorContainer: ViewStyle;
+  errorText: TextStyle;
+  mainContainer: ViewStyle;
+  loadingOverlay: ViewStyle;
+  loadingText: TextStyle;
+  notationContainer: ViewStyle;
+  placeholderContainer: ViewStyle;
+  placeholderIcon: TextStyle;
+  placeholderText: TextStyle;
+}
+
+const styles = StyleSheet.create<Styles>({
   // Empty/no data state
   emptyContainer: {
     backgroundColor: "#2d232e",

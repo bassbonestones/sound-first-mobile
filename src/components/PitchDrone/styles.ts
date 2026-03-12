@@ -4,10 +4,25 @@
  * Extracted StyleSheet for PitchDrone component to reduce inline styles.
  */
 
-import { StyleSheet, Platform } from "react-native";
+import { StyleSheet, Platform, ViewStyle, TextStyle } from "react-native";
 
 // Colors
-export const colors = {
+interface ColorsType {
+  gold: string;
+  goldDark: string;
+  background: string;
+  surface: string;
+  surfaceDark: string;
+  surfaceDisabled: string;
+  purple: string;
+  green: string;
+  border: string;
+  textMuted: string;
+  textLight: string;
+  textDark: string;
+}
+
+export const colors: ColorsType = {
   gold: "#FFD700",
   goldDark: "#bfa76a",
   background: "#1a1410",
@@ -22,7 +37,145 @@ export const colors = {
   textDark: "#1a1a2e",
 };
 
-export const styles = StyleSheet.create({
+interface PitchDroneStyles {
+  // Container
+  container: ViewStyle;
+
+  // Header
+  title: TextStyle;
+
+  // Mute button
+  muteButton: ViewStyle;
+  muteButtonMuted: ViewStyle;
+  muteButtonUnmuted: ViewStyle;
+  muteButtonText: TextStyle;
+
+  // Settings row
+  settingsRow: ViewStyle;
+
+  // Temperament toggle
+  temperamentContainer: ViewStyle;
+  temperamentButtonLeft: ViewStyle;
+  temperamentButtonRight: ViewStyle;
+  temperamentButtonActive: ViewStyle;
+  temperamentButtonInactive: ViewStyle;
+  temperamentText: TextStyle;
+  temperamentTextActive: TextStyle;
+  temperamentTextInactive: TextStyle;
+
+  // Concert A input
+  concertAContainer: ViewStyle;
+  concertALabel: TextStyle;
+  concertAInput: TextStyle;
+  concertAUnit: TextStyle;
+
+  // Pitch center selector
+  pitchCenterContainer: ViewStyle;
+  pitchCenterLabel: TextStyle;
+  pitchCenterGrid: ViewStyle;
+  pitchCenterButton: ViewStyle;
+  pitchCenterButtonActive: ViewStyle;
+  pitchCenterButtonInactive: ViewStyle;
+  pitchCenterText: TextStyle;
+  pitchCenterTextActive: TextStyle;
+  pitchCenterTextInactive: TextStyle;
+
+  // Octave selector
+  octaveRow: ViewStyle;
+  octaveButton: ViewStyle;
+  octaveButtonEnabled: ViewStyle;
+  octaveButtonDisabled: ViewStyle;
+  octaveButtonText: TextStyle;
+  octaveButtonTextEnabled: TextStyle;
+  octaveButtonTextDisabled: TextStyle;
+  octaveDisplay: ViewStyle;
+  octaveDisplayText: TextStyle;
+
+  // Sustain & Vibrato buttons
+  toggleRow: ViewStyle;
+  toggleButton: ViewStyle;
+  sustainButtonActive: ViewStyle;
+  sustainButtonInactive: ViewStyle;
+  vibratoButtonActive: ViewStyle;
+  vibratoButtonInactive: ViewStyle;
+  toggleButtonText: TextStyle;
+  toggleButtonTextActive: TextStyle;
+  toggleButtonTextInactive: TextStyle;
+
+  // Note grid
+  noteGrid: ViewStyle;
+  noteButton: ViewStyle;
+  noteButtonActive: ViewStyle;
+  noteButtonInactive: ViewStyle;
+  noteButtonText: TextStyle;
+  noteOctaveIndicator: ViewStyle;
+  octaveDot: ViewStyle;
+  frequencyLabel: TextStyle;
+
+  // Volume modal
+  modalOverlay: ViewStyle;
+  modalContent: ViewStyle;
+  modalTitle: TextStyle;
+  volumeRow: ViewStyle;
+  volumeLabel: TextStyle;
+  volumeValue: TextStyle;
+  doneButton: ViewStyle;
+  doneButtonText: TextStyle;
+
+  // Aliases
+  headerTitle: TextStyle;
+  headerRow: ViewStyle;
+  temperamentToggle: ViewStyle;
+  temperamentButtonText: TextStyle;
+  temperamentButtonTextActive: TextStyle;
+  temperamentButtonTextInactive: TextStyle;
+  concertARow: ViewStyle;
+
+  // Additional note grid styles
+  noteLabelWrapper: ViewStyle;
+  noteLabel: TextStyle;
+  noteLabelActive: TextStyle;
+  noteLabelInactive: TextStyle;
+  noteOctaveLabel: TextStyle;
+
+  // Active drones summary
+  activeDronesSummary: ViewStyle;
+  activeDronesText: TextStyle;
+
+  // Legend
+  legendContainer: ViewStyle;
+  legendLabel: TextStyle;
+
+  // Just intonation
+  justIntonationLabel: TextStyle;
+
+  // Vibrato button standalone
+  vibratoButtonTextActive: TextStyle;
+  vibratoButtonTextInactive: TextStyle;
+
+  // Octave highlight
+  octaveHighlightContainer: ViewStyle;
+  octaveHighlightSlice: ViewStyle;
+  octaveHighlightSliceActive: ViewStyle;
+  octaveHighlightSliceQueued: ViewStyle;
+
+  // Legend item
+  legendItem: ViewStyle;
+  legendColorBox: ViewStyle;
+  legendOctaveText: TextStyle;
+
+  // Volume modal overlay
+  volumeModalOverlay: ViewStyle;
+  volumeModalContent: ViewStyle;
+  volumeModalContentShadow: ViewStyle;
+  volumeModalTitle: TextStyle;
+  volumeRowLast: ViewStyle;
+  volumeLabelPurple: TextStyle;
+  volumeLabelCyan: TextStyle;
+  slider: ViewStyle;
+}
+
+export const styles = StyleSheet.create<PitchDroneStyles>({
   // Container
   container: {
     alignItems: "center",
@@ -225,7 +378,7 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     marginBottom: 16,
-  },
+  } as ViewStyle,
   toggleButton: {
     paddingVertical: 10,
     paddingHorizontal: 20,
@@ -267,13 +420,16 @@ export const styles = StyleSheet.create({
     maxWidth: 340,
   },
   noteButton: {
-    width: 52,
-    height: 52,
+    width: 72,
+    height: 56,
     margin: 4,
-    borderRadius: 12,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceDark,
+    borderWidth: 2,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2,
+    position: "relative",
+    overflow: "hidden",
   },
   noteButtonActive: {
     borderColor: "transparent",
@@ -289,7 +445,7 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     marginTop: 2,
     gap: 2,
-  },
+  } as ViewStyle,
   octaveDot: {
     width: 6,
     height: 6,
@@ -385,25 +541,7 @@ export const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  // Note grid styles
-  noteGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    maxWidth: 340,
-  },
-  noteButton: {
-    width: 72,
-    height: 56,
-    margin: 4,
-    borderRadius: 8,
-    backgroundColor: colors.surfaceDark,
-    borderWidth: 2,
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-    overflow: "hidden",
-  },
+  // Note label wrapper
   noteLabelWrapper: {
     zIndex: 1,
   },
@@ -415,12 +553,12 @@ export const styles = StyleSheet.create({
   noteLabelActive: {
     color: colors.textLight,
     ...Platform.select({
-      web: { textShadow: "1px 1px 2px #000" },
+      web: { textShadow: "1px 1px 2px #000" } as TextStyle,
       default: {
         textShadowColor: "#000",
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 2,
-      },
+      } as TextStyle,
     }),
   },
   noteLabelInactive: {
@@ -431,12 +569,12 @@ export const styles = StyleSheet.create({
     fontSize: 10,
     textAlign: "center",
     ...Platform.select({
-      web: { textShadow: "1px 1px 2px #000" },
+      web: { textShadow: "1px 1px 2px #000" } as TextStyle,
       default: {
         textShadowColor: "#000",
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 2,
-      },
+      } as TextStyle,
     }),
   },
 
@@ -466,29 +604,7 @@ export const styles = StyleSheet.create({
     marginRight: 8,
   },
 
-  // Concert A
-  concertAInput: {
-    backgroundColor: colors.surfaceDark,
-    color: colors.gold,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    width: 60,
-    textAlign: "center",
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  concertAUnit: {
-    color: colors.goldDark,
-    fontSize: 12,
-    marginLeft: 4,
-  },
-
-  // Pitch center container
-  pitchCenterContainer: {
-    marginBottom: 12,
-  },
+  // Just intonation
   justIntonationLabel: {
     color: colors.goldDark,
     fontSize: 12,
@@ -496,23 +612,7 @@ export const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
-  // Vibrato button
-  vibratoButtonActive: {
-    backgroundColor: colors.purple,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: colors.purple,
-  },
-  vibratoButtonInactive: {
-    backgroundColor: colors.surfaceDark,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: colors.border,
-  },
+  // Vibrato button text
   vibratoButtonTextActive: {
     color: colors.textLight,
     fontSize: 14,
@@ -524,7 +624,7 @@ export const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
-  // Octave highlight (for multi-octave note display)
+  // Octave highlight
   octaveHighlightContainer: {
     position: "absolute",
     top: 0,
@@ -577,14 +677,14 @@ export const styles = StyleSheet.create({
   },
   volumeModalContentShadow: {
     ...Platform.select({
-      web: { boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.5)" },
+      web: { boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.5)" } as ViewStyle,
       default: {
         shadowColor: "#000",
         shadowOpacity: 0.5,
         shadowRadius: 10,
         shadowOffset: { width: 0, height: 4 },
         elevation: 10,
-      },
+      } as ViewStyle,
     }),
   },
 
@@ -595,9 +695,6 @@ export const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 20,
     textAlign: "center",
-  },
-  volumeRow: {
-    marginBottom: 20,
   },
   volumeRowLast: {
     marginBottom: 24,

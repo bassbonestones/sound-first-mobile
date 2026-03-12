@@ -1,7 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet, Platform } from "react-native";
-import PropTypes from "prop-types";
-import { usePitchDetection } from "../hooks/usePitchDetection";
+import { View, Text, StyleSheet, Platform, ViewStyle, TextStyle } from "react-native";
+import { usePitchDetection, UsePitchDetectionOptions } from "../hooks/usePitchDetection";
 
 /**
  * Mobile Audio Input using react-native-live-audio-stream
@@ -13,7 +12,33 @@ import { usePitchDetection } from "../hooks/usePitchDetection";
  *
  * Note: Requires Expo Dev Client or bare workflow (not Expo Go)
  */
-export default function MobileAudioInput({
+
+interface NoteInfo {
+  noteName: string;
+  midiNote: number;
+  frequency: number;
+  cents: number;
+  isInTune?: boolean;
+}
+
+interface MobileAudioInputProps {
+  onVolumeChange?: (volume: number) => void;
+  onPitchDetected?: (noteInfo: NoteInfo) => void;
+  onRealtimePitch?: (noteInfo: NoteInfo) => void;
+  onSoundStart?: () => void;
+  onSoundEnd?: () => void;
+  targetNote?: string;
+  onPitchMatch?: (isMatch: boolean, noteInfo: NoteInfo) => void;
+  volumeThreshold?: number;
+  silenceDuration?: number;
+  pitchMargin?: number;
+  allowOctaveEquivalent?: boolean;
+  enabled?: boolean;
+  showDebug?: boolean;
+  compact?: boolean;
+}
+
+const MobileAudioInput: React.FC<MobileAudioInputProps> = ({
   onVolumeChange,
   onPitchDetected,
   onRealtimePitch,
@@ -28,22 +53,24 @@ export default function MobileAudioInput({
   enabled = true,
   showDebug = false,
   compact = false,
-}) {
+}) => {
+  const hookOptions: UsePitchDetectionOptions = {
+    onVolumeChange,
+    onPitchDetected,
+    onRealtimePitch,
+    onSoundStart,
+    onSoundEnd,
+    targetNote,
+    onPitchMatch,
+    volumeThreshold,
+    silenceDuration,
+    pitchMargin,
+    allowOctaveEquivalent,
+    enabled,
+  };
+
   const { isListening, error, currentPitch, volume, isSounding, isAvailable } =
-    usePitchDetection({
-      onVolumeChange,
-      onPitchDetected,
-      onRealtimePitch,
-      onSoundStart,
-      onSoundEnd,
-      targetNote,
-      onPitchMatch,
-      volumeThreshold,
-      silenceDuration,
-      pitchMargin,
-      allowOctaveEquivalent,
-      enabled,
-    });
+    usePitchDetection(hookOptions);
 
   // Check if native module is available
   if (!isAvailable) {
@@ -129,7 +156,7 @@ export default function MobileAudioInput({
             {currentPitch.noteName}
           </Text>
           <Text style={styles.pitchInfo}>
-            {currentPitch.isInTune
+            {Math.abs(currentPitch.cents) < 10
               ? "In tune ✓"
               : `${currentPitch.cents > 0 ? "+" : ""}${currentPitch.cents} cents`}
           </Text>
@@ -141,26 +168,29 @@ export default function MobileAudioInput({
       )}
     </View>
   );
-}
-
-MobileAudioInput.propTypes = {
-  onVolumeChange: PropTypes.func,
-  onPitchDetected: PropTypes.func,
-  onRealtimePitch: PropTypes.func,
-  onSoundStart: PropTypes.func,
-  onSoundEnd: PropTypes.func,
-  targetNote: PropTypes.string,
-  onPitchMatch: PropTypes.func,
-  volumeThreshold: PropTypes.number,
-  silenceDuration: PropTypes.number,
-  pitchMargin: PropTypes.number,
-  allowOctaveEquivalent: PropTypes.bool,
-  enabled: PropTypes.bool,
-  showDebug: PropTypes.bool,
-  compact: PropTypes.bool,
 };
 
-const styles = StyleSheet.create({
+interface Styles {
+  container: ViewStyle;
+  containerCompact: ViewStyle;
+  listeningText: TextStyle;
+  listeningTextCompact: TextStyle;
+  volumeBarContainer: ViewStyle;
+  volumeBarContainerCompact: ViewStyle;
+  volumeBar: ViewStyle;
+  pitchDisplay: ViewStyle;
+  pitchNote: TextStyle;
+  pitchNoteCompact: TextStyle;
+  pitchInfo: TextStyle;
+  detectingText: TextStyle;
+  errorIcon: TextStyle;
+  errorText: TextStyle;
+  errorHint: TextStyle;
+  debugContainer: ViewStyle;
+  debugText: TextStyle;
+}
+
+const styles = StyleSheet.create<Styles>({
   container: {
     padding: 20,
     alignItems: "center",
@@ -264,3 +294,5 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 });
+
+export default MobileAudioInput;

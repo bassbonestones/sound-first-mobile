@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useMemo } from "react";
-import PropTypes from "prop-types";
-import { View, StyleSheet, Animated, Platform } from "react-native";
+import { View, StyleSheet, Animated, Platform, ViewStyle, StyleProp } from "react-native";
 
 /**
  * EDMVisualizer - Exciting audio-reactive visualization
@@ -10,15 +9,24 @@ import { View, StyleSheet, Animated, Platform } from "react-native";
  * - Neon glow effects
  * - Pulsing/bouncing animations
  * - Color changes based on pitch accuracy
- *
- * Props:
- * - volume: Audio volume 0-1
- * - pitchAccuracy: "correct" | "off" | "listening" | null
- * - barCount: Number of bars (default 16)
- * - style: Additional container styles
  */
 
-const NEON_COLORS = {
+type PitchAccuracy = "correct" | "off" | "listening" | null;
+
+interface ColorScheme {
+  primary: string;
+  secondary: string;
+  glow: string;
+}
+
+interface NeonColors {
+  correct: ColorScheme;
+  off: ColorScheme;
+  listening: ColorScheme;
+  inactive: ColorScheme;
+}
+
+const NEON_COLORS: NeonColors = {
   correct: {
     primary: "#00FF88", // Bright neon green
     secondary: "#00CC66",
@@ -41,8 +49,16 @@ const NEON_COLORS = {
   },
 };
 
+interface AnimatedBarProps {
+  index: number;
+  volume: number;
+  colorScheme: ColorScheme;
+  maxHeight: number;
+  width: number;
+}
+
 // Individual bar component with animation
-function AnimatedBar({ index, volume, colorScheme, maxHeight, width }) {
+function AnimatedBar({ index, volume, colorScheme, maxHeight, width }: AnimatedBarProps): React.ReactElement {
   const heightAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0.3)).current;
 
@@ -79,7 +95,7 @@ function AnimatedBar({ index, volume, colorScheme, maxHeight, width }) {
       duration: 100,
       useNativeDriver: false,
     }).start();
-  }, [targetHeight, volume]);
+  }, [targetHeight, volume, heightAnim, glowAnim]);
 
   const barHeight = heightAnim.interpolate({
     inputRange: [0, 1],
@@ -101,7 +117,7 @@ function AnimatedBar({ index, volume, colorScheme, maxHeight, width }) {
               ? {
                   shadowColor: colorScheme.primary,
                   shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: glowAnim,
+                  shadowOpacity: glowAnim as unknown as number,
                   shadowRadius: 8,
                 }
               : {}),
@@ -127,8 +143,14 @@ function AnimatedBar({ index, volume, colorScheme, maxHeight, width }) {
   );
 }
 
+interface PulseRingProps {
+  volume: number;
+  colorScheme: ColorScheme;
+  size: number;
+}
+
 // Circular pulse ring effect
-function PulseRing({ volume, colorScheme, size }) {
+function PulseRing({ volume, colorScheme, size }: PulseRingProps): React.ReactElement {
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const opacityAnim = useRef(new Animated.Value(0.5)).current;
 
@@ -162,7 +184,7 @@ function PulseRing({ volume, colorScheme, size }) {
         ]).start();
       });
     }
-  }, [volume]);
+  }, [volume, scaleAnim, opacityAnim]);
 
   return (
     <Animated.View
@@ -181,14 +203,26 @@ function PulseRing({ volume, colorScheme, size }) {
   );
 }
 
+interface EDMVisualizerProps {
+  volume?: number;
+  pitchAccuracy?: PitchAccuracy;
+  barCount?: number;
+  style?: StyleProp<ViewStyle>;
+}
+
+interface BarConfig {
+  index: number;
+  key: number;
+}
+
 const EDMVisualizer = React.memo(function EDMVisualizer({
   volume = 0,
   pitchAccuracy = null,
   barCount = 16,
   style,
-}) {
+}: EDMVisualizerProps): React.ReactElement {
   // Get color scheme based on state
-  const colorScheme = useMemo(() => {
+  const colorScheme = useMemo<ColorScheme>(() => {
     if (volume < 0.02) return NEON_COLORS.inactive;
     switch (pitchAccuracy) {
       case "correct":
@@ -201,7 +235,7 @@ const EDMVisualizer = React.memo(function EDMVisualizer({
   }, [volume, pitchAccuracy]);
 
   // Generate bar configs
-  const bars = useMemo(() => {
+  const bars = useMemo<BarConfig[]>(() => {
     return Array.from({ length: barCount }, (_, i) => ({
       index: i,
       key: i,
@@ -255,13 +289,6 @@ const EDMVisualizer = React.memo(function EDMVisualizer({
   );
 });
 
-EDMVisualizer.propTypes = {
-  volume: PropTypes.number,
-  pitchAccuracy: PropTypes.oneOf(["correct", "off", "listening", null]),
-  barCount: PropTypes.number,
-  style: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
-};
-
 export default EDMVisualizer;
 
 // Medium version - smaller but keeps pulse rings and orb
@@ -270,8 +297,8 @@ export const EDMVisualizerMedium = React.memo(function EDMVisualizerMedium({
   pitchAccuracy = null,
   barCount = 12,
   style,
-}) {
-  const colorScheme = useMemo(() => {
+}: EDMVisualizerProps): React.ReactElement {
+  const colorScheme = useMemo<ColorScheme>(() => {
     if (volume < 0.02) return NEON_COLORS.inactive;
     switch (pitchAccuracy) {
       case "correct":
@@ -283,7 +310,7 @@ export const EDMVisualizerMedium = React.memo(function EDMVisualizerMedium({
     }
   }, [volume, pitchAccuracy]);
 
-  const bars = useMemo(() => {
+  const bars = useMemo<BarConfig[]>(() => {
     return Array.from({ length: barCount }, (_, i) => ({
       index: i,
       key: i,
@@ -337,12 +364,10 @@ export const EDMVisualizerMedium = React.memo(function EDMVisualizerMedium({
   );
 });
 
-EDMVisualizerMedium.propTypes = {
-  volume: PropTypes.number,
-  pitchAccuracy: PropTypes.oneOf(["correct", "off", "listening", null]),
-  barCount: PropTypes.number,
-  style: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
-};
+interface EDMVisualizerCompactProps extends EDMVisualizerProps {
+  width?: number;
+  height?: number;
+}
 
 // Compact version for inline use
 export const EDMVisualizerCompact = React.memo(function EDMVisualizerCompact({
@@ -352,8 +377,8 @@ export const EDMVisualizerCompact = React.memo(function EDMVisualizerCompact({
   width = 200,
   height = 60,
   style,
-}) {
-  const colorScheme = useMemo(() => {
+}: EDMVisualizerCompactProps): React.ReactElement {
+  const colorScheme = useMemo<ColorScheme>(() => {
     if (volume < 0.02) return NEON_COLORS.inactive;
     switch (pitchAccuracy) {
       case "correct":
@@ -365,7 +390,7 @@ export const EDMVisualizerCompact = React.memo(function EDMVisualizerCompact({
     }
   }, [volume, pitchAccuracy]);
 
-  const bars = useMemo(() => {
+  const bars = useMemo<BarConfig[]>(() => {
     return Array.from({ length: barCount }, (_, i) => ({
       index: i,
       key: i,
@@ -391,15 +416,6 @@ export const EDMVisualizerCompact = React.memo(function EDMVisualizerCompact({
     </View>
   );
 });
-
-EDMVisualizerCompact.propTypes = {
-  volume: PropTypes.number,
-  pitchAccuracy: PropTypes.oneOf(["correct", "off", "listening", null]),
-  barCount: PropTypes.number,
-  width: PropTypes.number,
-  height: PropTypes.number,
-  style: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
-};
 
 const styles = StyleSheet.create({
   container: {

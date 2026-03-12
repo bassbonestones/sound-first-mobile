@@ -7,9 +7,10 @@ import {
   Platform,
   TextInput,
   Modal,
+  ViewStyle,
+  TextStyle,
 } from "react-native";
 import Slider from "@react-native-community/slider";
-import PropTypes from "prop-types";
 import { devLog, devWarn } from "../utils/devLogger";
 
 // Import constants and utilities from extracted module
@@ -26,70 +27,97 @@ import {
 // Import styles
 import { styles, colors } from "./PitchDrone/styles";
 
+// AudioContext types
+interface NativeAudioContextType {
+  currentTime: number;
+  state: string;
+  destination: AudioDestinationNode;
+  resume: () => Promise<void>;
+  close: () => Promise<void>;
+  createOscillator: () => OscillatorNode;
+  createGain: () => GainNode;
+}
+
+type NativeAudioContextConstructor = new () => NativeAudioContextType;
+
 // Cross-platform AudioContext
-// Web: use browser's native AudioContext
-// Native: use react-native-audio-api
-let NativeAudioContext = null;
+let NativeAudioContext: NativeAudioContextConstructor | null = null;
 if (Platform.OS !== "web") {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     NativeAudioContext = require("react-native-audio-api").AudioContext;
   } catch (e) {
     devWarn("react-native-audio-api not available");
   }
 }
 
+interface PitchDroneProps {
+  onPlayingChange?: (isPlaying: boolean) => void;
+  onMuteChange?: (isMuted: boolean) => void;
+  muted?: boolean;
+  volume?: number;
+  hideInternalMute?: boolean;
+  metronomeVolume?: number;
+  onVolumeChange?: (volume: number) => void;
+  onMetronomeVolumeChange?: (volume: number) => void;
+  initialNote?: string | null;
+  autoStart?: boolean;
+}
+
+interface ActiveDrones {
+  [key: string]: boolean;
+}
+
+interface OctaveStacks {
+  [noteName: string]: number[];
+}
+
+interface ExtendedWindow extends Window {
+  AudioContext?: typeof AudioContext;
+  webkitAudioContext?: typeof AudioContext;
+}
+
 export default function PitchDrone({
   onPlayingChange,
   onMuteChange,
   muted = false,
-  volume = 1.0, // Master volume multiplier (0-1)
-  hideInternalMute = false, // Hide internal mute button when controlled externally
-  metronomeVolume = 0.5, // For cross-component volume control
-  onVolumeChange, // Callback to change drone volume
-  onMetronomeVolumeChange, // Callback to change metronome volume
-  initialNote = null, // Note name to start playing (e.g., "C", "Bb", "F#")
-  autoStart = false, // Auto-start drone on mount
-}) {
-  const [temperament, setTemperament] = useState("equal"); // "equal" or "just"
-  const [pitchCenter, setPitchCenter] = useState(0); // Semitone offset for just intonation root (0 = C)
+  volume = 1.0,
+  hideInternalMute = false,
+  metronomeVolume = 0.5,
+  onVolumeChange,
+  onMetronomeVolumeChange,
+  initialNote = null,
+  autoStart = false,
+}: PitchDroneProps): React.ReactElement {
+  const [temperament, setTemperament] = useState<"equal" | "just">("equal");
+  const [pitchCenter, setPitchCenter] = useState(0);
   const [concertA, setConcertA] = useState("440");
   const [octave, setOctave] = useState(4);
   const [sustain, setSustain] = useState(false);
   const [vibrato, setVibrato] = useState(false);
 
-  // Track which notes are currently sounding: { "C-4": true, "C-5": true, ... }
-  const [activeDrones, setActiveDrones] = useState({});
-
-  // Track octave selection order per note (stack) for 3-octave limit
-  // { "C": [4, 5, 6], "D": [3, 4], ... } - most recent last
-  const [octaveStacks, setOctaveStacks] = useState({});
-
-  // Volume control modal state
+  const [activeDrones, setActiveDrones] = useState<ActiveDrones>({});
+  const [octaveStacks, setOctaveStacks] = useState<OctaveStacks>({});
   const [showVolumeModal, setShowVolumeModal] = useState(false);
 
-  // Maximum simultaneous octaves per note
   const MAX_OCTAVES_PER_NOTE = 3;
 
-  const audioContextRef = useRef(null);
-  const oscillatorsRef = useRef({});
-  const gainNodesRef = useRef({});
-  const lfoRef = useRef({}); // LFO oscillators for vibrato
-  const lfoGainRef = useRef({}); // LFO depth control
+  const audioContextRef = useRef<AudioContext | NativeAudioContextType | null>(null);
+  const oscillatorsRef = useRef<Record<string, OscillatorNode>>({});
+  const gainNodesRef = useRef<Record<string, GainNode>>({});
+  const lfoRef = useRef<Record<string, OscillatorNode>>({});
+  const lfoGainRef = useRef<Record<string, GainNode>>({});
   const mutedRef = useRef(muted);
   const vibratoRef = useRef(vibrato);
   const volumeRef = useRef(volume);
 
-  // Base drone volume (will be multiplied by master volume)
   const BASE_DRONE_VOLUME = 0.3;
-
-  // Vibrato settings: 6 Hz rate, ~10 cents depth (subtle but audible)
-  const VIBRATO_RATE = 6; // Hz - standard vocal/string vibrato
-  const VIBRATO_DEPTH = 1.5; // cents worth of frequency variation
+  const VIBRATO_RATE = 6;
+  const VIBRATO_DEPTH = 1.5;
 
   // Keep mutedRef in sync
   useEffect(() => {
     mutedRef.current = muted;
-    // Apply mute to all active oscillators
     Object.keys(gainNodesRef.current).forEach((key) => {
       const gainNode = gainNodesRef.current[key];
       if (gainNode) {
@@ -101,10 +129,9 @@ export default function PitchDrone({
     });
   }, [muted]);
 
-  // Keep volumeRef in sync and apply to active oscillators
+  // Keep volumeRef in sync
   useEffect(() => {
     volumeRef.current = volume;
-    // Apply volume change to all active oscillators
     if (!mutedRef.current) {
       Object.keys(gainNodesRef.current).forEach((key) => {
         const gainNode = gainNodesRef.current[key];
@@ -118,17 +145,14 @@ export default function PitchDrone({
     }
   }, [volume]);
 
-  // Keep vibratoRef in sync and apply/remove vibrato to existing drones
+  // Keep vibratoRef in sync
   useEffect(() => {
     vibratoRef.current = vibrato;
 
-    // Apply or remove vibrato to all existing drones
     Object.keys(oscillatorsRef.current).forEach((key) => {
-      const oscillator = oscillatorsRef.current[key];
       const lfoGain = lfoGainRef.current[key];
 
-      if (oscillator && lfoGain && audioContextRef.current) {
-        // Toggle LFO depth
+      if (lfoGain && audioContextRef.current) {
         lfoGain.gain.setValueAtTime(
           vibrato ? VIBRATO_DEPTH : 0,
           audioContextRef.current.currentTime,
@@ -137,21 +161,19 @@ export default function PitchDrone({
     });
   }, [vibrato]);
 
-  // Initialize AudioContext (cross-platform)
+  // Initialize AudioContext
   useEffect(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
-      // Web: use browser's native AudioContext
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (AudioContext) {
-        audioContextRef.current = new AudioContext();
+      const extWindow = window as ExtendedWindow;
+      const AudioContextClass = extWindow.AudioContext || extWindow.webkitAudioContext;
+      if (AudioContextClass) {
+        audioContextRef.current = new AudioContextClass();
       }
     } else if (NativeAudioContext) {
-      // Native: use react-native-audio-api
       audioContextRef.current = new NativeAudioContext();
     }
 
     return () => {
-      // Clean up all oscillators and LFOs on unmount
       Object.entries(oscillatorsRef.current).forEach(([key, osc]) => {
         try {
           osc.stop();
@@ -195,35 +217,15 @@ export default function PitchDrone({
 
   // Calculate frequency for a note
   const calculateFrequency = useCallback(
-    (semitone, noteOctave) => {
+    (semitone: number, noteOctave: number): number => {
       const a4 = parseFloat(concertA) || 440;
 
       if (temperament === "equal") {
-        // Equal temperament: f = A4 * 2^((n - 69) / 12) where n is MIDI note number
-        // MIDI note: C4 = 60, A4 = 69
-        const midiNote = noteOctave * 12 + semitone + 12; // +12 because C0 = MIDI 12
+        const midiNote = noteOctave * 12 + semitone + 12;
         return a4 * Math.pow(2, (midiNote - 69) / 12);
       } else {
-        // Just intonation relative to pitch center
-        const rootMidiNote = noteOctave * 12 + pitchCenter + 12;
-        const rootFreq = a4 * Math.pow(2, (rootMidiNote - 69) / 12);
-
-        // Calculate interval from pitch center
-        let interval = (semitone - pitchCenter + 12) % 12;
-        const ratio = JUST_RATIOS[interval];
-
-        // Adjust octave if needed
-        let freq = rootFreq * ratio;
-        if (semitone < pitchCenter) {
-          // Note is below root in same octave context
-        }
-
-        // Correct for actual octave
-        const octaveDiff = noteOctave - 4; // relative to octave 4
-        freq = freq * Math.pow(2, octaveDiff);
-
-        // Recalculate properly
-        const baseMidi = 60 + pitchCenter; // C4 + pitch center
+        const interval = (semitone - pitchCenter + 12) % 12;
+        const baseMidi = 60 + pitchCenter;
         const baseFreq = a4 * Math.pow(2, (baseMidi - 69) / 12);
         const targetRatio = JUST_RATIOS[interval];
         const targetOctaveOffset = noteOctave - 4;
@@ -236,33 +238,24 @@ export default function PitchDrone({
 
   // Start a drone
   const startDrone = useCallback(
-    (semitone, noteOctave) => {
+    (semitone: number, noteOctave: number): void => {
       if (!audioContextRef.current) return;
 
       const key = `${NOTES[semitone].name}-${noteOctave}`;
 
-      // Don't start if already playing
       if (oscillatorsRef.current[key]) return;
-
-      // Don't create oscillators if context is closed
       if (audioContextRef.current.state === "closed") return;
 
-      // Resume audio context if suspended
       if (audioContextRef.current.state === "suspended") {
         audioContextRef.current.resume();
       }
 
       const frequency = calculateFrequency(semitone, noteOctave);
-
-      // Add very slight random detuning to prevent phase interference
-      // when multiple octaves play together (±2 cents max)
       const detuningCents = (Math.random() - 0.5) * 4;
       const detunedFrequency = frequency * Math.pow(2, detuningCents / 1200);
 
       const oscillator = audioContextRef.current.createOscillator();
       const gainNode = audioContextRef.current.createGain();
-
-      // Create LFO for vibrato
       const lfo = audioContextRef.current.createOscillator();
       const lfoGain = audioContextRef.current.createGain();
 
@@ -272,7 +265,6 @@ export default function PitchDrone({
         audioContextRef.current.currentTime,
       );
 
-      // Set up LFO (vibrato)
       lfo.type = "sine";
       lfo.frequency.setValueAtTime(
         VIBRATO_RATE,
@@ -283,7 +275,6 @@ export default function PitchDrone({
         audioContextRef.current.currentTime,
       );
 
-      // Connect LFO to oscillator frequency
       lfo.connect(lfoGain);
       lfoGain.connect(oscillator.frequency);
       lfo.start();
@@ -312,7 +303,7 @@ export default function PitchDrone({
   );
 
   // Stop a drone
-  const stopDrone = useCallback((semitone, noteOctave) => {
+  const stopDrone = useCallback((semitone: number, noteOctave: number): void => {
     const key = `${NOTES[semitone].name}-${noteOctave}`;
 
     const oscillator = oscillatorsRef.current[key];
@@ -321,14 +312,12 @@ export default function PitchDrone({
     const lfoGain = lfoGainRef.current[key];
 
     if (oscillator) {
-      // Remove from refs immediately to prevent race conditions
       delete oscillatorsRef.current[key];
       delete gainNodesRef.current[key];
       delete lfoRef.current[key];
       delete lfoGainRef.current[key];
 
       try {
-        // Fade out to avoid click
         if (gainNode && audioContextRef.current) {
           gainNode.gain.setValueAtTime(
             gainNode.gain.value,
@@ -339,7 +328,6 @@ export default function PitchDrone({
             audioContextRef.current.currentTime + 0.05,
           );
         }
-        // Stop after fade completes
         setTimeout(() => {
           try {
             oscillator.stop();
@@ -350,12 +338,9 @@ export default function PitchDrone({
               lfo.disconnect();
             }
             if (lfoGain) lfoGain.disconnect();
-          } catch (e) {
-            // Already stopped
-          }
+          } catch (e) {}
         }, 60);
       } catch (e) {
-        // If fade fails, stop immediately
         try {
           oscillator.stop();
           oscillator.disconnect();
@@ -379,21 +364,18 @@ export default function PitchDrone({
   }, []);
 
   // Stop all drones
-  const stopAllDrones = useCallback(() => {
-    // Capture current refs before clearing
+  const stopAllDrones = useCallback((): void => {
     const currentOscillators = { ...oscillatorsRef.current };
     const currentGainNodes = { ...gainNodesRef.current };
     const currentLfos = { ...lfoRef.current };
     const currentLfoGains = { ...lfoGainRef.current };
 
-    // Clear refs immediately
     oscillatorsRef.current = {};
     gainNodesRef.current = {};
     lfoRef.current = {};
     lfoGainRef.current = {};
     setActiveDrones({});
 
-    // Now stop all captured oscillators
     Object.keys(currentOscillators).forEach((key) => {
       const oscillator = currentOscillators[key];
       const gainNode = currentGainNodes[key];
@@ -401,7 +383,6 @@ export default function PitchDrone({
       const lfoGain = currentLfoGains[key];
 
       try {
-        // Fade out
         if (gainNode && audioContextRef.current) {
           gainNode.gain.setValueAtTime(
             gainNode.gain.value,
@@ -412,7 +393,6 @@ export default function PitchDrone({
             audioContextRef.current.currentTime + 0.05,
           );
         }
-        // Stop after fade
         setTimeout(() => {
           try {
             oscillator.stop();
@@ -426,7 +406,6 @@ export default function PitchDrone({
           } catch (e) {}
         }, 60);
       } catch (e) {
-        // If fade fails, stop immediately
         try {
           oscillator.stop();
           oscillator.disconnect();
@@ -442,14 +421,12 @@ export default function PitchDrone({
     devLog("[Drone] Stopped all drones");
   }, []);
 
-  // Auto-start drone on mount if autoStart is true and initialNote is provided
+  // Auto-start drone on mount
   useEffect(() => {
     if (autoStart && initialNote && audioContextRef.current) {
-      // Convert note name to semitone (handle flats and sharps)
-      const noteNameToSemitone = (noteName) => {
+      const noteNameToSemitone = (noteName: string | null): number | null => {
         if (!noteName) return null;
-        // Normalize note name: Bb -> A#, Db -> C#, etc.
-        const flatToSharp = {
+        const flatToSharp: Record<string, string> = {
           Bb: "A#",
           Db: "C#",
           Eb: "D#",
@@ -463,49 +440,42 @@ export default function PitchDrone({
 
       const semitone = noteNameToSemitone(initialNote);
       if (semitone !== null) {
-        // Start drone in default octave (4)
         startDrone(semitone, octave);
         devLog(`[Drone] Auto-started ${initialNote} in octave ${octave}`);
       }
     }
-    // Only run on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle sustain toggle
-  const handleSustainToggle = () => {
+  const handleSustainToggle = (): void => {
     if (sustain) {
-      // Turning off sustain - stop all drones and clear stacks
       stopAllDrones();
       setOctaveStacks({});
     }
     setSustain(!sustain);
   };
 
-  // Helper: get the octaves that should be playing (last 3 from stack)
-  const getPlayingOctaves = (stack) => {
+  // Helper: get the octaves that should be playing
+  const getPlayingOctaves = (stack: number[]): number[] => {
     if (!stack || stack.length === 0) return [];
-    return stack.slice(-MAX_OCTAVES_PER_NOTE); // Last 3
+    return stack.slice(-MAX_OCTAVES_PER_NOTE);
   };
 
-  // Handle note press - implements stack logic for 3-octave limit
-  const handleNotePress = (semitone) => {
+  // Handle note press
+  const handleNotePress = (semitone: number): void => {
     const noteName = NOTES[semitone].name;
 
     if (sustain) {
-      // In sustain mode, toggle the octave selection
       const currentStack = octaveStacks[noteName] || [];
       const octaveIndex = currentStack.indexOf(octave);
 
       if (octaveIndex !== -1) {
-        // Octave is selected - remove it
         const newStack = [...currentStack];
         newStack.splice(octaveIndex, 1);
 
-        // Was this octave playing?
         const wasPlaying = getPlayingOctaves(currentStack).includes(octave);
 
-        // Update stack state
         setOctaveStacks((prev) => {
           const updated = { ...prev };
           if (newStack.length === 0) {
@@ -516,15 +486,12 @@ export default function PitchDrone({
           return updated;
         });
 
-        // Stop the drone
         if (wasPlaying) {
           stopDrone(semitone, octave);
 
-          // If there's a queued octave that wasn't playing, start it
           const newPlayingOctaves = getPlayingOctaves(newStack);
           const oldPlayingOctaves = getPlayingOctaves(currentStack);
 
-          // Find octave that should now play but wasn't before
           newPlayingOctaves.forEach((oct) => {
             if (!oldPlayingOctaves.includes(oct)) {
               startDrone(semitone, oct);
@@ -532,66 +499,60 @@ export default function PitchDrone({
           });
         }
       } else {
-        // Octave not selected - add it to stack
         const newStack = [...currentStack, octave];
 
-        // Update stack state
         setOctaveStacks((prev) => ({
           ...prev,
           [noteName]: newStack,
         }));
 
-        // Determine what should play now
         const oldPlayingOctaves = getPlayingOctaves(currentStack);
         const newPlayingOctaves = getPlayingOctaves(newStack);
 
-        // Stop any octave that was playing but shouldn't be anymore
         oldPlayingOctaves.forEach((oct) => {
           if (!newPlayingOctaves.includes(oct)) {
             stopDrone(semitone, oct);
           }
         });
 
-        // Start new octave if it's in the playing set
         if (newPlayingOctaves.includes(octave)) {
           startDrone(semitone, octave);
         }
       }
     } else {
-      // Non-sustain: start on press
       startDrone(semitone, octave);
     }
   };
 
-  // Handle note release (only in non-sustain mode)
-  const handleNoteRelease = (semitone) => {
+  // Handle note release
+  const handleNoteRelease = (semitone: number): void => {
     if (!sustain) {
       stopDrone(semitone, octave);
     }
   };
 
-  // Get active octaves for a note (for highlighting) - returns all selected octaves
-  const getActiveOctavesForNote = (semitone) => {
+  // Get active octaves for a note
+  const getActiveOctavesForNote = (semitone: number): number[] => {
     const noteName = NOTES[semitone].name;
     return octaveStacks[noteName] || [];
   };
 
-  // Check if an octave is actually playing (vs just selected/queued)
-  const isOctavePlaying = (noteName, oct) => {
+  // Check if an octave is actually playing
+  const isOctavePlaying = (noteName: string, oct: number): boolean => {
     const stack = octaveStacks[noteName] || [];
     const playingOctaves = getPlayingOctaves(stack);
     return playingOctaves.includes(oct);
   };
 
-  // Render multi-octave highlight - shows all selected, dims queued ones
-  const renderOctaveHighlight = (semitone, activeOctaves) => {
+  // Render multi-octave highlight
+  const renderOctaveHighlight = (semitone: number, activeOctaves: number[]): React.ReactElement | null => {
     if (activeOctaves.length === 0) return null;
 
     const noteName = NOTES[semitone].name;
 
     return (
       <View style={styles.octaveHighlightContainer}>
-        {activeOctaves.map((oct, index) => {
+        {activeOctaves.map((oct) => {
           const isPlaying = isOctavePlaying(noteName, oct);
           return (
             <View
@@ -610,7 +571,7 @@ export default function PitchDrone({
     );
   };
 
-  const toggleMute = () => {
+  const toggleMute = (): void => {
     if (onMuteChange) {
       onMuteChange(!muted);
     }
@@ -620,8 +581,7 @@ export default function PitchDrone({
 
   return (
     <View style={styles.container}>
-      {/* Mute Button - top right corner, only when playing */}
-      {/* Tap to mute, long-press for volume controls */}
+      {/* Mute Button */}
       {isAnyDronePlaying && !hideInternalMute && (
         <Pressable
           onPress={toggleMute}
@@ -900,7 +860,7 @@ export default function PitchDrone({
         ))}
       </View>
 
-      {/* Volume Control Modal - appears on long-press of mute button */}
+      {/* Volume Control Modal */}
       <Modal
         visible={showVolumeModal}
         animationType="fade"
@@ -923,7 +883,7 @@ export default function PitchDrone({
                 minimumValue={0}
                 maximumValue={1}
                 value={metronomeVolume}
-                onValueChange={(val) =>
+                onValueChange={(val: number) =>
                   onMetronomeVolumeChange && onMetronomeVolumeChange(val)
                 }
                 minimumTrackTintColor="#9C27B0"
@@ -942,7 +902,7 @@ export default function PitchDrone({
                 minimumValue={0}
                 maximumValue={1}
                 value={volume}
-                onValueChange={(val) => onVolumeChange && onVolumeChange(val)}
+                onValueChange={(val: number) => onVolumeChange && onVolumeChange(val)}
                 minimumTrackTintColor="#00BCD4"
                 maximumTrackTintColor="#444"
                 thumbTintColor="#00BCD4"
@@ -962,13 +922,3 @@ export default function PitchDrone({
     </View>
   );
 }
-
-PitchDrone.propTypes = {
-  onPlayingChange: PropTypes.func,
-  onMuteChange: PropTypes.func,
-  muted: PropTypes.bool,
-  volume: PropTypes.number,
-  metronomeVolume: PropTypes.number,
-  onVolumeChange: PropTypes.func,
-  onMetronomeVolumeChange: PropTypes.func,
-};

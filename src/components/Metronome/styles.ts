@@ -4,10 +4,24 @@
  * Extracted StyleSheet for Metronome component to reduce inline styles.
  */
 
-import { StyleSheet, Platform } from "react-native";
+import { StyleSheet, Platform, ViewStyle, TextStyle } from "react-native";
 
 // Colors
-export const colors = {
+interface ColorsType {
+  gold: string;
+  goldDark: string;
+  goldMuted: string;
+  background: string;
+  surface: string;
+  surfaceDark: string;
+  purple: string;
+  accent: string;
+  textMuted: string;
+  textLight: string;
+  textDark: string;
+}
+
+export const colors: ColorsType = {
   gold: "#FFD700",
   goldDark: "#bfa76a",
   goldMuted: "#5a4a3a",
@@ -21,7 +35,185 @@ export const colors = {
   textDark: "#3b2c1a",
 };
 
-export const styles = StyleSheet.create({
+interface MetronomeStyles {
+  // Container styles
+  container: ViewStyle;
+
+  // BPM Display
+  bpmContainer: ViewStyle;
+  bpmText: TextStyle;
+  bpmLabel: TextStyle;
+
+  // Selector buttons row
+  selectorRow: ViewStyle;
+
+  // Time signature button
+  timeSigButton: ViewStyle;
+  timeSigButtonActive: ViewStyle;
+  timeSigButtonInactive: ViewStyle;
+  timeSigButtonText: TextStyle;
+  timeSigButtonTextActive: TextStyle;
+  timeSigButtonTextInactive: TextStyle;
+
+  // Subdivision button
+  subdivisionButton: ViewStyle;
+  subdivisionButtonActive: ViewStyle;
+  subdivisionButtonInactive: ViewStyle;
+  subdivisionButtonText: TextStyle;
+  subdivisionButtonTextActive: TextStyle;
+  subdivisionButtonTextInactive: TextStyle;
+
+  // Picker panels
+  pickerPanel: ViewStyle;
+  pickerTitle: TextStyle;
+  pickerTitleGold: TextStyle;
+  pickerTitlePurple: TextStyle;
+  pickerLabel: TextStyle;
+  pickerNote: TextStyle;
+
+  // Stepper controls
+  stepperRow: ViewStyle;
+  stepperButton: ViewStyle;
+  stepperButtonText: TextStyle;
+  stepperValue: TextStyle;
+
+  // Note value grid
+  noteValueGrid: ViewStyle;
+  noteValueButton: ViewStyle;
+  noteValueButtonActive: ViewStyle;
+  noteValueButtonInactive: ViewStyle;
+  noteValueText: TextStyle;
+  noteValueTextActive: TextStyle;
+  noteValueTextInactive: TextStyle;
+  noteValueLabel: TextStyle;
+  noteValueLabelActive: TextStyle;
+  noteValueLabelInactive: TextStyle;
+
+  // Done button
+  doneButton: ViewStyle;
+  doneButtonGold: ViewStyle;
+  doneButtonPurple: ViewStyle;
+  doneButtonText: TextStyle;
+  doneButtonTextDark: TextStyle;
+  doneButtonTextLight: TextStyle;
+
+  // Subdivision list item
+  subdivisionItem: ViewStyle;
+  subdivisionItemActive: ViewStyle;
+  subdivisionItemInactive: ViewStyle;
+  subdivisionItemContent: ViewStyle;
+  subdivisionItemTitle: TextStyle;
+  subdivisionItemTitleActive: TextStyle;
+  subdivisionItemTitleInactive: TextStyle;
+  subdivisionItemDesc: TextStyle;
+  subdivisionItemDescActive: TextStyle;
+  subdivisionItemDescInactive: TextStyle;
+  subdivisionCheckmark: TextStyle;
+
+  // Beat indicators
+  beatIndicatorRow: ViewStyle;
+  beatDot: ViewStyle;
+  beatDotActive: ViewStyle;
+  beatDotActiveAccent: ViewStyle;
+  beatDotInactive: ViewStyle;
+  beatDotInactiveAccent: ViewStyle;
+
+  // Subdivision indicators
+  subdivisionIndicatorRow: ViewStyle;
+  subdivisionDot: ViewStyle;
+  subdivisionDotActive: ViewStyle;
+  subdivisionDotInactive: ViewStyle;
+
+  // BPM controls row
+  bpmControlsRow: ViewStyle;
+  bpmButtonLarge: ViewStyle;
+  bpmButtonSmall: ViewStyle;
+  bpmButtonLargeText: TextStyle;
+  bpmButtonSmallText: TextStyle;
+
+  // Slider
+  sliderContainer: ViewStyle;
+
+  // Play button
+  playButton: ViewStyle;
+  playButtonActive: ViewStyle;
+  playButtonInactive: ViewStyle;
+  playButtonText: TextStyle;
+
+  // Mute button
+  muteButton: ViewStyle;
+  muteButtonMuted: ViewStyle;
+  muteButtonUnmuted: ViewStyle;
+  muteButtonText: TextStyle;
+
+  // Volume modal
+  modalOverlay: ViewStyle;
+  modalContent: ViewStyle;
+  modalTitle: TextStyle;
+  volumeRow: ViewStyle;
+  volumeLabel: TextStyle;
+  volumeValue: TextStyle;
+
+  // Main container
+  mainContainer: ViewStyle;
+
+  // Time signature picker panel
+  timeSigPickerPanel: ViewStyle;
+  beatsPerMeasureSection: ViewStyle;
+  timeSigDoneButton: ViewStyle;
+  timeSigDoneButtonText: TextStyle;
+
+  // Subdivision picker panel
+  subdivisionPickerPanel: ViewStyle;
+  subdivisionPickerTitle: TextStyle;
+  subdivisionScrollView: ViewStyle;
+  subdivisionOption: ViewStyle;
+  subdivisionOptionActive: ViewStyle;
+  subdivisionOptionInactive: ViewStyle;
+  subdivisionOptionContent: ViewStyle;
+  subdivisionOptionTitle: TextStyle;
+  subdivisionOptionTitleActive: TextStyle;
+  subdivisionOptionTitleInactive: TextStyle;
+  subdivisionOptionDesc: TextStyle;
+  subdivisionOptionDescActive: TextStyle;
+  subdivisionOptionDescInactive: TextStyle;
+
+  // Play buttons row
+  playButtonsRow: ViewStyle;
+  playButtonStart: ViewStyle;
+  playButtonStop: ViewStyle;
+  tapButton: ViewStyle;
+  tapButtonText: TextStyle;
+
+  // Presets row
+  presetsRow: ViewStyle;
+  presetButton: ViewStyle;
+  presetButtonActive: ViewStyle;
+  presetButtonInactive: ViewStyle;
+  presetButtonText: TextStyle;
+  presetButtonTextActive: TextStyle;
+  presetButtonTextInactive: TextStyle;
+
+  // Subdivision indicators
+  subIndicatorRow: ViewStyle;
+  subIndicatorDot: ViewStyle;
+  subIndicatorDotActive: ViewStyle;
+  subIndicatorDotInactive: ViewStyle;
+
+  // Volume modal styles
+  volumeModalOverlay: ViewStyle;
+  volumeModalContent: ViewStyle;
+  volumeModalTitle: TextStyle;
+  volumeSliderRow: ViewStyle;
+  volumeSliderRowLast: ViewStyle;
+  volumeLabelPurple: TextStyle;
+  volumeLabelCyan: TextStyle;
+  slider: ViewStyle;
+  volumeModalDoneButton: ViewStyle;
+  volumeModalDoneText: TextStyle;
+}
+
+export const styles = StyleSheet.create<MetronomeStyles>({
   // Container styles
   container: {
     flex: 1,
@@ -446,7 +638,7 @@ export const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
-  // Main component container (for non-compact mode)
+  // Main component container
   mainContainer: {
     alignItems: "center",
     padding: 16,
@@ -536,47 +728,6 @@ export const styles = StyleSheet.create({
   subdivisionOptionDescInactive: {
     color: colors.textMuted,
   },
-  subdivisionCheckmark: {
-    color: colors.textLight,
-    fontSize: 16,
-  },
-
-  // BPM controls row
-  bpmControlsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  bpmButtonLarge: {
-    backgroundColor: colors.surface,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.gold,
-  },
-  bpmButtonLargeText: {
-    color: colors.gold,
-    fontSize: 24,
-  },
-  bpmButtonSmall: {
-    backgroundColor: colors.surface,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: 8,
-    borderWidth: 1,
-    borderColor: colors.goldMuted,
-  },
-  bpmButtonSmallText: {
-    color: colors.goldDark,
-    fontSize: 18,
-  },
 
   // Play buttons row
   playButtonsRow: {
@@ -597,11 +748,6 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 32,
     borderRadius: 24,
     marginRight: 12,
-  },
-  playButtonText: {
-    color: colors.textLight,
-    fontWeight: "bold",
-    fontSize: 16,
   },
   tapButton: {
     backgroundColor: colors.surface,
@@ -728,7 +874,81 @@ export const styles = StyleSheet.create({
 });
 
 // Compact metronome styles
-export const compactStyles = StyleSheet.create({
+interface CompactStyles {
+  container: ViewStyle;
+  bpmText: TextStyle;
+  beatDot: ViewStyle;
+  beatDotActive: ViewStyle;
+  beatDotInactive: ViewStyle;
+  mainContainer: ViewStyle;
+  muteButton: ViewStyle;
+  muteButtonText: TextStyle;
+  subdivisionScrollView: ViewStyle;
+  subdivisionOption: ViewStyle;
+  subdivisionOptionActive: ViewStyle;
+  subdivisionOptionInactive: ViewStyle;
+  subdivisionOptionContent: ViewStyle;
+  subdivisionOptionTitle: TextStyle;
+  subdivisionOptionTitleActive: TextStyle;
+  subdivisionOptionTitleInactive: TextStyle;
+  subdivisionOptionDesc: TextStyle;
+  subdivisionOptionDescActive: TextStyle;
+  subdivisionOptionDescInactive: TextStyle;
+  subdivisionCheckmark: TextStyle;
+  doneButtonPurple: ViewStyle;
+  doneButtonGold: ViewStyle;
+  doneButtonTextLight: TextStyle;
+  doneButtonTextDark: TextStyle;
+  subIndicatorRow: ViewStyle;
+  subIndicatorDot: ViewStyle;
+  subIndicatorDotActive: ViewStyle;
+  subIndicatorDotInactive: ViewStyle;
+  bpmControlsRow: ViewStyle;
+  bpmButtonLarge: ViewStyle;
+  bpmButtonLargeText: TextStyle;
+  bpmButtonSmall: ViewStyle;
+  bpmButtonSmallText: TextStyle;
+  playButtonsRow: ViewStyle;
+  playButton: ViewStyle;
+  playButtonStart: ViewStyle;
+  playButtonStop: ViewStyle;
+  playButtonText: TextStyle;
+  tapButton: ViewStyle;
+  tapButtonText: TextStyle;
+  presetsRow: ViewStyle;
+  presetButton: ViewStyle;
+  presetButtonActive: ViewStyle;
+  presetButtonInactive: ViewStyle;
+  presetButtonText: TextStyle;
+  presetButtonTextActive: TextStyle;
+  presetButtonTextInactive: TextStyle;
+  audioWarning: TextStyle;
+  volumeModalTitle: TextStyle;
+  volumeSliderRow: ViewStyle;
+  volumeSliderRowLast: ViewStyle;
+  volumeLabelPurple: TextStyle;
+  volumeLabelCyan: TextStyle;
+  slider: ViewStyle;
+  volumeModalDoneButton: ViewStyle;
+  volumeModalDoneText: TextStyle;
+  timeSigPickerPanel: ViewStyle;
+  beatsPerMeasureSection: ViewStyle;
+  timeSigDoneButton: ViewStyle;
+  timeSigDoneButtonText: TextStyle;
+  subdivisionPickerPanel: ViewStyle;
+  subdivisionPickerTitle: TextStyle;
+  beatIndicatorRow: ViewStyle;
+  beatDotActiveAccent: ViewStyle;
+  beatDotInactiveAccent: ViewStyle;
+  volumeModalOverlay: ViewStyle;
+  volumeModalContent: ViewStyle;
+  volumeModalContentShadow: ViewStyle;
+  compactContainer: ViewStyle;
+  compactBpmText: TextStyle;
+  compactBeatDot: ViewStyle;
+}
+
+export const compactStyles = StyleSheet.create<CompactStyles>({
   container: {
     flexDirection: "row",
     alignItems: "center",
@@ -1064,27 +1284,10 @@ export const compactStyles = StyleSheet.create({
     flexWrap: "wrap",
     maxWidth: 320,
   },
-  beatDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    margin: 4,
-    borderWidth: 2,
-  },
   beatDotActiveAccent: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
     transform: [{ scale: 1.2 }],
-  },
-  beatDotActive: {
-    backgroundColor: colors.gold,
-    borderColor: colors.gold,
-    transform: [{ scale: 1.2 }],
-  },
-  beatDotInactive: {
-    backgroundColor: colors.surface,
-    borderColor: colors.gold,
-    transform: [{ scale: 1 }],
   },
   beatDotInactiveAccent: {
     backgroundColor: colors.surface,
@@ -1107,14 +1310,14 @@ export const compactStyles = StyleSheet.create({
   },
   volumeModalContentShadow: {
     ...Platform.select({
-      web: { boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.5)" },
+      web: { boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.5)" } as ViewStyle,
       default: {
         shadowColor: "#000",
         shadowOpacity: 0.5,
         shadowRadius: 10,
         shadowOffset: { width: 0, height: 4 },
         elevation: 10,
-      },
+      } as ViewStyle,
     }),
   },
 
