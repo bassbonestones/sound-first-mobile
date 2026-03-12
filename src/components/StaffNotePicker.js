@@ -225,7 +225,7 @@ export default function StaffNotePicker({
         >
           <Text style={styles.octaveText}>−</Text>
         </TouchableOpacity>
-        <View style={styles.noteNameBox}>>
+        <View style={styles.noteNameBox}>
           <Text style={styles.noteName}>
             {getEnharmonicDisplay(currentNote)}
           </Text>

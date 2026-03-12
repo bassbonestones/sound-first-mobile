@@ -38,7 +38,18 @@ import styles from "./styles";
  * Main content component that uses context
  */
 const FirstNoteContent = () => {
-  const { stage, skippableStages, error, setError } = useFirstNote();
+  const { stage, skippableStages, error, setError, scrollToEndRef } = useFirstNote();
+  const scrollViewRef = React.useRef(null);
+
+  // Set the scrollToEnd callback in context so child components can trigger scroll
+  React.useEffect(() => {
+    scrollToEndRef.current = () => {
+      // Small delay to let the content render first
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd?.({ animated: true });
+      }, 100);
+    };
+  }, [scrollToEndRef]);
 
   // Render current stage content
   const renderStage = () => {
@@ -91,6 +102,7 @@ const FirstNoteContent = () => {
   return (
     <View style={styles.flexContainer}>
       <ScrollView
+        ref={scrollViewRef}
         style={styles.container}
         contentContainerStyle={[
           styles.contentContainer,

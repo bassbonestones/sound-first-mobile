@@ -62,6 +62,14 @@ export function FirstNoteProvider({ children, navigation, route }) {
   // Refs
   const gotCorrectPitchRef = useRef(false);
   const focusListenStartedRef = useRef(false);
+  const scrollToEndRef = useRef(null);
+
+  // Scroll helper - call this to scroll the main ScrollView to the end
+  const scrollToEnd = useCallback(() => {
+    if (scrollToEndRef.current) {
+      scrollToEndRef.current();
+    }
+  }, []);
 
   // Derived values
   const noteInfo = useMemo(() => parseNoteName(resonantNote), [resonantNote]);
@@ -197,6 +205,10 @@ export function FirstNoteProvider({ children, navigation, route }) {
     // Refs
     gotCorrectPitchRef,
     focusListenStartedRef,
+    scrollToEndRef,
+
+    // Scroll helpers
+    scrollToEnd,
 
     // Audio handlers (from hook)
     playNote: audio.playNote,

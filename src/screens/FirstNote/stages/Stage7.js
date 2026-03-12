@@ -12,8 +12,13 @@ import styles from "../styles";
  * Stage 7 Content - Show the note on the staff
  */
 export const Stage7Content = () => {
-  const { noteInfo, clefType, stage6MusicXML, showSummary, setShowSummary } =
+  const { noteInfo, clefType, stage6MusicXML, showSummary, setShowSummary, scrollToEnd } =
     useFirstNote();
+
+  const handleShowSummary = () => {
+    setShowSummary(true);
+    scrollToEnd();
+  };
 
   return (
     <View style={styles.stageContainer}>
@@ -44,7 +49,7 @@ export const Stage7Content = () => {
           accessibilityLabel="View what I learned today"
           accessibilityRole="button"
           style={styles.summaryToggleButton}
-          onPress={() => setShowSummary(true)}
+          onPress={handleShowSummary}
         >
           <Text style={styles.summaryToggleText}>📋 What I Learned Today</Text>
         </TouchableOpacity>
