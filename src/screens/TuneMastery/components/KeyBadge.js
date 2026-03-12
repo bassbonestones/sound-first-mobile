@@ -5,7 +5,7 @@ import React from "react";
 import PropTypes from "prop-types";
 import { View, Text, StyleSheet } from "react-native";
 
-export default function KeyBadge({
+const KeyBadge = React.memo(function KeyBadge({
   keyName,
   score,
   attempts,
@@ -26,14 +26,19 @@ export default function KeyBadge({
   };
 
   return (
-    <View style={[styles.container, { borderColor: getScoreColor() }]}>
+    <View
+      style={[styles.container, { borderColor: getScoreColor() }]}
+      accessible={true}
+      accessibilityLabel={`Key ${keyName}, ${isStarted ? `score ${score}%${isMastered ? ", mastered" : ""}` : "not started"}`}
+      accessibilityRole="text"
+    >
       <Text style={styles.keyName}>{keyName}</Text>
       <Text style={[styles.score, { color: getScoreColor() }]}>
         {isStarted ? score : "-"}
       </Text>
     </View>
   );
-}
+});
 
 KeyBadge.propTypes = {
   keyName: PropTypes.string.isRequired,
@@ -41,6 +46,8 @@ KeyBadge.propTypes = {
   attempts: PropTypes.number.isRequired,
   masteryThreshold: PropTypes.number,
 };
+
+export default KeyBadge;
 
 const styles = StyleSheet.create({
   container: {

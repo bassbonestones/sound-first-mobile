@@ -1,7 +1,7 @@
 /**
  * TuneList - List of tunes with expand/collapse and reorder
  */
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import PropTypes from "prop-types";
 import { View, Text, StyleSheet } from "react-native";
 import TuneCard from "./TuneCard";
@@ -19,13 +19,22 @@ export default function TuneList({
 }) {
   const [expandedId, setExpandedId] = useState(null);
 
-  const handleToggleExpand = (tuneId) => {
+  const handleToggleExpand = useCallback((tuneId) => {
     setExpandedId((prev) => (prev === tuneId ? null : tuneId));
-  };
+  }, []);
 
   if (tunes.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
+      <View
+        style={styles.emptyContainer}
+        accessible={true}
+        accessibilityLabel={
+          isArchive
+            ? "No archived tunes"
+            : "No tunes yet. Add one to get started"
+        }
+        accessibilityRole="text"
+      >
         <Text style={styles.emptyText}>
           {isArchive
             ? "No archived tunes"
@@ -36,7 +45,11 @@ export default function TuneList({
   }
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      accessible={false}
+      accessibilityLabel={`${isArchive ? "Archived" : "Active"} tune list with ${tunes.length} ${tunes.length === 1 ? "tune" : "tunes"}`}
+    >
       {tunes.map((tune, index) => (
         <TuneCard
           key={tune.id}

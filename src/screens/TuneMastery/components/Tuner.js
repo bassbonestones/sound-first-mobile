@@ -13,7 +13,10 @@ import { frequencyToNote, getCentsDeviation } from "../../../constants/notes";
 // A4 frequency for calculations
 const A4_FREQUENCY = 440;
 
-export default function Tuner({ mode = "needle", temperament = "equal" }) {
+const Tuner = React.memo(function Tuner({
+  mode = "needle",
+  temperament = "equal",
+}) {
   const [isActive, setIsActive] = useState(false);
   const [currentNote, setCurrentNote] = useState(null);
   const [cents, setCents] = useState(0);
@@ -170,7 +173,7 @@ export default function Tuner({ mode = "needle", temperament = "equal" }) {
       </Text>
     </View>
   );
-}
+});
 
 Tuner.propTypes = {
   mode: PropTypes.oneOf(["needle", "text"]),
@@ -291,3 +294,5 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
 });
+
+export default Tuner;

@@ -1,7 +1,7 @@
 /**
  * SelectionPanel - Tune/Key dropdowns and Go button
  */
-import React, { useState } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import PropTypes from "prop-types";
 import {
   View,
@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { ALL_KEYS } from "../../../hooks/useTuneMasteryData";
 
-export default function SelectionPanel({
+const SelectionPanel = React.memo(function SelectionPanel({
   tunes,
   selectedTuneId,
   selectedKey,
@@ -27,12 +27,23 @@ export default function SelectionPanel({
 
   const selectedTune = tunes.find((t) => t.id === selectedTuneId);
 
-  const tuneOptions = [{ id: null, name: "Engine Select" }, ...tunes];
+  const tuneOptions = useMemo(
+    () => [{ id: null, name: "Engine Select" }, ...tunes],
+    [tunes],
+  );
 
-  const keyOptions = [
-    { key: null, label: "Engine Select" },
-    ...ALL_KEYS.map((k) => ({ key: k, label: k })),
-  ];
+  const keyOptions = useMemo(
+    () => [
+      { key: null, label: "Engine Select" },
+      ...ALL_KEYS.map((k) => ({ key: k, label: k })),
+    ],
+    [],
+  );
+
+  const openTunePicker = useCallback(() => setShowTunePicker(true), []);
+  const closeTunePicker = useCallback(() => setShowTunePicker(false), []);
+  const openKeyPicker = useCallback(() => setShowKeyPicker(true), []);
+  const closeKeyPicker = useCallback(() => setShowKeyPicker(false), []);
 
   return (
     <View style={styles.container}>
@@ -42,7 +53,7 @@ export default function SelectionPanel({
           <Text style={styles.selectorLabel}>Tune</Text>
           <TouchableOpacity
             style={styles.selector}
-            onPress={() => setShowTunePicker(true)}
+            onPress={openTunePicker}
             accessibilityLabel={`Select tune. Current: ${selectedTune?.name || "Engine Select"}`}
             accessibilityRole="button"
           >
@@ -58,7 +69,7 @@ export default function SelectionPanel({
           <Text style={styles.selectorLabel}>Key</Text>
           <TouchableOpacity
             style={styles.selector}
-            onPress={() => setShowKeyPicker(true)}
+            onPress={openKeyPicker}
             accessibilityLabel={`Select key. Current: ${selectedKey || "Engine Select"}`}
             accessibilityRole="button"
           >
@@ -92,12 +103,12 @@ export default function SelectionPanel({
         visible={showTunePicker}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowTunePicker(false)}
+        onRequestClose={closeTunePicker}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setShowTunePicker(false)}
+          onPress={closeTunePicker}
         >
           <View style={styles.pickerContainer}>
             <Text style={styles.pickerTitle}>Select Tune</Text>
@@ -112,7 +123,7 @@ export default function SelectionPanel({
                   ]}
                   onPress={() => {
                     onSelectTune(item.id);
-                    setShowTunePicker(false);
+                    closeTunePicker();
                   }}
                 >
                   <Text style={styles.pickerItemText}>{item.name}</Text>
@@ -132,12 +143,12 @@ export default function SelectionPanel({
         visible={showKeyPicker}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowKeyPicker(false)}
+        onRequestClose={closeKeyPicker}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setShowKeyPicker(false)}
+          onPress={closeKeyPicker}
         >
           <View style={styles.pickerContainer}>
             <Text style={styles.pickerTitle}>Select Key</Text>
@@ -153,7 +164,7 @@ export default function SelectionPanel({
                   ]}
                   onPress={() => {
                     onSelectKey(item.key);
-                    setShowKeyPicker(false);
+                    closeKeyPicker();
                   }}
                 >
                   <Text
@@ -174,7 +185,7 @@ export default function SelectionPanel({
       </Modal>
     </View>
   );
-}
+});
 
 SelectionPanel.propTypes = {
   tunes: PropTypes.arrayOf(
@@ -330,3 +341,5 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 });
+
+export default SelectionPanel;

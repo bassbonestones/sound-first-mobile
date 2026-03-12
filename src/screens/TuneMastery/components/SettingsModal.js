@@ -1,7 +1,7 @@
 /**
  * SettingsModal - Configure EMA alpha, tuner mode, temperament
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import {
   View,
@@ -13,10 +13,11 @@ import {
   Alert,
   ScrollView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { DEFAULT_TUNES } from "../../../hooks/useTuneMasteryData";
 
-export default function SettingsModal({
+const SettingsModal = React.memo(function SettingsModal({
   visible,
   onClose,
   settings,
@@ -32,6 +33,8 @@ export default function SettingsModal({
     settings?.autoMetronome || false,
   );
   const [autoDrone, setAutoDrone] = useState(settings?.autoDrone || false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   // Sync with settings when modal opens
   useEffect(() => {
@@ -44,44 +47,63 @@ export default function SettingsModal({
     }
   }, [visible, settings]);
 
-  const handleSave = () => {
+  const handleSave = useCallback(async () => {
     const alpha = parseFloat(emaAlpha);
     if (isNaN(alpha) || alpha < 0 || alpha > 1) {
       // Reset to default if invalid
       setEmaAlpha("0.3");
       return;
     }
-    onUpdateSettings({
-      emaAlpha: alpha,
-      tunerMode,
-      temperament,
-      autoMetronome,
-      autoDrone,
-    });
-    onClose();
-  };
+    setIsSaving(true);
+    try {
+      await onUpdateSettings({
+        emaAlpha: alpha,
+        tunerMode,
+        temperament,
+        autoMetronome,
+        autoDrone,
+      });
+      onClose();
+    } finally {
+      setIsSaving(false);
+    }
+  }, [
+    emaAlpha,
+    tunerMode,
+    temperament,
+    autoMetronome,
+    autoDrone,
+    onUpdateSettings,
+    onClose,
+  ]);
 
-  const handleSeedTunes = () => {
+  const handleSeedTunes = useCallback(() => {
     const message = `This will replace all existing tunes with ${DEFAULT_TUNES.length} default tunes (from Hot Cross Buns to Flight of the Bumblebee). Continue?`;
+
+    const doSeed = async () => {
+      setIsSeeding(true);
+      try {
+        await onSeedTunes?.();
+        onClose();
+      } finally {
+        setIsSeeding(false);
+      }
+    };
 
     if (Platform.OS === "web") {
       if (window.confirm(message)) {
-        onSeedTunes?.();
-        onClose();
+        doSeed();
       }
     } else {
       Alert.alert("Seed Default Tunes", message, [
         { text: "Cancel", style: "cancel" },
         {
           text: "Seed Tunes",
-          onPress: () => {
-            onSeedTunes?.();
-            onClose();
-          },
+          onPress: doSeed,
         },
       ]);
     }
-  };
+  }, [onSeedTunes, onClose]);
 
   return (
     <Modal
@@ -111,6 +133,8 @@ export default function SettingsModal({
               keyboardType="decimal-pad"
               placeholder="0.3"
               placeholderTextColor="#666"
+              accessibilityLabel="EMA Alpha value, between 0 and 1"
+              accessibilityHint="Higher values adapt faster to new ratings"
             />
           </View>
 
@@ -124,6 +148,9 @@ export default function SettingsModal({
                   tunerMode === "needle" && styles.optionButtonSelected,
                 ]}
                 onPress={() => setTunerMode("needle")}
+                accessibilityLabel="Needle tuner display"
+                accessibilityRole="radio"
+                accessibilityState={{ checked: tunerMode === "needle" }}
               >
                 <Text
                   style={[
@@ -140,6 +167,9 @@ export default function SettingsModal({
                   tunerMode === "text" && styles.optionButtonSelected,
                 ]}
                 onPress={() => setTunerMode("text")}
+                accessibilityLabel="Text tuner display"
+                accessibilityRole="radio"
+                accessibilityState={{ checked: tunerMode === "text" }}
               >
                 <Text
                   style={[
@@ -163,6 +193,9 @@ export default function SettingsModal({
                   temperament === "equal" && styles.optionButtonSelected,
                 ]}
                 onPress={() => setTemperament("equal")}
+                accessibilityLabel="Equal temperament"
+                accessibilityRole="radio"
+                accessibilityState={{ checked: temperament === "equal" }}
               >
                 <Text
                   style={[
@@ -179,6 +212,9 @@ export default function SettingsModal({
                   temperament === "just" && styles.optionButtonSelected,
                 ]}
                 onPress={() => setTemperament("just")}
+                accessibilityLabel="Just temperament"
+                accessibilityRole="radio"
+                accessibilityState={{ checked: temperament === "just" }}
               >
                 <Text
                   style={[
@@ -205,6 +241,9 @@ export default function SettingsModal({
                   autoMetronome && styles.toggleButtonActive,
                 ]}
                 onPress={() => setAutoMetronome(!autoMetronome)}
+                accessibilityLabel={`Auto-start metronome, ${autoMetronome ? "on" : "off"}`}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: autoMetronome }}
               >
                 <Text style={styles.toggleButtonText}>🥁 Metronome</Text>
                 <Text
@@ -222,6 +261,9 @@ export default function SettingsModal({
                   autoDrone && styles.toggleButtonActive,
                 ]}
                 onPress={() => setAutoDrone(!autoDrone)}
+                accessibilityLabel={`Auto-start pitch drone, ${autoDrone ? "on" : "off"}`}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: autoDrone }}
               >
                 <Text style={styles.toggleButtonText}>🎵 Pitch Drone</Text>
                 <Text
@@ -243,27 +285,57 @@ export default function SettingsModal({
               Load {DEFAULT_TUNES.length} default tunes (replaces existing)
             </Text>
             <TouchableOpacity
-              style={styles.seedButton}
+              style={[
+                styles.seedButton,
+                (isSaving || isSeeding) && styles.buttonDisabled,
+              ]}
               onPress={handleSeedTunes}
+              disabled={isSaving || isSeeding}
+              accessibilityLabel={`Seed ${DEFAULT_TUNES.length} default tunes`}
+              accessibilityHint="This will replace all existing tunes"
+              accessibilityRole="button"
             >
-              <Text style={styles.seedButtonText}>Seed Default Tunes</Text>
+              {isSeeding ? (
+                <ActivityIndicator size="small" color="#1a1a2e" />
+              ) : (
+                <Text style={styles.seedButtonText}>Seed Default Tunes</Text>
+              )}
             </TouchableOpacity>
           </View>
 
           {/* Buttons */}
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={onClose}
+              disabled={isSaving || isSeeding}
+              accessibilityLabel="Cancel settings"
+              accessibilityRole="button"
+            >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-              <Text style={styles.saveButtonText}>Save</Text>
+            <TouchableOpacity
+              style={[
+                styles.saveButton,
+                (isSaving || isSeeding) && styles.buttonDisabled,
+              ]}
+              onPress={handleSave}
+              disabled={isSaving || isSeeding}
+              accessibilityLabel="Save settings"
+              accessibilityRole="button"
+            >
+              {isSaving ? (
+                <ActivityIndicator size="small" color="#1a1a2e" />
+              ) : (
+                <Text style={styles.saveButtonText}>Save</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
       </TouchableOpacity>
     </Modal>
   );
-}
+});
 
 SettingsModal.propTypes = {
   visible: PropTypes.bool.isRequired,
@@ -378,6 +450,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
   seedButton: {
     backgroundColor: "#3a3a4e",
     borderRadius: 8,
@@ -426,3 +501,5 @@ const styles = StyleSheet.create({
     color: "#4CAF50",
   },
 });
+
+export default SettingsModal;

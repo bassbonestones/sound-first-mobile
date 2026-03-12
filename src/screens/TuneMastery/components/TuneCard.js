@@ -1,7 +1,7 @@
 /**
  * TuneCard - Single tune with 12-key score grid
  */
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import PropTypes from "prop-types";
 import {
   View,
@@ -18,7 +18,7 @@ import KeyBadge from "./KeyBadge";
 const TIME_SIGNATURES = ["2/4", "3/4", "4/4", "5/4", "6/8", "7/8", "12/8"];
 const SUBDIVISIONS = [1, 2, 3, 4];
 
-export default function TuneCard({
+const TuneCard = React.memo(function TuneCard({
   tune,
   isExpanded,
   onToggleExpand,
@@ -47,39 +47,45 @@ export default function TuneCard({
   const isMastered = masteredCount === ALL_KEYS.length;
   const progressPercent = Math.round((masteredCount / ALL_KEYS.length) * 100);
 
-  const handleRename = () => {
+  const handleRename = useCallback(() => {
     if (editName.trim() && editName.trim() !== tune.name) {
       onRename?.(editName.trim());
     } else {
       setEditName(tune.name);
     }
     setIsEditing(false);
-  };
+  }, [editName, tune.name, onRename]);
 
-  const handleBpmBlur = () => {
+  const handleBpmBlur = useCallback(() => {
     const bpmValue = editBpm.trim() === "" ? null : parseInt(editBpm, 10);
     if (bpmValue !== tune.bpm && (bpmValue === null || !isNaN(bpmValue))) {
       onUpdateSettings?.({ bpm: bpmValue });
     }
-  };
+  }, [editBpm, tune.bpm, onUpdateSettings]);
 
-  const handleTimeSignatureChange = (timeSig) => {
-    if (timeSig !== tune.timeSignature) {
-      onUpdateSettings?.({ timeSignature: timeSig });
-    }
-  };
+  const handleTimeSignatureChange = useCallback(
+    (timeSig) => {
+      if (timeSig !== tune.timeSignature) {
+        onUpdateSettings?.({ timeSignature: timeSig });
+      }
+    },
+    [tune.timeSignature, onUpdateSettings],
+  );
 
-  const handleSubdivisionChange = (sub) => {
-    if (sub !== tune.subdivision) {
-      onUpdateSettings?.({ subdivision: sub });
-    }
-  };
+  const handleSubdivisionChange = useCallback(
+    (sub) => {
+      if (sub !== tune.subdivision) {
+        onUpdateSettings?.({ subdivision: sub });
+      }
+    },
+    [tune.subdivision, onUpdateSettings],
+  );
 
-  const handleLongPress = () => {
+  const handleLongPress = useCallback(() => {
     if (!isArchive && onRename) {
       setIsEditing(true);
     }
-  };
+  }, [isArchive, onRename]);
 
   return (
     <View style={[styles.container, isMastered && styles.containerMastered]}>
@@ -296,7 +302,7 @@ export default function TuneCard({
       )}
     </View>
   );
-}
+});
 
 TuneCard.propTypes = {
   tune: PropTypes.shape({
@@ -481,3 +487,5 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+
+export default TuneCard;

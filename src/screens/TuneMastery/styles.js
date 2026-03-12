@@ -201,6 +201,9 @@ export default StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
+  modalButtonDisabled: {
+    opacity: 0.6,
+  },
 });
 
 export { colors };

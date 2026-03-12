@@ -60,6 +60,7 @@ export default function TuneMasteryScreen({ navigation }) {
   const [selectedTuneId, setSelectedTuneId] = useState(null);
   const [selectedKey, setSelectedKey] = useState(null);
   const [isPracticing, setIsPracticing] = useState(false);
+  const [isAddingTune, setIsAddingTune] = useState(false);
 
   // Restore session on mount if one exists
   useEffect(() => {
@@ -71,15 +72,20 @@ export default function TuneMasteryScreen({ navigation }) {
   }, [data.currentSession, isPracticing]);
 
   // Handle Add Tune
-  const handleAddTune = useCallback(() => {
+  const handleAddTune = useCallback(async () => {
     const trimmedName = newTuneName.trim();
     if (!trimmedName) {
       Alert.alert("Error", "Please enter a tune name");
       return;
     }
-    addTune(trimmedName);
-    setNewTuneName("");
-    setShowAddModal(false);
+    setIsAddingTune(true);
+    try {
+      await addTune(trimmedName);
+      setNewTuneName("");
+      setShowAddModal(false);
+    } finally {
+      setIsAddingTune(false);
+    }
   }, [newTuneName, addTune]);
 
   // Handle Go - start practice
@@ -368,6 +374,7 @@ export default function TuneMasteryScreen({ navigation }) {
                 placeholder="Tune name..."
                 placeholderTextColor="#666"
                 autoFocus
+                editable={!isAddingTune}
                 onSubmitEditing={handleAddTune}
               />
               <View style={styles.modalButtons}>
@@ -377,14 +384,23 @@ export default function TuneMasteryScreen({ navigation }) {
                     setNewTuneName("");
                     setShowAddModal(false);
                   }}
+                  disabled={isAddingTune}
                 >
                   <Text style={styles.modalCancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.modalAddButton}
+                  style={[
+                    styles.modalAddButton,
+                    isAddingTune && styles.modalButtonDisabled,
+                  ]}
                   onPress={handleAddTune}
+                  disabled={isAddingTune}
                 >
-                  <Text style={styles.modalAddButtonText}>Add</Text>
+                  {isAddingTune ? (
+                    <ActivityIndicator size="small" color="#1a1a2e" />
+                  ) : (
+                    <Text style={styles.modalAddButtonText}>Add</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
