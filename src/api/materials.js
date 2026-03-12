@@ -5,6 +5,7 @@
  */
 
 import { api, baseUrl } from "./client";
+import { devLog } from "../utils/devLogger";
 
 /**
  * @typedef {Object} Material
@@ -26,7 +27,7 @@ export async function getMaterials() {
       return response.json();
     }
   } catch (err) {
-    console.log("[materials] Admin endpoint unavailable, using public");
+    devLog("[materials] Admin endpoint unavailable, using public");
   }
 
   const response = await fetch(`${baseUrl}/materials`);

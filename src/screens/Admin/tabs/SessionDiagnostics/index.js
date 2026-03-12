@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { baseUrl } from "../../../../api/client";
+import { devError } from "../../../../utils/devLogger";
 import styles from "../../styles";
 
 function SessionDiagnostics() {
@@ -32,7 +33,7 @@ function SessionDiagnostics() {
         setSessionData(data);
       }
     } catch (err) {
-      console.error("[AdminScreen] Generate session error:", err);
+      devError("[AdminScreen] Generate session error:", err);
       // Fallback - try regular session generation and capture diagnostics
       try {
         const fallback = await fetch(`${baseUrl}/generate-session`, {
@@ -51,7 +52,7 @@ function SessionDiagnostics() {
           });
         }
       } catch (e) {
-        console.error("[AdminScreen] Fallback session generation failed:", e);
+        devError("[AdminScreen] Fallback session generation failed:", e);
       }
     }
     setGeneratingSession(false);
@@ -68,7 +69,7 @@ function SessionDiagnostics() {
         setSessionData(data);
       }
     } catch (err) {
-      console.error("[AdminScreen] Load session diagnostics error:", err);
+      devError("[AdminScreen] Load session diagnostics error:", err);
     }
     setLoading(false);
   };
@@ -90,6 +91,10 @@ function SessionDiagnostics() {
       {/* Action Buttons */}
       <View style={styles.actionRow}>
         <TouchableOpacity
+          accessibilityLabel={
+            generatingSession ? "Generating session" : "Generate test session"
+          }
+          accessibilityRole="button"
           style={[styles.actionButton, styles.primaryButton]}
           onPress={generateTestSession}
           disabled={generatingSession}
@@ -99,6 +104,8 @@ function SessionDiagnostics() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
+          accessibilityLabel="Load last session diagnostics"
+          accessibilityRole="button"
           style={styles.actionButton}
           onPress={loadLastSessionDiagnostics}
           disabled={loading}
@@ -257,6 +264,5 @@ function DetailRow({ label, value, valueStyle }) {
 // =============================================================================
 // SECTION 5: FOCUS CARD EXPLORER
 // =============================================================================
-
 
 export default SessionDiagnostics;

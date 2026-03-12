@@ -1,11 +1,15 @@
 /**
  * SessionTimer - Displays clock and session timer
  *
+ * Memoized to prevent unnecessary re-renders. Only re-renders when
+ * currentTime, elapsedSeconds, targetDurationSeconds, or isOverTime change.
+ *
  * Shows:
  * - Current time: 12:30:45 PM
  * - Session timer: 00:05:30 / 00:20:00 (elapsed / target)
  */
-import React from "react";
+import React, { memo } from "react";
+import PropTypes from "prop-types";
 import { View, Text, StyleSheet, Platform } from "react-native";
 
 /**
@@ -44,7 +48,7 @@ function formatClock(date) {
   return `${hh}:${mm}:${ss} ${ampm}`;
 }
 
-export default function SessionTimer({
+function SessionTimer({
   currentTime,
   elapsedSeconds,
   targetDurationSeconds,
@@ -68,6 +72,15 @@ export default function SessionTimer({
     </View>
   );
 }
+
+SessionTimer.propTypes = {
+  currentTime: PropTypes.instanceOf(Date),
+  elapsedSeconds: PropTypes.number.isRequired,
+  targetDurationSeconds: PropTypes.number.isRequired,
+  isOverTime: PropTypes.bool,
+};
+
+export default memo(SessionTimer);
 
 const styles = StyleSheet.create({
   container: {

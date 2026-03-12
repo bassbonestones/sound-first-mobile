@@ -5,6 +5,7 @@
  */
 
 import { api, baseUrl } from "./client";
+import { devLog } from "../utils/devLogger";
 
 /**
  * @typedef {Object} Capability
@@ -27,7 +28,7 @@ export async function getCapabilities() {
       return response.json();
     }
   } catch (err) {
-    console.log("[capabilities] Admin endpoint unavailable, using public");
+    devLog("[capabilities] Admin endpoint unavailable, using public");
   }
 
   // Fallback to v2 public endpoint

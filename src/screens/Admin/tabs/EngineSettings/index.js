@@ -13,6 +13,7 @@ import {
   Alert,
 } from "react-native";
 import { baseUrl } from "../../../../api/client";
+import { devError } from "../../../../utils/devLogger";
 import styles from "../../styles";
 
 function EngineSettings() {
@@ -31,7 +32,7 @@ function EngineSettings() {
         setEditedValues({});
       }
     } catch (err) {
-      console.error("[EngineSettings] Load error:", err);
+      devError("[EngineSettings] Load error:", err);
     }
     setLoading(false);
   };
@@ -75,7 +76,7 @@ function EngineSettings() {
         loadConfig();
       }
     } catch (err) {
-      console.error("[EngineSettings] Save error:", err);
+      devError("[EngineSettings] Save error:", err);
       Alert.alert("Error", "Failed to save changes");
     }
     setSaving(false);
@@ -103,7 +104,7 @@ function EngineSettings() {
                 loadConfig();
               }
             } catch (err) {
-              console.error("[EngineSettings] Reset error:", err);
+              devError("[EngineSettings] Reset error:", err);
             }
           },
         },
@@ -126,7 +127,12 @@ function EngineSettings() {
         <Text style={styles.noDataText}>
           Failed to load engine configuration
         </Text>
-        <TouchableOpacity style={styles.loadButton} onPress={loadConfig}>
+        <TouchableOpacity
+          accessibilityLabel="Retry loading configuration"
+          accessibilityRole="button"
+          style={styles.loadButton}
+          onPress={loadConfig}
+        >
           <Text style={styles.loadButtonText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -140,6 +146,8 @@ function EngineSettings() {
       {/* Action Buttons */}
       <View style={localStyles.actionBar}>
         <TouchableOpacity
+          accessibilityLabel="Save changes"
+          accessibilityRole="button"
           style={[localStyles.saveButton, !hasChanges && localStyles.disabled]}
           onPress={saveChanges}
           disabled={!hasChanges || saving}
@@ -149,6 +157,8 @@ function EngineSettings() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
+          accessibilityLabel="Reset to defaults"
+          accessibilityRole="button"
           style={localStyles.resetButton}
           onPress={resetToDefaults}
         >

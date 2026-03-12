@@ -2,6 +2,7 @@
  * VolumeModal - Volume control modal for metronome and drone
  */
 import React from "react";
+import PropTypes from "prop-types";
 import { View, Text, TouchableOpacity, Modal } from "react-native";
 import Slider from "@react-native-community/slider";
 import { styles, colors } from "./styles";
@@ -55,7 +56,12 @@ export default function VolumeModal({
           </View>
 
           {/* Close Button */}
-          <TouchableOpacity onPress={onClose} style={styles.doneButton}>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.doneButton}
+            accessibilityLabel="Close volume control"
+            accessibilityRole="button"
+          >
             <Text style={styles.doneButtonText}>Done</Text>
           </TouchableOpacity>
         </View>
@@ -63,3 +69,12 @@ export default function VolumeModal({
     </Modal>
   );
 }
+
+VolumeModal.propTypes = {
+  visible: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  metronomeVolume: PropTypes.number.isRequired,
+  setMetronomeVolume: PropTypes.func.isRequired,
+  droneVolume: PropTypes.number.isRequired,
+  setDroneVolume: PropTypes.func.isRequired,
+};

@@ -3,6 +3,7 @@
  */
 
 import React from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -28,12 +29,16 @@ export default function CapabilityRow({
         <Text style={styles.orderNum}>{item.teaching_order}</Text>
         <View style={styles.moveButtons}>
           <TouchableOpacity
+            accessibilityLabel="Move capability up"
+            accessibilityRole="button"
             onPress={() => onMoveItem(item.id, "up")}
             style={styles.moveBtn}
           >
             <Text style={styles.moveBtnText}>▲</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityLabel="Move capability down"
+            accessibilityRole="button"
             onPress={() => onMoveItem(item.id, "down")}
             style={styles.moveBtn}
           >
@@ -52,6 +57,8 @@ export default function CapabilityRow({
       {/* Type and mastery */}
       <View style={styles.typeCol}>
         <TouchableOpacity
+          accessibilityLabel={`Toggle type, currently ${item.type === "P" ? "prerequisite" : "teachable"}`}
+          accessibilityRole="button"
           style={[
             styles.typeButton,
             item.type === "P" ? styles.typeP : styles.typeT,
@@ -65,6 +72,8 @@ export default function CapabilityRow({
         <View style={styles.masteryRow}>
           <Text style={styles.masteryLabel}>Need:</Text>
           <TouchableOpacity
+            accessibilityLabel="Decrease mastery count"
+            accessibilityRole="button"
             style={styles.masteryBtn}
             onPress={() =>
               onUpdateItem(
@@ -78,6 +87,8 @@ export default function CapabilityRow({
           </TouchableOpacity>
           <Text style={styles.masteryCount}>{item.mastery_count}</Text>
           <TouchableOpacity
+            accessibilityLabel="Increase mastery count"
+            accessibilityRole="button"
             style={styles.masteryBtn}
             onPress={() =>
               onUpdateItem(item.id, "mastery_count", item.mastery_count + 1)
@@ -89,7 +100,14 @@ export default function CapabilityRow({
       </View>
 
       {/* Edit/expand button */}
-      <TouchableOpacity style={styles.editBtn} onPress={onToggleEdit}>
+      <TouchableOpacity
+        accessibilityLabel={
+          isEditing ? "Collapse edit section" : "Expand edit section"
+        }
+        accessibilityRole="button"
+        style={styles.editBtn}
+        onPress={onToggleEdit}
+      >
         <Text style={styles.editBtnText}>{isEditing ? "▼" : "▶"}</Text>
       </TouchableOpacity>
 
@@ -118,6 +136,8 @@ export default function CapabilityRow({
           />
 
           <TouchableOpacity
+            accessibilityLabel="Delete capability"
+            accessibilityRole="button"
             style={styles.deleteBtn}
             onPress={() => onDeleteItem(item.id)}
           >
@@ -128,3 +148,17 @@ export default function CapabilityRow({
     </View>
   );
 }
+
+CapabilityRow.propTypes = {
+  item: PropTypes.shape({
+    id: PropTypes.number,
+    name: PropTypes.string,
+    teaching_order: PropTypes.number,
+  }).isRequired,
+  index: PropTypes.number.isRequired,
+  isEditing: PropTypes.bool.isRequired,
+  onToggleEdit: PropTypes.func.isRequired,
+  onUpdateItem: PropTypes.func.isRequired,
+  onMoveItem: PropTypes.func.isRequired,
+  onDeleteItem: PropTypes.func.isRequired,
+};

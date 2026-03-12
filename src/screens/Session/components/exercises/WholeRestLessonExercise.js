@@ -37,13 +37,14 @@ import {
   exercisePropTypes,
   exerciseDefaultProps,
 } from "./shared";
+import { devLog, devWarn } from "../../../../utils/devLogger";
 
 // For notation display
 let NotationDisplay = null;
 try {
   NotationDisplay = require("../../../../components/NotationDisplay").default;
 } catch (e) {
-  console.warn("NotationDisplay not available");
+  devWarn("NotationDisplay not available");
 }
 
 // Generate MusicXML for whole note + whole rest + whole note
@@ -588,7 +589,7 @@ export default function WholeRestLessonExercise({
 
     const beatSoundPct = soundingOnBeatsRef.current; // Percentages (0-1) for beats 1-13
     const startedEarly = startedEarlyRef.current;
-    console.log("[WholeRestLesson] analyzePerformance:", {
+    devLog("[WholeRestLesson] analyzePerformance:", {
       totalCount,
       pitchCount,
       hitTarget,
@@ -824,6 +825,8 @@ export default function WholeRestLessonExercise({
       <View style={styles.notationContainer}>
         {!showNotation ? (
           <TouchableOpacity
+            accessibilityLabel="Show notation"
+            accessibilityRole="button"
             style={styles.showNotationButton}
             onPress={handleShowNotation}
           >
@@ -831,27 +834,23 @@ export default function WholeRestLessonExercise({
           </TouchableOpacity>
         ) : (
           <>
-            <View style={[styles.notationWrapper, { position: "relative" }]}>
+            <View
+              style={[styles.notationWrapper, styles.notationWrapperRelative]}
+            >
               {memoizedNotation}
               {/* Green highlight overlay */}
               {highlightLeft !== null && (
                 <View
-                  style={{
-                    position: "absolute",
-                    left: highlightLeft,
-                    top: 30,
-                    width: highlightWidth,
-                    height: 100,
-                    backgroundColor: "rgba(76, 175, 80, 0.25)",
-                    borderRadius: 4,
-                    borderWidth: 2,
-                    borderColor: "rgba(76, 175, 80, 0.6)",
-                    pointerEvents: "none",
-                  }}
+                  style={[
+                    styles.highlightOverlay,
+                    { left: highlightLeft, width: highlightWidth, height: 100 },
+                  ]}
                 />
               )}
             </View>
             <TouchableOpacity
+              accessibilityLabel="Hide notation"
+              accessibilityRole="button"
               style={styles.hideNotationButton}
               onPress={() => setShowNotation(false)}
             >
@@ -1044,12 +1043,16 @@ export default function WholeRestLessonExercise({
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity
+                accessibilityLabel="Cancel"
+                accessibilityRole="button"
                 style={styles.modalCancelButton}
                 onPress={() => setShowAttestModal(false)}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                accessibilityLabel="Confirm"
+                accessibilityRole="button"
                 style={styles.modalConfirmButton}
                 onPress={handleAttestConfirm}
               >
@@ -1098,6 +1101,8 @@ export default function WholeRestLessonExercise({
 
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
+            accessibilityLabel="Got it, continue"
+            accessibilityRole="button"
             style={styles.primaryButton}
             onPress={() => setPhase(PHASE.LISTEN)}
           >
@@ -1141,6 +1146,10 @@ export default function WholeRestLessonExercise({
         <View style={styles.fixedBottomButtons}>
           {!hasHeardPattern ? (
             <TouchableOpacity
+              accessibilityLabel={
+                isPlaying ? "Playing pattern" : "Hear pattern"
+              }
+              accessibilityRole="button"
               style={[styles.primaryButton, isPlaying && styles.buttonDisabled]}
               onPress={() => {
                 playPattern(() => setHasHeardPattern(true));
@@ -1154,6 +1163,10 @@ export default function WholeRestLessonExercise({
           ) : (
             <>
               <TouchableOpacity
+                accessibilityLabel={
+                  isPlaying ? "Playing pattern" : "Hear again"
+                }
+                accessibilityRole="button"
                 style={[
                   styles.secondaryButton,
                   isPlaying && styles.buttonDisabled,
@@ -1167,6 +1180,8 @@ export default function WholeRestLessonExercise({
               </TouchableOpacity>
               {!isPlaying && (
                 <TouchableOpacity
+                  accessibilityLabel="I heard it, continue"
+                  accessibilityRole="button"
                   style={[styles.primaryButton, { marginTop: 8 }]}
                   onPress={() => {
                     stopPlayback();
@@ -1239,6 +1254,8 @@ export default function WholeRestLessonExercise({
           {singResult && !singResult.success ? (
             <>
               <TouchableOpacity
+                accessibilityLabel="Try singing again"
+                accessibilityRole="button"
                 style={styles.primaryButton}
                 onPress={handleTrySingAgain}
               >
@@ -1246,6 +1263,8 @@ export default function WholeRestLessonExercise({
               </TouchableOpacity>
               {singAttempts >= 3 && (
                 <TouchableOpacity
+                  accessibilityLabel="I did it correctly, attest"
+                  accessibilityRole="button"
                   style={[styles.tertiaryButton, { marginTop: 8 }]}
                   onPress={() => handleShowAttestModal("sing")}
                 >
@@ -1257,7 +1276,7 @@ export default function WholeRestLessonExercise({
             </>
           ) : singResult?.success ? (
             <>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[
                     styles.secondaryButton,
@@ -1441,7 +1460,7 @@ export default function WholeRestLessonExercise({
             </>
           ) : playResult?.success ? (
             <>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[
                     styles.secondaryButton,
@@ -2132,5 +2151,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#fff",
+  },
+  // Extra styles for inline conversions
+  buttonRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  notationWrapperRelative: {
+    position: "relative",
+  },
+  highlightOverlay: {
+    position: "absolute",
+    top: 30,
+    backgroundColor: "rgba(76, 175, 80, 0.25)",
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: "rgba(76, 175, 80, 0.6)",
+    pointerEvents: "none",
   },
 });

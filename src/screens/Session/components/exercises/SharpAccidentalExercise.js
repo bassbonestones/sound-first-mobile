@@ -16,6 +16,8 @@ import {
   Platform,
 } from "react-native";
 import { exercisePropTypes, exerciseDefaultProps } from "./shared";
+import { devWarn } from "../../../../utils/devLogger";
+import MiniKeyboard from "./shared/MiniKeyboard";
 
 // Audio context
 // Audio context - works on web, iOS, and Android
@@ -29,7 +31,7 @@ if (Platform.OS === "web") {
   try {
     AudioContextClass = require("react-native-audio-api").AudioContext;
   } catch (e) {
-    console.warn("react-native-audio-api not available");
+    devWarn("react-native-audio-api not available");
   }
 }
 
@@ -65,23 +67,6 @@ const NOTE_FREQUENCIES = {
   // Enharmonic alias for white-to-white example
   "E#4": 349.23, // Same as F4
 };
-
-// Piano key layout (one octave + C5)
-const PIANO_KEYS = [
-  { note: "C4", isBlack: false, label: "C" },
-  { note: "C#4", isBlack: true, label: "C♯" },
-  { note: "D4", isBlack: false, label: "D" },
-  { note: "D#4", isBlack: true, label: "D♯" },
-  { note: "E4", isBlack: false, label: "E" },
-  { note: "F4", isBlack: false, label: "F" },
-  { note: "F#4", isBlack: true, label: "F♯" },
-  { note: "G4", isBlack: false, label: "G" },
-  { note: "G#4", isBlack: true, label: "G♯" },
-  { note: "A4", isBlack: false, label: "A" },
-  { note: "A#4", isBlack: true, label: "A♯" },
-  { note: "B4", isBlack: false, label: "B" },
-  { note: "C5", isBlack: false, label: "C" },
-];
 
 // Sharp examples
 const SHARP_EXAMPLES = [
@@ -136,178 +121,6 @@ const QUIZ_QUESTIONS = [
     ],
   },
 ];
-
-// ============================================================
-// MINI KEYBOARD COMPONENT
-// ============================================================
-
-function MiniKeyboard({
-  highlightNotes = [],
-  highlightSharp = null,
-  onKeyPress,
-  interactive = false,
-}) {
-  const whiteKeys = PIANO_KEYS.filter((k) => !k.isBlack);
-  const blackKeys = PIANO_KEYS.filter((k) => k.isBlack);
-
-  // White key dimensions: 40px width + 2px margin each side = 44px per key
-  const WHITE_KEY_WIDTH = 44;
-  const BLACK_KEY_WIDTH = 28;
-
-  return (
-    <View style={keyboardStyles.container}>
-      <View style={keyboardStyles.keyboardWrapper}>
-        {/* White keys */}
-        <View style={keyboardStyles.whiteKeysRow}>
-          {whiteKeys.map((key) => {
-            const isHighlighted = highlightNotes.includes(key.note);
-            const isSharpHighlight = highlightSharp === key.note;
-            return (
-              <TouchableOpacity
-                key={key.note}
-                style={[
-                  keyboardStyles.whiteKey,
-                  isHighlighted && keyboardStyles.whiteKeyHighlighted,
-                  isSharpHighlight && keyboardStyles.whiteKeySharp,
-                ]}
-                onPress={() => interactive && onKeyPress?.(key.note)}
-                disabled={!interactive}
-              >
-                <Text
-                  style={[
-                    keyboardStyles.whiteKeyLabel,
-                    (isHighlighted || isSharpHighlight) &&
-                      keyboardStyles.keyLabelHighlighted,
-                  ]}
-                >
-                  {key.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        {/* Black keys - positioned absolutely within wrapper */}
-        <View style={keyboardStyles.blackKeysRow}>
-          {blackKeys.map((key) => {
-            const isHighlighted = highlightNotes.includes(key.note);
-            const isSharpHighlight = highlightSharp === key.note;
-            // Position black keys between white keys
-            const whiteKeyIndices = {
-              "C#4": 0, // Between C(0) and D(1)
-              "D#4": 1, // Between D(1) and E(2)
-              "F#4": 3, // Between F(3) and G(4)
-              "G#4": 4, // Between G(4) and A(5)
-              "A#4": 5, // Between A(5) and B(6)
-            };
-            const whiteIdx = whiteKeyIndices[key.note];
-            if (whiteIdx === undefined) return null;
-
-            const leftPos =
-              (whiteIdx + 1) * WHITE_KEY_WIDTH - BLACK_KEY_WIDTH / 2;
-
-            return (
-              <TouchableOpacity
-                key={key.note}
-                style={[
-                  keyboardStyles.blackKey,
-                  { left: leftPos },
-                  isHighlighted && keyboardStyles.blackKeyHighlighted,
-                  isSharpHighlight && keyboardStyles.blackKeySharp,
-                ]}
-                onPress={() => interactive && onKeyPress?.(key.note)}
-                disabled={!interactive}
-              >
-                <Text
-                  style={[
-                    keyboardStyles.blackKeyLabel,
-                    (isHighlighted || isSharpHighlight) &&
-                      keyboardStyles.keyLabelHighlighted,
-                  ]}
-                >
-                  {key.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
-    </View>
-  );
-}
-
-const keyboardStyles = StyleSheet.create({
-  container: {
-    height: 140,
-    alignItems: "center",
-    marginVertical: 16,
-  },
-  keyboardWrapper: {
-    position: "relative",
-    width: 352, // 8 white keys * 44px (40px + 4px margin)
-    height: 120,
-  },
-  whiteKeysRow: {
-    flexDirection: "row",
-    height: 120,
-  },
-  whiteKey: {
-    width: 40,
-    height: 120,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#333",
-    borderRadius: 4,
-    marginHorizontal: 2,
-    justifyContent: "flex-end",
-    alignItems: "center",
-    paddingBottom: 8,
-  },
-  whiteKeyHighlighted: {
-    backgroundColor: "#4fc3f7",
-  },
-  whiteKeySharp: {
-    backgroundColor: "#ff5722", // Orange-red for sharp (same as black keys)
-  },
-  whiteKeyLabel: {
-    fontSize: 14,
-    color: "#333",
-    fontWeight: "600",
-  },
-  blackKeysRow: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 80,
-  },
-  blackKey: {
-    position: "absolute",
-    width: 28,
-    height: 75,
-    backgroundColor: "#1a1a2e",
-    borderWidth: 1,
-    borderColor: "#000",
-    borderRadius: 4,
-    justifyContent: "flex-end",
-    alignItems: "center",
-    paddingBottom: 6,
-  },
-  blackKeyHighlighted: {
-    backgroundColor: "#ff9800",
-  },
-  blackKeySharp: {
-    backgroundColor: "#ff5722", // Orange-red for sharp
-  },
-  blackKeyLabel: {
-    fontSize: 10,
-    color: "#888",
-    fontWeight: "600",
-  },
-  keyLabelHighlighted: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-});
 
 // ============================================================
 // MAIN COMPONENT
@@ -471,6 +284,8 @@ export default function SharpAccidentalExercise({
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => setPhase(PHASES.COMPARE)}
+          accessibilityLabel="Compare sharp to flat"
+          accessibilityRole="button"
         >
           <Text style={styles.primaryButtonText}>Compare to Flat →</Text>
         </TouchableOpacity>
@@ -526,6 +341,8 @@ export default function SharpAccidentalExercise({
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => setPhase(PHASES.KEYBOARD)}
+          accessibilityLabel="See sharp on keyboard"
+          accessibilityRole="button"
         >
           <Text style={styles.primaryButtonText}>See on Keyboard →</Text>
         </TouchableOpacity>
@@ -569,6 +386,8 @@ export default function SharpAccidentalExercise({
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => setPhase(PHASES.EXAMPLES)}
+          accessibilityLabel="See more examples"
+          accessibilityRole="button"
         >
           <Text style={styles.primaryButtonText}>See More Examples →</Text>
         </TouchableOpacity>
@@ -605,6 +424,8 @@ export default function SharpAccidentalExercise({
                   setHighlightedNotes([ex.natural]);
                   setHighlightSharp(ex.sharpKey || ex.sharp);
                 }}
+                accessibilityLabel={`Show ${ex.label} example`}
+                accessibilityRole="button"
               >
                 <Text style={styles.exampleButtonText}>{ex.label}</Text>
               </TouchableOpacity>
@@ -630,6 +451,8 @@ export default function SharpAccidentalExercise({
             setHighlightSharp(null);
             setPhase(PHASES.HEAR_IT);
           }}
+          accessibilityLabel="Hear the difference"
+          accessibilityRole="button"
         >
           <Text style={styles.primaryButtonText}>Hear the Difference →</Text>
         </TouchableOpacity>
@@ -663,6 +486,10 @@ export default function SharpAccidentalExercise({
             style={[styles.playButton, isPlaying && styles.playButtonDisabled]}
             onPress={() => playSharpExample(example)}
             disabled={isPlaying}
+            accessibilityLabel={
+              isPlaying ? "Playing audio" : "Play audio example"
+            }
+            accessibilityRole="button"
           >
             <Text style={styles.playButtonText}>
               {isPlaying ? "Playing..." : "▶ Play"}
@@ -686,6 +513,8 @@ export default function SharpAccidentalExercise({
                     idx === currentExample && styles.smallButtonActive,
                   ]}
                   onPress={() => setCurrentExample(idx)}
+                  accessibilityLabel={`Select ${ex.label} example`}
+                  accessibilityRole="button"
                 >
                   <Text
                     style={[
@@ -704,6 +533,8 @@ export default function SharpAccidentalExercise({
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => setPhase(PHASES.QUIZ)}
+          accessibilityLabel="Start quiz"
+          accessibilityRole="button"
         >
           <Text style={styles.primaryButtonText}>Quiz Me →</Text>
         </TouchableOpacity>
@@ -751,6 +582,8 @@ export default function SharpAccidentalExercise({
                   ]}
                   onPress={() => !showResult && handleAnswer(option)}
                   disabled={showResult}
+                  accessibilityLabel={`Select answer: ${option}`}
+                  accessibilityRole="button"
                 >
                   <Text
                     style={[
@@ -784,7 +617,16 @@ export default function SharpAccidentalExercise({
         </ScrollView>
 
         {showResult && (
-          <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={handleNext}
+            accessibilityLabel={
+              quizIndex < QUIZ_QUESTIONS.length - 1
+                ? "Go to next question"
+                : "See results"
+            }
+            accessibilityRole="button"
+          >
             <Text style={styles.primaryButtonText}>
               {quizIndex < QUIZ_QUESTIONS.length - 1
                 ? "Next →"
@@ -822,7 +664,14 @@ export default function SharpAccidentalExercise({
           </View>
         </ScrollView>
 
-        <TouchableOpacity style={styles.primaryButton} onPress={handleComplete}>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={handleComplete}
+          accessibilityLabel={
+            passed ? "Continue to next exercise" : "Try again"
+          }
+          accessibilityRole="button"
+        >
           <Text style={styles.primaryButtonText}>
             {passed ? "Continue →" : "Try Again"}
           </Text>

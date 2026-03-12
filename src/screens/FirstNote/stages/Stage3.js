@@ -109,6 +109,8 @@ export function Stage3Buttons() {
     return (
       <View style={styles.fixedBottomButtons}>
         <TouchableOpacity
+          accessibilityLabel="Got it, continue"
+          accessibilityRole="button"
           style={styles.primaryButton}
           onPress={() => setSubStep(1)}
         >
@@ -122,12 +124,16 @@ export function Stage3Buttons() {
     return (
       <View style={styles.fixedBottomButtons}>
         <TouchableOpacity
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
           style={styles.backTextButton}
           onPress={() => setSubStep(0)}
         >
           <Text style={styles.backTextButtonText}>← Back</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          accessibilityLabel="Ha, next"
+          accessibilityRole="button"
           style={styles.primaryButton}
           onPress={() => setSubStep(2)}
         >
@@ -141,12 +147,19 @@ export function Stage3Buttons() {
     return (
       <View style={styles.fixedBottomButtons}>
         <TouchableOpacity
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
           style={styles.backTextButton}
           onPress={() => setSubStep(1)}
         >
           <Text style={styles.backTextButtonText}>← Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.primaryButton} onPress={nextStage}>
+        <TouchableOpacity
+          accessibilityLabel="Got it, continue"
+          accessibilityRole="button"
+          style={styles.primaryButton}
+          onPress={nextStage}
+        >
           <Text style={styles.primaryButtonText}>Got it →</Text>
         </TouchableOpacity>
       </View>

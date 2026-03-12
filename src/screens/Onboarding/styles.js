@@ -25,6 +25,9 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  instrumentSelectionContainer: {
+    alignItems: "center",
+  },
   scrollContent: {
     flexGrow: 1,
     alignItems: "center",

@@ -171,7 +171,12 @@ export default function NoteNameQuizExercise({
           </View>
         </View>
 
-        <TouchableOpacity style={styles.primaryButton} onPress={handleComplete}>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={handleComplete}
+          accessibilityLabel="Continue to next exercise"
+          accessibilityRole="button"
+        >
           <Text style={styles.primaryButtonText}>Continue →</Text>
         </TouchableOpacity>
       </View>
@@ -241,6 +246,8 @@ export default function NoteNameQuizExercise({
                 ]}
                 onPress={() => !showResult && handleAnswer(option)}
                 disabled={showResult}
+                accessibilityLabel={`Select answer ${option}`}
+                accessibilityRole="button"
               >
                 <Text
                   style={[
@@ -284,7 +291,12 @@ export default function NoteNameQuizExercise({
 
       {/* Next button (shown after answering) */}
       {showResult && (
-        <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={handleNext}
+          accessibilityLabel="Next question"
+          accessibilityRole="button"
+        >
           <Text style={styles.primaryButtonText}>Next →</Text>
         </TouchableOpacity>
       )}

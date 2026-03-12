@@ -23,6 +23,7 @@ import {
   Platform,
 } from "react-native";
 import { exercisePropTypes, exerciseDefaultProps } from "./shared";
+import { devWarn } from "../../../../utils/devLogger";
 
 // Audio context for playing notes - works on web, iOS, and Android
 let AudioContextClass = null;
@@ -37,7 +38,7 @@ if (Platform.OS === "web") {
   try {
     AudioContextClass = require("react-native-audio-api").AudioContext;
   } catch (e) {
-    console.warn("react-native-audio-api not available");
+    devWarn("react-native-audio-api not available");
   }
 }
 
@@ -137,7 +138,7 @@ export default function NoteNamePatternExercise({
   const playNote = useCallback(async (frequency, duration = 0.35) => {
     const ctx = audioContextRef.current;
     if (!ctx) {
-      console.warn("No audio context available");
+      devWarn("No audio context available");
       return;
     }
 
@@ -431,7 +432,7 @@ export default function NoteNamePatternExercise({
         </ScrollView>
 
         {showResult && (
-          <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
+          <TouchableOpacity style={styles.primaryButton} onPress={handleNext} accessibilityLabel="Next step" accessibilityRole="button">
             <Text style={styles.primaryButtonText}>
               {quizIndex < questions.length - 1 ? "Next →" : "See Results →"}
             </Text>
@@ -475,7 +476,7 @@ export default function NoteNamePatternExercise({
           )}
         </ScrollView>
 
-        <TouchableOpacity style={styles.primaryButton} onPress={handleComplete}>
+        <TouchableOpacity style={styles.primaryButton} onPress={handleComplete} accessibilityLabel="Complete lesson" accessibilityRole="button">
           <Text style={styles.primaryButtonText}>
             {passed ? "Continue →" : "Try Again"}
           </Text>

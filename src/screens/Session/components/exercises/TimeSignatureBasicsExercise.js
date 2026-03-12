@@ -19,13 +19,14 @@ import {
   ScrollView,
 } from "react-native";
 import { exercisePropTypes, exerciseDefaultProps } from "./shared";
+import { devWarn } from "../../../../utils/devLogger";
 
 // For notation display
 let NotationDisplay = null;
 try {
   NotationDisplay = require("../../../../components/NotationDisplay").default;
 } catch (e) {
-  console.warn("NotationDisplay not available");
+  devWarn("NotationDisplay not available");
 }
 
 // ============================================================
@@ -430,6 +431,8 @@ export default function TimeSignatureBasicsExercise({
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={() => setPhase(PHASES.INTRO_2)}
+            accessibilityLabel="Next step"
+            accessibilityRole="button"
           >
             <Text style={styles.primaryButtonText}>Next →</Text>
           </TouchableOpacity>
@@ -500,12 +503,16 @@ export default function TimeSignatureBasicsExercise({
           <TouchableOpacity
             style={styles.secondaryButton}
             onPress={() => setPhase(PHASES.INTRO_1)}
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
           >
             <Text style={styles.secondaryButtonText}>← Back</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={() => setPhase(PHASES.INTRO_3)}
+            accessibilityLabel="Next step"
+            accessibilityRole="button"
           >
             <Text style={styles.primaryButtonText}>Next →</Text>
           </TouchableOpacity>
@@ -578,12 +585,16 @@ export default function TimeSignatureBasicsExercise({
           <TouchableOpacity
             style={styles.secondaryButton}
             onPress={() => setPhase(PHASES.INTRO_2)}
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
           >
             <Text style={styles.secondaryButtonText}>← Back</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={() => setPhase(PHASES.INTRO_4)}
+            accessibilityLabel="Next step"
+            accessibilityRole="button"
           >
             <Text style={styles.primaryButtonText}>Next →</Text>
           </TouchableOpacity>
@@ -681,12 +692,16 @@ export default function TimeSignatureBasicsExercise({
           <TouchableOpacity
             style={styles.secondaryButton}
             onPress={() => setPhase(PHASES.INTRO_3)}
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
           >
             <Text style={styles.secondaryButtonText}>← Back</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={() => setPhase(PHASES.QUIZ)}
+            accessibilityLabel="Take quiz"
+            accessibilityRole="button"
           >
             <Text style={styles.primaryButtonText}>Take Quiz →</Text>
           </TouchableOpacity>
@@ -781,6 +796,8 @@ export default function TimeSignatureBasicsExercise({
                   style={optionStyle}
                   onPress={() => handleAnswer(option)}
                   disabled={showFeedback}
+                  accessibilityLabel={`Select ${option}`}
+                  accessibilityRole="button"
                 >
                   <Text style={textStyle}>{option}</Text>
                 </TouchableOpacity>
@@ -827,6 +844,8 @@ export default function TimeSignatureBasicsExercise({
             <TouchableOpacity
               style={styles.primaryButton}
               onPress={handleComplete}
+              accessibilityLabel="Complete lesson"
+              accessibilityRole="button"
             >
               <Text style={styles.primaryButtonText}>Complete →</Text>
             </TouchableOpacity>
@@ -851,6 +870,8 @@ export default function TimeSignatureBasicsExercise({
             <TouchableOpacity
               style={styles.primaryButton}
               onPress={handleRestart}
+              accessibilityLabel="Start over"
+              accessibilityRole="button"
             >
               <Text style={styles.primaryButtonText}>Start Over →</Text>
             </TouchableOpacity>

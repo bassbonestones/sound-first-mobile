@@ -5,6 +5,7 @@
  */
 
 import React from "react";
+import PropTypes from "prop-types";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import StaffNotePicker from "../../../components/StaffNotePicker";
 import AudioInput from "../../../components/AudioInput";
@@ -80,6 +81,8 @@ function PlayToSelectMode({
       {/* Fixed bottom area with button and progress dots */}
       <View style={styles.fixedBottomArea}>
         <TouchableOpacity
+          accessibilityLabel="Confirm this is my note"
+          accessibilityRole="button"
           disabled={!canConfirm}
           onPress={onConfirm}
           style={[
@@ -123,7 +126,12 @@ function StaffSelectMode({
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContentWithTopPadding}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
+        <TouchableOpacity
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+          onPress={onBack}
+          style={styles.backButton}
+        >
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
 
@@ -151,6 +159,8 @@ function StaffSelectMode({
       {/* Fixed bottom area with button and progress dots */}
       <View style={styles.fixedBottomArea}>
         <TouchableOpacity
+          accessibilityLabel="Start practicing"
+          accessibilityRole="button"
           disabled={!canProceed}
           onPress={onSubmit}
           style={[
@@ -224,3 +234,24 @@ export default function StartingNoteStep({
     />
   );
 }
+
+StartingNoteStep.propTypes = {
+  instrument: PropTypes.string.isRequired,
+  instrumentIcon: PropTypes.string,
+  clef: PropTypes.string.isRequired,
+  startingNote: PropTypes.string,
+  playToSelectMode: PropTypes.bool.isRequired,
+  detectedPitch: PropTypes.shape({
+    note: PropTypes.string,
+    isInTune: PropTypes.bool,
+  }),
+  isSounding: PropTypes.bool.isRequired,
+  onChangeNote: PropTypes.func.isRequired,
+  onRealtimePitch: PropTypes.func.isRequired,
+  onFinalPitch: PropTypes.func.isRequired,
+  onSoundEnd: PropTypes.func.isRequired,
+  onConfirmPitch: PropTypes.func.isRequired,
+  onSetPlayToSelectMode: PropTypes.func.isRequired,
+  onBack: PropTypes.func.isRequired,
+  onSubmit: PropTypes.func.isRequired,
+};

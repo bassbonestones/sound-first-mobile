@@ -8,6 +8,7 @@
 
 import React, { useState, useCallback } from "react";
 import { Alert } from "react-native";
+import ErrorBoundary from "../../components/ErrorBoundary";
 import { useUser } from "../../context/UserContext";
 import {
   instrumentDefaults,
@@ -131,36 +132,40 @@ function OnboardingScreen({ navigation, route }) {
 
   if (step === 1) {
     return (
-      <InstrumentStep
-        selectedFamily={selectedFamily}
-        instrument={instrument}
-        onSelectFamily={selectFamily}
-        onSelectInstrument={selectInstrument}
-        onNext={() => setStep(2)}
-        onNavigateAdmin={() => navigation.navigate("Admin")}
-      />
+      <ErrorBoundary>
+        <InstrumentStep
+          selectedFamily={selectedFamily}
+          instrument={instrument}
+          onSelectFamily={selectFamily}
+          onSelectInstrument={selectInstrument}
+          onNext={() => setStep(2)}
+          onNavigateAdmin={() => navigation.navigate("Admin")}
+        />
+      </ErrorBoundary>
     );
   }
 
   if (step === 2) {
     return (
-      <StartingNoteStep
-        instrument={instrument}
-        instrumentIcon={instrumentIcon}
-        clef={clef}
-        startingNote={startingNote}
-        playToSelectMode={playToSelectMode}
-        detectedPitch={detectedPitch}
-        isSounding={isSounding}
-        onChangeNote={setStartingNote}
-        onRealtimePitch={handleRealtimePitch}
-        onFinalPitch={handleFinalPitch}
-        onSoundEnd={handleSoundEnd}
-        onConfirmPitch={confirmDetectedPitch}
-        onSetPlayToSelectMode={setPlayToSelectMode}
-        onBack={() => setStep(1)}
-        onSubmit={handleSubmit}
-      />
+      <ErrorBoundary>
+        <StartingNoteStep
+          instrument={instrument}
+          instrumentIcon={instrumentIcon}
+          clef={clef}
+          startingNote={startingNote}
+          playToSelectMode={playToSelectMode}
+          detectedPitch={detectedPitch}
+          isSounding={isSounding}
+          onChangeNote={setStartingNote}
+          onRealtimePitch={handleRealtimePitch}
+          onFinalPitch={handleFinalPitch}
+          onSoundEnd={handleSoundEnd}
+          onConfirmPitch={confirmDetectedPitch}
+          onSetPlayToSelectMode={setPlayToSelectMode}
+          onBack={() => setStep(1)}
+          onSubmit={handleSubmit}
+        />
+      </ErrorBoundary>
     );
   }
 

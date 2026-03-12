@@ -26,13 +26,14 @@ import {
   ScrollView,
 } from "react-native";
 import { exercisePropTypes, exerciseDefaultProps } from "./shared";
+import { devWarn } from "../../../../utils/devLogger";
 
 // For notation display
 let NotationDisplay = null;
 try {
   NotationDisplay = require("../../../../components/NotationDisplay").default;
 } catch (e) {
-  console.warn("NotationDisplay not available");
+  devWarn("NotationDisplay not available");
 }
 
 // ============================================================
@@ -326,6 +327,8 @@ export default function TimeSignature44Exercise({
 
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
+            accessibilityLabel="Next"
+            accessibilityRole="button"
             style={styles.primaryButton}
             onPress={() => setPhase(PHASES.INTRO_2)}
           >
@@ -380,12 +383,16 @@ export default function TimeSignature44Exercise({
 
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
+            accessibilityLabel="Back"
+            accessibilityRole="button"
             style={styles.secondaryButton}
             onPress={() => setPhase(PHASES.INTRO_1)}
           >
             <Text style={styles.secondaryButtonText}>← Back</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityLabel="Next"
+            accessibilityRole="button"
             style={styles.primaryButton}
             onPress={() => setPhase(PHASES.INTRO_3)}
           >
@@ -458,12 +465,16 @@ export default function TimeSignature44Exercise({
 
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
+            accessibilityLabel="Back"
+            accessibilityRole="button"
             style={styles.secondaryButton}
             onPress={() => setPhase(PHASES.INTRO_2)}
           >
             <Text style={styles.secondaryButtonText}>← Back</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityLabel="Take quiz"
+            accessibilityRole="button"
             style={styles.primaryButton}
             onPress={() => setPhase(PHASES.QUIZ)}
           >
@@ -568,6 +579,8 @@ export default function TimeSignature44Exercise({
               return (
                 <TouchableOpacity
                   key={index}
+                  accessibilityLabel={`Select ${option}`}
+                  accessibilityRole="button"
                   style={optionStyle}
                   onPress={() => handleAnswer(option)}
                   disabled={showFeedback}
@@ -618,6 +631,8 @@ export default function TimeSignature44Exercise({
 
           <View style={styles.fixedBottomButtons}>
             <TouchableOpacity
+              accessibilityLabel="Complete exercise"
+              accessibilityRole="button"
               style={styles.primaryButton}
               onPress={handleComplete}
             >
@@ -642,6 +657,8 @@ export default function TimeSignature44Exercise({
 
           <View style={styles.fixedBottomButtons}>
             <TouchableOpacity
+              accessibilityLabel="Start over"
+              accessibilityRole="button"
               style={styles.primaryButton}
               onPress={handleRestart}
             >

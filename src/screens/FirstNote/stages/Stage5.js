@@ -85,12 +85,16 @@ export const Stage5Buttons = () => {
     return (
       <View style={styles.fixedBottomButtons}>
         <TouchableOpacity
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
           style={styles.backTextButton}
           onPress={() => goBackTeaching(4, 3)}
         >
           <Text style={styles.backTextButtonText}>← Back</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          accessibilityLabel="Tell me more"
+          accessibilityRole="button"
           style={styles.primaryButton}
           onPress={() => setSubStep(1)}
         >
@@ -103,12 +107,19 @@ export const Stage5Buttons = () => {
     return (
       <View style={styles.fixedBottomButtons}>
         <TouchableOpacity
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
           style={styles.backTextButton}
           onPress={() => setSubStep(0)}
         >
           <Text style={styles.backTextButtonText}>← Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.primaryButton} onPress={nextStage}>
+        <TouchableOpacity
+          accessibilityLabel="Got it, continue"
+          accessibilityRole="button"
+          style={styles.primaryButton}
+          onPress={nextStage}
+        >
           <Text style={styles.primaryButtonText}>Got it →</Text>
         </TouchableOpacity>
       </View>

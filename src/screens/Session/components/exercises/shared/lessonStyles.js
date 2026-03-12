@@ -7,17 +7,31 @@
 import { StyleSheet, Platform } from "react-native";
 
 export const COLORS = {
+  // Core backgrounds
   background: "#1a1410",
   card: "#2a1f15",
+  cardAlt: "#2d241a", // Slightly lighter card variant
   cardBorder: "#3d2e20",
+  cardBorderAlt: "#3b2c1a", // Slightly different border
+
+  // Primary text colors
   primary: "#e8d5b7",
+  primaryBright: "#f5e6d3", // Brighter text variant
   secondary: "#c4b5a0",
+  secondaryDark: "#a69580", // Darker secondary for subtle text
+  muted: "#8a7a6a", // Muted/inactive text
+
+  // Accent colors
   accent: "#d4a574",
   gold: "#FFD700",
+
+  // Feedback colors
   success: "#4CAF50",
   error: "#FF5252",
   warning: "#FFC107",
   info: "#64B5F6",
+
+  // Utility
   white: "#fff",
   shadow: "#000",
 };

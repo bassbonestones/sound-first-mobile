@@ -92,3 +92,95 @@ export const NOTE_FREQUENCIES = {
   B4: 493.88,
   C5: 523.25,
 };
+
+/**
+ * Chromatic note names (sharp notation)
+ */
+export const CHROMATIC_NOTES = [
+  "C",
+  "C#",
+  "D",
+  "D#",
+  "E",
+  "F",
+  "F#",
+  "G",
+  "G#",
+  "A",
+  "A#",
+  "B",
+];
+
+/**
+ * Flat equivalents for sharp notes
+ */
+export const FLAT_EQUIVALENTS = {
+  "C#": "Db",
+  "D#": "Eb",
+  "F#": "Gb",
+  "G#": "Ab",
+  "A#": "Bb",
+};
+
+/**
+ * Sharp equivalents for flat notes
+ */
+export const SHARP_EQUIVALENTS = {
+  Db: "C#",
+  Eb: "D#",
+  Gb: "F#",
+  Ab: "G#",
+  Bb: "A#",
+};
+
+/**
+ * Convert MIDI number to note name
+ * @param {number} midi - MIDI note number
+ * @param {boolean} preferFlats - Whether to prefer flat notation (default true)
+ * @returns {string} Note name like "C4", "Bb3"
+ */
+export function midiToNote(midi, preferFlats = true) {
+  const octave = Math.floor(midi / 12) - 1;
+  const noteIndex = midi % 12;
+  let noteName = CHROMATIC_NOTES[noteIndex];
+  if (preferFlats && FLAT_EQUIVALENTS[noteName]) {
+    noteName = FLAT_EQUIVALENTS[noteName];
+  }
+  return `${noteName}${octave}`;
+}
+
+/**
+ * Determine if sharps should be used based on the root note
+ * Sharp keys: G, D, A, E, B, F#, C#
+ * @param {string} noteName - Reference note name
+ * @returns {boolean} True if sharps should be used
+ */
+export function shouldUseSharps(noteName) {
+  if (!noteName) return false;
+  if (noteName.includes("#")) return true;
+  const letter = noteName.charAt(0).toUpperCase();
+  const sharpRoots = ["G", "D", "A", "E", "B"];
+  return sharpRoots.includes(letter);
+}
+
+/**
+ * Convert MIDI to note name with context-aware sharp/flat choice
+ * @param {number} midi - MIDI note number
+ * @param {string} referenceNote - Reference note for determining sharp/flat preference
+ * @returns {string} Note name with appropriate accidental
+ */
+export function midiToNoteInContext(midi, referenceNote) {
+  const octave = Math.floor(midi / 12) - 1;
+  const noteIndex = midi % 12;
+  const sharpName = CHROMATIC_NOTES[noteIndex];
+  const flatName = FLAT_EQUIVALENTS[sharpName] || sharpName;
+
+  // If it's a natural note, just return it
+  if (sharpName === flatName) {
+    return `${sharpName}${octave}`;
+  }
+
+  // Use sharps if the reference suggests it
+  const useSharp = shouldUseSharps(referenceNote);
+  return useSharp ? `${sharpName}${octave}` : `${flatName}${octave}`;
+}

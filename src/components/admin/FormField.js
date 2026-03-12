@@ -6,6 +6,7 @@
 
 import React from "react";
 import { View, Text, TextInput, StyleSheet } from "react-native";
+import PropTypes from "prop-types";
 import { colors, spacing, fontSizes, borderRadius } from "../../styles/theme";
 
 /**
@@ -55,6 +56,18 @@ export function FormField({
     </View>
   );
 }
+
+FormField.propTypes = {
+  label: PropTypes.string.isRequired,
+  value: PropTypes.string,
+  onChangeText: PropTypes.func.isRequired,
+  error: PropTypes.string,
+  placeholder: PropTypes.string,
+  keyboardType: PropTypes.string,
+  autoCapitalize: PropTypes.string,
+  multiline: PropTypes.bool,
+  numberOfLines: PropTypes.number,
+};
 
 const styles = StyleSheet.create({
   container: {

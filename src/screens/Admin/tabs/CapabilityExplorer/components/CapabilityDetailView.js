@@ -2,6 +2,7 @@
  * CapabilityDetailView - Shows details of a capability
  */
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import styles from "../../../styles";
 import DetailRow from "./DetailRow";
@@ -39,6 +40,8 @@ export default function CapabilityDetailView({
         <View style={styles.detailHeaderButtons}>
           {isActive ? (
             <TouchableOpacity
+              accessibilityLabel="Archive capability"
+              accessibilityRole="button"
               style={[styles.editButton, { backgroundColor: "#f59e0b" }]}
               onPress={() => onArchive(capability)}
             >
@@ -46,6 +49,8 @@ export default function CapabilityDetailView({
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
+              accessibilityLabel="Restore capability"
+              accessibilityRole="button"
               style={[styles.editButton, { backgroundColor: "#10b981" }]}
               onPress={() => onRestore(capability)}
             >
@@ -53,18 +58,27 @@ export default function CapabilityDetailView({
             </TouchableOpacity>
           )}
           <TouchableOpacity
+            accessibilityLabel="Edit capability"
+            accessibilityRole="button"
             style={styles.editButton}
             onPress={() => onEdit(capability)}
           >
             <Text style={styles.editButtonText}>Edit</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityLabel="Delete capability"
+            accessibilityRole="button"
             style={[styles.editButton, { backgroundColor: "#dc2626" }]}
             onPress={handleDeletePress}
           >
             <Text style={styles.editButtonText}>Delete</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity
+            accessibilityLabel="Close detail view"
+            accessibilityRole="button"
+            style={styles.closeButton}
+            onPress={onClose}
+          >
             <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -78,6 +92,8 @@ export default function CapabilityDetailView({
           </Text>
           <View style={styles.deleteConfirmButtons}>
             <TouchableOpacity
+              accessibilityLabel="Cancel delete"
+              accessibilityRole="button"
               style={[
                 styles.deleteConfirmButton,
                 { backgroundColor: "#6b7280" },
@@ -87,6 +103,8 @@ export default function CapabilityDetailView({
               <Text style={styles.deleteConfirmButtonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
+              accessibilityLabel="Confirm delete"
+              accessibilityRole="button"
               style={[
                 styles.deleteConfirmButton,
                 { backgroundColor: "#dc2626" },
@@ -199,3 +217,35 @@ export default function CapabilityDetailView({
     </ScrollView>
   );
 }
+
+CapabilityDetailView.propTypes = {
+  capability: PropTypes.shape({
+    id: PropTypes.number,
+    name: PropTypes.string,
+    display_name: PropTypes.string,
+    domain: PropTypes.string,
+    subdomain: PropTypes.string,
+    requirement_type: PropTypes.string,
+    difficulty_tier: PropTypes.number,
+    mastery_type: PropTypes.string,
+    mastery_count: PropTypes.number,
+    is_active: PropTypes.bool,
+    is_global: PropTypes.bool,
+    prerequisite_ids: PropTypes.array,
+    detection_rule: PropTypes.object,
+    evidence_required_count: PropTypes.number,
+    evidence_distinct_materials: PropTypes.bool,
+    evidence_acceptance_threshold: PropTypes.number,
+    difficulty_weight: PropTypes.number,
+    soft_gate_requirements: PropTypes.object,
+  }),
+  dependencyGraph: PropTypes.shape({
+    depends_on: PropTypes.array,
+    required_by: PropTypes.array,
+  }),
+  onClose: PropTypes.func.isRequired,
+  onEdit: PropTypes.func.isRequired,
+  onArchive: PropTypes.func.isRequired,
+  onRestore: PropTypes.func.isRequired,
+  onDelete: PropTypes.func.isRequired,
+};

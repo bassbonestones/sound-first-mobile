@@ -189,6 +189,8 @@ export default function AuralCompareExercise({
         style={[styles.playButton, isPlaying && styles.playButtonDisabled]}
         onPress={playExercise}
         disabled={isPlaying}
+        accessibilityLabel={isPlaying ? "Playing audio" : "Play audio again"}
+        accessibilityRole="button"
       >
         <Text style={styles.playButtonIcon}>{isPlaying ? "🔊" : "▶️"}</Text>
         <Text style={styles.playButtonText}>
@@ -213,6 +215,8 @@ export default function AuralCompareExercise({
           ]}
           onPress={() => handleAnswer("same")}
           disabled={hasAnswered}
+          accessibilityLabel="The notes are the same pitch"
+          accessibilityRole="button"
         >
           <Text style={styles.answerButtonIcon}>🎵 = 🎵</Text>
           <Text style={styles.answerButtonText}>Same</Text>
@@ -233,6 +237,8 @@ export default function AuralCompareExercise({
           ]}
           onPress={() => handleAnswer("different")}
           disabled={hasAnswered}
+          accessibilityLabel="The notes are different pitches"
+          accessibilityRole="button"
         >
           <Text style={styles.answerButtonIcon}>🎵 ≠ 🎵</Text>
           <Text style={styles.answerButtonText}>Different</Text>

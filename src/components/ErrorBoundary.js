@@ -16,7 +16,9 @@
  */
 
 import React from "react";
+import PropTypes from "prop-types";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { devError } from "../utils/devLogger";
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -31,8 +33,8 @@ export default class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     // Log the error to console (could also send to error reporting service)
-    console.error("[ErrorBoundary] Caught error:", error);
-    console.error("[ErrorBoundary] Error info:", errorInfo);
+    devError("[ErrorBoundary] Caught error:", error);
+    devError("[ErrorBoundary] Error info:", errorInfo);
     this.setState({ errorInfo });
 
     // Call optional onError callback
@@ -70,7 +72,12 @@ export default class ErrorBoundary extends React.Component {
               </View>
             )}
 
-            <TouchableOpacity style={styles.button} onPress={this.handleReset}>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={this.handleReset}
+              accessibilityLabel="Try again"
+              accessibilityRole="button"
+            >
               <Text style={styles.buttonText}>Try Again</Text>
             </TouchableOpacity>
           </View>
@@ -81,6 +88,12 @@ export default class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
+
+ErrorBoundary.propTypes = {
+  children: PropTypes.node.isRequired,
+  fallback: PropTypes.node,
+  onError: PropTypes.func,
+};
 
 const styles = StyleSheet.create({
   container: {

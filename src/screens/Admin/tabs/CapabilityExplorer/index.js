@@ -12,9 +12,11 @@ import {
   ScrollView,
   Modal,
   ActivityIndicator,
+  StyleSheet,
 } from "react-native";
 import styles from "../../styles";
 import useCapabilities from "./hooks/useCapabilities";
+import { devLog } from "../../../../utils/devLogger";
 
 // Extracted components
 import CapabilityDetailView from "./components/CapabilityDetailView";
@@ -50,12 +52,12 @@ function CapabilityExplorer() {
 
   // Debug: log capabilitiesWithContent when it updates
   useEffect(() => {
-    console.log(
+    devLog(
       "[CapabilityExplorer] capabilitiesWithContent size:",
       capabilitiesWithContent.size,
     );
     if (capabilitiesWithContent.size > 0) {
-      console.log("[CapabilityExplorer] capabilities with content:", [
+      devLog("[CapabilityExplorer] capabilities with content:", [
         ...capabilitiesWithContent,
       ]);
     }
@@ -165,7 +167,7 @@ function CapabilityExplorer() {
         "rest_quarter",
       ];
       if (day0Names.includes(item.name)) {
-        console.log(
+        devLog(
           `[render] ${item.name}: has=${capabilitiesWithContent.has(item.name)}, setSize=${capabilitiesWithContent.size}`,
         );
       }
@@ -173,16 +175,14 @@ function CapabilityExplorer() {
       return (
         <View style={styles.listItem}>
           <TouchableOpacity
-            style={{ flex: 1 }}
+            accessibilityLabel={`View capability ${item.display_name || item.name}`}
+            accessibilityRole="button"
+            style={localStyles.flexContainer}
             onPress={() => viewCapabilityDetail(item)}
           >
             <View style={styles.listItemHeader}>
               {capabilitiesWithContent.has(item.name) && (
-                <Text
-                  style={{ color: "#4CAF50", fontSize: 16, marginRight: 4 }}
-                >
-                  ●
-                </Text>
+                <Text style={localStyles.contentIndicator}>●</Text>
               )}
               <Text style={styles.listItemTitle}>
                 {item.display_name || item.name}
@@ -237,6 +237,8 @@ function CapabilityExplorer() {
           {domainFilter !== "all" && (
             <View style={styles.reorderButtons}>
               <TouchableOpacity
+                accessibilityLabel="Move capability up"
+                accessibilityRole="button"
                 style={[
                   styles.reorderButton,
                   !canMoveUp && styles.reorderButtonDisabled,
@@ -247,6 +249,8 @@ function CapabilityExplorer() {
                 <Text style={styles.reorderButtonText}>▲</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                accessibilityLabel="Move capability down"
+                accessibilityRole="button"
                 style={[
                   styles.reorderButton,
                   !canMoveDown && styles.reorderButtonDisabled,
@@ -292,18 +296,24 @@ function CapabilityExplorer() {
           onChangeText={setSearchQuery}
         />
         <TouchableOpacity
+          accessibilityLabel="Add capability"
+          accessibilityRole="button"
           style={styles.addCapButton}
           onPress={() => setShowCreateModal(true)}
         >
           <Text style={styles.addCapButtonText}>+ Add</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          accessibilityLabel="Manage domains"
+          accessibilityRole="button"
           style={styles.domainManageButton}
           onPress={() => setShowDomainManageModal(true)}
         >
           <Text style={styles.domainManageButtonText}>✎ Domains</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          accessibilityLabel={exporting ? "Exporting" : "Export capabilities"}
+          accessibilityRole="button"
           style={[
             styles.exportButton,
             exporting && styles.exportButtonDisabled,
@@ -344,6 +354,8 @@ function CapabilityExplorer() {
         showsHorizontalScrollIndicator={false}
       >
         <TouchableOpacity
+          accessibilityLabel={`Filter by all domains, ${capabilities.length} total`}
+          accessibilityRole="button"
           style={[
             styles.domainChip,
             domainFilter === "all" && styles.domainChipActive,
@@ -362,6 +374,8 @@ function CapabilityExplorer() {
         {domains.map((domain) => (
           <TouchableOpacity
             key={domain}
+            accessibilityLabel={`Filter by ${domain} domain`}
+            accessibilityRole="button"
             style={[
               styles.domainChip,
               domainFilter === domain && styles.domainChipActive,
@@ -388,7 +402,7 @@ function CapabilityExplorer() {
             capabilitiesWithContent.has(c.name),
           ).length
         }{" "}
-        with modules <Text style={{ color: "#4CAF50" }}>●</Text>)
+        with modules <Text style={localStyles.moduleIndicator}>●</Text>)
       </Text>
 
       <FlatList
@@ -464,5 +478,19 @@ function CapabilityExplorer() {
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  flexContainer: {
+    flex: 1,
+  },
+  contentIndicator: {
+    color: "#4CAF50",
+    fontSize: 16,
+    marginRight: 4,
+  },
+  moduleIndicator: {
+    color: "#4CAF50",
+  },
+});
 
 export default CapabilityExplorer;

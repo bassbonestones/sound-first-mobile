@@ -13,6 +13,7 @@ import {
   ScrollView,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { devLog } from "../utils/devLogger";
 
 // Exercise components
 import {
@@ -40,58 +41,20 @@ import {
   KeySignatureBasicsExercise,
 } from "./Session/components/exercises";
 import {
+  parseNoteName,
+  noteToMidi,
+  midiToNote,
+  midiToNoteInContext,
+  shouldUseSharps,
+  CHROMATIC_NOTES,
+  FLAT_EQUIVALENTS,
+} from "./Session/components/exercises/shared";
+import {
   getAvailablePatterns,
   PATTERNS_UP,
   PATTERNS_DOWN,
 } from "../constants/rangeExpansionPatterns";
 import StaffNotePicker from "../components/StaffNotePicker";
-
-// Note/MIDI conversion helpers
-const CHROMATIC_NOTES = [
-  "C",
-  "C#",
-  "D",
-  "D#",
-  "E",
-  "F",
-  "F#",
-  "G",
-  "G#",
-  "A",
-  "A#",
-  "B",
-];
-const FLAT_EQUIVALENTS = {
-  "C#": "Db",
-  "D#": "Eb",
-  "F#": "Gb",
-  "G#": "Ab",
-  "A#": "Bb",
-};
-
-function parseNoteName(noteName) {
-  if (!noteName) return null;
-  const match = noteName.match(/^([A-Ga-g])([#b]?)(\d)$/);
-  if (!match) return null;
-  const [, letter, accidental, octaveStr] = match;
-  return {
-    letter: letter.toUpperCase(),
-    accidental,
-    octave: parseInt(octaveStr, 10),
-  };
-}
-
-function noteToMidi(noteName) {
-  const parsed = parseNoteName(noteName);
-  if (!parsed) return 60;
-  const letterIndex = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[
-    parsed.letter
-  ];
-  let noteIndex = letterIndex;
-  if (parsed.accidental === "#") noteIndex += 1;
-  if (parsed.accidental === "b") noteIndex -= 1;
-  return (parsed.octave + 1) * 12 + noteIndex;
-}
 
 /**
  * Lower a note chromatically while preserving the letter name.
@@ -112,71 +75,6 @@ function chromaticLower(noteName) {
   }
 
   return `${parsed.letter}${newAccidental}${parsed.octave}`;
-}
-
-function midiToNote(midi, preferFlats = true) {
-  const octave = Math.floor(midi / 12) - 1;
-  const noteIndex = midi % 12;
-  let noteName = CHROMATIC_NOTES[noteIndex];
-  if (preferFlats && FLAT_EQUIVALENTS[noteName]) {
-    noteName = FLAT_EQUIVALENTS[noteName];
-  }
-  return `${noteName}${octave}`;
-}
-
-// Smarter sharp/flat decision based on context
-// Returns the best enharmonic spelling for a MIDI note given a reference note
-function midiToNoteInContext(midi, referenceNote) {
-  const octave = Math.floor(midi / 12) - 1;
-  const noteIndex = midi % 12;
-  const sharpName = CHROMATIC_NOTES[noteIndex];
-  const flatName = FLAT_EQUIVALENTS[sharpName] || sharpName;
-
-  // If it's a natural note (no enharmonic choice), just return it
-  if (sharpName === flatName) {
-    return `${sharpName}${octave}`;
-  }
-
-  // Get reference base (letter + accidental, without octave)
-  const refBase = referenceNote ? referenceNote.replace(/\d+$/, "") : "";
-
-  // If reference already uses flat spelling (e.g., Eb), keep using flats
-  if (refBase.includes("b")) {
-    return `${flatName}${octave}`;
-  }
-
-  // If reference already uses sharp spelling (e.g., F#), keep using sharps
-  if (refBase.includes("#")) {
-    return `${sharpName}${octave}`;
-  }
-
-  // Get reference letter (without accidental or octave)
-  const refLetter = referenceNote ? referenceNote.charAt(0).toUpperCase() : "";
-
-  // If the sharp spelling would have the same letter as reference (e.g., D → D#),
-  // that's musically awkward - use the flat spelling instead (Eb)
-  if (sharpName.charAt(0) === refLetter) {
-    return `${flatName}${octave}`;
-  }
-
-  // Default: use sharp/flat preference based on key context
-  const useFlats = !shouldUseSharps(referenceNote);
-  if (useFlats) {
-    return `${flatName}${octave}`;
-  }
-  return `${sharpName}${octave}`;
-}
-
-// Determine if we should use sharps based on the root note
-// Sharp keys: G, D, A, E, B, F#, C# (and their relative minors)
-// Also use sharps if the note itself has a sharp
-function shouldUseSharps(noteName) {
-  if (!noteName) return false;
-  if (noteName.includes("#")) return true;
-  const letter = noteName.charAt(0).toUpperCase();
-  // Natural notes that typically use sharps in their key signatures
-  const sharpRoots = ["G", "D", "A", "E", "B"];
-  return sharpRoots.includes(letter);
 }
 
 const EXERCISES = [
@@ -514,7 +412,7 @@ export default function ExerciseTestScreen() {
   }, [anchorNote, selectedPattern]);
 
   const handleComplete = (exerciseResult) => {
-    console.log("[ExerciseTest] Complete:", exerciseResult);
+    devLog("[ExerciseTest] Complete:", exerciseResult);
     setResult(exerciseResult);
     // Go back to menu after 2 seconds
     setTimeout(() => {
@@ -524,7 +422,7 @@ export default function ExerciseTestScreen() {
   };
 
   const handleProgress = (progress) => {
-    console.log("[ExerciseTest] Progress:", progress);
+    devLog("[ExerciseTest] Progress:", progress);
   };
 
   // Handle exercise selection - show config picker for range expansion
@@ -566,6 +464,8 @@ export default function ExerciseTestScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
             style={styles.backButton}
             onPress={() => {
               setShowRangeConfig(false);
@@ -577,7 +477,7 @@ export default function ExerciseTestScreen() {
           <Text style={styles.headerTitle}>Configure Exercise</Text>
         </View>
 
-        <View style={{ flex: 1 }}>
+        <View style={styles.configScrollWrapper}>
           <ScrollView
             style={styles.configScroll}
             contentContainerStyle={styles.configContent}
@@ -590,6 +490,8 @@ export default function ExerciseTestScreen() {
             <Text style={styles.sectionLabel}>Clef</Text>
             <View style={styles.optionRow}>
               <TouchableOpacity
+                accessibilityLabel="Select treble clef"
+                accessibilityRole="button"
                 style={[
                   styles.optionButton,
                   selectedClef === "treble" && styles.optionButtonSelected,
@@ -601,6 +503,8 @@ export default function ExerciseTestScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
+                accessibilityLabel="Select bass clef"
+                accessibilityRole="button"
                 style={[
                   styles.optionButton,
                   selectedClef === "bass" && styles.optionButtonSelected,
@@ -633,6 +537,8 @@ export default function ExerciseTestScreen() {
               {availablePatterns.map((pattern) => (
                 <TouchableOpacity
                   key={pattern.id}
+                  accessibilityLabel={`Select ${pattern.name} pattern`}
+                  accessibilityRole="button"
                   style={[
                     styles.patternCard,
                     selectedPatternId === pattern.id &&
@@ -658,6 +564,8 @@ export default function ExerciseTestScreen() {
           {/* Fixed Start Button */}
           <View style={styles.fixedBottomButton}>
             <TouchableOpacity
+              accessibilityLabel="Start exercise"
+              accessibilityRole="button"
               style={[
                 styles.startButton,
                 !selectedPatternId && styles.startButtonDisabled,
@@ -680,6 +588,8 @@ export default function ExerciseTestScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.exerciseHeader}>
           <TouchableOpacity
+            accessibilityLabel="Go back to exercise list"
+            accessibilityRole="button"
             style={styles.backButton}
             onPress={() => setSelectedExercise(null)}
           >
@@ -719,6 +629,8 @@ export default function ExerciseTestScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity
+          accessibilityLabel="Go back to home"
+          accessibilityRole="button"
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
@@ -733,6 +645,8 @@ export default function ExerciseTestScreen() {
         {EXERCISES.map((exercise) => (
           <TouchableOpacity
             key={exercise.id}
+            accessibilityLabel={`${exercise.name}: ${exercise.description}`}
+            accessibilityRole="button"
             style={styles.exerciseCard}
             onPress={() => handleSelectExercise(exercise)}
           >
@@ -927,6 +841,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#3b2c1a",
     alignItems: "center",
+  },
+  configScrollWrapper: {
+    flex: 1,
   },
   // Config picker styles
   configScroll: {

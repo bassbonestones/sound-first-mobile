@@ -5,27 +5,43 @@
  */
 
 import React from "react";
-import { View } from "react-native";
+import PropTypes from "prop-types";
+import { View, StyleSheet } from "react-native";
 
 const TOTAL_STEPS = 2;
 
 export default function ProgressDots({ currentStep }) {
   return (
-    <View style={{ flexDirection: "row", marginTop: 16 }}>
+    <View style={styles.container}>
       {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
         <View
           key={s}
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: 5,
-            backgroundColor: currentStep === s ? "#FFD700" : "#3b2c1a",
-            marginHorizontal: 4,
-            borderWidth: 1,
-            borderColor: "#FFD700",
-          }}
+          style={[styles.dot, currentStep === s && styles.dotActive]}
         />
       ))}
     </View>
   );
 }
+
+ProgressDots.propTypes = {
+  currentStep: PropTypes.number.isRequired,
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    marginTop: 16,
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#3b2c1a",
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: "#FFD700",
+  },
+  dotActive: {
+    backgroundColor: "#FFD700",
+  },
+});

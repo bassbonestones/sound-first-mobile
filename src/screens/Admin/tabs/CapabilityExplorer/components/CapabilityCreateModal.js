@@ -2,6 +2,7 @@
  * CapabilityCreateModal - Modal for creating new capabilities
  */
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -106,7 +107,12 @@ export default function CapabilityCreateModal({
     <View style={styles.editModalContainer}>
       <View style={styles.editModalHeader}>
         <Text style={styles.editModalTitle}>Create Capability</Text>
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+        <TouchableOpacity
+          accessibilityLabel="Close create modal"
+          accessibilityRole="button"
+          style={styles.closeButton}
+          onPress={onClose}
+        >
           <Text style={styles.closeButtonText}>✕</Text>
         </TouchableOpacity>
       </View>
@@ -137,6 +143,8 @@ export default function CapabilityCreateModal({
 
           <View style={styles.domainToggleContainer}>
             <TouchableOpacity
+              accessibilityLabel="Use existing domain"
+              accessibilityRole="button"
               style={[
                 styles.domainToggleButton,
                 !useNewDomain && styles.domainToggleButtonActive,
@@ -153,6 +161,8 @@ export default function CapabilityCreateModal({
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
+              accessibilityLabel="Create new domain"
+              accessibilityRole="button"
               style={[
                 styles.domainToggleButton,
                 useNewDomain && styles.domainToggleButtonActive,
@@ -175,6 +185,8 @@ export default function CapabilityCreateModal({
               {domains.map((d) => (
                 <TouchableOpacity
                   key={d}
+                  accessibilityLabel={`Select ${d} domain`}
+                  accessibilityRole="button"
                   style={[
                     styles.domainChip,
                     formData.domain === d && styles.domainChipActive,
@@ -220,6 +232,8 @@ export default function CapabilityCreateModal({
             {VALID_REQUIREMENT_TYPES.map((type) => (
               <TouchableOpacity
                 key={type}
+                accessibilityLabel={`Select ${type} requirement type`}
+                accessibilityRole="button"
                 style={[
                   styles.pickerOption,
                   formData.requirement_type === type &&
@@ -279,6 +293,8 @@ export default function CapabilityCreateModal({
                       </Text>
                     </View>
                     <TouchableOpacity
+                      accessibilityLabel={`Remove prerequisite ${prereq.display_name || prereq.name}`}
+                      accessibilityRole="button"
                       style={styles.prereqChipRemove}
                       onPress={() => {
                         setSelectedPrereqIds((prev) =>
@@ -297,6 +313,8 @@ export default function CapabilityCreateModal({
 
           {/* Add prerequisite button */}
           <TouchableOpacity
+            accessibilityLabel="Add prerequisite"
+            accessibilityRole="button"
             style={styles.addPrereqButton}
             onPress={() => setShowPrereqSelector(true)}
           >
@@ -340,6 +358,8 @@ export default function CapabilityCreateModal({
       {/* Action Buttons */}
       <View style={styles.editModalFooter}>
         <TouchableOpacity
+          accessibilityLabel="Cancel"
+          accessibilityRole="button"
           style={[styles.editModalButton, styles.cancelButton]}
           onPress={onClose}
           disabled={saving}
@@ -347,6 +367,8 @@ export default function CapabilityCreateModal({
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          accessibilityLabel={saving ? "Creating" : "Create capability"}
+          accessibilityRole="button"
           style={[
             styles.editModalButton,
             styles.saveButton,
@@ -363,3 +385,11 @@ export default function CapabilityCreateModal({
     </View>
   );
 }
+
+CapabilityCreateModal.propTypes = {
+  domains: PropTypes.arrayOf(PropTypes.string).isRequired,
+  allCapabilities: PropTypes.array.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onCreate: PropTypes.func.isRequired,
+  initialDomain: PropTypes.string,
+};

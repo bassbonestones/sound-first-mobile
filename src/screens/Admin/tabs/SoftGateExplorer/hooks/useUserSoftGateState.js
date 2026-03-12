@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { baseUrl } from "../../../../../api/client";
+import { devError } from "../../../../../utils/devLogger";
 
 /**
  * Hook for managing user soft gate states
@@ -32,7 +33,7 @@ export function useUserSoftGateState() {
         }
       }
     } catch (err) {
-      console.error("[useUserSoftGateState] Fetch users error:", err);
+      devError("[useUserSoftGateState] Fetch users error:", err);
     }
   }, [selectedUserId]);
 
@@ -60,7 +61,7 @@ export function useUserSoftGateState() {
         setError("Failed to fetch states");
       }
     } catch (err) {
-      console.error("[useUserSoftGateState] Fetch states error:", err);
+      devError("[useUserSoftGateState] Fetch states error:", err);
       setError(err.message);
     } finally {
       setLoading(false);

@@ -15,6 +15,7 @@
  */
 
 import { useState, useCallback } from "react";
+import { devError } from "../utils/devLogger";
 import { api, baseUrl } from "../api/client";
 
 /**
@@ -66,7 +67,7 @@ export function useApi({ autoReset = true } = {}) {
         return result;
       } catch (err) {
         setError(err);
-        console.error("[useApi] Request failed:", err);
+        devError("[useApi] Request failed:", err);
         return null;
       } finally {
         setLoading(false);

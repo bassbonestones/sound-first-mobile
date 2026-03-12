@@ -1,6 +1,7 @@
 /**
  * Audio utility functions for pitch detection
  */
+import { devError } from "./devLogger";
 
 export const NOTE_NAMES = [
   "C",
@@ -158,7 +159,7 @@ export function base64ToFloat32Array(base64) {
       bytes[i] = binaryString.charCodeAt(i);
     }
   } else {
-    console.error("No base64 decoder available");
+    devError("No base64 decoder available");
     return new Float32Array(0);
   }
 

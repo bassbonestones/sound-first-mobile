@@ -9,6 +9,8 @@ import {
   Modal,
 } from "react-native";
 import Slider from "@react-native-community/slider";
+import PropTypes from "prop-types";
+import { devLog, devWarn } from "../utils/devLogger";
 
 // Import constants and utilities from extracted module
 import {
@@ -32,7 +34,7 @@ if (Platform.OS !== "web") {
   try {
     NativeAudioContext = require("react-native-audio-api").AudioContext;
   } catch (e) {
-    console.warn("react-native-audio-api not available");
+    devWarn("react-native-audio-api not available");
   }
 }
 
@@ -41,6 +43,7 @@ export default function PitchDrone({
   onMuteChange,
   muted = false,
   volume = 1.0, // Master volume multiplier (0-1)
+  hideInternalMute = false, // Hide internal mute button when controlled externally
   metronomeVolume = 0.5, // For cross-component volume control
   onVolumeChange, // Callback to change drone volume
   onMetronomeVolumeChange, // Callback to change metronome volume
@@ -299,7 +302,7 @@ export default function PitchDrone({
 
       setActiveDrones((prev) => ({ ...prev, [key]: true }));
 
-      console.log(
+      devLog(
         `[Drone] Started ${key} at ${frequency.toFixed(2)} Hz (${temperament})`,
       );
     },
@@ -369,7 +372,7 @@ export default function PitchDrone({
         return next;
       });
 
-      console.log(`[Drone] Stopped ${key}`);
+      devLog(`[Drone] Stopped ${key}`);
     }
   }, []);
 
@@ -434,7 +437,7 @@ export default function PitchDrone({
         } catch (e2) {}
       }
     });
-    console.log("[Drone] Stopped all drones");
+    devLog("[Drone] Stopped all drones");
   }, []);
 
   // Handle sustain toggle
@@ -555,28 +558,19 @@ export default function PitchDrone({
     const noteName = NOTES[semitone].name;
 
     return (
-      <View
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          flexDirection: "row",
-          borderRadius: 8,
-          overflow: "hidden",
-        }}
-      >
+      <View style={styles.octaveHighlightContainer}>
         {activeOctaves.map((oct, index) => {
           const isPlaying = isOctavePlaying(noteName, oct);
           return (
             <View
               key={oct}
-              style={{
-                flex: 1,
-                backgroundColor: OCTAVE_COLORS[oct],
-                opacity: isPlaying ? 0.7 : 0.3, // Dimmer if queued (not playing)
-              }}
+              style={[
+                styles.octaveHighlightSlice,
+                { backgroundColor: OCTAVE_COLORS[oct] },
+                isPlaying
+                  ? styles.octaveHighlightSliceActive
+                  : styles.octaveHighlightSliceQueued,
+              ]}
             />
           );
         })}
@@ -596,7 +590,7 @@ export default function PitchDrone({
     <View style={styles.container}>
       {/* Mute Button - top right corner, only when playing */}
       {/* Tap to mute, long-press for volume controls */}
-      {isAnyDronePlaying && (
+      {isAnyDronePlaying && !hideInternalMute && (
         <Pressable
           onPress={toggleMute}
           onLongPress={() => setShowVolumeModal(true)}
@@ -605,6 +599,9 @@ export default function PitchDrone({
             styles.muteButton,
             { backgroundColor: muted ? "#555" : pressed ? "#444" : "#333" },
           ]}
+          accessibilityLabel={muted ? "Unmute drone" : "Mute drone"}
+          accessibilityHint="Long press to open volume controls"
+          accessibilityRole="button"
         >
           <Text style={styles.muteButtonText}>{muted ? "🔇" : "🔊"}</Text>
         </Pressable>
@@ -625,6 +622,9 @@ export default function PitchDrone({
                 ? styles.temperamentButtonActive
                 : styles.temperamentButtonInactive,
             ]}
+            accessibilityLabel={`Equal temperament${temperament === "equal" ? ", selected" : ""}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: temperament === "equal" }}
           >
             <Text
               style={[
@@ -645,6 +645,9 @@ export default function PitchDrone({
                 ? styles.temperamentButtonActive
                 : styles.temperamentButtonInactive,
             ]}
+            accessibilityLabel={`Just intonation${temperament === "just" ? ", selected" : ""}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: temperament === "just" }}
           >
             <Text
               style={[
@@ -666,38 +669,18 @@ export default function PitchDrone({
             value={concertA}
             onChangeText={setConcertA}
             keyboardType="numeric"
-            style={{
-              backgroundColor: "#2d232e",
-              color: "#FFD700",
-              paddingVertical: 4,
-              paddingHorizontal: 8,
-              borderRadius: 8,
-              width: 60,
-              textAlign: "center",
-              fontSize: 14,
-              borderWidth: 1,
-              borderColor: "#444",
-            }}
+            style={styles.concertAInput}
             placeholder="440"
             placeholderTextColor="#666"
           />
-          <Text style={{ color: "#bfa76a", fontSize: 12, marginLeft: 4 }}>
-            Hz
-          </Text>
+          <Text style={styles.concertAUnit}>Hz</Text>
         </View>
       </View>
 
       {/* Pitch Center (only for Just temperament) */}
       {temperament === "just" && (
-        <View style={{ marginBottom: 12 }}>
-          <Text
-            style={{
-              color: "#bfa76a",
-              fontSize: 12,
-              textAlign: "center",
-              marginBottom: 4,
-            }}
-          >
+        <View style={styles.pitchCenterContainer}>
+          <Text style={styles.justIntonationLabel}>
             Root for Just Intonation:
           </Text>
           <View style={styles.pitchCenterGrid}>
@@ -802,21 +785,16 @@ export default function PitchDrone({
         {/* Vibrato Button */}
         <TouchableOpacity
           onPress={() => setVibrato(!vibrato)}
-          style={{
-            backgroundColor: vibrato ? "#9C27B0" : "#2d232e",
-            paddingVertical: 10,
-            paddingHorizontal: 20,
-            borderRadius: 20,
-            borderWidth: 2,
-            borderColor: vibrato ? "#9C27B0" : "#444",
-          }}
+          style={
+            vibrato ? styles.vibratoButtonActive : styles.vibratoButtonInactive
+          }
         >
           <Text
-            style={{
-              color: vibrato ? "#fff" : "#bfa76a",
-              fontSize: 14,
-              fontWeight: "bold",
-            }}
+            style={
+              vibrato
+                ? styles.vibratoButtonTextActive
+                : styles.vibratoButtonTextInactive
+            }
           >
             {vibrato ? "〰️ Vib ON" : "〰️ Vib"}
           </Text>
@@ -878,24 +856,14 @@ export default function PitchDrone({
       <View style={styles.legendContainer}>
         <Text style={styles.legendLabel}>Octave colors:</Text>
         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((oct) => (
-          <View
-            key={oct}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              marginRight: 6,
-            }}
-          >
+          <View key={oct} style={styles.legendItem}>
             <View
-              style={{
-                width: 10,
-                height: 10,
-                backgroundColor: OCTAVE_COLORS[oct],
-                borderRadius: 2,
-                marginRight: 2,
-              }}
+              style={[
+                styles.legendColorBox,
+                { backgroundColor: OCTAVE_COLORS[oct] },
+              ]}
             />
-            <Text style={{ color: "#666", fontSize: 10 }}>{oct}</Text>
+            <Text style={styles.legendOctaveText}>{oct}</Text>
           </View>
         ))}
       </View>
@@ -907,30 +875,9 @@ export default function PitchDrone({
         transparent={true}
         onRequestClose={() => setShowVolumeModal(false)}
       >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.7)",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
+        <View style={styles.volumeModalOverlay}>
           <View
-            style={{
-              backgroundColor: "#2d232e",
-              borderRadius: 16,
-              padding: 24,
-              width: 300,
-              ...(Platform.OS === "web"
-                ? { boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.5)" }
-                : {
-                    shadowColor: "#000",
-                    shadowOpacity: 0.5,
-                    shadowRadius: 10,
-                    shadowOffset: { width: 0, height: 4 },
-                    elevation: 10,
-                  }),
-            }}
+            style={[styles.volumeModalContent, styles.volumeModalContentShadow]}
           >
             <Text style={styles.volumeModalTitle}>🔊 Volume Controls</Text>
 
@@ -983,3 +930,13 @@ export default function PitchDrone({
     </View>
   );
 }
+
+PitchDrone.propTypes = {
+  onPlayingChange: PropTypes.func,
+  onMuteChange: PropTypes.func,
+  muted: PropTypes.bool,
+  volume: PropTypes.number,
+  metronomeVolume: PropTypes.number,
+  onVolumeChange: PropTypes.func,
+  onMetronomeVolumeChange: PropTypes.func,
+};

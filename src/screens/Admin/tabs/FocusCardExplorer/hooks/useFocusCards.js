@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { baseUrl } from "../../../../../api/client";
+import { devError } from "../../../../../utils/devLogger";
 
 /**
  * Hook for managing focus cards
@@ -40,7 +41,7 @@ export function useFocusCards() {
         setError("Failed to fetch focus cards");
       }
     } catch (err) {
-      console.error("[useFocusCards] Fetch error:", err);
+      devError("[useFocusCards] Fetch error:", err);
       setError(err.message);
     } finally {
       setLoading(false);

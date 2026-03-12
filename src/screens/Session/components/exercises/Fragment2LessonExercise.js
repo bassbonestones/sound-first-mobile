@@ -39,6 +39,7 @@ import {
   noteToMidi,
   midiToFrequency,
   noteToFrequency,
+  midiToNote,
   createAudioContext,
   createClickSound,
   LESSON_PHASES,
@@ -46,13 +47,14 @@ import {
   exercisePropTypes,
   exerciseDefaultProps,
 } from "./shared";
+import { devLog, devWarn } from "../../../../utils/devLogger";
 
 // For notation display
 let NotationDisplay = null;
 try {
   NotationDisplay = require("../../../../components/NotationDisplay").default;
 } catch (e) {
-  console.warn("NotationDisplay not available");
+  devWarn("NotationDisplay not available");
 }
 
 // Phases - extend LESSON_PHASES with play_with_drone
@@ -119,27 +121,6 @@ const FOCUS_CARD_ROTATION = [
   },
 ];
 
-// Get note name from MIDI
-function midiToNoteName(midi) {
-  const noteNames = [
-    "C",
-    "C#",
-    "D",
-    "D#",
-    "E",
-    "F",
-    "F#",
-    "G",
-    "G#",
-    "A",
-    "A#",
-    "B",
-  ];
-  const octave = Math.floor(midi / 12) - 1;
-  const noteIndex = midi % 12;
-  return noteNames[noteIndex] + octave;
-}
-
 // Major scale intervals (semitones from root)
 const MAJOR_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11, 12];
 
@@ -160,7 +141,7 @@ function generateFragmentMusicXML(scaleDegrees, firstNote, clef = "treble") {
   let notes = scaleDegrees
     .map((degree) => {
       const midi = getScaleDegreePitch(firstNoteMidi, degree);
-      const noteName = midiToNoteName(midi);
+      const noteName = midiToNote(midi, false);
       const parsed = parseNoteName(noteName);
 
       let alter = 0;
@@ -208,7 +189,7 @@ ${accidentalXML}      </note>`;
     // Split into 2 measures for 3-note patterns
     const allNotes = scaleDegrees.map((degree) => {
       const midi = getScaleDegreePitch(firstNoteMidi, degree);
-      const noteName = midiToNoteName(midi);
+      const noteName = midiToNote(midi, false);
 
       let alterXML = "";
       let accidentalXML = "";
@@ -432,7 +413,7 @@ export default function Fragment2LessonExercise({
     const notes = [];
 
     for (let midi = lowMidi; midi <= maxStartingMidi; midi++) {
-      notes.push(midiToNoteName(midi));
+      notes.push(midiToNote(midi, false));
     }
 
     // If no valid notes (range too small), fall back to userFirstNote
@@ -453,7 +434,7 @@ export default function Fragment2LessonExercise({
       const randomIndex = Math.floor(Math.random() * validStartingNotes.length);
       const selectedNote = validStartingNotes[randomIndex];
       setSessionStartingNote(selectedNote);
-      console.log(
+      devLog(
         `[SESSION] Selected starting note for session: ${selectedNote} from [${validStartingNotes.join(", ")}]`,
       );
     }
@@ -984,7 +965,7 @@ export default function Fragment2LessonExercise({
     });
 
     // Log per-note accuracy for debugging
-    console.log(
+    devLog(
       "[PITCH] Per-note accuracy:",
       perNotePitch
         .map(
@@ -1185,6 +1166,8 @@ export default function Fragment2LessonExercise({
         return (
           <TouchableOpacity
             key={id}
+            accessibilityLabel={`${pattern.name} pattern${isCompleted ? ", completed" : isCurrent ? ", current" : ""}`}
+            accessibilityRole="button"
             style={[
               styles.patternDot,
               isCompleted && styles.patternDotCompleted,
@@ -1360,6 +1343,8 @@ export default function Fragment2LessonExercise({
       <View style={styles.notationContainer}>
         {!showNotation ? (
           <TouchableOpacity
+            accessibilityLabel="Show notation"
+            accessibilityRole="button"
             style={styles.showNotationButton}
             onPress={handleShowNotation}
           >
@@ -1368,7 +1353,9 @@ export default function Fragment2LessonExercise({
         ) : (
           <>
             {NotationDisplay && (
-              <View style={[styles.notationWrapper, { position: "relative" }]}>
+              <View
+                style={[styles.notationWrapper, styles.notationWrapperRelative]}
+              >
                 <NotationDisplay
                   musicxml={musicXML}
                   width={300}
@@ -1378,23 +1365,21 @@ export default function Fragment2LessonExercise({
                 {/* Custom cursor highlight overlay */}
                 {highlightLeft !== null && (
                   <View
-                    style={{
-                      position: "absolute",
-                      left: highlightLeft,
-                      top: 40,
-                      width: highlightWidth,
-                      height: 120,
-                      backgroundColor: "rgba(76, 175, 80, 0.25)",
-                      borderRadius: 4,
-                      borderWidth: 2,
-                      borderColor: "rgba(76, 175, 80, 0.6)",
-                      pointerEvents: "none",
-                    }}
+                    style={[
+                      styles.highlightOverlay,
+                      {
+                        left: highlightLeft,
+                        width: highlightWidth,
+                        height: 120,
+                      },
+                    ]}
                   />
                 )}
               </View>
             )}
             <TouchableOpacity
+              accessibilityLabel="Hide notation"
+              accessibilityRole="button"
               style={styles.hideNotationButton}
               onPress={() => setShowNotation(false)}
             >
@@ -1425,12 +1410,16 @@ export default function Fragment2LessonExercise({
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity
+                accessibilityLabel="Cancel attestation"
+                accessibilityRole="button"
                 style={styles.modalCancelButton}
                 onPress={() => setShowAttestModal(false)}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                accessibilityLabel="Confirm attestation"
+                accessibilityRole="button"
                 style={styles.modalConfirmButton}
                 onPress={handleAttestConfirm}
               >
@@ -1480,6 +1469,8 @@ export default function Fragment2LessonExercise({
 
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
+            accessibilityLabel="Begin exercise"
+            accessibilityRole="button"
             style={styles.primaryButton}
             onPress={goToNextPhase}
           >
@@ -1523,6 +1514,10 @@ export default function Fragment2LessonExercise({
 
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
+            accessibilityLabel={
+              isPlaying ? "Listening to pattern" : "Play pattern"
+            }
+            accessibilityRole="button"
             style={[styles.primaryButton, isPlaying && styles.buttonDisabled]}
             onPress={() => playPattern(() => goToNextPhase())}
             disabled={isPlaying}
@@ -1593,8 +1588,12 @@ export default function Fragment2LessonExercise({
         <View style={styles.fixedBottomButtons}>
           {singResult && !singResult.success ? (
             <>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={styles.buttonRow}>
                 <TouchableOpacity
+                  accessibilityLabel={
+                    isPlaying ? "Playing pattern" : "Hear pattern again"
+                  }
+                  accessibilityRole="button"
                   style={[
                     styles.secondaryButton,
                     { flex: 1 },
@@ -1608,6 +1607,8 @@ export default function Fragment2LessonExercise({
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
+                  accessibilityLabel="Try singing again"
+                  accessibilityRole="button"
                   style={[
                     styles.primaryButton,
                     { flex: 1 },
@@ -1641,7 +1642,7 @@ export default function Fragment2LessonExercise({
             </>
           ) : singResult?.success ? (
             <>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[
                     styles.secondaryButton,
@@ -1819,7 +1820,7 @@ export default function Fragment2LessonExercise({
         <View style={styles.fixedBottomButtons}>
           {playResult ? (
             <>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[
                     styles.secondaryButton,
@@ -1937,7 +1938,7 @@ export default function Fragment2LessonExercise({
         <View style={styles.fixedBottomButtons}>
           {playResult && !playResult.success ? (
             <>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[
                     styles.secondaryButton,
@@ -1985,7 +1986,7 @@ export default function Fragment2LessonExercise({
             </>
           ) : playResult?.success ? (
             <>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[
                     styles.secondaryButton,
@@ -2728,5 +2729,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#1a1410",
+  },
+  // Extra styles for inline conversions
+  buttonRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  notationWrapperRelative: {
+    position: "relative",
+  },
+  highlightOverlay: {
+    position: "absolute",
+    top: 40,
+    backgroundColor: "rgba(76, 175, 80, 0.25)",
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: "rgba(76, 175, 80, 0.6)",
+    pointerEvents: "none",
   },
 });

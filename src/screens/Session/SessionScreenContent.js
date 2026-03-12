@@ -28,6 +28,7 @@ import SessionTimer from "./components/SessionTimer";
 import TimeUpModal from "./components/TimeUpModal";
 
 import { baseUrl } from "../../api/client";
+import { devLog, devWarn } from "../../utils/devLogger";
 
 export default function SessionScreenContent() {
   // Get session state from context
@@ -125,6 +126,8 @@ export default function SessionScreenContent() {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
         >
           <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
@@ -146,6 +149,8 @@ export default function SessionScreenContent() {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
         >
           <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
@@ -175,13 +180,13 @@ export default function SessionScreenContent() {
 
   // Handle extending session with one more item
   const handleModuleExtend = async () => {
-    console.log("[Session] handleModuleExtend called");
-    console.log("[Session] current before extend:", current);
+    devLog("[Session] handleModuleExtend called");
+    devLog("[Session] current before extend:", current);
 
     const gotMore = await fetchMoreMaterial();
     if (gotMore) {
       setCurrent(current + 1);
-      console.log("[Session] current after extend:", current + 1);
+      devLog("[Session] current after extend:", current + 1);
     } else {
       // No more items available, end session
       navigation.navigate("SessionEnd", {
@@ -200,9 +205,9 @@ export default function SessionScreenContent() {
   // Handle teaching module completion
   // Record lesson completion to backend immediately when mastery achieved
   const recordLessonCompletion = async (result) => {
-    console.log("[Session] recordLessonCompletion called");
-    console.log("[Session] mini:", mini?.lesson_id);
-    console.log("[Session] result:", JSON.stringify(result));
+    devLog("[Session] recordLessonCompletion called");
+    devLog("[Session] mini:", mini?.lesson_id);
+    devLog("[Session] result:", JSON.stringify(result));
 
     if (mini?.lesson_id && result?.success) {
       try {
@@ -215,56 +220,52 @@ export default function SessionScreenContent() {
         // Include key for multi-key tracking (e.g., fragment exercises)
         if (result.key) {
           params.append("key", result.key);
-          console.log("[Session] Including key:", result.key);
+          devLog("[Session] Including key:", result.key);
         }
 
         const url = `${baseUrl}/modules/user/${userId}/lesson/${mini.lesson_id}/complete?${params}`;
-        console.log("[Session] Calling:", url);
+        devLog("[Session] Calling:", url);
 
         const response = await fetch(url, { method: "POST" });
         const data = await response.json();
-        console.log("[Session] Complete response:", JSON.stringify(data));
+        devLog("[Session] Complete response:", JSON.stringify(data));
 
         // Log multi-key progress if present
         if (data.keys_completed) {
-          console.log(
+          devLog(
             `[Session] Keys completed: ${data.keys_completed.length}/${data.keys_required}`,
           );
         }
 
         // Check if this was a range expansion exercise and update user's range
         if (result.direction && result.targetNote && selectedInstrument) {
-          console.log("[Session] Range expansion detected, updating range");
+          devLog("[Session] Range expansion detected, updating range");
           const rangeUpdate = {};
 
           if (result.direction === "up") {
             // Expand range_high to the target note
             rangeUpdate.range_high = result.targetNote;
-            console.log(
-              `[Session] Expanding range_high to: ${result.targetNote}`,
-            );
+            devLog(`[Session] Expanding range_high to: ${result.targetNote}`);
           } else if (result.direction === "down") {
             // Expand range_low to the target note
             rangeUpdate.range_low = result.targetNote;
-            console.log(
-              `[Session] Expanding range_low to: ${result.targetNote}`,
-            );
+            devLog(`[Session] Expanding range_low to: ${result.targetNote}`);
           }
 
           if (Object.keys(rangeUpdate).length > 0) {
             try {
               await updateInstrument(selectedInstrument.id, rangeUpdate);
-              console.log("[Session] Range updated successfully:", rangeUpdate);
+              devLog("[Session] Range updated successfully:", rangeUpdate);
             } catch (rangeErr) {
-              console.warn("[Session] Failed to update range:", rangeErr);
+              devWarn("[Session] Failed to update range:", rangeErr);
             }
           }
         }
       } catch (err) {
-        console.warn("[Session] Failed to record lesson completion:", err);
+        devWarn("[Session] Failed to record lesson completion:", err);
       }
     } else {
-      console.log(
+      devLog(
         "[Session] NOT recording - mini.lesson_id:",
         mini?.lesson_id,
         "result.success:",
@@ -275,10 +276,7 @@ export default function SessionScreenContent() {
 
   // Handle navigation after user clicks Continue/Finish button
   const handleModuleNavigate = async () => {
-    console.log(
-      "[Session] handleModuleNavigate called, isLastItem:",
-      isLastItem,
-    );
+    devLog("[Session] handleModuleNavigate called, isLastItem:", isLastItem);
 
     if (!isLastItem) {
       // Move to next mini-session
@@ -431,10 +429,24 @@ export default function SessionScreenContent() {
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+          <TouchableOpacity
+            style={styles.skipButton}
+            onPress={handleSkip}
+            accessibilityLabel="Skip this item"
+            accessibilityRole="button"
+          >
             <Text style={styles.skipButtonText}>Skip</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+          <TouchableOpacity
+            style={styles.nextButton}
+            onPress={handleNext}
+            accessibilityLabel={
+              current < session.mini_sessions.length - 1
+                ? "Go to next item"
+                : "Finish session"
+            }
+            accessibilityRole="button"
+          >
             <Text style={styles.nextButtonText}>
               {current < session.mini_sessions.length - 1 ? "Next" : "Finish"}
             </Text>
@@ -466,8 +478,10 @@ export default function SessionScreenContent() {
         <TouchableOpacity
           style={styles.helpButton}
           onPress={() => setShowHelpMenu(true)}
+          accessibilityLabel="Open help menu"
+          accessibilityRole="button"
         >
-          <Text style={{ fontSize: 20 }}>❓</Text>
+          <Text style={styles.helpIcon}>❓</Text>
         </TouchableOpacity>
 
         {/* Reflection Modal */}
@@ -678,5 +692,8 @@ const styles = {
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#555",
+  },
+  helpIcon: {
+    fontSize: 20,
   },
 };

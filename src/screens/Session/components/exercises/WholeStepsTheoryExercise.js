@@ -17,6 +17,8 @@ import {
   Platform,
 } from "react-native";
 import { exercisePropTypes, exerciseDefaultProps } from "./shared";
+import { devWarn } from "../../../../utils/devLogger";
+import MiniKeyboard from "./shared/MiniKeyboard";
 
 // Audio context
 // Audio context - works on web, iOS, and Android
@@ -30,7 +32,7 @@ if (Platform.OS === "web") {
   try {
     AudioContextClass = require("react-native-audio-api").AudioContext;
   } catch (e) {
-    console.warn("react-native-audio-api not available");
+    devWarn("react-native-audio-api not available");
   }
 }
 
@@ -135,184 +137,6 @@ const QUIZ_QUESTIONS = [
     ],
   },
 ];
-
-// ============================================================
-// MINI KEYBOARD COMPONENT
-// ============================================================
-
-const PIANO_KEYS = [
-  { note: "C4", isBlack: false, label: "C" },
-  { note: "C#4", isBlack: true, label: "C#" },
-  { note: "D4", isBlack: false, label: "D" },
-  { note: "D#4", isBlack: true, label: "D#" },
-  { note: "E4", isBlack: false, label: "E" },
-  { note: "F4", isBlack: false, label: "F" },
-  { note: "F#4", isBlack: true, label: "F#" },
-  { note: "G4", isBlack: false, label: "G" },
-  { note: "G#4", isBlack: true, label: "G#" },
-  { note: "A4", isBlack: false, label: "A" },
-  { note: "A#4", isBlack: true, label: "A#" },
-  { note: "B4", isBlack: false, label: "B" },
-  { note: "C5", isBlack: false, label: "C" },
-];
-
-function MiniKeyboard({ highlightNotes = [], skippedNote = null }) {
-  const whiteKeys = PIANO_KEYS.filter((k) => !k.isBlack);
-  const blackKeys = PIANO_KEYS.filter((k) => k.isBlack);
-
-  // Map black keys to the white key index they come after
-  const blackKeyAfterWhiteIdx = {
-    "C#4": 0, // after C
-    "D#4": 1, // after D
-    "F#4": 3, // after F
-    "G#4": 4, // after G
-    "A#4": 5, // after A
-  };
-
-  // Check if skipped note is a white key (for E→F# skipping F, A#→C skipping B)
-  const isWhiteKeySkipped = skippedNote && !skippedNote.includes("#");
-
-  return (
-    <View style={keyboardStyles.container}>
-      <View style={keyboardStyles.keyboardWrapper}>
-        <View style={keyboardStyles.whiteKeysRow}>
-          {whiteKeys.map((key) => {
-            const isHighlighted = highlightNotes.includes(key.note);
-            const isSkipped = isWhiteKeySkipped && skippedNote === key.note;
-            return (
-              <View
-                key={key.note}
-                style={[
-                  keyboardStyles.whiteKey,
-                  isHighlighted && keyboardStyles.whiteKeyHighlighted,
-                  isSkipped && keyboardStyles.whiteKeySkipped,
-                ]}
-              >
-                <Text
-                  style={[
-                    keyboardStyles.whiteKeyLabel,
-                    isHighlighted && keyboardStyles.keyLabelHighlighted,
-                    isSkipped && keyboardStyles.skippedKeyLabel,
-                  ]}
-                >
-                  {isSkipped ? "skip" : key.label}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-        <View style={keyboardStyles.blackKeysRow}>
-          {blackKeys.map((key) => {
-            const isHighlighted = highlightNotes.includes(key.note);
-            const isSkipped = skippedNote === key.note;
-            const whiteIdx = blackKeyAfterWhiteIdx[key.note];
-            if (whiteIdx === undefined) return null;
-
-            return (
-              <View
-                key={key.note}
-                style={[
-                  keyboardStyles.blackKey,
-                  { left: (whiteIdx + 1) * 44 - 14 },
-                  isHighlighted && keyboardStyles.blackKeyHighlighted,
-                  isSkipped && keyboardStyles.blackKeySkipped,
-                ]}
-              >
-                <Text
-                  style={[
-                    keyboardStyles.blackKeyLabel,
-                    (isHighlighted || isSkipped) &&
-                      keyboardStyles.keyLabelHighlighted,
-                  ]}
-                >
-                  {isSkipped ? "skip" : key.label}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-      </View>
-    </View>
-  );
-}
-
-const keyboardStyles = StyleSheet.create({
-  container: {
-    height: 140,
-    position: "relative",
-    marginVertical: 16,
-    alignItems: "center",
-  },
-  keyboardWrapper: {
-    width: 352, // 8 white keys * 44px each
-    position: "relative",
-  },
-  whiteKeysRow: {
-    flexDirection: "row",
-    height: 120,
-  },
-  whiteKey: {
-    width: 40,
-    height: 120,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#333",
-    borderRadius: 4,
-    marginHorizontal: 2,
-    justifyContent: "flex-end",
-    alignItems: "center",
-    paddingBottom: 8,
-  },
-  whiteKeyHighlighted: {
-    backgroundColor: "#81c784",
-  },
-  whiteKeySkipped: {
-    backgroundColor: "#ff5722",
-  },
-  whiteKeyLabel: {
-    fontSize: 14,
-    color: "#333",
-    fontWeight: "600",
-  },
-  skippedKeyLabel: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  blackKeysRow: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 80,
-  },
-  blackKey: {
-    position: "absolute",
-    width: 28,
-    height: 75,
-    backgroundColor: "#1a1a2e",
-    borderWidth: 1,
-    borderColor: "#000",
-    borderRadius: 4,
-    justifyContent: "flex-end",
-    alignItems: "center",
-    paddingBottom: 6,
-  },
-  blackKeyHighlighted: {
-    backgroundColor: "#81c784",
-  },
-  blackKeySkipped: {
-    backgroundColor: "#ff5722",
-  },
-  blackKeyLabel: {
-    fontSize: 10,
-    color: "#888",
-    fontWeight: "600",
-  },
-  keyLabelHighlighted: {
-    color: "#1a1a2e",
-    fontWeight: "bold",
-  },
-});
 
 // ============================================================
 // MAIN COMPONENT
@@ -703,7 +527,7 @@ export default function WholeStepsTheoryExercise({
         </ScrollView>
 
         {showResult && (
-          <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
+          <TouchableOpacity style={styles.primaryButton} onPress={handleNext} accessibilityLabel="Next step" accessibilityRole="button">
             <Text style={styles.primaryButtonText}>
               {quizIndex < QUIZ_QUESTIONS.length - 1
                 ? "Next →"
@@ -740,7 +564,7 @@ export default function WholeStepsTheoryExercise({
           </View>
         </ScrollView>
 
-        <TouchableOpacity style={styles.primaryButton} onPress={handleComplete}>
+        <TouchableOpacity style={styles.primaryButton} onPress={handleComplete} accessibilityLabel="Complete lesson" accessibilityRole="button">
           <Text style={styles.primaryButtonText}>
             {passed ? "Continue →" : "Try Again"}
           </Text>

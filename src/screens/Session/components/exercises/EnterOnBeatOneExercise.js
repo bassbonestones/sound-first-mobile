@@ -421,6 +421,8 @@ export default function EnterOnBeatOneExercise({
         onPress={handleTap}
         activeOpacity={0.8}
         disabled={!isPlaying || isPrepPhase}
+        accessibilityLabel="Tap on beat one"
+        accessibilityRole="button"
       >
         <Animated.View
           style={[

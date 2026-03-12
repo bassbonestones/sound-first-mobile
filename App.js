@@ -97,6 +97,7 @@ import HistoryScreen from "./src/screens/HistoryScreen";
 import AdminScreen from "./src/screens/Admin";
 import FirstNoteScreen from "./src/screens/FirstNote";
 import ExerciseTestScreen from "./src/screens/ExerciseTestScreen";
+import TuneMasteryScreen from "./src/screens/TuneMastery";
 
 const Stack = createNativeStackNavigator();
 
@@ -184,6 +185,11 @@ export default function App() {
               name="ExerciseTest"
               component={ExerciseTestScreen}
               options={{ title: "Exercise Tester", headerShown: false }}
+            />
+            <Stack.Screen
+              name="TuneMastery"
+              component={TuneMasteryScreen}
+              options={{ title: "Tune Mastery", headerShown: false }}
             />
           </Stack.Navigator>
         </NavigationContainer>

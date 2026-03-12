@@ -2,6 +2,7 @@
  * ReflectionModal - Session reflection/rating modal
  */
 import React from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -38,6 +39,8 @@ export default function ReflectionModal({
             styles.ratingButton,
             rating === r && styles.ratingButtonSelected,
           ]}
+          accessibilityLabel={`Rate ${r} out of 5`}
+          accessibilityRole="button"
         >
           <Text
             style={[
@@ -75,6 +78,8 @@ export default function ReflectionModal({
                   styles.fatigueButton,
                   fatigueInput === idx && styles.fatigueButtonSelected,
                 ]}
+                accessibilityLabel={`Select fatigue level ${idx === 0 ? "exhausted" : idx === 1 ? "okay" : idx === 2 ? "good" : "energized"}`}
+                accessibilityRole="button"
               >
                 <Text style={styles.fatigueEmoji}>{emoji}</Text>
               </TouchableOpacity>
@@ -93,12 +98,22 @@ export default function ReflectionModal({
           )}
 
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.skipButton} onPress={onSkip}>
+            <TouchableOpacity
+              style={styles.skipButton}
+              onPress={onSkip}
+              accessibilityLabel="Skip reflection"
+              accessibilityRole="button"
+            >
               <Text style={styles.skipButtonText}>Skip</Text>
             </TouchableOpacity>
 
             {!extended && (
-              <TouchableOpacity style={styles.extendButton} onPress={onExtend}>
+              <TouchableOpacity
+                style={styles.extendButton}
+                onPress={onExtend}
+                accessibilityLabel="Add notes"
+                accessibilityRole="button"
+              >
                 <Text style={styles.extendButtonText}>+ Notes</Text>
               </TouchableOpacity>
             )}
@@ -110,6 +125,10 @@ export default function ReflectionModal({
               ]}
               onPress={onSubmit}
               disabled={submitting || !rating}
+              accessibilityLabel={
+                isLastItem ? "Finish session" : "Submit rating"
+              }
+              accessibilityRole="button"
             >
               {submitting ? (
                 <ActivityIndicator size="small" color={colors.textDark} />
@@ -126,6 +145,8 @@ export default function ReflectionModal({
             <TouchableOpacity
               style={styles.endPracticeLink}
               onPress={onEndPractice}
+              accessibilityLabel="End practice and go home"
+              accessibilityRole="button"
             >
               <Text style={styles.endPracticeLinkText}>
                 End Practice & Go Home
@@ -137,3 +158,20 @@ export default function ReflectionModal({
     </Modal>
   );
 }
+
+ReflectionModal.propTypes = {
+  visible: PropTypes.bool.isRequired,
+  rating: PropTypes.number,
+  setRating: PropTypes.func.isRequired,
+  fatigueInput: PropTypes.number,
+  setFatigueInput: PropTypes.func.isRequired,
+  extended: PropTypes.bool,
+  reflection: PropTypes.string,
+  setReflection: PropTypes.func.isRequired,
+  submitting: PropTypes.bool.isRequired,
+  onSkip: PropTypes.func.isRequired,
+  onExtend: PropTypes.func.isRequired,
+  onSubmit: PropTypes.func.isRequired,
+  onEndPractice: PropTypes.func.isRequired,
+  isLastItem: PropTypes.bool,
+};

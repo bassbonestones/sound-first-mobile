@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Platform } from "react-native";
+import PropTypes from "prop-types";
 import { usePitchDetection } from "../hooks/usePitchDetection";
 
 /**
@@ -28,27 +29,21 @@ export default function MobileAudioInput({
   showDebug = false,
   compact = false,
 }) {
-  const {
-    isListening,
-    error,
-    currentPitch,
-    volume,
-    isSounding,
-    isAvailable,
-  } = usePitchDetection({
-    onVolumeChange,
-    onPitchDetected,
-    onRealtimePitch,
-    onSoundStart,
-    onSoundEnd,
-    targetNote,
-    onPitchMatch,
-    volumeThreshold,
-    silenceDuration,
-    pitchMargin,
-    allowOctaveEquivalent,
-    enabled,
-  });
+  const { isListening, error, currentPitch, volume, isSounding, isAvailable } =
+    usePitchDetection({
+      onVolumeChange,
+      onPitchDetected,
+      onRealtimePitch,
+      onSoundStart,
+      onSoundEnd,
+      targetNote,
+      onPitchMatch,
+      volumeThreshold,
+      silenceDuration,
+      pitchMargin,
+      allowOctaveEquivalent,
+      enabled,
+    });
 
   // Check if native module is available
   if (!isAvailable) {
@@ -106,11 +101,17 @@ export default function MobileAudioInput({
   // Main display
   return (
     <View style={compact ? styles.containerCompact : styles.container}>
-      <Text style={compact ? styles.listeningTextCompact : styles.listeningText}>
+      <Text
+        style={compact ? styles.listeningTextCompact : styles.listeningText}
+      >
         {isListening ? "🎤 Listening..." : "🎤 Starting..."}
       </Text>
 
-      <View style={compact ? styles.volumeBarContainerCompact : styles.volumeBarContainer}>
+      <View
+        style={
+          compact ? styles.volumeBarContainerCompact : styles.volumeBarContainer
+        }
+      >
         <View
           style={[
             styles.volumeBar,
@@ -141,6 +142,23 @@ export default function MobileAudioInput({
     </View>
   );
 }
+
+MobileAudioInput.propTypes = {
+  onVolumeChange: PropTypes.func,
+  onPitchDetected: PropTypes.func,
+  onRealtimePitch: PropTypes.func,
+  onSoundStart: PropTypes.func,
+  onSoundEnd: PropTypes.func,
+  targetNote: PropTypes.string,
+  onPitchMatch: PropTypes.func,
+  volumeThreshold: PropTypes.number,
+  silenceDuration: PropTypes.number,
+  pitchMargin: PropTypes.number,
+  allowOctaveEquivalent: PropTypes.bool,
+  enabled: PropTypes.bool,
+  showDebug: PropTypes.bool,
+  compact: PropTypes.bool,
+};
 
 const styles = StyleSheet.create({
   container: {

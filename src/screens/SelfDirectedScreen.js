@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -118,6 +119,8 @@ export default function SelfDirectedScreen({ navigation }) {
         </View>
 
         <TouchableOpacity
+          accessibilityLabel="Start self-directed session"
+          accessibilityRole="button"
           onPress={handleStart}
           style={[styles.startButton, createShadow("#000", 0, 4, 0.2, 8)]}
         >
@@ -130,6 +133,12 @@ export default function SelfDirectedScreen({ navigation }) {
     </View>
   );
 }
+
+SelfDirectedScreen.propTypes = {
+  navigation: PropTypes.shape({
+    navigate: PropTypes.func.isRequired,
+  }).isRequired,
+};
 
 const styles = StyleSheet.create({
   container: {

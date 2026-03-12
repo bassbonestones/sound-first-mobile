@@ -3,6 +3,7 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { baseUrl } from "../../../../../api/client";
+import { devLog, devError } from "../../../../../utils/devLogger";
 
 export default function useCapabilities() {
   const [capabilities, setCapabilities] = useState([]);
@@ -47,22 +48,19 @@ export default function useCapabilities() {
         const modulesResponse = await fetch(
           `${baseUrl}/modules/?active_only=false`,
         );
-        console.log(
+        devLog(
           "[useCapabilities] Modules response status:",
           modulesResponse.status,
         );
         if (modulesResponse.ok) {
           const modulesData = await modulesResponse.json();
-          console.log("[useCapabilities] Modules loaded:", modulesData.length);
+          devLog("[useCapabilities] Modules loaded:", modulesData.length);
           modulesData
             .filter((m) => m.capability_name)
             .forEach((m) => withContent.add(m.capability_name));
         }
       } catch (moduleErr) {
-        console.log(
-          "[useCapabilities] Could not load teaching modules:",
-          moduleErr,
-        );
+        devLog("[useCapabilities] Could not load teaching modules:", moduleErr);
       }
 
       // Also fetch Day 0 capabilities (granted when first note experience completes)
@@ -70,22 +68,19 @@ export default function useCapabilities() {
         const day0Response = await fetch(`${baseUrl}/admin/day0-capabilities`);
         if (day0Response.ok) {
           const day0Data = await day0Response.json();
-          console.log("[useCapabilities] Day 0 capabilities:", day0Data.all);
+          devLog("[useCapabilities] Day 0 capabilities:", day0Data.all);
           (day0Data.all || []).forEach((name) => withContent.add(name));
         }
       } catch (day0Err) {
-        console.log(
-          "[useCapabilities] Could not load Day 0 capabilities:",
-          day0Err,
-        );
+        devLog("[useCapabilities] Could not load Day 0 capabilities:", day0Err);
       }
 
-      console.log("[useCapabilities] Total capabilities with content:", [
+      devLog("[useCapabilities] Total capabilities with content:", [
         ...withContent,
       ]);
       setCapabilitiesWithContent(withContent);
     } catch (err) {
-      console.error("[useCapabilities] Load error:", err);
+      devError("[useCapabilities] Load error:", err);
       // Fallback to v2 endpoint
       try {
         const fallback = await fetch(`${baseUrl}/capabilities/v2`);
@@ -96,7 +91,7 @@ export default function useCapabilities() {
         ].sort();
         setDomains(uniqueDomains);
       } catch (e) {
-        console.error("[useCapabilities] Fallback failed:", e);
+        devError("[useCapabilities] Fallback failed:", e);
       }
     }
     setLoading(false);
@@ -134,7 +129,7 @@ export default function useCapabilities() {
         return await response.json();
       }
     } catch (err) {
-      console.log("[useCapabilities] Could not load dependency graph");
+      devLog("[useCapabilities] Could not load dependency graph");
     }
     return null;
   };
@@ -153,7 +148,7 @@ export default function useCapabilities() {
         return { success: true, capability: updated };
       }
     } catch (err) {
-      console.log("[useCapabilities] Could not archive capability", err);
+      devLog("[useCapabilities] Could not archive capability", err);
     }
     return { success: false };
   };
@@ -172,7 +167,7 @@ export default function useCapabilities() {
         return { success: true, capability: updated };
       }
     } catch (err) {
-      console.log("[useCapabilities] Could not restore capability", err);
+      devLog("[useCapabilities] Could not restore capability", err);
     }
     return { success: false };
   };
@@ -188,7 +183,7 @@ export default function useCapabilities() {
         return { success: true };
       }
     } catch (err) {
-      console.log("[useCapabilities] Could not delete capability", err);
+      devLog("[useCapabilities] Could not delete capability", err);
     }
     return { success: false };
   };
@@ -211,7 +206,7 @@ export default function useCapabilities() {
         };
       }
     } catch (err) {
-      console.log("[useCapabilities] Could not create capability", err);
+      devLog("[useCapabilities] Could not create capability", err);
       return { success: false, error: "Network error" };
     }
   };
@@ -252,7 +247,7 @@ export default function useCapabilities() {
         };
       }
     } catch (err) {
-      console.error("[useCapabilities] Save error:", err);
+      devError("[useCapabilities] Save error:", err);
       return { success: false, error: "Network error" };
     }
   };
@@ -301,7 +296,7 @@ export default function useCapabilities() {
         return { success: true };
       }
     } catch (err) {
-      console.log("[useCapabilities] Could not reorder capabilities", err);
+      devLog("[useCapabilities] Could not reorder capabilities", err);
     }
     return { success: false };
   };
@@ -324,7 +319,7 @@ export default function useCapabilities() {
         };
       }
     } catch (err) {
-      console.log("[useCapabilities] Could not rename domain", err);
+      devLog("[useCapabilities] Could not rename domain", err);
       return { success: false, error: "Network error" };
     }
   };
@@ -349,7 +344,7 @@ export default function useCapabilities() {
         });
       }
     } catch (err) {
-      console.error("[useCapabilities] Export error:", err);
+      devError("[useCapabilities] Export error:", err);
       setExportStatus({
         type: "error",
         message: "Failed to connect to server",

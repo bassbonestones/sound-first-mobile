@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { baseUrl } from "../../../../../api/client";
+import { devError } from "../../../../../utils/devLogger";
 
 /**
  * Hook for managing materials data and operations
@@ -46,7 +47,7 @@ export function useMaterials() {
         setMaterials(data.materials || []);
       }
     } catch (err) {
-      console.error("[useMaterials] Load error:", err);
+      devError("[useMaterials] Load error:", err);
       setMaterials([]);
     } finally {
       setLoading(false);
@@ -87,7 +88,7 @@ export function useMaterials() {
       }
       return material;
     } catch (err) {
-      console.error("[useMaterials] Detail fetch error:", err);
+      devError("[useMaterials] Detail fetch error:", err);
       return material;
     }
   };
@@ -110,7 +111,7 @@ export function useMaterials() {
       }
       return false;
     } catch (err) {
-      console.error("[useMaterials] Analysis trigger error:", err);
+      devError("[useMaterials] Analysis trigger error:", err);
       return false;
     }
   };
@@ -200,7 +201,7 @@ export function useMaterials() {
       }
       return false;
     } catch (err) {
-      console.error("[useMaterials] Delete error:", err);
+      devError("[useMaterials] Delete error:", err);
       return false;
     }
   };

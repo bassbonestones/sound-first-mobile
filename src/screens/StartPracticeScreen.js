@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -102,6 +103,9 @@ export default function StartPracticeScreen({ navigation, route }) {
                 styles.durationButton,
                 duration === d ? styles.durationButtonSelected : null,
               ]}
+              accessibilityLabel={`${d} minutes${duration === d ? ", selected" : ""}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: duration === d }}
             >
               <Text
                 style={[
@@ -121,6 +125,10 @@ export default function StartPracticeScreen({ navigation, route }) {
             <TouchableOpacity
               key={f}
               onPress={() => handleFatigueSelect(f)}
+              accessibilityLabel={`Fatigue level ${f}: ${FATIGUE_LABELS[f]}${fatigue === f ? ", selected" : ""}`}
+              accessibilityHint={FATIGUE_HINTS[f]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: fatigue === f }}
               style={[
                 styles.fatigueButton,
                 {
@@ -245,18 +253,25 @@ export default function StartPracticeScreen({ navigation, route }) {
         <TouchableOpacity
           onPress={() => navigation.navigate("History")}
           style={styles.secondaryButton}
+          accessibilityLabel="View practice history"
+          accessibilityRole="button"
         >
           <Text style={styles.secondaryButtonText}>Practice History</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => navigation.navigate("SelfDirected")}
           style={styles.secondaryButton}
+          accessibilityLabel="Self-directed practice mode"
+          accessibilityRole="button"
         >
           <Text style={styles.secondaryButtonText}>Self-Directed Mode</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={handleStartPractice}
           style={styles.primaryButton}
+          accessibilityLabel={`Start ${duration} minute practice session`}
+          accessibilityHint={`Fatigue level ${fatigue}: ${FATIGUE_LABELS[fatigue]}`}
+          accessibilityRole="button"
         >
           <Text style={styles.primaryButtonText}>Start Practice</Text>
         </TouchableOpacity>
@@ -266,6 +281,17 @@ export default function StartPracticeScreen({ navigation, route }) {
     </View>
   );
 }
+
+StartPracticeScreen.propTypes = {
+  navigation: PropTypes.shape({
+    navigate: PropTypes.func.isRequired,
+  }).isRequired,
+  route: PropTypes.shape({
+    params: PropTypes.shape({
+      instrumentId: PropTypes.number,
+    }),
+  }),
+};
 
 const styles = StyleSheet.create({
   // Container styles

@@ -345,6 +345,10 @@ export default function TapAlongExercise({
         onPress={handleTap}
         activeOpacity={0.8}
         disabled={!isPlaying || isPrepPhase}
+        accessibilityLabel={
+          isPrepPhase ? "Get ready for tapping" : "Tap on the beat"
+        }
+        accessibilityRole="button"
       >
         <Animated.View
           style={[

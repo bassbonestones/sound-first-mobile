@@ -3,6 +3,7 @@
  * Day 0 first-note experience with 8 stages
  */
 import React from "react";
+import PropTypes from "prop-types";
 import {
   View,
   ScrollView,
@@ -10,6 +11,7 @@ import {
   TouchableOpacity,
   Platform,
 } from "react-native";
+import ErrorBoundary from "../../components/ErrorBoundary";
 import { FirstNoteProvider, useFirstNote } from "./context/FirstNoteContext";
 import { DevNavMenu } from "./components/DevNavMenu";
 import {
@@ -87,7 +89,7 @@ const FirstNoteContent = () => {
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.flexContainer}>
       <ScrollView
         style={styles.container}
         contentContainerStyle={[
@@ -116,7 +118,11 @@ const FirstNoteContent = () => {
         {error && (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity onPress={() => setError(null)}>
+            <TouchableOpacity
+              accessibilityLabel="Dismiss error"
+              accessibilityRole="button"
+              onPress={() => setError(null)}
+            >
               <Text style={styles.dismissText}>Dismiss</Text>
             </TouchableOpacity>
           </View>
@@ -136,8 +142,20 @@ const FirstNoteContent = () => {
  */
 export default function FirstNoteScreen({ route, navigation }) {
   return (
-    <FirstNoteProvider route={route} navigation={navigation}>
-      <FirstNoteContent />
-    </FirstNoteProvider>
+    <ErrorBoundary>
+      <FirstNoteProvider route={route} navigation={navigation}>
+        <FirstNoteContent />
+      </FirstNoteProvider>
+    </ErrorBoundary>
   );
 }
+
+FirstNoteScreen.propTypes = {
+  route: PropTypes.shape({
+    params: PropTypes.object,
+  }),
+  navigation: PropTypes.shape({
+    navigate: PropTypes.func,
+    dispatch: PropTypes.func,
+  }).isRequired,
+};

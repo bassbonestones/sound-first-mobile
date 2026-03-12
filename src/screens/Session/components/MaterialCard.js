@@ -1,7 +1,10 @@
 /**
  * MaterialCard - Displays material information with notation in session
+ *
+ * Memoized to prevent unnecessary re-renders when parent state changes.
  */
-import React from "react";
+import React, { memo } from "react";
+import PropTypes from "prop-types";
 import { View, Text } from "react-native";
 import NotationDisplay, {
   NotationPlaceholder,
@@ -10,7 +13,7 @@ import AudioPlayer from "../../../components/AudioPlayer";
 import { createShadow } from "../../../styles/theme";
 import { styles } from "./styles";
 
-export default function MaterialCard({ mini }) {
+function MaterialCard({ mini }) {
   return (
     <>
       <View
@@ -53,3 +56,15 @@ export default function MaterialCard({ mini }) {
     </>
   );
 }
+
+MaterialCard.propTypes = {
+  mini: PropTypes.shape({
+    material_title: PropTypes.string,
+    key: PropTypes.string,
+    notation_url: PropTypes.string,
+    material_id: PropTypes.number,
+    audio_url: PropTypes.string,
+  }).isRequired,
+};
+
+export default memo(MaterialCard);

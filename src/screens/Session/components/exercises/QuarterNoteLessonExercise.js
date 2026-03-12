@@ -38,13 +38,14 @@ import {
   exercisePropTypes,
   exerciseDefaultProps,
 } from "./shared";
+import { devLog, devWarn } from "../../../../utils/devLogger";
 
 // For notation display
 let NotationDisplay = null;
 try {
   NotationDisplay = require("../../../../components/NotationDisplay").default;
 } catch (e) {
-  console.warn("NotationDisplay not available");
+  devWarn("NotationDisplay not available");
 }
 
 // Generate MusicXML for a single quarter note
@@ -562,7 +563,7 @@ export default function QuarterNoteLessonExercise({
 
     const beatSoundPct = soundingOnBeatsRef.current;
     const startedEarly = startedEarlyRef.current;
-    console.log("[QuarterNoteLesson] analyzePerformance:", {
+    devLog("[QuarterNoteLesson] analyzePerformance:", {
       totalCount,
       pitchCount,
       hitTarget,
@@ -734,6 +735,8 @@ export default function QuarterNoteLessonExercise({
       <View style={styles.notationContainer}>
         {!showNotation ? (
           <TouchableOpacity
+            accessibilityLabel="Show notation"
+            accessibilityRole="button"
             style={styles.showNotationButton}
             onPress={handleShowNotation}
           >
@@ -741,27 +744,23 @@ export default function QuarterNoteLessonExercise({
           </TouchableOpacity>
         ) : (
           <>
-            <View style={[styles.notationWrapper, { position: "relative" }]}>
+            <View
+              style={[styles.notationWrapper, styles.notationWrapperRelative]}
+            >
               {memoizedNotation}
               {/* Green highlight overlay */}
               {highlightLeft !== null && (
                 <View
-                  style={{
-                    position: "absolute",
-                    left: highlightLeft,
-                    top: 40,
-                    width: highlightWidth,
-                    height: 120,
-                    backgroundColor: "rgba(76, 175, 80, 0.25)",
-                    borderRadius: 4,
-                    borderWidth: 2,
-                    borderColor: "rgba(76, 175, 80, 0.6)",
-                    pointerEvents: "none",
-                  }}
+                  style={[
+                    styles.highlightOverlay,
+                    { left: highlightLeft, width: highlightWidth },
+                  ]}
                 />
               )}
             </View>
             <TouchableOpacity
+              accessibilityLabel="Hide notation"
+              accessibilityRole="button"
               style={styles.hideNotationButton}
               onPress={() => setShowNotation(false)}
             >
@@ -888,12 +887,16 @@ export default function QuarterNoteLessonExercise({
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity
+                accessibilityLabel="Cancel"
+                accessibilityRole="button"
                 style={styles.modalCancelButton}
                 onPress={() => setShowAttestModal(false)}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                accessibilityLabel="Confirm"
+                accessibilityRole="button"
                 style={styles.modalConfirmButton}
                 onPress={handleAttestConfirm}
               >
@@ -964,6 +967,8 @@ export default function QuarterNoteLessonExercise({
 
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
+            accessibilityLabel="Got it, continue"
+            accessibilityRole="button"
             style={styles.primaryButton}
             onPress={() => setPhase(PHASE.LISTEN)}
           >
@@ -1007,6 +1012,10 @@ export default function QuarterNoteLessonExercise({
         <View style={styles.fixedBottomButtons}>
           {!hasHeardPattern ? (
             <TouchableOpacity
+              accessibilityLabel={
+                isPlaying ? "Playing pattern" : "Hear pattern"
+              }
+              accessibilityRole="button"
               style={[styles.primaryButton, isPlaying && styles.buttonDisabled]}
               onPress={() => {
                 playQuarterNote(() => setHasHeardPattern(true));
@@ -1020,6 +1029,10 @@ export default function QuarterNoteLessonExercise({
           ) : (
             <>
               <TouchableOpacity
+                accessibilityLabel={
+                  isPlaying ? "Playing pattern" : "Hear again"
+                }
+                accessibilityRole="button"
                 style={[
                   styles.secondaryButton,
                   isPlaying && styles.buttonDisabled,
@@ -1033,6 +1046,8 @@ export default function QuarterNoteLessonExercise({
               </TouchableOpacity>
               {!isPlaying && (
                 <TouchableOpacity
+                  accessibilityLabel="I heard it, continue"
+                  accessibilityRole="button"
                   style={[styles.primaryButton, { marginTop: 8 }]}
                   onPress={() => {
                     stopPlayback();
@@ -1104,6 +1119,8 @@ export default function QuarterNoteLessonExercise({
           {singResult && !singResult.success ? (
             <>
               <TouchableOpacity
+                accessibilityLabel="Try singing again"
+                accessibilityRole="button"
                 style={styles.primaryButton}
                 onPress={handleTrySingAgain}
               >
@@ -1111,6 +1128,8 @@ export default function QuarterNoteLessonExercise({
               </TouchableOpacity>
               {singAttempts >= 3 && (
                 <TouchableOpacity
+                  accessibilityLabel="I did it correctly, attest"
+                  accessibilityRole="button"
                   style={[styles.tertiaryButton, { marginTop: 8 }]}
                   onPress={() => handleShowAttestModal("sing")}
                 >
@@ -1122,7 +1141,7 @@ export default function QuarterNoteLessonExercise({
             </>
           ) : singResult?.success ? (
             <>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[
                     styles.secondaryButton,
@@ -1302,7 +1321,7 @@ export default function QuarterNoteLessonExercise({
             </>
           ) : playResult?.success ? (
             <>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[
                     styles.secondaryButton,
@@ -2082,5 +2101,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#fff",
+  },
+  // Extra styles for inline conversions
+  buttonRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  notationWrapperRelative: {
+    position: "relative",
+  },
+  highlightOverlay: {
+    position: "absolute",
+    top: 40,
+    height: 120,
+    backgroundColor: "rgba(76, 175, 80, 0.25)",
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: "rgba(76, 175, 80, 0.6)",
+    pointerEvents: "none",
   },
 });

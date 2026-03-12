@@ -4,6 +4,7 @@
  */
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Platform } from "react-native";
+import { devError } from "../../../utils/devLogger";
 import { noteToFrequency } from "../utils";
 import { PITCH_EXPLORER_NOTES } from "../data";
 
@@ -123,7 +124,7 @@ export default function useFirstNoteAudio(resonantNote) {
         (DURATION + 0.5) * 1000,
       );
     } catch (err) {
-      console.error("Audio error:", err);
+      devError("Audio error:", err);
       setIsPlaying(false);
       if (heardItTimerRef.current) {
         clearTimeout(heardItTimerRef.current);
@@ -180,7 +181,7 @@ export default function useFirstNoteAudio(resonantNote) {
 
         oscillatorRef.current = oscillators[0];
       } catch (err) {
-        console.error("Piano note audio error:", err);
+        devError("Piano note audio error:", err);
       }
     },
     [getAudioContext, stopOscillator],

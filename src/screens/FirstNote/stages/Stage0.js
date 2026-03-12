@@ -83,6 +83,8 @@ export function Stage0Buttons() {
     return (
       <View style={styles.fixedBottomButtons}>
         <TouchableOpacity
+          accessibilityLabel={isPlaying ? "Playing note" : "Play note"}
+          accessibilityRole="button"
           style={[styles.primaryButton, isPlaying && styles.buttonDisabled]}
           onPress={playNote}
           disabled={isPlaying}
@@ -93,6 +95,8 @@ export function Stage0Buttons() {
         </TouchableOpacity>
         {showHeardItButton && (
           <TouchableOpacity
+            accessibilityLabel="I heard the note, continue"
+            accessibilityRole="button"
             style={[styles.primaryButton, { marginTop: 12 }]}
             onPress={() => {
               stopAudio();
@@ -110,6 +114,8 @@ export function Stage0Buttons() {
     return (
       <View style={styles.fixedBottomButtons}>
         <TouchableOpacity
+          accessibilityLabel="Done singing, continue"
+          accessibilityRole="button"
           style={styles.primaryButton}
           onPress={() => setSubStep(2)}
         >
@@ -124,6 +130,10 @@ export function Stage0Buttons() {
       <View style={styles.fixedBottomButtons}>
         <View style={styles.buttonRow}>
           <TouchableOpacity
+            accessibilityLabel={
+              isPlaying ? "Playing note" : "Listen to note again"
+            }
+            accessibilityRole="button"
             style={[styles.secondaryButton, isPlaying && styles.buttonDisabled]}
             onPress={playNote}
             disabled={isPlaying}
@@ -133,13 +143,20 @@ export function Stage0Buttons() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityLabel="Sing the note again"
+            accessibilityRole="button"
             style={styles.secondaryButton}
             onPress={() => setSubStep(1)}
           >
             <Text style={styles.secondaryButtonText}>Sing Again</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.primaryButton} onPress={nextStage}>
+        <TouchableOpacity
+          accessibilityLabel="Continue to play the note"
+          accessibilityRole="button"
+          style={styles.primaryButton}
+          onPress={nextStage}
+        >
           <Text style={styles.primaryButtonText}>Play →</Text>
         </TouchableOpacity>
       </View>

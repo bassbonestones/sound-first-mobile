@@ -8,6 +8,7 @@
  * - Backend validates for circular dependencies
  */
 import React from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -64,7 +65,12 @@ export default function PrerequisiteSelector({
       <View style={styles.prereqSelectorContainer}>
         <View style={styles.prereqSelectorHeader}>
           <Text style={styles.prereqSelectorTitle}>Select Prerequisite</Text>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity
+            accessibilityLabel="Close prerequisite selector"
+            accessibilityRole="button"
+            style={styles.closeButton}
+            onPress={onClose}
+          >
             <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -87,6 +93,8 @@ export default function PrerequisiteSelector({
           showsHorizontalScrollIndicator={false}
         >
           <TouchableOpacity
+            accessibilityLabel="Show all domains"
+            accessibilityRole="button"
             style={[
               styles.prereqDomainChip,
               prereqDomainFilter === "all" && styles.prereqDomainChipActive,
@@ -106,6 +114,8 @@ export default function PrerequisiteSelector({
           {domains.map((domain) => (
             <TouchableOpacity
               key={domain}
+              accessibilityLabel={`Filter by ${domain} domain`}
+              accessibilityRole="button"
               style={[
                 styles.prereqDomainChip,
                 prereqDomainFilter === domain && styles.prereqDomainChipActive,
@@ -136,6 +146,8 @@ export default function PrerequisiteSelector({
           style={styles.prereqSelectorList}
           renderItem={({ item }) => (
             <TouchableOpacity
+              accessibilityLabel={`Select ${item.display_name || item.name} as prerequisite`}
+              accessibilityRole="button"
               style={styles.prereqSelectItem}
               onPress={() => {
                 onSelect(item.id);
@@ -160,6 +172,8 @@ export default function PrerequisiteSelector({
 
         {/* Cancel Button */}
         <TouchableOpacity
+          accessibilityLabel="Cancel"
+          accessibilityRole="button"
           style={styles.prereqSelectorCancelButton}
           onPress={onClose}
         >
@@ -169,3 +183,15 @@ export default function PrerequisiteSelector({
     </View>
   );
 }
+
+PrerequisiteSelector.propTypes = {
+  currentCapabilityId: PropTypes.number,
+  allCapabilities: PropTypes.array.isRequired,
+  selectedIds: PropTypes.arrayOf(PropTypes.number).isRequired,
+  onSelect: PropTypes.func.isRequired,
+  onClose: PropTypes.func.isRequired,
+  prereqDomainFilter: PropTypes.string,
+  setPrereqDomainFilter: PropTypes.func,
+  prereqSearchQuery: PropTypes.string,
+  setPrereqSearchQuery: PropTypes.func,
+};

@@ -242,6 +242,8 @@ export default function ContourCopyExercise({
         style={[styles.playButton, isPlaying && styles.playButtonDisabled]}
         onPress={playExercise}
         disabled={isPlaying}
+        accessibilityLabel={isPlaying ? "Playing audio" : "Play audio again"}
+        accessibilityRole="button"
       >
         <Text style={styles.playButtonText}>
           {isPlaying ? "🔊 Playing..." : "🔊 Play Again"}
@@ -264,6 +266,8 @@ export default function ContourCopyExercise({
             ]}
             onPress={() => handleAnswer(shape)}
             disabled={hasAnswered}
+            accessibilityLabel={`Select ${shape.replace("-", " to ")} contour`}
+            accessibilityRole="button"
           >
             <Text style={styles.contourSymbol}>{symbol}</Text>
             <Text style={styles.answerButtonText}>

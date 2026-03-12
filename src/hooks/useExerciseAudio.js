@@ -5,6 +5,7 @@
  */
 import { useRef, useCallback, useEffect, useMemo } from "react";
 import { Platform } from "react-native";
+import { devLog, devWarn } from "../utils/devLogger";
 
 // Cross-platform AudioContext
 let NativeAudioContext = null;
@@ -12,7 +13,7 @@ if (Platform.OS !== "web") {
   try {
     NativeAudioContext = require("react-native-audio-api").AudioContext;
   } catch (e) {
-    console.warn("react-native-audio-api not available");
+    devWarn("react-native-audio-api not available");
   }
 }
 
@@ -51,7 +52,7 @@ function noteToFrequency(noteName) {
   // Parse note name (e.g., "F#4" -> note="F#", octave=4)
   const match = noteName.match(/^([A-Ga-g][#b]?)(\d)$/);
   if (!match) {
-    console.warn("Invalid note name:", noteName);
+    devWarn("Invalid note name:", noteName);
     return 440; // Default to A4
   }
 
@@ -60,7 +61,7 @@ function noteToFrequency(noteName) {
   const octave = parseInt(octaveStr, 10);
 
   if (semitone === undefined) {
-    console.warn("Unknown note:", note);
+    devWarn("Unknown note:", note);
     return 440;
   }
 
@@ -263,7 +264,7 @@ export default function useExerciseAudio() {
         secondFreq = transposeFrequency(freq1, semitones * direction);
       }
 
-      console.log(
+      devLog(
         `[Exercise] Same/Diff: isSame=${isSame}, offset=${totalOffset}, f1=${freq1.toFixed(1)}, f2=${secondFreq.toFixed(1)}`,
       );
 
@@ -319,7 +320,7 @@ export default function useExerciseAudio() {
         );
       }
 
-      console.log(
+      devLog(
         `[Exercise] Direction: dir=${direction}, offset=${totalOffset}, interval semitones=${(Math.log2(secondFreq / freq1) * 12).toFixed(1)}`,
       );
 

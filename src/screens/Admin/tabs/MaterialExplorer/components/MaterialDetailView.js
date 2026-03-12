@@ -2,6 +2,7 @@
  * MaterialDetailView - Shows detailed information about a material
  */
 import React, { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -10,6 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { baseUrl } from "../../../../../api/client";
+import { devLog, devError } from "../../../../../utils/devLogger";
 import styles from "../../../styles";
 
 function DetailRow({ label, value, valueStyle }) {
@@ -49,7 +51,7 @@ export default function MaterialDetailView({
         setGateStatus(data);
       }
     } catch (err) {
-      console.log("[AdminScreen] Gate check failed");
+      devLog("[AdminScreen] Gate check failed");
     }
     setLoadingGates(false);
   };
@@ -84,7 +86,7 @@ export default function MaterialDetailView({
         });
       }
     } catch (err) {
-      console.error("[AdminScreen] Reanalyze error:", err);
+      devError("[AdminScreen] Reanalyze error:", err);
       setReanalyzeResult({ type: "error", message: err.message });
     }
     setReanalyzing(false);
@@ -98,7 +100,12 @@ export default function MaterialDetailView({
     <ScrollView style={styles.detailContainer}>
       <View style={styles.detailHeader}>
         <Text style={styles.detailTitle}>{material.title}</Text>
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+        <TouchableOpacity
+          accessibilityLabel="Close material detail"
+          accessibilityRole="button"
+          style={styles.closeButton}
+          onPress={onClose}
+        >
           <Text style={styles.closeButtonText}>✕</Text>
         </TouchableOpacity>
       </View>
@@ -253,6 +260,10 @@ export default function MaterialDetailView({
         <Text style={styles.detailSectionTitle}>Actions</Text>
         <View style={styles.actionButtonRow}>
           <TouchableOpacity
+            accessibilityLabel={
+              reanalyzing ? "Analyzing" : "Reanalyze all metrics"
+            }
+            accessibilityRole="button"
             style={[
               styles.actionButton,
               reanalyzing && styles.actionButtonDisabled,
@@ -265,6 +276,8 @@ export default function MaterialDetailView({
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityLabel="Reanalyze soft gates only"
+            accessibilityRole="button"
             style={[
               styles.actionButton,
               reanalyzing && styles.actionButtonDisabled,
@@ -275,6 +288,8 @@ export default function MaterialDetailView({
             <Text style={styles.actionButtonText}>Soft Gates Only</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityLabel="Reanalyze capabilities only"
+            accessibilityRole="button"
             style={[
               styles.actionButton,
               reanalyzing && styles.actionButtonDisabled,
@@ -306,3 +321,22 @@ export default function MaterialDetailView({
     </ScrollView>
   );
 }
+
+MaterialDetailView.propTypes = {
+  material: PropTypes.shape({
+    id: PropTypes.number,
+    title: PropTypes.string,
+    filename: PropTypes.string,
+    key_center: PropTypes.string,
+    time_signature: PropTypes.string,
+    tempo_bpm: PropTypes.number,
+    measure_count: PropTypes.number,
+    range_low: PropTypes.string,
+    range_high: PropTypes.string,
+    capabilities: PropTypes.array,
+    soft_gates: PropTypes.object,
+  }),
+  userId: PropTypes.number,
+  onClose: PropTypes.func.isRequired,
+  onTriggerAnalysis: PropTypes.func,
+};

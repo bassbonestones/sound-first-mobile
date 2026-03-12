@@ -404,4 +404,15 @@ export default StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#1a1a2e",
+  },
+  loadingText: {
+    color: "#888",
+    marginTop: 16,
+    fontSize: 16,
+  },
 });

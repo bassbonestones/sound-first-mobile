@@ -3,6 +3,7 @@
  */
 
 import React from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -53,6 +54,8 @@ export default function AddCapabilityModal({
             {CATEGORIES.map((cat) => (
               <TouchableOpacity
                 key={cat}
+                accessibilityLabel={`Select ${cat} category`}
+                accessibilityRole="button"
                 style={[
                   styles.catOption,
                   newItem.category === cat && styles.catOptionActive,
@@ -87,6 +90,8 @@ export default function AddCapabilityModal({
           <Text style={styles.modalLabel}>Type:</Text>
           <View style={styles.typeSelector}>
             <TouchableOpacity
+              accessibilityLabel="Set type to prerequisite"
+              accessibilityRole="button"
               style={[
                 styles.typeSelectorBtn,
                 newItem.type === "P" && styles.typeSelectorBtnActive,
@@ -104,6 +109,8 @@ export default function AddCapabilityModal({
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
+              accessibilityLabel="Set type to teachable"
+              accessibilityRole="button"
               style={[
                 styles.typeSelectorBtn,
                 newItem.type === "T" && styles.typeSelectorBtnActive,
@@ -123,10 +130,20 @@ export default function AddCapabilityModal({
           </View>
 
           <View style={styles.modalButtons}>
-            <TouchableOpacity style={styles.modalCancelBtn} onPress={onCancel}>
+            <TouchableOpacity
+              accessibilityLabel="Cancel adding capability"
+              accessibilityRole="button"
+              style={styles.modalCancelBtn}
+              onPress={onCancel}
+            >
               <Text style={styles.modalCancelText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.modalAddBtn} onPress={onAdd}>
+            <TouchableOpacity
+              accessibilityLabel="Add new capability"
+              accessibilityRole="button"
+              style={styles.modalAddBtn}
+              onPress={onAdd}
+            >
               <Text style={styles.modalAddText}>Add</Text>
             </TouchableOpacity>
           </View>
@@ -135,3 +152,15 @@ export default function AddCapabilityModal({
     </Modal>
   );
 }
+
+AddCapabilityModal.propTypes = {
+  visible: PropTypes.bool.isRequired,
+  newItem: PropTypes.shape({
+    capability: PropTypes.string,
+    name: PropTypes.string,
+    category: PropTypes.string,
+  }).isRequired,
+  onChangeItem: PropTypes.func.isRequired,
+  onAdd: PropTypes.func.isRequired,
+  onCancel: PropTypes.func.isRequired,
+};

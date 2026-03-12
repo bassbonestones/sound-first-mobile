@@ -16,6 +16,7 @@ import {
   Platform,
 } from "react-native";
 import { baseUrl } from "../../../../api/client";
+import { devError } from "../../../../utils/devLogger";
 import styles from "../../styles";
 
 // Cross-platform alert helper (Alert doesn't work on web)
@@ -69,7 +70,7 @@ function UserProgressionInspector() {
         }
       }
     } catch (err) {
-      console.error("[AdminScreen] Load user progression error:", err);
+      devError("[AdminScreen] Load user progression error:", err);
       // Try fallback endpoints
       try {
         const [userRes, capRes, journeyRes] = await Promise.all([
@@ -86,7 +87,7 @@ function UserProgressionInspector() {
           journey,
         });
       } catch (e) {
-        console.error("[AdminScreen] User data fallback failed:", e);
+        devError("[AdminScreen] User data fallback failed:", e);
       }
     }
     setLoading(false);
@@ -117,6 +118,8 @@ function UserProgressionInspector() {
           placeholder="Enter user ID"
         />
         <TouchableOpacity
+          accessibilityLabel="Load user data"
+          accessibilityRole="button"
           style={styles.loadButton}
           onPress={() => loadUserData()}
         >
@@ -134,6 +137,8 @@ function UserProgressionInspector() {
             style={localStyles.instrumentScroll}
           >
             <TouchableOpacity
+              accessibilityLabel="Show all instruments, global capabilities only"
+              accessibilityRole="button"
               style={[
                 localStyles.instrumentChip,
                 selectedInstrumentId === null &&
@@ -154,6 +159,8 @@ function UserProgressionInspector() {
             {instruments.map((inst) => (
               <TouchableOpacity
                 key={inst.id}
+                accessibilityLabel={`Select ${inst.instrument_name}${inst.is_primary ? ", primary instrument" : ""}`}
+                accessibilityRole="button"
                 style={[
                   localStyles.instrumentChip,
                   selectedInstrumentId === inst.id &&
@@ -182,6 +189,8 @@ function UserProgressionInspector() {
         {SUB_TABS.map((tab) => (
           <TouchableOpacity
             key={tab.id}
+            accessibilityLabel={`View ${tab.label}`}
+            accessibilityRole="button"
             style={[
               styles.subTab,
               activeSubTab === tab.id && styles.subTabActive,
@@ -379,7 +388,7 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
       setEditing(false);
       onRefresh();
     } catch (err) {
-      console.error("Failed to save:", err);
+      devError("Failed to save:", err);
       showAlert("Error", "Failed to save changes");
     }
     setSaving(false);
@@ -424,12 +433,16 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
         {!editing ? (
           <>
             <TouchableOpacity
+              accessibilityLabel="Edit user info"
+              accessibilityRole="button"
               style={localStyles.editButton}
               onPress={startEditing}
             >
               <Text style={localStyles.editButtonText}>Edit User Info</Text>
             </TouchableOpacity>
             <TouchableOpacity
+              accessibilityLabel="Reset user progress"
+              accessibilityRole="button"
               style={localStyles.resetButton}
               onPress={resetUser}
             >
@@ -439,6 +452,8 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
         ) : (
           <>
             <TouchableOpacity
+              accessibilityLabel="Save changes"
+              accessibilityRole="button"
               style={localStyles.saveButton}
               onPress={saveChanges}
               disabled={saving}
@@ -448,6 +463,8 @@ function UserOverviewTab({ userData, userId, onRefresh }) {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
+              accessibilityLabel="Cancel editing"
+              accessibilityRole="button"
               style={localStyles.cancelButton}
               onPress={() => setEditing(false)}
             >
@@ -664,7 +681,7 @@ function UserCapabilitiesTab({
         setAllCaps(data.capabilities);
       }
     } catch (err) {
-      console.error("Failed to load capabilities:", err);
+      devError("Failed to load capabilities:", err);
     }
     setLoadingCaps(false);
   };
@@ -969,7 +986,7 @@ function UserSoftGatesTab({ userData, userId, onRefresh }) {
         setAllGates(data.soft_gates);
       }
     } catch (err) {
-      console.error("Failed to load soft gates:", err);
+      devError("Failed to load soft gates:", err);
     }
     setLoading(false);
   };
@@ -1162,7 +1179,7 @@ function UserCandidatesTab({ userId }) {
         setAvailableModules(modulesData);
       }
     } catch (err) {
-      console.error("[AdminScreen] Load candidates error:", err);
+      devError("[AdminScreen] Load candidates error:", err);
     }
     setLoading(false);
   };

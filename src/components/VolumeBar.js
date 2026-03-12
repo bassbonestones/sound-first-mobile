@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import PropTypes from "prop-types";
 import { View, Text, StyleSheet, Animated, Platform } from "react-native";
 
 /**
@@ -135,6 +136,16 @@ export default function VolumeBar({
   );
 }
 
+VolumeBar.propTypes = {
+  volume: PropTypes.number,
+  pitchAccuracy: PropTypes.oneOf(["correct", "off", "listening", null]),
+  label: PropTypes.string,
+  height: PropTypes.number,
+  animated: PropTypes.bool,
+  showPeakHold: PropTypes.bool,
+  style: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
+};
+
 /**
  * CircularVolumeIndicator - Alternative circular volume display
  *
@@ -197,6 +208,13 @@ export function CircularVolumeIndicator({
     </View>
   );
 }
+
+CircularVolumeIndicator.propTypes = {
+  volume: PropTypes.number,
+  pitchAccuracy: PropTypes.oneOf(["correct", "off", "listening", null]),
+  size: PropTypes.number,
+  style: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
+};
 
 const styles = StyleSheet.create({
   container: {

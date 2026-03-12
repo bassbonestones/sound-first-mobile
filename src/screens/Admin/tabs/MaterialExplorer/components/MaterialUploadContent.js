@@ -3,6 +3,7 @@
  * Handles file selection, analysis preview, and save to database
  */
 import React, { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -12,8 +13,10 @@ import {
   Modal,
   Platform,
   ActivityIndicator,
+  StyleSheet,
 } from "react-native";
 import { baseUrl } from "../../../../../api/client";
+import { devLog } from "../../../../../utils/devLogger";
 import styles from "../../../styles";
 
 function DetailRow({ label, value }) {
@@ -65,9 +68,7 @@ export default function MaterialUploadContent({ uploadHook, softGateHelp }) {
         setAllCapabilities(data.capabilities || []);
       }
     } catch (err) {
-      console.log(
-        "[MaterialUpload] Could not load capabilities for domain lookup",
-      );
+      devLog("[MaterialUpload] Could not load capabilities for domain lookup");
     }
   };
 
@@ -107,7 +108,12 @@ export default function MaterialUploadContent({ uploadHook, softGateHelp }) {
         <Text style={styles.detailTitle}>
           {uploadStep === "select" ? "Upload Material" : "Analysis Preview"}
         </Text>
-        <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
+        <TouchableOpacity
+          accessibilityLabel="Close upload modal"
+          accessibilityRole="button"
+          style={styles.closeButton}
+          onPress={closeModal}
+        >
           <Text style={styles.closeButtonText}>✕</Text>
         </TouchableOpacity>
       </View>
@@ -118,6 +124,12 @@ export default function MaterialUploadContent({ uploadHook, softGateHelp }) {
             {/* File Picker */}
             <Text style={styles.uploadLabel}>MusicXML File</Text>
             <TouchableOpacity
+              accessibilityLabel={
+                uploadFileName
+                  ? `Selected file: ${uploadFileName}`
+                  : "Choose MusicXML file"
+              }
+              accessibilityRole="button"
               style={styles.filePickerButton}
               onPress={handleFilePick}
             >
@@ -168,6 +180,8 @@ export default function MaterialUploadContent({ uploadHook, softGateHelp }) {
             )}
 
             <TouchableOpacity
+              accessibilityLabel="Analyze file"
+              accessibilityRole="button"
               style={styles.analyzeButton}
               onPress={analyzeUploadedFile}
               disabled={!uploadFileContent}
@@ -384,6 +398,8 @@ export default function MaterialUploadContent({ uploadHook, softGateHelp }) {
                     </>
                   )}
                   <TouchableOpacity
+                    accessibilityLabel="Close help modal"
+                    accessibilityRole="button"
                     style={styles.helpModalClose}
                     onPress={() => setSoftGateHelpVisible(null)}
                   >
@@ -400,6 +416,12 @@ export default function MaterialUploadContent({ uploadHook, softGateHelp }) {
                   Detected Capabilities ({uploadPreview.capability_count})
                 </Text>
                 <TouchableOpacity
+                  accessibilityLabel={
+                    showAllCapabilities
+                      ? "Collapse all capabilities"
+                      : "Expand all capabilities"
+                  }
+                  accessibilityRole="button"
                   onPress={() => setShowAllCapabilities(!showAllCapabilities)}
                   style={styles.toggleCapabilitiesButton}
                 >
@@ -435,6 +457,8 @@ export default function MaterialUploadContent({ uploadHook, softGateHelp }) {
                   return (
                     <View key={domain} style={styles.domainSection}>
                       <TouchableOpacity
+                        accessibilityLabel={`${isExpanded ? "Collapse" : "Expand"} ${domain.replace(/_/g, " ")} capabilities`}
+                        accessibilityRole="button"
                         style={styles.domainHeader}
                         onPress={() => toggleDomain(domain)}
                       >
@@ -467,12 +491,18 @@ export default function MaterialUploadContent({ uploadHook, softGateHelp }) {
             {/* Action Buttons */}
             <View style={styles.uploadActions}>
               <TouchableOpacity
+                accessibilityLabel="Go back to file selection"
+                accessibilityRole="button"
                 style={styles.backButton}
                 onPress={() => setUploadStep("select")}
               >
                 <Text style={styles.backButtonText}>← Back</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                accessibilityLabel={
+                  uploadSaving ? "Saving" : "Save to database"
+                }
+                accessibilityRole="button"
                 style={[
                   styles.confirmButton,
                   uploadSaving && styles.buttonDisabled,
@@ -507,7 +537,12 @@ function SoftGateCell({ label, value, onHelp, warning }) {
     <View style={styles.softGateCell}>
       <View style={styles.softGateLabelRow}>
         <Text style={styles.softGateCellLabel}>{label}</Text>
-        <TouchableOpacity onPress={onHelp} style={styles.helpButton}>
+        <TouchableOpacity
+          accessibilityLabel={`Help for ${label}`}
+          accessibilityRole="button"
+          onPress={onHelp}
+          style={styles.helpButton}
+        >
           <Text style={styles.helpButtonText}>?</Text>
         </TouchableOpacity>
       </View>
@@ -554,7 +589,7 @@ function UnifiedScoresSection({
             <Text style={[styles.softGateCellValue, { fontSize: 18 }]}>
               {(unifiedScores.composite.overall * 100).toFixed(0)}%
               {unifiedScores.composite.interaction_bonus > 0 && (
-                <Text style={{ fontSize: 10, color: "#e74c3c" }}>
+                <Text style={localStyles.interactionBonusText}>
                   {" "}
                   (+
                   {(unifiedScores.composite.interaction_bonus * 100).toFixed(0)}
@@ -721,3 +756,31 @@ function UnifiedScoresSection({
     </View>
   );
 }
+MaterialUploadContent.propTypes = {
+  uploadHook: PropTypes.shape({
+    step: PropTypes.string,
+    setStep: PropTypes.func,
+    fileName: PropTypes.string,
+    fileContent: PropTypes.string,
+    title: PropTypes.string,
+    setTitle: PropTypes.func,
+    keyCenter: PropTypes.string,
+    setKeyCenter: PropTypes.func,
+    preview: PropTypes.object,
+    error: PropTypes.string,
+    saving: PropTypes.bool,
+    setContent: PropTypes.func,
+    handleFilePick: PropTypes.func,
+    analyzeFile: PropTypes.func,
+    confirmUpload: PropTypes.func,
+    closeModal: PropTypes.func,
+  }).isRequired,
+  softGateHelp: PropTypes.object,
+};
+
+const localStyles = StyleSheet.create({
+  interactionBonusText: {
+    fontSize: 10,
+    color: "#e74c3c",
+  },
+});

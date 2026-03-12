@@ -12,7 +12,13 @@ export {
   midiToFrequency,
   noteToFrequency,
   formatNoteName,
+  midiToNote,
+  shouldUseSharps,
+  midiToNoteInContext,
   NOTE_FREQUENCIES,
+  CHROMATIC_NOTES,
+  FLAT_EQUIVALENTS,
+  SHARP_EQUIVALENTS,
 } from "./noteUtils";
 
 // Audio helpers
@@ -56,3 +62,15 @@ export {
   COLORS,
   SHADOWS,
 } from "./lessonStyles";
+
+// Error Boundary
+export {
+  default as ExerciseErrorBoundary,
+  withExerciseErrorBoundary,
+} from "./ExerciseErrorBoundary";
+
+// Audio Loading State
+export { AudioLoadingState, WithAudioLoading } from "./AudioLoadingState";
+
+// Audio Context Hook
+export { useExerciseAudioContext } from "./useExerciseAudioContext";

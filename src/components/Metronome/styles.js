@@ -445,6 +445,286 @@ export const styles = StyleSheet.create({
     color: colors.gold,
     fontWeight: "bold",
   },
+
+  // Main component container (for non-compact mode)
+  mainContainer: {
+    alignItems: "center",
+    padding: 16,
+    position: "relative",
+    width: "100%",
+  },
+
+  // Time signature picker panel
+  timeSigPickerPanel: {
+    backgroundColor: colors.surfaceDark,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    width: "100%",
+    maxWidth: 340,
+    alignSelf: "center",
+  },
+  beatsPerMeasureSection: {
+    marginBottom: 16,
+  },
+  timeSigDoneButton: {
+    backgroundColor: colors.gold,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 12,
+    alignItems: "center",
+  },
+  timeSigDoneButtonText: {
+    color: colors.textDark,
+    fontWeight: "bold",
+  },
+
+  // Subdivision picker panel
+  subdivisionPickerPanel: {
+    backgroundColor: colors.surfaceDark,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    width: "100%",
+    maxWidth: 340,
+    alignSelf: "center",
+  },
+  subdivisionPickerTitle: {
+    color: colors.purple,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  subdivisionScrollView: {
+    maxHeight: 250,
+  },
+  subdivisionOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    marginBottom: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+  },
+  subdivisionOptionActive: {
+    backgroundColor: colors.purple,
+  },
+  subdivisionOptionInactive: {
+    backgroundColor: colors.surface,
+  },
+  subdivisionOptionContent: {
+    flex: 1,
+  },
+  subdivisionOptionTitle: {
+    fontWeight: "bold",
+    fontSize: 14,
+    color: colors.goldDark,
+  },
+  subdivisionOptionTitleActive: {
+    color: colors.textLight,
+  },
+  subdivisionOptionTitleInactive: {
+    color: colors.goldDark,
+  },
+  subdivisionOptionDesc: {
+    fontSize: 11,
+    color: colors.textMuted,
+  },
+  subdivisionOptionDescActive: {
+    color: "#ddd",
+  },
+  subdivisionOptionDescInactive: {
+    color: colors.textMuted,
+  },
+  subdivisionCheckmark: {
+    color: colors.textLight,
+    fontSize: 16,
+  },
+
+  // BPM controls row
+  bpmControlsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  bpmButtonLarge: {
+    backgroundColor: colors.surface,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.gold,
+  },
+  bpmButtonLargeText: {
+    color: colors.gold,
+    fontSize: 24,
+  },
+  bpmButtonSmall: {
+    backgroundColor: colors.surface,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 8,
+    borderWidth: 1,
+    borderColor: colors.goldMuted,
+  },
+  bpmButtonSmallText: {
+    color: colors.goldDark,
+    fontSize: 18,
+  },
+
+  // Play buttons row
+  playButtonsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  playButtonStart: {
+    backgroundColor: "#27ae60",
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 24,
+    marginRight: 12,
+  },
+  playButtonStop: {
+    backgroundColor: "#c0392b",
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 24,
+    marginRight: 12,
+  },
+  playButtonText: {
+    color: colors.textLight,
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  tapButton: {
+    backgroundColor: colors.surface,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: colors.gold,
+  },
+  tapButtonText: {
+    color: colors.gold,
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+
+  // Presets row
+  presetsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    marginTop: 16,
+    width: "100%",
+  },
+  presetButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    margin: 4,
+    backgroundColor: colors.surfaceDark,
+  },
+  presetButtonActive: {
+    backgroundColor: colors.gold,
+  },
+  presetButtonInactive: {
+    backgroundColor: colors.surfaceDark,
+  },
+  presetButtonText: {
+    fontWeight: "bold",
+    fontSize: 13,
+    color: colors.goldDark,
+  },
+  presetButtonTextActive: {
+    color: colors.textDark,
+  },
+  presetButtonTextInactive: {
+    color: colors.goldDark,
+  },
+
+  // Subdivision indicators
+  subIndicatorRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginBottom: 12,
+    marginTop: -10,
+  },
+  subIndicatorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 3,
+    borderWidth: 1,
+    borderColor: colors.purple,
+  },
+  subIndicatorDotActive: {
+    backgroundColor: colors.purple,
+  },
+  subIndicatorDotInactive: {
+    backgroundColor: colors.surface,
+  },
+
+  // Volume modal styles
+  volumeModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  volumeModalContent: {
+    backgroundColor: colors.surfaceDark,
+    borderRadius: 16,
+    padding: 24,
+    width: 300,
+  },
+  volumeModalTitle: {
+    color: colors.gold,
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  volumeSliderRow: {
+    marginBottom: 20,
+  },
+  volumeSliderRowLast: {
+    marginBottom: 24,
+  },
+  volumeLabelPurple: {
+    color: colors.purple,
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  volumeLabelCyan: {
+    color: "#00BCD4",
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  slider: {
+    width: "100%",
+    height: 40,
+  },
+  volumeModalDoneButton: {
+    backgroundColor: colors.gold,
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  volumeModalDoneText: {
+    color: "#1a1a2e",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
 });
 
 // Compact metronome styles
@@ -735,6 +1015,107 @@ export const compactStyles = StyleSheet.create({
     color: "#1a1a2e",
     fontWeight: "bold",
     fontSize: 16,
+  },
+
+  // Time signature picker panel
+  timeSigPickerPanel: {
+    backgroundColor: colors.surfaceDark,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    width: "100%",
+    maxWidth: 340,
+  },
+  beatsPerMeasureSection: {
+    marginBottom: 16,
+  },
+  timeSigDoneButton: {
+    backgroundColor: colors.gold,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 12,
+    alignItems: "center",
+  },
+  timeSigDoneButtonText: {
+    color: colors.textDark,
+    fontWeight: "bold",
+  },
+
+  // Subdivision picker panel
+  subdivisionPickerPanel: {
+    backgroundColor: colors.surfaceDark,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    width: "100%",
+    maxWidth: 340,
+  },
+  subdivisionPickerTitle: {
+    color: colors.purple,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+
+  // Beat indicator row
+  beatIndicatorRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginBottom: 20,
+    flexWrap: "wrap",
+    maxWidth: 320,
+  },
+  beatDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    margin: 4,
+    borderWidth: 2,
+  },
+  beatDotActiveAccent: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+    transform: [{ scale: 1.2 }],
+  },
+  beatDotActive: {
+    backgroundColor: colors.gold,
+    borderColor: colors.gold,
+    transform: [{ scale: 1.2 }],
+  },
+  beatDotInactive: {
+    backgroundColor: colors.surface,
+    borderColor: colors.gold,
+    transform: [{ scale: 1 }],
+  },
+  beatDotInactiveAccent: {
+    backgroundColor: colors.surface,
+    borderColor: colors.accent,
+    transform: [{ scale: 1 }],
+  },
+
+  // Volume modal
+  volumeModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  volumeModalContent: {
+    backgroundColor: colors.surfaceDark,
+    borderRadius: 16,
+    padding: 24,
+    width: 300,
+  },
+  volumeModalContentShadow: {
+    ...Platform.select({
+      web: { boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.5)" },
+      default: {
+        shadowColor: "#000",
+        shadowOpacity: 0.5,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 10,
+      },
+    }),
   },
 
   // Compact metronome styles

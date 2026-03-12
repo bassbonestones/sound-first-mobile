@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { baseUrl } from "../../../../../api/client";
+import { devError } from "../../../../../utils/devLogger";
 
 /**
  * Hook for managing soft gate rules
@@ -30,7 +31,7 @@ export function useSoftGateRules() {
         setError("Failed to fetch rules");
       }
     } catch (err) {
-      console.error("[useSoftGateRules] Fetch error:", err);
+      devError("[useSoftGateRules] Fetch error:", err);
       setError(err.message);
     } finally {
       setLoading(false);

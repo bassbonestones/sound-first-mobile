@@ -2,12 +2,14 @@
  * DomainManageModal - Modal for managing capability domains
  */
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
   TextInput,
   ScrollView,
   TouchableOpacity,
+  StyleSheet,
 } from "react-native";
 import styles from "../../../styles";
 
@@ -68,13 +70,18 @@ export default function DomainManageModal({
     <View style={styles.editModalContainer}>
       <View style={styles.editModalHeader}>
         <Text style={styles.editModalTitle}>Manage Domains</Text>
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+        <TouchableOpacity
+          accessibilityLabel="Close domain management"
+          accessibilityRole="button"
+          style={styles.closeButton}
+          onPress={onClose}
+        >
           <Text style={styles.closeButtonText}>✕</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={{ padding: 16, backgroundColor: "#f0f0f0" }}>
-        <Text style={{ color: "#666", fontSize: 12 }}>
+      <View style={localStyles.infoContainer}>
+        <Text style={localStyles.infoText}>
           Domains are sorted alphabetically. Renaming a domain will update all
           capabilities in that domain and re-sort bit_indexes.
         </Text>
@@ -84,7 +91,7 @@ export default function DomainManageModal({
         {domains.map((domain) => (
           <View key={domain} style={styles.domainReorderItem}>
             {editingDomain === domain ? (
-              <View style={{ flex: 1 }}>
+              <View style={localStyles.flexContainer}>
                 <TextInput
                   style={styles.domainEditInput}
                   value={editValue}
@@ -93,14 +100,12 @@ export default function DomainManageModal({
                   placeholder="Domain name"
                 />
                 {saveError && (
-                  <Text
-                    style={{ color: "#dc2626", fontSize: 12, marginTop: 4 }}
-                  >
-                    {saveError}
-                  </Text>
+                  <Text style={localStyles.errorText}>{saveError}</Text>
                 )}
-                <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+                <View style={localStyles.buttonRow}>
                   <TouchableOpacity
+                    accessibilityLabel="Cancel rename"
+                    accessibilityRole="button"
                     style={[
                       styles.domainEditActionButton,
                       { backgroundColor: "#6b7280" },
@@ -108,9 +113,11 @@ export default function DomainManageModal({
                     onPress={cancelEditing}
                     disabled={saving}
                   >
-                    <Text style={{ color: "#fff", fontSize: 12 }}>Cancel</Text>
+                    <Text style={localStyles.buttonText}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
+                    accessibilityLabel={saving ? "Saving" : "Save domain name"}
+                    accessibilityRole="button"
                     style={[
                       styles.domainEditActionButton,
                       { backgroundColor: "#3b82f6" },
@@ -118,7 +125,7 @@ export default function DomainManageModal({
                     onPress={handleSaveRename}
                     disabled={saving}
                   >
-                    <Text style={{ color: "#fff", fontSize: 12 }}>
+                    <Text style={localStyles.buttonText}>
                       {saving ? "Saving..." : "Save"}
                     </Text>
                   </TouchableOpacity>
@@ -126,13 +133,15 @@ export default function DomainManageModal({
               </View>
             ) : (
               <>
-                <View style={{ flex: 1 }}>
+                <View style={localStyles.flexContainer}>
                   <Text style={styles.domainReorderName}>{domain}</Text>
                   <Text style={styles.domainReorderCount}>
                     {domainCounts[domain] || 0} capabilities
                   </Text>
                 </View>
                 <TouchableOpacity
+                  accessibilityLabel={`Edit ${domain} domain name`}
+                  accessibilityRole="button"
                   style={styles.domainEditButton}
                   onPress={() => startEditing(domain)}
                 >
@@ -146,6 +155,8 @@ export default function DomainManageModal({
 
       <View style={styles.editModalFooter}>
         <TouchableOpacity
+          accessibilityLabel="Close"
+          accessibilityRole="button"
           style={[styles.editModalButton, styles.cancelButton]}
           onPress={onClose}
         >
@@ -155,3 +166,38 @@ export default function DomainManageModal({
     </View>
   );
 }
+
+DomainManageModal.propTypes = {
+  domains: PropTypes.arrayOf(PropTypes.string).isRequired,
+  capabilities: PropTypes.array.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onRename: PropTypes.func.isRequired,
+};
+
+const localStyles = StyleSheet.create({
+  infoContainer: {
+    padding: 16,
+    backgroundColor: "#f0f0f0",
+  },
+  infoText: {
+    color: "#666",
+    fontSize: 12,
+  },
+  flexContainer: {
+    flex: 1,
+  },
+  errorText: {
+    color: "#dc2626",
+    fontSize: 12,
+    marginTop: 4,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 12,
+  },
+});

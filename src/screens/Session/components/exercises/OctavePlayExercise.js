@@ -24,6 +24,7 @@ import {
 import { usePitchDetection } from "../../../../hooks/usePitchDetection";
 import { CircularVolumeIndicator } from "../../../../components/VolumeBar";
 import { exercisePropTypes, exerciseDefaultProps } from "./shared";
+import { devWarn } from "../../../../utils/devLogger";
 
 // Audio context
 // Audio context - works on web, iOS, and Android
@@ -37,7 +38,7 @@ if (Platform.OS === "web") {
   try {
     AudioContextClass = require("react-native-audio-api").AudioContext;
   } catch (e) {
-    console.warn("react-native-audio-api not available");
+    devWarn("react-native-audio-api not available");
   }
 }
 
@@ -297,7 +298,12 @@ export default function OctavePlayExercise({
           </View>
         </View>
 
-        <TouchableOpacity style={styles.primaryButton} onPress={handleComplete}>
+        <TouchableOpacity
+          accessibilityLabel="Continue"
+          accessibilityRole="button"
+          style={styles.primaryButton}
+          onPress={handleComplete}
+        >
           <Text style={styles.primaryButtonText}>Continue →</Text>
         </TouchableOpacity>
       </View>
@@ -332,6 +338,8 @@ export default function OctavePlayExercise({
         </View>
 
         <TouchableOpacity
+          accessibilityLabel="Let's go"
+          accessibilityRole="button"
           style={styles.primaryButton}
           onPress={() => setPhase("listen")}
         >
@@ -373,6 +381,8 @@ export default function OctavePlayExercise({
           </Text>
 
           <TouchableOpacity
+            accessibilityLabel={isPlaying ? "Playing audio" : "Play and record"}
+            accessibilityRole="button"
             style={[styles.playButton, isPlaying && styles.playButtonDisabled]}
             onPress={playReference}
             disabled={isPlaying}
@@ -432,7 +442,12 @@ export default function OctavePlayExercise({
             </Text>
           )}
 
-          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+          <TouchableOpacity
+            accessibilityLabel="Skip, I can't find it"
+            accessibilityRole="button"
+            style={styles.skipButton}
+            onPress={handleSkip}
+          >
             <Text style={styles.skipButtonText}>I can't find it</Text>
           </TouchableOpacity>
         </View>
@@ -467,7 +482,12 @@ export default function OctavePlayExercise({
           )}
         </View>
 
-        <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
+        <TouchableOpacity
+          accessibilityLabel={wasCorrect ? "Next" : "Try again"}
+          accessibilityRole="button"
+          style={styles.primaryButton}
+          onPress={handleNext}
+        >
           <Text style={styles.primaryButtonText}>
             {wasCorrect ? "Next →" : "Try Again →"}
           </Text>

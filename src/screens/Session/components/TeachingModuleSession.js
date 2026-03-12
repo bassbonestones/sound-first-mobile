@@ -4,6 +4,7 @@
  * Renders the appropriate exercise component based on exercise_template_id
  */
 import React, { useState, useCallback } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -14,6 +15,7 @@ import {
 } from "react-native";
 import { getExerciseComponent } from "./exercises";
 import { useUser } from "../../../context/UserContext";
+import { devLog } from "../../../utils/devLogger";
 
 /**
  * Intro screen shown before starting the exercise
@@ -59,10 +61,20 @@ function LessonIntro({ mini, onStart, onSkip, onEndPractice }) {
 
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
-        <TouchableOpacity style={styles.skipButton} onPress={onSkip}>
+        <TouchableOpacity
+          style={styles.skipButton}
+          onPress={onSkip}
+          accessibilityLabel="Skip this exercise"
+          accessibilityRole="button"
+        >
           <Text style={styles.skipButtonText}>Skip</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.startButton} onPress={onStart}>
+        <TouchableOpacity
+          style={styles.startButton}
+          onPress={onStart}
+          accessibilityLabel="Start exercise"
+          accessibilityRole="button"
+        >
           <Text style={styles.startButtonText}>Start Exercise</Text>
         </TouchableOpacity>
       </View>
@@ -71,6 +83,8 @@ function LessonIntro({ mini, onStart, onSkip, onEndPractice }) {
       <TouchableOpacity
         style={styles.endPracticeIntroButton}
         onPress={() => setShowEndConfirm(true)}
+        accessibilityLabel="End practice session"
+        accessibilityRole="button"
       >
         <Text style={styles.endPracticeIntroText}>End Practice</Text>
       </TouchableOpacity>
@@ -100,12 +114,16 @@ function LessonIntro({ mini, onStart, onSkip, onEndPractice }) {
               <TouchableOpacity
                 style={styles.modalCancelButton}
                 onPress={() => setShowEndConfirm(false)}
+                accessibilityLabel="Continue practicing"
+                accessibilityRole="button"
               >
                 <Text style={styles.modalCancelText}>Continue</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalConfirmButton}
                 onPress={onEndPractice}
+                accessibilityLabel="Confirm end practice"
+                accessibilityRole="button"
               >
                 <Text style={styles.modalConfirmText}>End Practice</Text>
               </TouchableOpacity>
@@ -116,6 +134,16 @@ function LessonIntro({ mini, onStart, onSkip, onEndPractice }) {
     </View>
   );
 }
+
+LessonIntro.propTypes = {
+  mini: PropTypes.shape({
+    module_display_name: PropTypes.string,
+    lesson_intro: PropTypes.string,
+  }).isRequired,
+  onStart: PropTypes.func.isRequired,
+  onSkip: PropTypes.func,
+  onEndPractice: PropTypes.func,
+};
 
 /**
  * Completion screen shown after mastering the exercise
@@ -151,10 +179,20 @@ function LessonComplete({
         {isLastItem ? (
           <>
             {/* When last item, show Extend and Finish options */}
-            <TouchableOpacity style={styles.extendButton} onPress={onExtend}>
+            <TouchableOpacity
+              style={styles.extendButton}
+              onPress={onExtend}
+              accessibilityLabel="Add one more exercise"
+              accessibilityRole="button"
+            >
               <Text style={styles.extendButtonText}>+ Extend One More</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.finishButton} onPress={onContinue}>
+            <TouchableOpacity
+              style={styles.finishButton}
+              onPress={onContinue}
+              accessibilityLabel="Finish session"
+              accessibilityRole="button"
+            >
               <Text style={styles.finishButtonText}>Finish Session</Text>
             </TouchableOpacity>
           </>
@@ -164,12 +202,16 @@ function LessonComplete({
             <TouchableOpacity
               style={styles.continueButton}
               onPress={onContinue}
+              accessibilityLabel="Continue to next exercise"
+              accessibilityRole="button"
             >
               <Text style={styles.continueButtonText}>Continue</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.endPracticeButton}
               onPress={onEndPractice}
+              accessibilityLabel="End practice session"
+              accessibilityRole="button"
             >
               <Text style={styles.endPracticeButtonText}>End Practice</Text>
             </TouchableOpacity>
@@ -179,6 +221,19 @@ function LessonComplete({
     </View>
   );
 }
+
+LessonComplete.propTypes = {
+  mini: PropTypes.shape({
+    module_display_name: PropTypes.string,
+  }).isRequired,
+  result: PropTypes.shape({
+    streak: PropTypes.number,
+  }),
+  onContinue: PropTypes.func,
+  onEndPractice: PropTypes.func,
+  onExtend: PropTypes.func,
+  isLastItem: PropTypes.bool,
+};
 
 /**
  * Fallback for unsupported exercise types
@@ -196,12 +251,19 @@ function UnsupportedExercise({ mini, onComplete, onSkip }) {
       </Text>
 
       <View style={styles.actionButtons}>
-        <TouchableOpacity style={styles.skipButton} onPress={onSkip}>
+        <TouchableOpacity
+          style={styles.skipButton}
+          onPress={onSkip}
+          accessibilityLabel="Skip this exercise"
+          accessibilityRole="button"
+        >
           <Text style={styles.skipButtonText}>Skip</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.startButton}
           onPress={() => onComplete({ success: true, skipped: true })}
+          accessibilityLabel="Mark exercise as complete"
+          accessibilityRole="button"
         >
           <Text style={styles.startButtonText}>Mark Complete</Text>
         </TouchableOpacity>
@@ -209,6 +271,15 @@ function UnsupportedExercise({ mini, onComplete, onSkip }) {
     </View>
   );
 }
+
+UnsupportedExercise.propTypes = {
+  mini: PropTypes.shape({
+    exercise_template_id: PropTypes.string,
+    lesson_display_name: PropTypes.string,
+  }).isRequired,
+  onComplete: PropTypes.func.isRequired,
+  onSkip: PropTypes.func,
+};
 
 /**
  * Main component - manages lesson flow state
@@ -245,7 +316,7 @@ export default function TeachingModuleSession({
 
   // Handle closing/exiting - unmounts exercise BEFORE calling onSkip
   const handleClose = useCallback(() => {
-    console.log("[TeachingModule] Closing - setting phase to closing");
+    devLog("[TeachingModule] Closing - setting phase to closing");
     setPhase("closing");
     // Small delay to ensure exercise unmounts before navigation
     setTimeout(() => {
@@ -257,7 +328,7 @@ export default function TeachingModuleSession({
   // Record completion immediately to backend - don't wait for button clicks
   const handleExerciseComplete = useCallback(
     (exerciseResult) => {
-      console.log(
+      devLog(
         "[TeachingModule] Exercise complete, recording immediately:",
         exerciseResult,
       );
@@ -276,7 +347,7 @@ export default function TeachingModuleSession({
 
   // Handle continuing after completion (navigation only - completion already recorded)
   const handleContinue = useCallback(() => {
-    console.log("[TeachingModule] handleContinue - navigating");
+    devLog("[TeachingModule] handleContinue - navigating");
     onNavigate?.();
   }, [onNavigate]);
 
@@ -355,10 +426,17 @@ export default function TeachingModuleSession({
           <TouchableOpacity
             style={styles.devSkipButton}
             onPress={handleDevSkip}
+            accessibilityLabel="Skip to complete exercise"
+            accessibilityRole="button"
           >
             <Text style={styles.devSkipButtonText}>⏭ Skip</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.exitButton} onPress={handleClose}>
+          <TouchableOpacity
+            style={styles.exitButton}
+            onPress={handleClose}
+            accessibilityLabel="Close exercise"
+            accessibilityRole="button"
+          >
             <Text style={styles.exitButtonText}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -379,6 +457,22 @@ export default function TeachingModuleSession({
     </SafeAreaView>
   );
 }
+
+TeachingModuleSession.propTypes = {
+  mini: PropTypes.shape({
+    module_display_name: PropTypes.string,
+    exercise_template_id: PropTypes.string,
+    exercise_config: PropTypes.object,
+    lesson_intro: PropTypes.string,
+  }).isRequired,
+  userResonantNote: PropTypes.string,
+  onRecordCompletion: PropTypes.func,
+  onNavigate: PropTypes.func,
+  onSkip: PropTypes.func,
+  onEndPractice: PropTypes.func,
+  onExtend: PropTypes.func,
+  isLastItem: PropTypes.bool,
+};
 
 const styles = StyleSheet.create({
   container: {

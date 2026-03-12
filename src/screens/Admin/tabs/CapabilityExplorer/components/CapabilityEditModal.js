@@ -2,6 +2,7 @@
  * CapabilityEditModal - Modal for editing existing capabilities
  */
 import React, { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -11,9 +12,11 @@ import {
   Switch,
   Modal,
   ActivityIndicator,
+  StyleSheet,
 } from "react-native";
 import styles from "../../../styles";
 import { baseUrl } from "../../../../../api/client";
+import { devLog, devError } from "../../../../../utils/devLogger";
 import {
   VALID_REQUIREMENT_TYPES,
   VALID_MASTERY_TYPES,
@@ -66,9 +69,7 @@ export default function CapabilityEditModal({
     fetch(`${baseUrl}/admin/detection-rule-options`)
       .then((res) => res.json())
       .then((data) => setDetectionRuleOptions(data))
-      .catch((err) =>
-        console.error("Failed to fetch detection rule options:", err),
-      );
+      .catch((err) => devError("Failed to fetch detection rule options:", err));
   }, []);
 
   // Prerequisites state - track by ID
@@ -138,7 +139,7 @@ export default function CapabilityEditModal({
           detectionRule && detectionRule.type ? detectionRule : null,
       };
 
-      console.log(
+      devLog(
         "[CapabilityEditModal] Saving:",
         JSON.stringify(requestBody, null, 2),
       );
@@ -153,7 +154,7 @@ export default function CapabilityEditModal({
       );
 
       const result = await response.json();
-      console.log("[CapabilityEditModal] Response:", response.status, result);
+      devLog("[CapabilityEditModal] Response:", response.status, result);
 
       if (!response.ok) {
         // Handle validation errors from the API
@@ -196,7 +197,7 @@ export default function CapabilityEditModal({
         });
       }, 500);
     } catch (err) {
-      console.error("[CapabilityEditModal] Save error:", err);
+      devError("[CapabilityEditModal] Save error:", err);
       setSaveError(err.message || "Failed to save changes");
     } finally {
       setSaving(false);
@@ -209,7 +210,12 @@ export default function CapabilityEditModal({
     <View style={styles.editModalContainer}>
       <View style={styles.editModalHeader}>
         <Text style={styles.editModalTitle}>Edit Capability</Text>
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+        <TouchableOpacity
+          accessibilityLabel="Close edit modal"
+          accessibilityRole="button"
+          style={styles.closeButton}
+          onPress={onClose}
+        >
           <Text style={styles.closeButtonText}>✕</Text>
         </TouchableOpacity>
       </View>
@@ -267,6 +273,8 @@ export default function CapabilityEditModal({
             {VALID_REQUIREMENT_TYPES.map((type) => (
               <TouchableOpacity
                 key={type}
+                accessibilityLabel={`Select ${type} requirement type`}
+                accessibilityRole="button"
                 style={[
                   styles.pickerOption,
                   formData.requirement_type === type &&
@@ -316,6 +324,8 @@ export default function CapabilityEditModal({
             {VALID_MASTERY_TYPES.map((type) => (
               <TouchableOpacity
                 key={type}
+                accessibilityLabel={`Select ${type} mastery type`}
+                accessibilityRole="button"
                 style={[
                   styles.pickerOption,
                   formData.mastery_type === type && styles.pickerOptionSelected,
@@ -451,6 +461,8 @@ export default function CapabilityEditModal({
                       </Text>
                     </View>
                     <TouchableOpacity
+                      accessibilityLabel={`Remove ${prereq.display_name || prereq.name} prerequisite`}
+                      accessibilityRole="button"
                       style={styles.prereqChipRemove}
                       onPress={() => {
                         setSelectedPrereqIds((prev) =>
@@ -470,6 +482,8 @@ export default function CapabilityEditModal({
 
           {/* Add prerequisite button */}
           <TouchableOpacity
+            accessibilityLabel="Add prerequisite"
+            accessibilityRole="button"
             style={styles.addPrereqButton}
             onPress={() => setShowPrereqSelector(true)}
           >
@@ -534,6 +548,8 @@ export default function CapabilityEditModal({
         {/* Action Buttons */}
         <View style={styles.editModalActions}>
           <TouchableOpacity
+            accessibilityLabel="Cancel editing"
+            accessibilityRole="button"
             style={[styles.editModalButton, styles.cancelButton]}
             onPress={onClose}
             disabled={saving}
@@ -541,6 +557,8 @@ export default function CapabilityEditModal({
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityLabel="Save changes"
+            accessibilityRole="button"
             style={[
               styles.editModalButton,
               styles.saveButton,
@@ -558,8 +576,41 @@ export default function CapabilityEditModal({
         </View>
 
         {/* Spacer for bottom padding */}
-        <View style={{ height: 40 }} />
+        <View style={localStyles.bottomSpacer} />
       </ScrollView>
     </View>
   );
 }
+
+CapabilityEditModal.propTypes = {
+  capability: PropTypes.shape({
+    id: PropTypes.number,
+    name: PropTypes.string,
+    display_name: PropTypes.string,
+    domain: PropTypes.string,
+    subdomain: PropTypes.string,
+    requirement_type: PropTypes.string,
+    difficulty_tier: PropTypes.number,
+    mastery_type: PropTypes.string,
+    mastery_count: PropTypes.number,
+    is_global: PropTypes.bool,
+    prerequisite_ids: PropTypes.array,
+    detection_rule: PropTypes.object,
+    evidence_required_count: PropTypes.number,
+    evidence_distinct_materials: PropTypes.bool,
+    evidence_acceptance_threshold: PropTypes.number,
+    difficulty_weight: PropTypes.number,
+    soft_gate_requirements: PropTypes.oneOfType([
+      PropTypes.object,
+      PropTypes.string,
+    ]),
+  }),
+  allCapabilities: PropTypes.array.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSave: PropTypes.func.isRequired,
+};
+const localStyles = StyleSheet.create({
+  bottomSpacer: {
+    height: 40,
+  },
+});

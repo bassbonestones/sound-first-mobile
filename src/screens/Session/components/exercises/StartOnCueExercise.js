@@ -18,10 +18,13 @@ import { usePitchDetection } from "../../../../hooks/usePitchDetection";
 import {
   createAudioContext,
   createClickSound,
+  midiToNote,
   TIMING_TOLERANCES,
   exercisePropTypes,
   exerciseDefaultProps,
 } from "./shared";
+
+import { devLog, devWarn } from "../../../../utils/devLogger";
 
 // Default timing tolerance - generous for beginners (~1/8 note at 60 BPM)
 // This allows being up to an 8th note early or late and still counting as success
@@ -114,7 +117,7 @@ export default function StartOnCueExercise({
       if (semitone !== undefined) {
         const midi = (octave + 1) * 12 + semitone;
         const freq = 440 * Math.pow(2, (midi - 69) / 12);
-        console.log(
+        devLog(
           `[StartOnCueExercise] Target note ${userFirstNote} = MIDI ${midi} (~${freq.toFixed(1)}Hz), tolerance: ±3 semitones`,
         );
         return midi;
@@ -132,23 +135,7 @@ export default function StartOnCueExercise({
   // Helper: convert MIDI note number to note name (e.g., 53 -> "F3")
   const midiToNoteName = React.useCallback((midi) => {
     if (midi === null || midi === undefined) return null;
-    const noteNames = [
-      "C",
-      "C#",
-      "D",
-      "D#",
-      "E",
-      "F",
-      "F#",
-      "G",
-      "G#",
-      "A",
-      "A#",
-      "B",
-    ];
-    const octave = Math.floor(midi / 12) - 1;
-    const noteIndex = midi % 12;
-    return `${noteNames[noteIndex]}${octave}`;
+    return midiToNote(midi, false);
   }, []);
 
   // Keep pitch detection alive for the entire exercise duration (not toggling per round)
@@ -225,7 +212,7 @@ export default function StartOnCueExercise({
     if (!waitingForNewSoundRef.current && !soundStartTimeRef.current) {
       if (wasSoundingAtListenStartRef.current) {
         // User was genuinely playing BEFORE beat 1 - that's an early entry!
-        console.log(
+        devLog(
           "[StartOnCueExercise] User was already playing when listening started - counting as EARLY",
         );
         wasSoundingAtListenStartRef.current = false; // Reset so we only check once
@@ -251,7 +238,7 @@ export default function StartOnCueExercise({
         soundStartTimeRef.current = now;
         // currentPitch is an object with .frequency property
         soundStartPitchRef.current = currentPitchRef.current?.frequency || null;
-        console.log(
+        devLog(
           "[StartOnCueExercise] Sound detected at",
           now,
           "pitch=",
@@ -262,7 +249,7 @@ export default function StartOnCueExercise({
         sustainTimerRef.current = setTimeout(() => {
           // Sound has been sustained long enough - this is real user input
           if (waitingForEntry && !hasEnteredRef.current && isSounding) {
-            console.log(
+            devLog(
               "[StartOnCueExercise] Sustained long enough, triggering entry",
             );
             handleEntryRef.current?.();
@@ -274,14 +261,14 @@ export default function StartOnCueExercise({
       if (sustainTimerRef.current) {
         clearTimeout(sustainTimerRef.current);
         sustainTimerRef.current = null;
-        console.log("[StartOnCueExercise] Sound stopped, clearing timer");
+        devLog("[StartOnCueExercise] Sound stopped, clearing timer");
       }
       soundStartTimeRef.current = null;
       soundStartPitchRef.current = null;
       pitchBufferRef.current = []; // Clear buffer on sound stop
       // They released - now we can detect a fresh sound
       if (waitingForNewSoundRef.current) {
-        console.log(
+        devLog(
           "[StartOnCueExercise] User released - now listening for fresh sound",
         );
         waitingForNewSoundRef.current = false;
@@ -292,9 +279,7 @@ export default function StartOnCueExercise({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      console.log(
-        "[StartOnCueExercise] Cleanup - stopping metronome and audio",
-      );
+      devLog("[StartOnCueExercise] Cleanup - stopping metronome and audio");
       unmountedRef.current = true;
       if (beatIntervalRef.current) {
         clearInterval(beatIntervalRef.current);
@@ -312,7 +297,7 @@ export default function StartOnCueExercise({
         try {
           sharedAudioContext.close();
         } catch (e) {
-          console.warn("Error closing audio context:", e);
+          devWarn("Error closing audio context:", e);
         }
       }
     };
@@ -339,7 +324,7 @@ export default function StartOnCueExercise({
       try {
         await audioContextRef.current.resume();
       } catch (e) {
-        console.warn("Failed to resume AudioContext:", e);
+        devWarn("Failed to resume AudioContext:", e);
       }
     }
 
@@ -494,7 +479,7 @@ export default function StartOnCueExercise({
         });
       }
 
-      console.log(
+      devLog(
         `[Entry] Pitch buffer:`,
         counts,
         `-> candidates (>=${MIN_VOTES} votes):`,
@@ -512,11 +497,11 @@ export default function StartOnCueExercise({
     if (detectedMidi !== null) {
       const midiDiff = Math.abs(detectedMidi - targetMidiNote);
       isPitchCorrect = midiDiff <= PITCH_TOLERANCE_SEMITONES;
-      console.log(
+      devLog(
         `[Entry] Most common MIDI ${detectedMidi} (${midiToNoteName(detectedMidi)}), target: MIDI ${targetMidiNote}, diff: ${midiDiff} semitones, correct: ${isPitchCorrect}`,
       );
     } else {
-      console.log(`[Entry] No pitch detected, skipping pitch validation`);
+      devLog(`[Entry] No pitch detected, skipping pitch validation`);
     }
 
     // If wrong pitch, fail immediately regardless of timing
@@ -558,7 +543,7 @@ export default function StartOnCueExercise({
       measureDuration;
     const timeToNextBeatOne = measureDuration - positionInMeasure;
 
-    console.log(
+    devLog(
       `[Entry] timeSinceBeatOne=${timeSinceBeatOne}ms, positionInMeasure=${positionInMeasure}ms, timeToNextBeatOne=${timeToNextBeatOne}ms, tolerance=${timingToleranceMs}ms`,
     );
 
@@ -720,14 +705,14 @@ export default function StartOnCueExercise({
         // This way we know if they were already playing BEFORE beat 1
         // Use the ref since we're in a callback that might have stale closures
         wasSoundingAtListenStartRef.current = isSoundingRef.current;
-        console.log(
+        devLog(
           "[StartOnCueExercise] Starting to listen, isSounding at this moment:",
           isSoundingRef.current,
         );
         setPhase("listening");
         setWaitingForEntry(true); // This enables pitch detection via the hook
         lastBeatOneTimeRef.current = Date.now();
-        console.log(
+        devLog(
           "[StartOnCueExercise] Beat 1 (first listening) at",
           lastBeatOneTimeRef.current,
         );
@@ -742,7 +727,7 @@ export default function StartOnCueExercise({
 
         if (beatInMeasure === 1) {
           lastBeatOneTimeRef.current = Date.now();
-          console.log(
+          devLog(
             "[StartOnCueExercise] Beat 1 (measure",
             measureCountRef.current + 1,
             ") at",
@@ -883,6 +868,10 @@ export default function StartOnCueExercise({
             <Text style={styles.firstNoteLabel}>Your First Note</Text>
             <Text style={styles.firstNoteValue}>{userFirstNote}</Text>
             <TouchableOpacity
+              accessibilityLabel={
+                isPlayingNote ? "Playing note" : "Hear your note"
+              }
+              accessibilityRole="button"
               style={[
                 styles.hearNoteButton,
                 isPlayingNote && styles.hearNoteButtonActive,
@@ -896,7 +885,12 @@ export default function StartOnCueExercise({
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.startButton} onPress={handleStart}>
+          <TouchableOpacity
+            accessibilityLabel="Start exercise"
+            accessibilityRole="button"
+            style={styles.startButton}
+            onPress={handleStart}
+          >
             <Text style={styles.startButtonText}>Start</Text>
           </TouchableOpacity>
         </View>
@@ -924,6 +918,10 @@ export default function StartOnCueExercise({
         <Text style={styles.targetNoteLabel}>Target: </Text>
         <Text style={styles.targetNoteValue}>{userFirstNote}</Text>
         <TouchableOpacity
+          accessibilityLabel={
+            isPlayingNote ? "Playing note" : "Hear target note"
+          }
+          accessibilityRole="button"
           style={[
             styles.hearNoteSmall,
             isPlayingNote && styles.hearNoteSmallActive,

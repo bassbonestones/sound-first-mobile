@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { View, Text, Platform, ActivityIndicator } from "react-native";
+import PropTypes from "prop-types";
+import {
+  View,
+  Text,
+  Platform,
+  ActivityIndicator,
+  StyleSheet,
+} from "react-native";
+import { devError } from "../utils/devLogger";
 
 // Conditionally import WebView for native platforms
 let WebView = null;
@@ -155,7 +163,7 @@ export default function NotationDisplay({
 
         setLoading(false);
       } catch (err) {
-        console.error("OSMD error:", err);
+        devError("OSMD error:", err);
         setError("Failed to render notation");
         setLoading(false);
       }
@@ -358,41 +366,18 @@ export default function NotationDisplay({
   if (Platform.OS !== "web") {
     if (!musicxml) {
       return (
-        <View
-          style={{
-            width,
-            height,
-            backgroundColor: "#2d232e",
-            borderRadius: 12,
-            justifyContent: "center",
-            alignItems: "center",
-            borderWidth: 1,
-            borderColor: "#5a4a3a",
-          }}
-        >
-          <Text style={{ color: "#666", fontSize: 12 }}>No notation data</Text>
+        <View style={[styles.emptyContainer, { width, height }]}>
+          <Text style={styles.emptyText}>No notation data</Text>
         </View>
       );
     }
 
     return (
-      <View
-        style={{
-          width,
-          height,
-          borderRadius: 12,
-          overflow: "hidden",
-          backgroundColor: "transparent",
-        }}
-      >
+      <View style={[styles.webViewWrapper, { width, height }]}>
         <WebView
           ref={webViewRef}
           source={{ html: webviewHtml }}
-          style={{
-            width,
-            height,
-            backgroundColor: "transparent",
-          }}
+          style={[styles.webView, { width, height }]}
           scrollEnabled={false}
           showsHorizontalScrollIndicator={false}
           showsVerticalScrollIndicator={false}
@@ -408,69 +393,38 @@ export default function NotationDisplay({
   // Web: use direct DOM (existing code)
   if (error) {
     return (
-      <View
-        style={{
-          width,
-          height: 60,
-          backgroundColor: "#2d232e",
-          borderRadius: 12,
-          justifyContent: "center",
-          alignItems: "center",
-          borderWidth: 1,
-          borderColor: "#c0392b",
-        }}
-      >
-        <Text style={{ color: "#c0392b", fontSize: 12 }}>{error}</Text>
+      <View style={[styles.errorContainer, { width }]}>
+        <Text style={styles.errorText}>{error}</Text>
       </View>
     );
   }
 
   return (
-    <View
-      style={{
-        width,
-        height,
-        overflow: "hidden",
-        position: "relative",
-      }}
-    >
+    <View style={[styles.mainContainer, { width, height }]}>
       {loading && (
-        <View
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "#2d232e",
-            borderRadius: 12,
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 10,
-          }}
-        >
+        <View style={styles.loadingOverlay}>
           <ActivityIndicator color="#FFD700" />
-          <Text style={{ color: "#bfa76a", fontSize: 12, marginTop: 8 }}>
-            Loading notation...
-          </Text>
+          <Text style={styles.loadingText}>Loading notation...</Text>
         </View>
       )}
       <View
         ref={containerRef}
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width,
-          height,
-          backgroundColor: "#fffbe6",
-          borderRadius: 8,
-          overflow: "visible",
-        }}
+        style={[styles.notationContainer, { width, height }]}
       />
     </View>
   );
 }
+
+NotationDisplay.propTypes = {
+  musicxml: PropTypes.string,
+  width: PropTypes.number,
+  height: PropTypes.number,
+  showTitle: PropTypes.bool,
+  showTimeSignature: PropTypes.bool,
+  fixedMeasureWidthPixels: PropTypes.number,
+  zoom: PropTypes.number,
+  currentNoteIndex: PropTypes.number,
+};
 
 /**
  * Simple notation placeholder when show_notation is false
@@ -479,25 +433,112 @@ export function NotationPlaceholder({
   message = "Notation hidden - practice by ear",
 }) {
   return (
-    <View
-      style={{
-        backgroundColor: "#2d232e",
-        borderRadius: 12,
-        padding: 16,
-        alignItems: "center",
-        borderWidth: 1,
-        borderColor: "#5a4a3a",
-      }}
-    >
-      <Text style={{ color: "#FFD700", fontSize: 24, marginBottom: 4 }}>
-        🎧
-      </Text>
-      <Text style={{ color: "#bfa76a", fontSize: 13, textAlign: "center" }}>
-        {message}
-      </Text>
+    <View style={styles.placeholderContainer}>
+      <Text style={styles.placeholderIcon}>🎧</Text>
+      <Text style={styles.placeholderText}>{message}</Text>
     </View>
   );
 }
+
+NotationPlaceholder.propTypes = {
+  message: PropTypes.string,
+};
+
+const styles = StyleSheet.create({
+  // Empty/no data state
+  emptyContainer: {
+    backgroundColor: "#2d232e",
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#5a4a3a",
+  },
+  emptyText: {
+    color: "#666",
+    fontSize: 12,
+  },
+
+  // WebView wrapper
+  webViewWrapper: {
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "transparent",
+  },
+  webView: {
+    backgroundColor: "transparent",
+  },
+
+  // Error state
+  errorContainer: {
+    height: 60,
+    backgroundColor: "#2d232e",
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#c0392b",
+  },
+  errorText: {
+    color: "#c0392b",
+    fontSize: 12,
+  },
+
+  // Main container
+  mainContainer: {
+    overflow: "hidden",
+    position: "relative",
+  },
+
+  // Loading overlay
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#2d232e",
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  loadingText: {
+    color: "#bfa76a",
+    fontSize: 12,
+    marginTop: 8,
+  },
+
+  // Notation container
+  notationContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    backgroundColor: "#fffbe6",
+    borderRadius: 8,
+    overflow: "visible",
+  },
+
+  // Placeholder component
+  placeholderContainer: {
+    backgroundColor: "#2d232e",
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#5a4a3a",
+  },
+  placeholderIcon: {
+    color: "#FFD700",
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  placeholderText: {
+    color: "#bfa76a",
+    fontSize: 13,
+    textAlign: "center",
+  },
+});
 
 /**
  * Sample MusicXML for testing

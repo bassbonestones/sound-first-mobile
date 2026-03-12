@@ -8,6 +8,8 @@
  * - Functions to fetch, select, add, and update instruments
  */
 import React, { createContext, useContext, useState, useCallback } from "react";
+import PropTypes from "prop-types";
+import { devError } from "../utils/devLogger";
 import {
   getUserInstruments,
   createUserInstrument,
@@ -52,7 +54,7 @@ export function UserProvider({ children, initialUserId = 1 }) {
         setSelectedInstrument(null);
       }
     } catch (err) {
-      console.error("[UserContext] Failed to load instruments:", err);
+      devError("[UserContext] Failed to load instruments:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -69,10 +71,7 @@ export function UserProvider({ children, initialUserId = 1 }) {
       try {
         await selectUserInstrument(userId, instrument.id);
       } catch (err) {
-        console.error(
-          "[UserContext] Failed to persist instrument selection:",
-          err,
-        );
+        devError("[UserContext] Failed to persist instrument selection:", err);
         // Don't throw - local selection still works
       }
     },
@@ -91,7 +90,7 @@ export function UserProvider({ children, initialUserId = 1 }) {
         await loadInstruments();
         return result.instrument;
       } catch (err) {
-        console.error("[UserContext] Failed to add instrument:", err);
+        devError("[UserContext] Failed to add instrument:", err);
         setError(err.message);
         throw err;
       } finally {
@@ -124,7 +123,7 @@ export function UserProvider({ children, initialUserId = 1 }) {
         }
         return result.instrument;
       } catch (err) {
-        console.error("[UserContext] Failed to update instrument:", err);
+        devError("[UserContext] Failed to update instrument:", err);
         throw err;
       }
     },
@@ -145,6 +144,11 @@ export function UserProvider({ children, initialUserId = 1 }) {
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
+
+UserProvider.propTypes = {
+  children: PropTypes.node.isRequired,
+  initialUserId: PropTypes.number,
+};
 
 /**
  * Hook to access user context

@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Platform,
 } from "react-native";
+import PropTypes from "prop-types";
 import { baseUrl } from "../api/client";
 
 /**
@@ -97,7 +98,12 @@ export default function HelpMenu({
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>📚 Help Menu</Text>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={onClose}
+              accessibilityLabel="Close help menu"
+              accessibilityRole="button"
+            >
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -118,6 +124,8 @@ export default function HelpMenu({
               <TouchableOpacity
                 style={styles.retryButton}
                 onPress={fetchCapabilities}
+                accessibilityLabel="Retry loading help topics"
+                accessibilityRole="button"
               >
                 <Text style={styles.retryButtonText}>Retry</Text>
               </TouchableOpacity>
@@ -152,6 +160,8 @@ export default function HelpMenu({
                         cap.has_lesson && handleSelectCapability(cap)
                       }
                       disabled={!cap.has_lesson}
+                      accessibilityLabel={`Learn about ${cap.display_name || cap.name}${!cap.has_lesson ? ", coming soon" : ""}`}
+                      accessibilityRole="button"
                     >
                       <Text style={styles.capabilityName}>
                         {cap.display_name || cap.name}
@@ -300,4 +310,11 @@ const styles = {
     color: "#888888",
     textAlign: "center",
   },
+};
+
+HelpMenu.propTypes = {
+  visible: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  materialId: PropTypes.string,
+  onSelectCapability: PropTypes.func,
 };

@@ -38,13 +38,14 @@ import {
   exercisePropTypes,
   exerciseDefaultProps,
 } from "./shared";
+import { devLog, devWarn } from "../../../../utils/devLogger";
 
 // For notation display
 let NotationDisplay = null;
 try {
   NotationDisplay = require("../../../../components/NotationDisplay").default;
 } catch (e) {
-  console.warn("NotationDisplay not available");
+  devWarn("NotationDisplay not available");
 }
 
 // Generate MusicXML for half note → half rest → half note pattern (2 measures)
@@ -565,7 +566,7 @@ export default function HalfRestLessonExercise({
 
     const beatSoundPct = soundingOnBeatsRef.current;
     const startedEarly = startedEarlyRef.current;
-    console.log("[HalfRestLesson] analyzePerformance:", {
+    devLog("[HalfRestLesson] analyzePerformance:", {
       totalCount,
       pitchCount,
       hitTarget,
@@ -762,34 +763,32 @@ export default function HalfRestLessonExercise({
           <TouchableOpacity
             style={styles.showNotationButton}
             onPress={handleShowNotation}
+            accessibilityLabel="Show notation"
+            accessibilityRole="button"
           >
             <Text style={styles.showNotationText}>Show Notation 📝</Text>
           </TouchableOpacity>
         ) : (
           <>
-            <View style={[styles.notationWrapper, { position: "relative" }]}>
+            <View
+              style={[styles.notationWrapper, styles.notationWrapperRelative]}
+            >
               {memoizedNotation}
               {/* Green highlight overlay */}
               {highlightLeft !== null && (
                 <View
-                  style={{
-                    position: "absolute",
-                    left: highlightLeft,
-                    top: 40,
-                    width: highlightWidth,
-                    height: 120,
-                    backgroundColor: "rgba(76, 175, 80, 0.25)",
-                    borderRadius: 4,
-                    borderWidth: 2,
-                    borderColor: "rgba(76, 175, 80, 0.6)",
-                    pointerEvents: "none",
-                  }}
+                  style={[
+                    styles.highlightOverlay,
+                    { left: highlightLeft, width: highlightWidth, height: 120 },
+                  ]}
                 />
               )}
             </View>
             <TouchableOpacity
               style={styles.hideNotationButton}
               onPress={() => setShowNotation(false)}
+              accessibilityLabel="Hide notation"
+              accessibilityRole="button"
             >
               <Text style={styles.hideNotationText}>Hide Notation</Text>
             </TouchableOpacity>
@@ -1030,12 +1029,16 @@ export default function HalfRestLessonExercise({
               <TouchableOpacity
                 style={styles.modalCancelButton}
                 onPress={() => setShowAttestModal(false)}
+                accessibilityLabel="Cancel"
+                accessibilityRole="button"
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalConfirmButton}
                 onPress={handleAttestConfirm}
+                accessibilityLabel="Confirm attestation"
+                accessibilityRole="button"
               >
                 <Text style={styles.modalConfirmText}>Confirm</Text>
               </TouchableOpacity>
@@ -1107,6 +1110,8 @@ export default function HalfRestLessonExercise({
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={() => setPhase(PHASE.LISTEN)}
+            accessibilityLabel="Got it, continue"
+            accessibilityRole="button"
           >
             <Text style={styles.primaryButtonText}>Got It →</Text>
           </TouchableOpacity>
@@ -1153,6 +1158,8 @@ export default function HalfRestLessonExercise({
                 playHalfNoteRestPattern(() => setHasHeardPattern(true));
               }}
               disabled={isPlaying}
+              accessibilityLabel="Hear pattern"
+              accessibilityRole="button"
             >
               <Text style={styles.primaryButtonText}>
                 {isPlaying ? "🔊 Playing..." : "🔊 Hear Pattern"}
@@ -1167,6 +1174,8 @@ export default function HalfRestLessonExercise({
                 ]}
                 onPress={playHalfNoteRestPattern}
                 disabled={isPlaying}
+                accessibilityLabel="Hear pattern again"
+                accessibilityRole="button"
               >
                 <Text style={styles.secondaryButtonText}>
                   {isPlaying ? "🔊 Playing..." : "🔊 Hear Again"}
@@ -1179,6 +1188,8 @@ export default function HalfRestLessonExercise({
                     stopPlayback();
                     setPhase(PHASE.SING);
                   }}
+                  accessibilityLabel="Continue to singing"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.primaryButtonText}>I Heard It →</Text>
                 </TouchableOpacity>
@@ -1247,6 +1258,8 @@ export default function HalfRestLessonExercise({
               <TouchableOpacity
                 style={styles.primaryButton}
                 onPress={handleTrySingAgain}
+                accessibilityLabel="Try again"
+                accessibilityRole="button"
               >
                 <Text style={styles.primaryButtonText}>Try Again</Text>
               </TouchableOpacity>
@@ -1254,6 +1267,8 @@ export default function HalfRestLessonExercise({
                 <TouchableOpacity
                   style={[styles.tertiaryButton, { marginTop: 8 }]}
                   onPress={() => handleShowAttestModal("sing")}
+                  accessibilityLabel="Attest correct performance"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.tertiaryButtonText}>
                     I did it correctly →
@@ -1263,7 +1278,7 @@ export default function HalfRestLessonExercise({
             </>
           ) : singResult?.success ? (
             <>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[
                     styles.secondaryButton,
@@ -1272,6 +1287,8 @@ export default function HalfRestLessonExercise({
                   ]}
                   onPress={playHalfNoteRestPattern}
                   disabled={isPlaying}
+                  accessibilityLabel="Hear pattern again"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.secondaryButtonText}>
                     {isPlaying ? "🔊 Playing..." : "🔊 Hear Again"}
@@ -1287,6 +1304,8 @@ export default function HalfRestLessonExercise({
                     handleTrySingAgain();
                   }}
                   disabled={isPlaying}
+                  accessibilityLabel="Sing again"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.secondaryButtonText}>🎤 Sing Again</Text>
                 </TouchableOpacity>
@@ -1294,6 +1313,8 @@ export default function HalfRestLessonExercise({
               <TouchableOpacity
                 style={[styles.primaryButton, { marginTop: 8 }]}
                 onPress={() => setPhase(PHASE.IMAGINE)}
+                accessibilityLabel="Continue to imagining"
+                accessibilityRole="button"
               >
                 <Text style={styles.primaryButtonText}>Continue →</Text>
               </TouchableOpacity>
@@ -1303,6 +1324,8 @@ export default function HalfRestLessonExercise({
               style={[styles.primaryButton, isPlaying && styles.buttonDisabled]}
               onPress={() => playMetronomeOnly(handleDoneSinging)}
               disabled={isPlaying}
+              accessibilityLabel="Start singing"
+              accessibilityRole="button"
             >
               <Text style={styles.primaryButtonText}>
                 {isPlaying ? "🎤 Sing Now..." : "🎤 Start Singing"}
@@ -1355,6 +1378,8 @@ export default function HalfRestLessonExercise({
             style={[styles.secondaryButton, isPlaying && styles.buttonDisabled]}
             onPress={playMetronomeOnly}
             disabled={isPlaying}
+            accessibilityLabel="Count with metronome clicks"
+            accessibilityRole="button"
           >
             <Text style={styles.secondaryButtonText}>
               {isPlaying ? "🥁 Counting..." : "🥁 Count with Clicks"}
@@ -1363,6 +1388,8 @@ export default function HalfRestLessonExercise({
           <TouchableOpacity
             style={[styles.primaryButton, { marginTop: 8 }]}
             onPress={handleDoneImagining}
+            accessibilityLabel="Continue after imagining"
+            accessibilityRole="button"
           >
             <Text style={styles.primaryButtonText}>I Imagined It →</Text>
           </TouchableOpacity>
@@ -1428,6 +1455,8 @@ export default function HalfRestLessonExercise({
               <TouchableOpacity
                 style={styles.primaryButton}
                 onPress={handleTryPlayAgain}
+                accessibilityLabel="Try again"
+                accessibilityRole="button"
               >
                 <Text style={styles.primaryButtonText}>Try Again</Text>
               </TouchableOpacity>
@@ -1435,6 +1464,8 @@ export default function HalfRestLessonExercise({
                 <TouchableOpacity
                   style={[styles.tertiaryButton, { marginTop: 8 }]}
                   onPress={() => handleShowAttestModal("play")}
+                  accessibilityLabel="Attest correct performance"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.tertiaryButtonText}>
                     I did it correctly →
@@ -1444,7 +1475,7 @@ export default function HalfRestLessonExercise({
             </>
           ) : playResult?.success ? (
             <>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[
                     styles.secondaryButton,
@@ -1453,6 +1484,8 @@ export default function HalfRestLessonExercise({
                   ]}
                   onPress={playHalfNoteRestPattern}
                   disabled={isPlaying}
+                  accessibilityLabel="Hear pattern again"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.secondaryButtonText}>
                     {isPlaying ? "🔊 Playing..." : "🔊 Hear Again"}
@@ -1468,6 +1501,8 @@ export default function HalfRestLessonExercise({
                     handleTryPlayAgain();
                   }}
                   disabled={isPlaying}
+                  accessibilityLabel="Play again"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.secondaryButtonText}>🎵 Play Again</Text>
                 </TouchableOpacity>
@@ -1490,6 +1525,8 @@ export default function HalfRestLessonExercise({
                     setPhase(PHASE.FEEDBACK);
                   }
                 }}
+                accessibilityLabel="Continue"
+                accessibilityRole="button"
               >
                 <Text style={styles.primaryButtonText}>Continue →</Text>
               </TouchableOpacity>
@@ -1499,6 +1536,8 @@ export default function HalfRestLessonExercise({
               style={[styles.primaryButton, isPlaying && styles.buttonDisabled]}
               onPress={() => playMetronomeOnly(handleDonePlaying)}
               disabled={isPlaying}
+              accessibilityLabel="Start playing"
+              accessibilityRole="button"
             >
               <Text style={styles.primaryButtonText}>
                 {isPlaying ? "🎵 Play Now..." : "🎵 Start Playing"}
@@ -1580,6 +1619,8 @@ export default function HalfRestLessonExercise({
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={handleContinue}
+            accessibilityLabel="Continue"
+            accessibilityRole="button"
           >
             <Text style={styles.primaryButtonText}>
               {overallSuccess ? "Next Round →" : "Try Again →"}
@@ -2255,5 +2296,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#fff",
+  },
+  // Extra styles for inline conversions
+  buttonRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  notationWrapperRelative: {
+    position: "relative",
+  },
+  highlightOverlay: {
+    position: "absolute",
+    top: 40,
+    backgroundColor: "rgba(76, 175, 80, 0.25)",
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: "rgba(76, 175, 80, 0.6)",
+    pointerEvents: "none",
   },
 });

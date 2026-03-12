@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Platform,
 } from "react-native";
+import PropTypes from "prop-types";
 import { getBackendUrl } from "../api/client";
 
 /**
@@ -215,6 +216,9 @@ export default function AudioPlayer({
               style={[styles.playButton, { backgroundColor: accentColor }]}
               onPress={togglePlayback}
               disabled={!isLoaded}
+              accessibilityLabel={isPlaying ? "Pause audio" : "Play audio"}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !isLoaded }}
             >
               <Text style={styles.playButtonText}>{isPlaying ? "⏸" : "▶"}</Text>
             </TouchableOpacity>
@@ -237,6 +241,9 @@ export default function AudioPlayer({
                 seekTo(percent);
               }}
               activeOpacity={0.8}
+              accessibilityLabel={`Audio progress: ${Math.round(progressPercent)} percent`}
+              accessibilityRole="adjustable"
+              accessibilityHint="Tap to seek to a different position"
             >
               <View style={styles.progressTrack}>
                 <View
@@ -265,6 +272,17 @@ export default function AudioPlayer({
     </View>
   );
 }
+
+AudioPlayer.propTypes = {
+  materialId: PropTypes.string.isRequired,
+  targetKey: PropTypes.string,
+  instrument: PropTypes.string,
+  title: PropTypes.string,
+  onComplete: PropTypes.func,
+  autoPlay: PropTypes.bool,
+  showProgress: PropTypes.bool,
+  accentColor: PropTypes.string,
+};
 
 const styles = StyleSheet.create({
   container: {

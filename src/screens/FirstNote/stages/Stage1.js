@@ -83,6 +83,8 @@ export function Stage1Content() {
             {RATING_FACES.map((face) => (
               <TouchableOpacity
                 key={face.value}
+                accessibilityLabel={`Rate ${face.label}`}
+                accessibilityRole="button"
                 style={styles.ratingButton}
                 onPress={() => setRating(face.value)}
               >
@@ -129,6 +131,8 @@ export function Stage1Buttons() {
     return (
       <View style={styles.fixedBottomButtons}>
         <TouchableOpacity
+          accessibilityLabel="I'm imagining the note"
+          accessibilityRole="button"
           style={styles.primaryButton}
           onPress={() => setSubStep(1)}
         >
@@ -142,6 +146,8 @@ export function Stage1Buttons() {
     return (
       <View style={styles.fixedBottomButtons}>
         <TouchableOpacity
+          accessibilityLabel="I'm ready to play"
+          accessibilityRole="button"
           style={styles.primaryButton}
           onPress={() => setSubStep(2)}
         >
@@ -154,7 +160,12 @@ export function Stage1Buttons() {
   if (subStep === 2) {
     return (
       <View style={styles.fixedBottomButtons}>
-        <TouchableOpacity style={styles.primaryButton} onPress={handleSoundEnd}>
+        <TouchableOpacity
+          accessibilityLabel="Done playing"
+          accessibilityRole="button"
+          style={styles.primaryButton}
+          onPress={handleSoundEnd}
+        >
           <Text style={styles.primaryButtonText}>Done Playing →</Text>
         </TouchableOpacity>
       </View>
@@ -165,6 +176,8 @@ export function Stage1Buttons() {
     return (
       <View style={styles.fixedBottomButtons}>
         <TouchableOpacity
+          accessibilityLabel="Pick a different note"
+          accessibilityRole="button"
           style={styles.secondaryButton}
           onPress={() => {
             setRating(null);
@@ -174,6 +187,8 @@ export function Stage1Buttons() {
           <Text style={styles.secondaryButtonText}>Pick a Different Note</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          accessibilityLabel="Practice the note again"
+          accessibilityRole="button"
           style={[styles.secondaryButton, { marginTop: 12 }]}
           onPress={() => {
             setRating(null);
@@ -187,6 +202,8 @@ export function Stage1Buttons() {
         </TouchableOpacity>
         {rating >= 4 && (
           <TouchableOpacity
+            accessibilityLabel="Continue to next stage"
+            accessibilityRole="button"
             style={[styles.primaryButton, { marginTop: 12 }]}
             onPress={() => {
               setRating(null);

@@ -2,6 +2,7 @@
  * SoftGateRuleCreateModal - Create form for new soft gate rules
  */
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -77,7 +78,12 @@ export default function SoftGateRuleCreateModal({ onClose, onCreate }) {
       <View style={styles.editModalPopup}>
         <View style={styles.detailModalHeader}>
           <Text style={styles.detailModalTitle}>Create Rule</Text>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity
+            accessibilityLabel="Close create modal"
+            accessibilityRole="button"
+            style={styles.closeButton}
+            onPress={onClose}
+          >
             <Text style={[styles.closeButtonText, { color: "#fff" }]}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -143,12 +149,16 @@ export default function SoftGateRuleCreateModal({ onClose, onCreate }) {
 
         <View style={styles.editModalFooter}>
           <TouchableOpacity
+            accessibilityLabel="Cancel"
+            accessibilityRole="button"
             style={[styles.editModalButton, styles.cancelButton]}
             onPress={onClose}
           >
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityLabel={saving ? "Creating" : "Create rule"}
+            accessibilityRole="button"
             style={[
               styles.editModalButton,
               styles.saveButton,
@@ -168,3 +178,8 @@ export default function SoftGateRuleCreateModal({ onClose, onCreate }) {
     </View>
   );
 }
+
+SoftGateRuleCreateModal.propTypes = {
+  onClose: PropTypes.func.isRequired,
+  onCreate: PropTypes.func.isRequired,
+};

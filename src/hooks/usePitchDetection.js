@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Platform, PermissionsAndroid } from "react-native";
+import { devLog, devWarn, devError } from "../utils/devLogger";
 import {
   frequencyToNote,
   noteNameToMidi,
@@ -18,13 +19,13 @@ if (Platform.OS !== "web") {
       !LiveAudioStream?.start ||
       !LiveAudioStream?.stop
     ) {
-      console.warn(
+      devWarn(
         "react-native-live-audio-stream loaded but missing required methods",
       );
       LiveAudioStream = null;
     }
   } catch (e) {
-    console.warn("react-native-live-audio-stream not available:", e);
+    devWarn("react-native-live-audio-stream not available:", e);
   }
 }
 
@@ -115,7 +116,7 @@ export function usePitchDetection({
         return true;
       }
     } catch (err) {
-      console.error("Permission error:", err);
+      devError("Permission error:", err);
       setError("Failed to request microphone permission");
       return false;
     }
@@ -171,7 +172,7 @@ export function usePitchDetection({
 
               // Only set currentPitch if in soundingFrequencyRange (when specified) to filter out metronome etc
               if (inDefaultRange && inSoundingRange) {
-                console.log("[Audio Processing]", result, noteInfo, "IN RANGE");
+                devLog("[Audio Processing]", result, noteInfo, "IN RANGE");
                 // Only update state if note changed (avoid excessive re-renders)
                 if (noteInfo.noteName !== lastPitchNoteRef.current) {
                   lastPitchNoteRef.current = noteInfo.noteName;
@@ -272,7 +273,7 @@ export function usePitchDetection({
           }
         }
       } catch (err) {
-        console.error("Audio processing error:", err);
+        devError("Audio processing error:", err);
       }
     },
     [
@@ -333,7 +334,7 @@ export function usePitchDetection({
                 noteInfo.frequency <= soundingFrequencyRange.max);
 
             if (inDefaultRange) {
-              console.log(
+              devLog(
                 "[usePitchDetection Web]",
                 noteInfo.noteName,
                 noteInfo.frequency.toFixed(0) + "Hz",
@@ -414,7 +415,7 @@ export function usePitchDetection({
         }
       }
     } catch (err) {
-      console.warn("[usePitchDetection] Frame processing error:", err);
+      devWarn("[usePitchDetection] Frame processing error:", err);
     }
 
     // Continue animation loop (even after errors, try to recover)
@@ -443,15 +444,13 @@ export function usePitchDetection({
   const startListeningWeb = useCallback(async () => {
     // Prevent concurrent starts
     if (isListeningRef.current || isStartingRef.current) {
-      console.log(
-        "[usePitchDetection] Already listening or starting, skipping",
-      );
+      devLog("[usePitchDetection] Already listening or starting, skipping");
       return;
     }
     isStartingRef.current = true;
 
     try {
-      console.log("[usePitchDetection] Starting web audio...");
+      devLog("[usePitchDetection] Starting web audio...");
 
       // Get user media
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -464,7 +463,7 @@ export function usePitchDetection({
 
       // Check if we were stopped while waiting for getUserMedia
       if (!isStartingRef.current) {
-        console.log("[usePitchDetection] Cancelled during getUserMedia");
+        devLog("[usePitchDetection] Cancelled during getUserMedia");
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
@@ -476,21 +475,18 @@ export function usePitchDetection({
       if (externalAudioContext) {
         audioContext = externalAudioContext;
         ownsAudioContextRef.current = false;
-        console.log("[usePitchDetection] Using external AudioContext");
+        devLog("[usePitchDetection] Using external AudioContext");
       } else {
         const AudioContextClass =
           window.AudioContext || window.webkitAudioContext;
         audioContext = new AudioContextClass();
         ownsAudioContextRef.current = true;
-        console.log("[usePitchDetection] Created new AudioContext");
+        devLog("[usePitchDetection] Created new AudioContext");
       }
 
       webAudioContextRef.current = audioContext;
       webSampleRateRef.current = audioContext.sampleRate;
-      console.log(
-        "[usePitchDetection] Using sample rate:",
-        audioContext.sampleRate,
-      );
+      devLog("[usePitchDetection] Using sample rate:", audioContext.sampleRate);
 
       // Resume context if suspended (required after user interaction)
       if (audioContext.state === "suspended") {
@@ -514,9 +510,9 @@ export function usePitchDetection({
       // Start processing
       processWebAudioFrame();
 
-      console.log("[usePitchDetection] Web audio started");
+      devLog("[usePitchDetection] Web audio started");
     } catch (err) {
-      console.error("Web audio start error:", err);
+      devError("Web audio start error:", err);
       setError(`Failed to start microphone: ${err.message}`);
       isStartingRef.current = false;
     }
@@ -524,7 +520,7 @@ export function usePitchDetection({
 
   // Stop listening - web version
   const stopListeningWeb = useCallback(() => {
-    console.log("[usePitchDetection] Stopping web audio");
+    devLog("[usePitchDetection] Stopping web audio");
     isListeningRef.current = false;
     isStartingRef.current = false; // Cancel any pending start
 
@@ -572,7 +568,7 @@ export function usePitchDetection({
     if (isListeningRef.current) return;
 
     try {
-      console.log("[usePitchDetection] Initializing native audio stream...");
+      devLog("[usePitchDetection] Initializing native audio stream...");
 
       // Initialize audio stream
       LiveAudioStream.init({
@@ -591,9 +587,9 @@ export function usePitchDetection({
       isListeningRef.current = true;
       setIsListening(true);
       setError(null);
-      console.log("[usePitchDetection] Native audio started");
+      devLog("[usePitchDetection] Native audio started");
     } catch (err) {
-      console.error("Native audio start error:", err);
+      devError("Native audio start error:", err);
       setError(`Failed to start audio: ${err.message}`);
     }
   }, [processAudioData]);
@@ -603,7 +599,7 @@ export function usePitchDetection({
     if (!LiveAudioStream || !isListeningRef.current) return;
 
     try {
-      console.log("[usePitchDetection] Stopping native audio");
+      devLog("[usePitchDetection] Stopping native audio");
       isListeningRef.current = false;
       LiveAudioStream.stop();
       setIsListening(false);
@@ -619,7 +615,7 @@ export function usePitchDetection({
         silenceTimerRef.current = null;
       }
     } catch (err) {
-      console.warn("Stop listening error:", err);
+      devWarn("Stop listening error:", err);
     }
   }, []);
 

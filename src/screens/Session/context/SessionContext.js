@@ -9,7 +9,9 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
+import PropTypes from "prop-types";
 import { Platform, Alert } from "react-native";
+import { devWarn, devError } from "../../../utils/devLogger";
 import { baseUrl } from "../../../api/client";
 
 const SessionContext = createContext(null);
@@ -188,7 +190,7 @@ export function SessionProvider({ children, routeParams, navigation }) {
 
       return false;
     } catch (err) {
-      console.warn("[SessionContext] Failed to fetch more material:", err);
+      devWarn("[SessionContext] Failed to fetch more material:", err);
       return false;
     }
   }, [
@@ -241,7 +243,7 @@ export function SessionProvider({ children, routeParams, navigation }) {
         setCurriculumLoading(false);
       })
       .catch((err) => {
-        console.warn("[SessionContext] Curriculum load error:", err);
+        devWarn("[SessionContext] Curriculum load error:", err);
         setCurriculumSteps([]);
         setCurriculumLoading(false);
       });
@@ -320,7 +322,7 @@ export function SessionProvider({ children, routeParams, navigation }) {
         setShowReflection(true);
       }
     } catch (err) {
-      console.error("[SessionContext] Step completion error:", err);
+      devError("[SessionContext] Step completion error:", err);
     }
   };
 
@@ -506,6 +508,16 @@ export function SessionProvider({ children, routeParams, navigation }) {
     <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
   );
 }
+
+SessionProvider.propTypes = {
+  children: PropTypes.node.isRequired,
+  routeParams: PropTypes.object,
+  navigation: PropTypes.shape({
+    navigate: PropTypes.func,
+    replace: PropTypes.func,
+    goBack: PropTypes.func,
+  }).isRequired,
+};
 
 export function useSession() {
   const context = useContext(SessionContext);

@@ -13,6 +13,7 @@ import {
   Modal,
   Platform,
   ActivityIndicator,
+  StyleSheet,
 } from "react-native";
 import styles from "../../styles";
 import { useMaterials, useUpload } from "./hooks";
@@ -57,10 +58,12 @@ function MaterialExplorer() {
 
   const renderMaterialItem = ({ item }) => (
     <TouchableOpacity
+      accessibilityLabel={`View material ${item.title}`}
+      accessibilityRole="button"
       style={styles.listItem}
       onPress={() => viewMaterialDetail(item)}
     >
-      <View style={{ flex: 1 }}>
+      <View style={localStyles.flexContainer}>
         <View style={styles.listItemHeader}>
           <Text style={styles.listItemTitle}>{item.title}</Text>
           {item.analysis?.difficulty_index != null && (
@@ -106,7 +109,8 @@ function MaterialExplorer() {
         {item.analysis?.tonal_complexity_stage != null && (
           <Text style={styles.listItemSubtext}>
             Stages: T{item.analysis.tonal_complexity_stage} I
-            {item.analysis.interval_sustained_stage}/{item.analysis.interval_hazard_stage} R
+            {item.analysis.interval_sustained_stage}/
+            {item.analysis.interval_hazard_stage} R
             {item.analysis.rhythm_complexity_stage ?? "?"} Range
             {item.analysis.range_usage_stage}
           </Text>
@@ -135,12 +139,16 @@ function MaterialExplorer() {
           onChangeText={setSearchQuery}
         />
         <TouchableOpacity
+          accessibilityLabel="Upload material"
+          accessibilityRole="button"
           style={styles.uploadButton}
           onPress={uploadHook.openModal}
         >
           <Text style={styles.uploadButtonText}>+ Upload</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          accessibilityLabel={exporting ? "Exporting" : "Export to JSON"}
+          accessibilityRole="button"
           style={[
             styles.exportButton,
             exporting && styles.exportButtonDisabled,
@@ -157,6 +165,10 @@ function MaterialExplorer() {
       {/* Batch Actions */}
       <View style={styles.batchActionsBar}>
         <TouchableOpacity
+          accessibilityLabel={
+            ingesting ? "Ingesting" : "Batch ingest materials"
+          }
+          accessibilityRole="button"
           style={[
             styles.batchActionButton,
             ingesting && styles.batchActionButtonDisabled,
@@ -190,14 +202,20 @@ function MaterialExplorer() {
           ]}
         >
           <Text style={styles.statusText}>{actionStatus.message}</Text>
-          <TouchableOpacity onPress={() => setActionStatus(null)}>
+          <TouchableOpacity
+            accessibilityLabel="Dismiss status message"
+            accessibilityRole="button"
+            onPress={() => setActionStatus(null)}
+          >
             <Text style={styles.statusDismiss}>✕</Text>
           </TouchableOpacity>
         </View>
       )}
 
       {/* Results Count */}
-      <Text style={styles.resultCount}>{filteredMaterials.length} materials</Text>
+      <Text style={styles.resultCount}>
+        {filteredMaterials.length} materials
+      </Text>
 
       {/* Materials List */}
       <FlatList
@@ -235,5 +253,11 @@ function MaterialExplorer() {
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  flexContainer: {
+    flex: 1,
+  },
+});
 
 export default MaterialExplorer;

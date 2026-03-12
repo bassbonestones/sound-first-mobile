@@ -110,6 +110,8 @@ export function Stage4Content() {
           </View>
           <View style={styles.pitchExplorerControls}>
             <TouchableOpacity
+              accessibilityLabel="Move note down"
+              accessibilityRole="button"
               style={[
                 styles.pitchExplorerButton,
                 pitchExplorerIndex === 0 && styles.pitchExplorerButtonDisabled,
@@ -126,12 +128,16 @@ export function Stage4Content() {
               <Text style={styles.pitchExplorerButtonText}>↓ Down</Text>
             </TouchableOpacity>
             <TouchableOpacity
+              accessibilityLabel="Play current note"
+              accessibilityRole="button"
               style={styles.pitchExplorerPlayButton}
               onPress={() => playPitchExplorer(pitchExplorerIndex)}
             >
               <Text style={styles.pitchExplorerPlayButtonText}>▶ Play</Text>
             </TouchableOpacity>
             <TouchableOpacity
+              accessibilityLabel="Move note up"
+              accessibilityRole="button"
               style={[
                 styles.pitchExplorerButton,
                 pitchExplorerIndex === PITCH_EXPLORER_NOTES.length - 1 &&
@@ -165,12 +171,16 @@ export function Stage4Buttons() {
     return (
       <View style={styles.fixedBottomButtons}>
         <TouchableOpacity
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
           style={styles.backTextButton}
           onPress={() => goBackTeaching(3, 2)}
         >
           <Text style={styles.backTextButtonText}>← Back</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          accessibilityLabel="Got it, continue"
+          accessibilityRole="button"
           style={styles.primaryButton}
           onPress={() => setSubStep(1)}
         >
@@ -184,12 +194,16 @@ export function Stage4Buttons() {
     return (
       <View style={styles.fixedBottomButtons}>
         <TouchableOpacity
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
           style={styles.backTextButton}
           onPress={() => setSubStep(0)}
         >
           <Text style={styles.backTextButtonText}>← Back</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          accessibilityLabel="What else, continue"
+          accessibilityRole="button"
           style={styles.primaryButton}
           onPress={() => setSubStep(2)}
         >
@@ -203,12 +217,16 @@ export function Stage4Buttons() {
     return (
       <View style={styles.fixedBottomButtons}>
         <TouchableOpacity
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
           style={styles.backTextButton}
           onPress={() => setSubStep(1)}
         >
           <Text style={styles.backTextButtonText}>← Back</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          accessibilityLabel="Try it"
+          accessibilityRole="button"
           style={styles.primaryButton}
           onPress={() => setSubStep(3)}
         >
@@ -222,12 +240,19 @@ export function Stage4Buttons() {
     return (
       <View style={styles.fixedBottomButtons}>
         <TouchableOpacity
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
           style={styles.backTextButton}
           onPress={() => setSubStep(2)}
         >
           <Text style={styles.backTextButtonText}>← Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.primaryButton} onPress={nextStage}>
+        <TouchableOpacity
+          accessibilityLabel="Next"
+          accessibilityRole="button"
+          style={styles.primaryButton}
+          onPress={nextStage}
+        >
           <Text style={styles.primaryButtonText}>Next →</Text>
         </TouchableOpacity>
       </View>

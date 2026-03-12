@@ -6,6 +6,8 @@ import {
   StyleSheet,
   Platform,
 } from "react-native";
+import PropTypes from "prop-types";
+import { devLog, devWarn, devError } from "../utils/devLogger";
 
 // Import pitch utilities from extracted module
 import {
@@ -23,7 +25,7 @@ if (Platform?.OS && Platform.OS !== "web") {
   try {
     MobileAudioInput = require("./MobileAudioInput").default;
   } catch (e) {
-    console.warn("MobileAudioInput not available:", e);
+    devWarn("MobileAudioInput not available:", e);
   }
 }
 
@@ -221,7 +223,7 @@ export default function AudioInput({
             break;
         }
       } catch (e) {
-        console.error("WebView message parse error:", e);
+        devError("WebView message parse error:", e);
       }
     },
     [
@@ -280,13 +282,13 @@ export default function AudioInput({
 
     // Prevent concurrent getUserMedia calls
     if (globalMicPermissionState.pending) {
-      console.log("AudioInput: getUserMedia already pending, skipping");
+      devLog("AudioInput: getUserMedia already pending, skipping");
       return;
     }
 
     // If already listening with an active stream, don't restart
     if (mediaStreamRef.current && audioContextRef.current) {
-      console.log("AudioInput: Already have active stream, reusing");
+      devLog("AudioInput: Already have active stream, reusing");
       setIsListening(true);
       analyze();
       return;
@@ -331,7 +333,7 @@ export default function AudioInput({
       analyze();
     } catch (err) {
       globalMicPermissionState.pending = false;
-      console.error("Microphone access error:", err);
+      devError("Microphone access error:", err);
       if (err.name === "NotAllowedError") {
         setError(
           "Microphone permission denied. Please allow microphone access.",
@@ -568,7 +570,7 @@ export default function AudioInput({
   // Start mobile audio recording with metering
   const startMobileListening = useCallback(async () => {
     if (!ExpoAudio) {
-      console.warn("[AudioInput] expo-audio module not available");
+      devWarn("[AudioInput] expo-audio module not available");
       return;
     }
 
@@ -661,7 +663,7 @@ export default function AudioInput({
       setIsListening(true);
       setError(null);
     } catch (err) {
-      console.error("Mobile recording error:", err);
+      devError("Mobile recording error:", err);
       setError(`Recording error: ${err.message}`);
     }
   }, [
@@ -684,7 +686,7 @@ export default function AudioInput({
         // expo-audio uses stop() instead of stopAndUnloadAsync()
         await recordingRef.current.stop();
       } catch (err) {
-        console.warn("Error stopping recording:", err);
+        devWarn("Error stopping recording:", err);
       }
       recordingRef.current = null;
     }
@@ -736,7 +738,12 @@ export default function AudioInput({
       <View style={styles.container}>
         <Text style={styles.errorText}>{error}</Text>
         {error.includes("permission") && (
-          <TouchableOpacity style={styles.button} onPress={requestPermission}>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={requestPermission}
+            accessibilityLabel="Grant microphone permission"
+            accessibilityRole="button"
+          >
             <Text style={styles.buttonText}>Grant Permission</Text>
           </TouchableOpacity>
         )}
@@ -762,7 +769,12 @@ export default function AudioInput({
         <Text style={styles.infoText}>
           We need microphone access to hear you play.
         </Text>
-        <TouchableOpacity style={styles.button} onPress={requestPermission}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={requestPermission}
+          accessibilityLabel="Enable microphone"
+          accessibilityRole="button"
+        >
           <Text style={styles.buttonText}>Enable Microphone</Text>
         </TouchableOpacity>
       </View>
@@ -805,6 +817,23 @@ export default function AudioInput({
   // Default: invisible component (just provides callbacks)
   return null;
 }
+
+AudioInput.propTypes = {
+  onVolumeChange: PropTypes.func,
+  onPitchDetected: PropTypes.func,
+  onRealtimePitch: PropTypes.func,
+  onSoundStart: PropTypes.func,
+  onSoundEnd: PropTypes.func,
+  targetNote: PropTypes.string,
+  onPitchMatch: PropTypes.func,
+  volumeThreshold: PropTypes.number,
+  silenceDuration: PropTypes.number,
+  pitchMargin: PropTypes.number,
+  allowOctaveEquivalent: PropTypes.bool,
+  enabled: PropTypes.bool,
+  showDebug: PropTypes.bool,
+  compact: PropTypes.bool,
+};
 
 const styles = StyleSheet.create({
   container: {

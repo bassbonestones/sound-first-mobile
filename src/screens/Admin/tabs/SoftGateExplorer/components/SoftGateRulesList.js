@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
+  StyleSheet,
 } from "react-native";
 import styles from "../../../styles";
 import { useSoftGateRules } from "../hooks";
@@ -32,6 +33,8 @@ export default function SoftGateRulesList() {
 
   const renderRuleItem = ({ item }) => (
     <TouchableOpacity
+      accessibilityLabel={`Edit rule ${item.dimension_name}`}
+      accessibilityRole="button"
       style={styles.listItem}
       onPress={() => {
         setSelectedRule(item);
@@ -69,8 +72,10 @@ export default function SoftGateRulesList() {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={localStyles.flexContainer}>
       <TouchableOpacity
+        accessibilityLabel="Create rule"
+        accessibilityRole="button"
         style={styles.createButton}
         onPress={() => setShowCreateModal(true)}
       >
@@ -130,3 +135,9 @@ export default function SoftGateRulesList() {
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  flexContainer: {
+    flex: 1,
+  },
+});

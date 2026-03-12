@@ -36,13 +36,14 @@ import {
   exercisePropTypes,
   exerciseDefaultProps,
 } from "./shared";
+import { devLog, devWarn } from "../../../../utils/devLogger";
 
 // For notation display
 let NotationDisplay = null;
 try {
   NotationDisplay = require("../../../../components/NotationDisplay").default;
 } catch (e) {
-  console.warn("NotationDisplay not available");
+  devWarn("NotationDisplay not available");
 }
 
 // Generate MusicXML for a single whole note
@@ -528,7 +529,7 @@ export default function WholeNoteLessonExercise({
 
     const beatSoundPct = soundingOnBeatsRef.current; // Percentages (0-1) of each beat with sound
     const startedEarly = startedEarlyRef.current;
-    console.log("[WholeNoteLesson] analyzePerformance:", {
+    devLog("[WholeNoteLesson] analyzePerformance:", {
       totalCount,
       pitchCount,
       hitTarget,
@@ -734,34 +735,32 @@ export default function WholeNoteLessonExercise({
           <TouchableOpacity
             style={styles.showNotationButton}
             onPress={handleShowNotation}
+            accessibilityLabel="Show notation"
+            accessibilityRole="button"
           >
             <Text style={styles.showNotationText}>Show Notation 📝</Text>
           </TouchableOpacity>
         ) : (
           <>
-            <View style={[styles.notationWrapper, { position: "relative" }]}>
+            <View
+              style={[styles.notationWrapper, styles.notationWrapperRelative]}
+            >
               {memoizedNotation}
               {/* Green highlight overlay */}
               {highlightLeft !== null && (
                 <View
-                  style={{
-                    position: "absolute",
-                    left: highlightLeft,
-                    top: 40,
-                    width: highlightWidth,
-                    height: 160,
-                    backgroundColor: "rgba(76, 175, 80, 0.25)",
-                    borderRadius: 4,
-                    borderWidth: 2,
-                    borderColor: "rgba(76, 175, 80, 0.6)",
-                    pointerEvents: "none",
-                  }}
+                  style={[
+                    styles.highlightOverlay,
+                    { left: highlightLeft, width: highlightWidth, height: 160 },
+                  ]}
                 />
               )}
             </View>
             <TouchableOpacity
               style={styles.hideNotationButton}
               onPress={() => setShowNotation(false)}
+              accessibilityLabel="Hide notation"
+              accessibilityRole="button"
             >
               <Text style={styles.hideNotationText}>Hide Notation</Text>
             </TouchableOpacity>
@@ -895,12 +894,16 @@ export default function WholeNoteLessonExercise({
               <TouchableOpacity
                 style={styles.modalCancelButton}
                 onPress={() => setShowAttestModal(false)}
+                accessibilityLabel="Cancel"
+                accessibilityRole="button"
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalConfirmButton}
                 onPress={handleAttestConfirm}
+                accessibilityLabel="Confirm"
+                accessibilityRole="button"
               >
                 <Text style={styles.modalConfirmText}>Confirm</Text>
               </TouchableOpacity>
@@ -945,6 +948,8 @@ export default function WholeNoteLessonExercise({
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={() => setPhase(PHASE.LISTEN)}
+            accessibilityLabel="Got it, continue to listen phase"
+            accessibilityRole="button"
           >
             <Text style={styles.primaryButtonText}>Got It →</Text>
           </TouchableOpacity>
@@ -992,6 +997,8 @@ export default function WholeNoteLessonExercise({
                 playWholeNote(() => setHasHeardPattern(true));
               }}
               disabled={isPlaying}
+              accessibilityLabel={isPlaying ? "Playing" : "Hear pattern"}
+              accessibilityRole="button"
             >
               <Text style={styles.primaryButtonText}>
                 {isPlaying ? "🔊 Playing..." : "🔊 Hear Pattern"}
@@ -1007,6 +1014,8 @@ export default function WholeNoteLessonExercise({
                 ]}
                 onPress={playWholeNote}
                 disabled={isPlaying}
+                accessibilityLabel={isPlaying ? "Playing" : "Hear again"}
+                accessibilityRole="button"
               >
                 <Text style={styles.secondaryButtonText}>
                   {isPlaying ? "🔊 Playing..." : "🔊 Hear Again"}
@@ -1019,6 +1028,8 @@ export default function WholeNoteLessonExercise({
                     stopPlayback();
                     setPhase(PHASE.SING);
                   }}
+                  accessibilityLabel="I heard it, continue to sing phase"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.primaryButtonText}>I Heard It →</Text>
                 </TouchableOpacity>
@@ -1103,7 +1114,7 @@ export default function WholeNoteLessonExercise({
             </>
           ) : singResult?.success ? (
             <>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[
                     styles.secondaryButton,
@@ -1287,7 +1298,7 @@ export default function WholeNoteLessonExercise({
             </>
           ) : playResult?.success ? (
             <>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[
                     styles.secondaryButton,
@@ -1940,5 +1951,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#fff",
+  },
+  buttonRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  notationWrapperRelative: {
+    position: "relative",
+  },
+  highlightOverlay: {
+    position: "absolute",
+    top: 40,
+    backgroundColor: "rgba(76, 175, 80, 0.25)",
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: "rgba(76, 175, 80, 0.6)",
+    pointerEvents: "none",
   },
 });

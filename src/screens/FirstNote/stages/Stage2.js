@@ -73,6 +73,8 @@ export function Stage2Content() {
               Listen to your note with the focus in mind
             </Text>
             <TouchableOpacity
+              accessibilityLabel={isPlaying ? "Playing note" : "Play note"}
+              accessibilityRole="button"
               style={[
                 styles.focusActionButton,
                 isPlaying && styles.buttonDisabled,
@@ -203,6 +205,8 @@ export function Stage2Content() {
             {FOCUS_STEPS.map((step, idx) => (
               <TouchableOpacity
                 key={step.key}
+                accessibilityLabel={`${step.label} step${focusStepsDone[step.key] ? ", completed" : ""}`}
+                accessibilityRole="button"
                 style={[
                   styles.focusTab,
                   focusActiveStep === idx && styles.focusTabActive,
@@ -250,6 +254,8 @@ export function Stage2Content() {
             {RATING_FACES.map((face) => (
               <TouchableOpacity
                 key={face.value}
+                accessibilityLabel={`Rate ${face.label}`}
+                accessibilityRole="button"
                 style={styles.ratingButton}
                 onPress={() => {
                   // Save rating for this card
@@ -333,6 +339,8 @@ export function Stage2Buttons() {
       <View style={styles.fixedBottomButtons}>
         <View style={styles.buttonRow}>
           <TouchableOpacity
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
             style={[
               styles.secondaryButton,
               { flex: 1, marginRight: 8 },
@@ -351,6 +359,8 @@ export function Stage2Buttons() {
 
           {focusActiveStep < 3 ? (
             <TouchableOpacity
+              accessibilityLabel="Next step"
+              accessibilityRole="button"
               style={[styles.primaryButton, { flex: 1, marginLeft: 8 }]}
               onPress={() => {
                 stopAudio();
@@ -363,6 +373,8 @@ export function Stage2Buttons() {
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
+              accessibilityLabel="Rate this focus card"
+              accessibilityRole="button"
               style={[styles.primaryButton, { flex: 1, marginLeft: 8 }]}
               onPress={() => {
                 stopAudio();
@@ -388,6 +400,8 @@ export function Stage2Buttons() {
       return (
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
+            accessibilityLabel="Practice focus cards again"
+            accessibilityRole="button"
             style={styles.secondaryButton}
             onPress={() => {
               setFocusCardRatings([]);
@@ -403,6 +417,8 @@ export function Stage2Buttons() {
             <Text style={styles.secondaryButtonText}>Practice Cards Again</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityLabel="Continue to next stage"
+            accessibilityRole="button"
             style={[styles.primaryButton, { marginTop: 12 }]}
             onPress={nextStage}
           >
@@ -414,6 +430,8 @@ export function Stage2Buttons() {
       return (
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
+            accessibilityLabel="Pick a different note"
+            accessibilityRole="button"
             style={styles.secondaryButton}
             onPress={() => {
               setFocusCardRatings([]);
@@ -425,6 +443,8 @@ export function Stage2Buttons() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityLabel="Practice focus cards again"
+            accessibilityRole="button"
             style={[styles.primaryButton, { marginTop: 12 }]}
             onPress={() => {
               setFocusCardRatings([]);

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -9,6 +10,7 @@ import {
   Alert,
 } from "react-native";
 import { useNavigation, CommonActions } from "@react-navigation/native";
+import { devError } from "../utils/devLogger";
 import { getBackendUrl } from "../api/client";
 import { DEV_NAV_ITEMS } from "../constants/devNavItems";
 
@@ -36,7 +38,7 @@ export function DevNavMenu({ userId = 1 }) {
         }),
       );
     } catch (err) {
-      console.error("Reset error:", err);
+      devError("Reset error:", err);
       if (Platform.OS === "web") {
         alert("Failed to reset: " + err.message);
       } else {
@@ -74,6 +76,8 @@ export function DevNavMenu({ userId = 1 }) {
       <TouchableOpacity
         style={styles.menuButton}
         onPress={() => setIsOpen(true)}
+        accessibilityLabel="Open developer navigation menu"
+        accessibilityRole="button"
       >
         <Text style={styles.menuButtonText}>🔧</Text>
       </TouchableOpacity>
@@ -89,6 +93,8 @@ export function DevNavMenu({ userId = 1 }) {
             onPress={() => {
               setIsOpen(false);
             }}
+            accessibilityLabel="Close developer menu"
+            accessibilityRole="button"
           >
             <Text style={styles.closeButton}>✕</Text>
           </TouchableOpacity>
@@ -100,6 +106,8 @@ export function DevNavMenu({ userId = 1 }) {
               key={item.screen}
               style={styles.stageRow}
               onPress={() => navigateTo(item.screen)}
+              accessibilityLabel={`Navigate to ${item.label}`}
+              accessibilityRole="button"
             >
               <Text style={styles.stageIcon}>•</Text>
               <Text style={styles.stageName}>
@@ -113,6 +121,10 @@ export function DevNavMenu({ userId = 1 }) {
           style={[styles.resetButton, isResetting && { opacity: 0.6 }]}
           onPress={handleReset}
           disabled={isResetting}
+          accessibilityLabel={
+            isResetting ? "Resetting user data" : "Reset user data"
+          }
+          accessibilityRole="button"
         >
           <Text style={styles.resetButtonText}>
             {isResetting ? "Resetting..." : "🔄 Reset User Data"}
@@ -128,6 +140,8 @@ export function DevNavMenu({ userId = 1 }) {
             setIsOpen(false);
             navigation.navigate("Admin");
           }}
+          accessibilityLabel="Open admin panel"
+          accessibilityRole="button"
         >
           <Text style={styles.resetButtonText}>⚙️ Admin Panel</Text>
         </TouchableOpacity>
@@ -135,6 +149,10 @@ export function DevNavMenu({ userId = 1 }) {
     </View>
   );
 }
+
+DevNavMenu.propTypes = {
+  userId: PropTypes.number,
+};
 
 const styles = StyleSheet.create({
   menuButton: {

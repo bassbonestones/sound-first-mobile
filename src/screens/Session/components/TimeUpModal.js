@@ -6,6 +6,7 @@
  * - Finish session (go to session end screen)
  */
 import React from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -43,6 +44,8 @@ export default function TimeUpModal({
             <TouchableOpacity
               style={[styles.button, styles.continueButton]}
               onPress={onDismiss}
+              accessibilityLabel="Keep practicing"
+              accessibilityRole="button"
             >
               <Text style={styles.continueButtonText}>Keep Going</Text>
             </TouchableOpacity>
@@ -50,6 +53,8 @@ export default function TimeUpModal({
             <TouchableOpacity
               style={[styles.button, styles.extendButton]}
               onPress={onExtend}
+              accessibilityLabel="Add more practice material"
+              accessibilityRole="button"
             >
               <Text style={styles.extendButtonText}>Add More Material</Text>
             </TouchableOpacity>
@@ -57,6 +62,8 @@ export default function TimeUpModal({
             <TouchableOpacity
               style={[styles.button, styles.finishButton]}
               onPress={onFinish}
+              accessibilityLabel="Finish practice session"
+              accessibilityRole="button"
             >
               <Text style={styles.finishButtonText}>Finish Session</Text>
             </TouchableOpacity>
@@ -66,6 +73,13 @@ export default function TimeUpModal({
     </Modal>
   );
 }
+
+TimeUpModal.propTypes = {
+  visible: PropTypes.bool.isRequired,
+  onDismiss: PropTypes.func.isRequired,
+  onExtend: PropTypes.func,
+  onFinish: PropTypes.func.isRequired,
+};
 
 const styles = StyleSheet.create({
   backdrop: {

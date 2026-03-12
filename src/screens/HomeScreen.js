@@ -7,6 +7,7 @@
  * - Dev navigation via ResetButton component
  */
 import React, { useState, useCallback } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -18,6 +19,7 @@ import {
   FlatList,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import ErrorBoundary from "../components/ErrorBoundary";
 import ResetButton from "../components/ResetButton";
 import { useUser } from "../context/UserContext";
 
@@ -74,148 +76,188 @@ export default function HomeScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        {/* App Logo/Title */}
-        <View style={styles.header}>
-          <Text style={styles.logo}>
-            {getInstrumentEmoji(selectedInstrument?.instrument_name)}
-          </Text>
-          <Text style={styles.title}>Sound First</Text>
-          <Text style={styles.subtitle}>Ear-First Music Practice</Text>
-        </View>
-
-        {/* Instrument Selector */}
-        {instruments.length > 0 ? (
-          <TouchableOpacity
-            style={styles.instrumentSelector}
-            onPress={() => setShowPicker(true)}
-          >
-            <Text style={styles.instrumentLabel}>Practicing:</Text>
-            <View style={styles.instrumentValue}>
-              <Text style={styles.instrumentName}>
-                {selectedInstrument?.instrument_name || "Select instrument"}
-              </Text>
-              <Text style={styles.dropdownArrow}>▼</Text>
-            </View>
-            {selectedInstrument && !selectedInstrument.day0_completed && (
-              <Text style={styles.day0Badge}>Setup needed</Text>
-            )}
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={styles.addFirstInstrument}
-            onPress={() => navigation.navigate("Onboarding")}
-          >
-            <Text style={styles.addFirstInstrumentIcon}>🎵</Text>
-            <Text style={styles.addFirstInstrumentText}>
-              Add Your Instrument
+    <ErrorBoundary>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          {/* App Logo/Title */}
+          <View style={styles.header}>
+            <Text style={styles.logo}>
+              {getInstrumentEmoji(selectedInstrument?.instrument_name)}
             </Text>
-            <Text style={styles.addFirstInstrumentHint}>
-              Get started by selecting your instrument
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Main Practice Button */}
-        <TouchableOpacity
-          style={[
-            styles.practiceButton,
-            (!selectedInstrument || loading) && styles.practiceButtonDisabled,
-          ]}
-          onPress={handleStartPractice}
-          activeOpacity={0.8}
-          disabled={!selectedInstrument || loading}
-        >
-          <Text style={styles.practiceButtonIcon}>
-            {selectedInstrument && !selectedInstrument.day0_completed
-              ? "🎯"
-              : "▶️"}
-          </Text>
-          <Text style={styles.practiceButtonText}>
-            {selectedInstrument && !selectedInstrument.day0_completed
-              ? "Set Up Instrument"
-              : "Start Practice"}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Quick Stats - placeholder for now */}
-        <View style={styles.statsCard}>
-          <Text style={styles.statsTitle}>Your Progress</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>-</Text>
-              <Text style={styles.statLabel}>Day Streak</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>-</Text>
-              <Text style={styles.statLabel}>Total Sessions</Text>
-            </View>
+            <Text style={styles.title}>Sound First</Text>
+            <Text style={styles.subtitle}>Ear-First Music Practice</Text>
           </View>
-        </View>
-      </View>
 
-      {/* Instrument Picker Modal */}
-      <Modal
-        visible={showPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowPicker(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowPicker(false)}
-        >
-          <View style={styles.pickerContainer}>
-            <Text style={styles.pickerTitle}>Select Instrument</Text>
-            <FlatList
-              data={instruments}
-              keyExtractor={(item) => String(item.id)}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.pickerItem,
-                    selectedInstrument?.id === item.id &&
-                      styles.pickerItemSelected,
-                  ]}
-                  onPress={() => handleSelectInstrument(item)}
-                >
-                  <Text style={styles.pickerItemEmoji}>
-                    {getInstrumentEmoji(item.instrument_name)}
-                  </Text>
-                  <View style={styles.pickerItemInfo}>
-                    <Text style={styles.pickerItemName}>
-                      {item.instrument_name}
-                    </Text>
-                    {!item.day0_completed && (
-                      <Text style={styles.setupBadge}>Needs setup</Text>
-                    )}
-                  </View>
-                  {selectedInstrument?.id === item.id && (
-                    <Text style={styles.checkmark}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              )}
-            />
+          {/* Instrument Selector */}
+          {instruments.length > 0 ? (
             <TouchableOpacity
-              style={styles.addInstrumentButton}
-              onPress={() => {
-                setShowPicker(false);
-                navigation.navigate("Onboarding", { addingInstrument: true });
-              }}
+              style={styles.instrumentSelector}
+              onPress={() => setShowPicker(true)}
+              accessibilityLabel={`Select instrument. Currently: ${selectedInstrument?.instrument_name || "none selected"}`}
+              accessibilityHint="Opens instrument picker"
+              accessibilityRole="button"
             >
-              <Text style={styles.addInstrumentText}>+ Add New Instrument</Text>
+              <Text style={styles.instrumentLabel}>Practicing:</Text>
+              <View style={styles.instrumentValue}>
+                <Text style={styles.instrumentName}>
+                  {selectedInstrument?.instrument_name || "Select instrument"}
+                </Text>
+                <Text style={styles.dropdownArrow}>▼</Text>
+              </View>
+              {selectedInstrument && !selectedInstrument.day0_completed && (
+                <Text style={styles.day0Badge}>Setup needed</Text>
+              )}
             </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+          ) : (
+            <TouchableOpacity
+              style={styles.addFirstInstrument}
+              onPress={() => navigation.navigate("Onboarding")}
+              accessibilityLabel="Add your first instrument"
+              accessibilityHint="Opens instrument setup"
+              accessibilityRole="button"
+            >
+              <Text style={styles.addFirstInstrumentIcon}>🎵</Text>
+              <Text style={styles.addFirstInstrumentText}>
+                Add Your Instrument
+              </Text>
+              <Text style={styles.addFirstInstrumentHint}>
+                Get started by selecting your instrument
+              </Text>
+            </TouchableOpacity>
+          )}
 
-      <ResetButton />
-    </SafeAreaView>
+          {/* Main Practice Button */}
+          <TouchableOpacity
+            style={[
+              styles.practiceButton,
+              (!selectedInstrument || loading) && styles.practiceButtonDisabled,
+            ]}
+            onPress={handleStartPractice}
+            activeOpacity={0.8}
+            disabled={!selectedInstrument || loading}
+            accessibilityLabel={
+              selectedInstrument && !selectedInstrument.day0_completed
+                ? "Set up instrument"
+                : "Start practice"
+            }
+            accessibilityHint={
+              selectedInstrument && !selectedInstrument.day0_completed
+                ? "Begin instrument setup"
+                : "Begin practice session"
+            }
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !selectedInstrument || loading }}
+          >
+            <Text style={styles.practiceButtonIcon}>
+              {selectedInstrument && !selectedInstrument.day0_completed
+                ? "🎯"
+                : "▶️"}
+            </Text>
+            <Text style={styles.practiceButtonText}>
+              {selectedInstrument && !selectedInstrument.day0_completed
+                ? "Set Up Instrument"
+                : "Start Practice"}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Quick Stats - placeholder for now */}
+          <View style={styles.statsCard}>
+            <Text style={styles.statsTitle}>Your Progress</Text>
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>-</Text>
+                <Text style={styles.statLabel}>Day Streak</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>-</Text>
+                <Text style={styles.statLabel}>Total Sessions</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Tune Mastery Tool */}
+          <TouchableOpacity
+            style={styles.tuneMasteryButton}
+            onPress={() => navigation.navigate("TuneMastery")}
+            accessibilityLabel="Tune Mastery tool"
+            accessibilityHint="Practice tunes in all 12 keys"
+            accessibilityRole="button"
+          >
+            <Text style={styles.tuneMasteryIcon}>🎸</Text>
+            <Text style={styles.tuneMasteryText}>Tune Mastery</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Instrument Picker Modal */}
+        <Modal
+          visible={showPicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowPicker(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowPicker(false)}
+          >
+            <View style={styles.pickerContainer}>
+              <Text style={styles.pickerTitle}>Select Instrument</Text>
+              <FlatList
+                data={instruments}
+                keyExtractor={(item) => String(item.id)}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[
+                      styles.pickerItem,
+                      selectedInstrument?.id === item.id &&
+                        styles.pickerItemSelected,
+                    ]}
+                    onPress={() => handleSelectInstrument(item)}
+                  >
+                    <Text style={styles.pickerItemEmoji}>
+                      {getInstrumentEmoji(item.instrument_name)}
+                    </Text>
+                    <View style={styles.pickerItemInfo}>
+                      <Text style={styles.pickerItemName}>
+                        {item.instrument_name}
+                      </Text>
+                      {!item.day0_completed && (
+                        <Text style={styles.setupBadge}>Needs setup</Text>
+                      )}
+                    </View>
+                    {selectedInstrument?.id === item.id && (
+                      <Text style={styles.checkmark}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+              />
+              <TouchableOpacity
+                style={styles.addInstrumentButton}
+                onPress={() => {
+                  setShowPicker(false);
+                  navigation.navigate("Onboarding", { addingInstrument: true });
+                }}
+              >
+                <Text style={styles.addInstrumentText}>
+                  + Add New Instrument
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        <ResetButton />
+      </SafeAreaView>
+    </ErrorBoundary>
   );
 }
+
+HomeScreen.propTypes = {
+  navigation: PropTypes.shape({
+    navigate: PropTypes.func.isRequired,
+  }).isRequired,
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -320,6 +362,27 @@ const styles = StyleSheet.create({
     width: 1,
     height: 40,
     backgroundColor: "#444",
+  },
+
+  // Tune Mastery Button
+  tuneMasteryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#2a2a3e",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  tuneMasteryIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  tuneMasteryText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFD700",
   },
 
   // Practice Button Disabled

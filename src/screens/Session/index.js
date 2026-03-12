@@ -11,16 +11,31 @@
  * - SessionScreenContent.js - UI component using context
  */
 import React from "react";
+import PropTypes from "prop-types";
+import ErrorBoundary from "../../components/ErrorBoundary";
 import { SessionProvider } from "./context/SessionContext";
 import SessionScreenContent from "./SessionScreenContent";
 
 export default function SessionScreen({ navigation, route }) {
   return (
-    <SessionProvider routeParams={route?.params} navigation={navigation}>
-      <SessionScreenContent />
-    </SessionProvider>
+    <ErrorBoundary>
+      <SessionProvider routeParams={route?.params} navigation={navigation}>
+        <SessionScreenContent />
+      </SessionProvider>
+    </ErrorBoundary>
   );
 }
+
+SessionScreen.propTypes = {
+  navigation: PropTypes.shape({
+    navigate: PropTypes.func,
+    replace: PropTypes.func,
+    goBack: PropTypes.func,
+  }).isRequired,
+  route: PropTypes.shape({
+    params: PropTypes.object,
+  }),
+};
 
 // Export context hook for external use
 export { useSession } from "./context/SessionContext";

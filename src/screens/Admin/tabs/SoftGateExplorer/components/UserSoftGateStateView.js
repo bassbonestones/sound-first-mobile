@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
+  StyleSheet,
 } from "react-native";
 import styles from "../../../styles";
 import { useUserSoftGateState } from "../hooks";
@@ -43,7 +44,9 @@ export default function UserSoftGateStateView() {
   const renderStateItem = ({ item }) => (
     <View style={styles.listItem}>
       <TouchableOpacity
-        style={{ flex: 1 }}
+        accessibilityLabel={`Edit ${item.dimension_name} state`}
+        accessibilityRole="button"
+        style={localStyles.flexContainer}
         onPress={() => {
           setSelectedState(item);
           setShowEditModal(true);
@@ -93,6 +96,12 @@ export default function UserSoftGateStateView() {
       <View style={styles.userPickerContainer}>
         <Text style={styles.userPickerLabel}>User:</Text>
         <TouchableOpacity
+          accessibilityLabel={
+            selectedUser
+              ? `Selected user: ${selectedUser.email}`
+              : "Select user"
+          }
+          accessibilityRole="button"
           style={styles.userPickerButton}
           onPress={() => setShowUserPicker(true)}
         >
@@ -107,6 +116,8 @@ export default function UserSoftGateStateView() {
 
       {/* Reset All Button */}
       <TouchableOpacity
+        accessibilityLabel="Reset all dimensions"
+        accessibilityRole="button"
         style={styles.resetAllButton}
         onPress={() => handleReset(null)}
       >
@@ -139,6 +150,8 @@ export default function UserSoftGateStateView() {
         onRequestClose={() => setShowUserPicker(false)}
       >
         <TouchableOpacity
+          accessibilityLabel="Close user picker"
+          accessibilityRole="button"
           style={styles.pickerModalOverlay}
           activeOpacity={1}
           onPress={() => setShowUserPicker(false)}
@@ -150,6 +163,8 @@ export default function UserSoftGateStateView() {
               keyExtractor={(item) => String(item.id)}
               renderItem={({ item }) => (
                 <TouchableOpacity
+                  accessibilityLabel={`Select user ${item.email || `User ${item.id}`}`}
+                  accessibilityRole="button"
                   style={[
                     styles.pickerModalItem,
                     item.id === selectedUserId &&
@@ -205,3 +220,9 @@ export default function UserSoftGateStateView() {
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  flexContainer: {
+    flex: 1,
+  },
+});

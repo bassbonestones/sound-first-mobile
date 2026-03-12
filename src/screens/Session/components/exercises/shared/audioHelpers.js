@@ -5,6 +5,7 @@
  * that were previously duplicated across exercise files.
  */
 import { Platform } from "react-native";
+import { devWarn } from "../../../../../utils/devLogger";
 
 /**
  * Get the appropriate AudioContext class for the current platform
@@ -21,7 +22,7 @@ export function getAudioContextClass() {
   try {
     return require("react-native-audio-api").AudioContext;
   } catch (e) {
-    console.warn("react-native-audio-api not available");
+    devWarn("react-native-audio-api not available");
     return null;
   }
 }

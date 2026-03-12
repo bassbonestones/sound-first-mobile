@@ -12,6 +12,7 @@ import {
   ScrollView,
   Modal,
   ActivityIndicator,
+  StyleSheet,
 } from "react-native";
 import styles from "../../styles";
 import { useFocusCards } from "./hooks";
@@ -64,7 +65,9 @@ function FocusCardExplorer() {
   const renderFocusCardItem = ({ item }) => (
     <View style={styles.listItem}>
       <TouchableOpacity
-        style={{ flex: 1 }}
+        accessibilityLabel={`View focus card ${item.name}`}
+        accessibilityRole="button"
+        style={localStyles.flexContainer}
         onPress={() => {
           setSelectedFocusCard(item);
           setShowDetailModal(true);
@@ -113,6 +116,8 @@ function FocusCardExplorer() {
           onChangeText={setSearchQuery}
         />
         <TouchableOpacity
+          accessibilityLabel="Add focus card"
+          accessibilityRole="button"
           style={styles.addCapButton}
           onPress={() => setShowCreateModal(true)}
         >
@@ -127,6 +132,8 @@ function FocusCardExplorer() {
         showsHorizontalScrollIndicator={false}
       >
         <TouchableOpacity
+          accessibilityLabel={`Filter by all categories, ${focusCards.length} total`}
+          accessibilityRole="button"
           style={[
             styles.domainChip,
             categoryFilter === "all" && styles.domainChipActive,
@@ -145,6 +152,8 @@ function FocusCardExplorer() {
         {categories.map((cat) => (
           <TouchableOpacity
             key={cat}
+            accessibilityLabel={`Filter by ${cat} category`}
+            accessibilityRole="button"
             style={[
               styles.domainChip,
               categoryFilter === cat && styles.domainChipActive,
@@ -243,5 +252,11 @@ function FocusCardExplorer() {
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  flexContainer: {
+    flex: 1,
+  },
+});
 
 export default FocusCardExplorer;

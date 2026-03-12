@@ -11,6 +11,8 @@ import React, {
   useEffect,
   useMemo,
 } from "react";
+import PropTypes from "prop-types";
+import { devLog, devError } from "../../../utils/devLogger";
 import { parseNoteName, generateSingleNoteMusicXML } from "../utils";
 import { INSTRUMENT_CLEFS, DEFAULT_PITCH_EXPLORER_INDEX } from "../data";
 import { useFirstNoteAudio, useFirstNoteNavigation } from "../hooks";
@@ -86,10 +88,10 @@ export function FirstNoteProvider({ children, navigation, route }) {
         if (response.ok) {
           const data = await response.json();
           setSkippableStages(data.skippable_stages || []);
-          console.log("[Day0] Skippable stages:", data.skippable_stages);
+          devLog("[Day0] Skippable stages:", data.skippable_stages);
         }
       } catch (err) {
-        console.error("[Day0] Failed to fetch day0 status:", err);
+        devError("[Day0] Failed to fetch day0 status:", err);
       }
     };
     fetchDay0Status();
@@ -220,6 +222,17 @@ export function FirstNoteProvider({ children, navigation, route }) {
     </FirstNoteContext.Provider>
   );
 }
+
+FirstNoteProvider.propTypes = {
+  children: PropTypes.node.isRequired,
+  navigation: PropTypes.shape({
+    navigate: PropTypes.func,
+    dispatch: PropTypes.func,
+  }).isRequired,
+  route: PropTypes.shape({
+    params: PropTypes.object,
+  }),
+};
 
 /**
  * Hook to access FirstNote context

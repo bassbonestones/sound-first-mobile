@@ -16,6 +16,8 @@ function SoftGateExplorer() {
       {/* Sub-tabs */}
       <View style={styles.subTabBar}>
         <TouchableOpacity
+          accessibilityLabel="View rules"
+          accessibilityRole="button"
           style={[
             styles.subTab,
             activeSection === "rules" && styles.subTabActive,
@@ -32,6 +34,8 @@ function SoftGateExplorer() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
+          accessibilityLabel="View user state"
+          accessibilityRole="button"
           style={[
             styles.subTab,
             activeSection === "user_state" && styles.subTabActive,

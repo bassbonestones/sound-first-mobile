@@ -206,6 +206,8 @@ export default function PitchDirectionExercise({
         style={[styles.playButton, isPlaying && styles.playButtonDisabled]}
         onPress={playExercise}
         disabled={isPlaying}
+        accessibilityLabel={isPlaying ? "Playing audio" : "Play audio again"}
+        accessibilityRole="button"
       >
         <Text style={styles.playButtonIcon}>{isPlaying ? "🔊" : "▶️"}</Text>
         <Text style={styles.playButtonText}>
@@ -232,6 +234,8 @@ export default function PitchDirectionExercise({
             ]}
             onPress={() => handleAnswer(btn.key)}
             disabled={hasAnswered}
+            accessibilityLabel={`The note went ${btn.label}`}
+            accessibilityRole="button"
           >
             <Text style={styles.answerButtonIcon}>{btn.icon}</Text>
             <Text style={styles.answerButtonText}>{btn.label}</Text>

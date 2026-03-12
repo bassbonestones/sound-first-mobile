@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -7,6 +8,13 @@ import {
   Platform,
 } from "react-native";
 import NotationDisplay from "./NotationDisplay";
+import {
+  parseNoteName,
+  noteToMidi,
+  midiToNote,
+  FLAT_EQUIVALENTS,
+  SHARP_EQUIVALENTS,
+} from "../screens/Session/components/exercises/shared";
 
 /**
  * StaffNotePicker - Visual staff-based note selection using real MusicXML rendering
@@ -24,30 +32,6 @@ import NotationDisplay from "./NotationDisplay";
  * - onPlayToSelect: Callback to enable microphone pitch detection
  * - instrument: Instrument name for context
  */
-
-// Note names in chromatic order
-const CHROMATIC_NOTES = [
-  "C",
-  "C#",
-  "D",
-  "D#",
-  "E",
-  "F",
-  "F#",
-  "G",
-  "G#",
-  "A",
-  "A#",
-  "B",
-];
-const FLAT_EQUIVALENTS = {
-  "C#": "Db",
-  "D#": "Eb",
-  "F#": "Gb",
-  "G#": "Ab",
-  "A#": "Bb",
-};
-const SHARP_EQUIVALENTS = { Db: "C#", Eb: "D#", Gb: "F#", Ab: "G#", Bb: "A#" };
 
 // Get both enharmonic names for display
 function getEnharmonicDisplay(noteName) {
@@ -67,43 +51,6 @@ function getEnharmonicDisplay(noteName) {
   }
   // Natural note, just return as-is
   return noteName;
-}
-
-// Parse a note name like "Bb3" or "F#4" into parts
-function parseNoteName(noteName) {
-  if (!noteName) return null;
-  const match = noteName.match(/^([A-Ga-g])([#b]?)(\d)$/);
-  if (!match) return null;
-  const [, letter, accidental, octaveStr] = match;
-  return {
-    letter: letter.toUpperCase(),
-    accidental,
-    octave: parseInt(octaveStr, 10),
-  };
-}
-
-// Convert note name to MIDI number
-function noteToMidi(noteName) {
-  const parsed = parseNoteName(noteName);
-  if (!parsed) return 60; // Default to C4
-  const letterIndex = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[
-    parsed.letter
-  ];
-  let noteIndex = letterIndex;
-  if (parsed.accidental === "#") noteIndex += 1;
-  if (parsed.accidental === "b") noteIndex -= 1;
-  return (parsed.octave + 1) * 12 + noteIndex;
-}
-
-// Convert MIDI number to note name with preferred accidental format
-function midiToNote(midi, preferFlats = true) {
-  const octave = Math.floor(midi / 12) - 1;
-  const noteIndex = midi % 12;
-  let noteName = CHROMATIC_NOTES[noteIndex];
-  if (preferFlats && FLAT_EQUIVALENTS[noteName]) {
-    noteName = FLAT_EQUIVALENTS[noteName];
-  }
-  return `${noteName}${octave}`;
 }
 
 // Convert note name to MusicXML pitch representation
@@ -226,6 +173,8 @@ export default function StaffNotePicker({
         <TouchableOpacity
           onPress={onPlayToSelect}
           style={styles.playToSelectButton}
+          accessibilityLabel="Use microphone to select note by playing"
+          accessibilityRole="button"
         >
           <Text style={styles.playToSelectText}>🎤 I'll play it instead</Text>
         </TouchableOpacity>
@@ -237,6 +186,8 @@ export default function StaffNotePicker({
         <TouchableOpacity
           onPress={() => moveNote(1)}
           style={styles.arrowButton}
+          accessibilityLabel="Move note up one semitone"
+          accessibilityRole="button"
         >
           <Text style={styles.arrowText}>▲</Text>
         </TouchableOpacity>
@@ -257,6 +208,8 @@ export default function StaffNotePicker({
         <TouchableOpacity
           onPress={() => moveNote(-1)}
           style={styles.arrowButton}
+          accessibilityLabel="Move note down one semitone"
+          accessibilityRole="button"
         >
           <Text style={styles.arrowText}>▼</Text>
         </TouchableOpacity>
@@ -267,10 +220,12 @@ export default function StaffNotePicker({
         <TouchableOpacity
           onPress={() => changeOctave(-1)}
           style={styles.octaveButton}
+          accessibilityLabel="Decrease octave"
+          accessibilityRole="button"
         >
           <Text style={styles.octaveText}>−</Text>
         </TouchableOpacity>
-        <View style={styles.noteNameBox}>
+        <View style={styles.noteNameBox}>>
           <Text style={styles.noteName}>
             {getEnharmonicDisplay(currentNote)}
           </Text>
@@ -278,6 +233,8 @@ export default function StaffNotePicker({
         <TouchableOpacity
           onPress={() => changeOctave(1)}
           style={styles.octaveButton}
+          accessibilityLabel="Increase octave"
+          accessibilityRole="button"
         >
           <Text style={styles.octaveText}>+</Text>
         </TouchableOpacity>
@@ -287,6 +244,14 @@ export default function StaffNotePicker({
     </View>
   );
 }
+
+StaffNotePicker.propTypes = {
+  clef: PropTypes.oneOf(["treble", "bass"]),
+  value: PropTypes.string,
+  onChange: PropTypes.func,
+  onPlayToSelect: PropTypes.func,
+  instrument: PropTypes.string,
+};
 
 const styles = StyleSheet.create({
   container: {

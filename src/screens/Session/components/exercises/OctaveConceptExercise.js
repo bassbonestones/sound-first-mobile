@@ -23,6 +23,7 @@ import {
   Platform,
 } from "react-native";
 import { exercisePropTypes, exerciseDefaultProps } from "./shared";
+import { devWarn } from "../../../../utils/devLogger";
 
 // Audio context for playing notes - works on web, iOS, and Android
 let AudioContextClass = null;
@@ -35,7 +36,7 @@ if (Platform.OS === "web") {
   try {
     AudioContextClass = require("react-native-audio-api").AudioContext;
   } catch (e) {
-    console.warn("react-native-audio-api not available");
+    devWarn("react-native-audio-api not available");
   }
 }
 
@@ -265,6 +266,8 @@ export default function OctaveConceptExercise({
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => setPhase(PHASES.LISTEN)}
+          accessibilityLabel="Hear octave examples"
+          accessibilityRole="button"
         >
           <Text style={styles.primaryButtonText}>Hear It →</Text>
         </TouchableOpacity>
@@ -308,6 +311,8 @@ export default function OctaveConceptExercise({
             style={[styles.playButton, isPlaying && styles.playButtonDisabled]}
             onPress={() => playOctavePair(currentPair)}
             disabled={isPlaying}
+            accessibilityLabel="Play octave"
+            accessibilityRole="button"
           >
             <Text style={styles.playButtonText}>
               {isPlaying ? "Playing..." : "▶ Play Octave"}
@@ -332,6 +337,8 @@ export default function OctaveConceptExercise({
                     idx === currentPairIndex && styles.pairButtonActive,
                   ]}
                   onPress={() => setCurrentPairIndex(idx)}
+                  accessibilityLabel={`Select ${pair.name} octave`}
+                  accessibilityRole="button"
                 >
                   <Text
                     style={[
@@ -350,6 +357,8 @@ export default function OctaveConceptExercise({
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => setPhase(PHASES.QUIZ)}
+          accessibilityLabel="Start quiz"
+          accessibilityRole="button"
         >
           <Text style={styles.primaryButtonText}>Got it! Quiz me →</Text>
         </TouchableOpacity>
@@ -398,6 +407,8 @@ export default function OctaveConceptExercise({
                   ]}
                   onPress={() => !showResult && handleAnswer(option)}
                   disabled={showResult}
+                  accessibilityLabel={`Select ${option}`}
+                  accessibilityRole="button"
                 >
                   <Text
                     style={[
@@ -431,7 +442,16 @@ export default function OctaveConceptExercise({
         </ScrollView>
 
         {showResult && (
-          <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={handleNext}
+            accessibilityLabel={
+              quizIndex < QUIZ_QUESTIONS.length - 1
+                ? "Next question"
+                : "See results"
+            }
+            accessibilityRole="button"
+          >
             <Text style={styles.primaryButtonText}>
               {quizIndex < QUIZ_QUESTIONS.length - 1
                 ? "Next →"
@@ -467,7 +487,12 @@ export default function OctaveConceptExercise({
           </View>
         </ScrollView>
 
-        <TouchableOpacity style={styles.primaryButton} onPress={handleComplete}>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={handleComplete}
+          accessibilityLabel={passed ? "Continue" : "Try again"}
+          accessibilityRole="button"
+        >
           <Text style={styles.primaryButtonText}>
             {passed ? "Continue →" : "Try Again"}
           </Text>

@@ -11,7 +11,9 @@
  */
 
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import { View, Text, TouchableOpacity } from "react-native";
+import ErrorBoundary from "../../components/ErrorBoundary";
 import ResetButton from "../../components/ResetButton";
 import {
   CapabilityExplorer,
@@ -39,45 +41,56 @@ export default function AdminScreen({ navigation }) {
   const [activeTab, setActiveTab] = useState("capabilities");
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Admin Console</Text>
-      </View>
+    <ErrorBoundary>
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Admin Console</Text>
+        </View>
 
-      {/* Tab Bar */}
-      <View style={styles.tabBar}>
-        {TABS.map((tab) => (
-          <TouchableOpacity
-            key={tab.id}
-            style={[styles.tab, activeTab === tab.id && styles.activeTab]}
-            onPress={() => setActiveTab(tab.id)}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === tab.id && styles.activeTabText,
-              ]}
+        {/* Tab Bar */}
+        <View style={styles.tabBar}>
+          {TABS.map((tab) => (
+            <TouchableOpacity
+              key={tab.id}
+              accessibilityLabel={`${tab.label} tab`}
+              accessibilityRole="button"
+              style={[styles.tab, activeTab === tab.id && styles.activeTab]}
+              onPress={() => setActiveTab(tab.id)}
             >
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === tab.id && styles.activeTabText,
+                ]}
+              >
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      {/* Content */}
-      <View style={styles.content}>
-        {activeTab === "capabilities" && <CapabilityExplorer />}
-        {activeTab === "materials" && <MaterialExplorer />}
-        {activeTab === "focus_cards" && <FocusCardExplorer />}
-        {activeTab === "soft_gates" && <SoftGateExplorer />}
-        {activeTab === "users" && <UserProgressionInspector />}
-        {activeTab === "engine" && <EngineSettings />}
-        {activeTab === "sessions" && <SessionDiagnostics />}
-      </View>
+        {/* Content */}
+        <View style={styles.content}>
+          {activeTab === "capabilities" && <CapabilityExplorer />}
+          {activeTab === "materials" && <MaterialExplorer />}
+          {activeTab === "focus_cards" && <FocusCardExplorer />}
+          {activeTab === "soft_gates" && <SoftGateExplorer />}
+          {activeTab === "users" && <UserProgressionInspector />}
+          {activeTab === "engine" && <EngineSettings />}
+          {activeTab === "sessions" && <SessionDiagnostics />}
+        </View>
 
-      {/* Dev Menu - at root level so overlay covers everything */}
-      <ResetButton />
-    </View>
+        {/* Dev Menu - at root level so overlay covers everything */}
+        <ResetButton />
+      </View>
+    </ErrorBoundary>
   );
 }
+
+AdminScreen.propTypes = {
+  navigation: PropTypes.shape({
+    navigate: PropTypes.func,
+    goBack: PropTypes.func,
+  }),
+};

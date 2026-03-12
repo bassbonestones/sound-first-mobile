@@ -5,6 +5,7 @@
  * instead of raw JSON.
  */
 import React from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -12,6 +13,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  StyleSheet,
 } from "react-native";
 import styles from "../../../styles";
 
@@ -120,6 +122,8 @@ export default function DetectionRuleEditor({ rule, options, onChange }) {
               {sources.map((src) => (
                 <TouchableOpacity
                   key={src}
+                  accessibilityLabel={`Select ${src.replace(/_/g, " ")} source`}
+                  accessibilityRole="button"
                   style={[
                     styles.detectionPickerOption,
                     currentRule.source === src &&
@@ -191,6 +195,8 @@ export default function DetectionRuleEditor({ rule, options, onChange }) {
                 {["ascending", "descending", "any"].map((dir) => (
                   <TouchableOpacity
                     key={dir}
+                    accessibilityLabel={`Select ${dir} direction`}
+                    accessibilityRole="button"
                     style={[
                       styles.detectionPickerOption,
                       (currentRule.direction || "any") === dir &&
@@ -232,6 +238,8 @@ export default function DetectionRuleEditor({ rule, options, onChange }) {
                 {["contains", "exact", "regex"].map((mt) => (
                   <TouchableOpacity
                     key={mt}
+                    accessibilityLabel={`Select ${mt} match type`}
+                    accessibilityRole="button"
                     style={[
                       styles.detectionPickerOption,
                       (currentRule.match_type || "contains") === mt &&
@@ -259,7 +267,7 @@ export default function DetectionRuleEditor({ rule, options, onChange }) {
         {ruleType === "time_signature" && (
           <View style={styles.detectionFieldRow}>
             <Text style={styles.detectionFieldLabel}>Time Signature:</Text>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <View style={localStyles.rowAlignCenter}>
               <TextInput
                 style={[
                   styles.detectionFieldInput,
@@ -293,7 +301,7 @@ export default function DetectionRuleEditor({ rule, options, onChange }) {
         {ruleType === "range" && (
           <View style={styles.detectionFieldRow}>
             <Text style={styles.detectionFieldLabel}>Range:</Text>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <View style={localStyles.rowAlignCenter}>
               <TextInput
                 style={[
                   styles.detectionFieldInput,
@@ -331,6 +339,8 @@ export default function DetectionRuleEditor({ rule, options, onChange }) {
               {custom_functions.map((fn) => (
                 <TouchableOpacity
                   key={fn}
+                  accessibilityLabel={`Select ${fn} custom function`}
+                  accessibilityRole="button"
                   style={[
                     styles.detectionPickerOption,
                     currentRule.custom_function === fn &&
@@ -378,7 +388,12 @@ export default function DetectionRuleEditor({ rule, options, onChange }) {
       </Text>
 
       {!rule ? (
-        <TouchableOpacity style={styles.addPrereqButton} onPress={addRule}>
+        <TouchableOpacity
+          accessibilityLabel="Add detection rule"
+          accessibilityRole="button"
+          style={styles.addPrereqButton}
+          onPress={addRule}
+        >
           <Text style={styles.addPrereqButtonText}>+ Add Detection Rule</Text>
         </TouchableOpacity>
       ) : (
@@ -391,6 +406,8 @@ export default function DetectionRuleEditor({ rule, options, onChange }) {
                 {types.map((type) => (
                   <TouchableOpacity
                     key={type}
+                    accessibilityLabel={`Select ${type.replace(/_/g, " ")} type`}
+                    accessibilityRole="button"
                     style={[
                       styles.detectionPickerOption,
                       rule.type === type &&
@@ -425,6 +442,8 @@ export default function DetectionRuleEditor({ rule, options, onChange }) {
                   <View style={styles.subRuleHeader}>
                     <Text style={styles.subRuleIndex}>Rule {index + 1}</Text>
                     <TouchableOpacity
+                      accessibilityLabel={`Remove sub-rule ${index + 1}`}
+                      accessibilityRole="button"
                       style={styles.subRuleRemove}
                       onPress={() => removeSubRule(index)}
                     >
@@ -443,6 +462,8 @@ export default function DetectionRuleEditor({ rule, options, onChange }) {
                           .map((type) => (
                             <TouchableOpacity
                               key={type}
+                              accessibilityLabel={`Select ${type.replace(/_/g, " ")} type for sub-rule`}
+                              accessibilityRole="button"
                               style={[
                                 styles.detectionPickerOption,
                                 subRule.type === type &&
@@ -468,6 +489,8 @@ export default function DetectionRuleEditor({ rule, options, onChange }) {
                 </View>
               ))}
               <TouchableOpacity
+                accessibilityLabel="Add sub-rule"
+                accessibilityRole="button"
                 style={styles.addSubRuleButton}
                 onPress={addSubRule}
               >
@@ -478,6 +501,8 @@ export default function DetectionRuleEditor({ rule, options, onChange }) {
 
           {/* Remove rule button */}
           <TouchableOpacity
+            accessibilityLabel="Remove detection rule"
+            accessibilityRole="button"
             style={styles.removeRuleButton}
             onPress={removeRule}
           >
@@ -490,3 +515,20 @@ export default function DetectionRuleEditor({ rule, options, onChange }) {
     </View>
   );
 }
+
+DetectionRuleEditor.propTypes = {
+  rule: PropTypes.object,
+  options: PropTypes.shape({
+    types: PropTypes.array,
+    sources: PropTypes.array,
+    custom_functions: PropTypes.array,
+  }),
+  onChange: PropTypes.func.isRequired,
+};
+
+const localStyles = StyleSheet.create({
+  rowAlignCenter: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+});

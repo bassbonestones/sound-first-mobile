@@ -6,6 +6,7 @@
  * - Extend Session (generates more content)
  */
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -14,6 +15,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
 } from "react-native";
+import { devError } from "../utils/devLogger";
 import { baseUrl } from "../api/client";
 
 export default function SessionEndScreen({ navigation, route }) {
@@ -44,7 +46,7 @@ export default function SessionEndScreen({ navigation, route }) {
         extendSession: true,
       });
     } catch (error) {
-      console.error("Failed to extend session:", error);
+      devError("Failed to extend session:", error);
       setExtending(false);
     }
   };
@@ -87,6 +89,10 @@ export default function SessionEndScreen({ navigation, route }) {
             style={styles.extendButton}
             onPress={handleExtend}
             disabled={extending}
+            accessibilityLabel="Keep practicing"
+            accessibilityHint="Extend your session with more activities"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: extending }}
           >
             {extending ? (
               <ActivityIndicator color="#1a1a2e" />
@@ -99,7 +105,13 @@ export default function SessionEndScreen({ navigation, route }) {
           </TouchableOpacity>
 
           {/* Home Button */}
-          <TouchableOpacity style={styles.homeButton} onPress={handleGoHome}>
+          <TouchableOpacity
+            style={styles.homeButton}
+            onPress={handleGoHome}
+            accessibilityLabel="Go home"
+            accessibilityHint="Return to the main menu"
+            accessibilityRole="button"
+          >
             <Text style={styles.homeIcon}>🏠</Text>
             <Text style={styles.homeText}>Go Home</Text>
           </TouchableOpacity>
@@ -113,6 +125,20 @@ export default function SessionEndScreen({ navigation, route }) {
     </SafeAreaView>
   );
 }
+
+SessionEndScreen.propTypes = {
+  navigation: PropTypes.shape({
+    reset: PropTypes.func.isRequired,
+    replace: PropTypes.func.isRequired,
+  }).isRequired,
+  route: PropTypes.shape({
+    params: PropTypes.shape({
+      completedCount: PropTypes.number,
+      totalDuration: PropTypes.number,
+      sessionParams: PropTypes.object,
+    }),
+  }),
+};
 
 const styles = StyleSheet.create({
   container: {

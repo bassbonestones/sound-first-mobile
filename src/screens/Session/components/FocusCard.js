@@ -1,12 +1,15 @@
 /**
  * FocusCard - Displays focus card information in session
+ *
+ * Memoized to prevent unnecessary re-renders when parent state changes.
  */
-import React from "react";
+import React, { memo } from "react";
+import PropTypes from "prop-types";
 import { View, Text } from "react-native";
 import { createShadow } from "../../../styles/theme";
 import { styles } from "./styles";
 
-export default function FocusCard({ mini }) {
+function FocusCard({ mini }) {
   return (
     <View
       style={[styles.focusCardContainer, createShadow("#000", 0, 4, 0.2, 8)]}
@@ -37,3 +40,14 @@ export default function FocusCard({ mini }) {
     </View>
   );
 }
+
+FocusCard.propTypes = {
+  mini: PropTypes.shape({
+    focus_card_category: PropTypes.string,
+    focus_card_name: PropTypes.string,
+    focus_card_attention_cue: PropTypes.string,
+    focus_card_instruction: PropTypes.string,
+  }).isRequired,
+};
+
+export default memo(FocusCard);

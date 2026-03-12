@@ -8,6 +8,7 @@ import {
   Platform,
 } from "react-native";
 import { CommonActions } from "@react-navigation/native";
+import { devError } from "../../../utils/devLogger";
 import { getBackendUrl } from "../../../api/client";
 import { useFirstNote } from "../context/FirstNoteContext";
 
@@ -45,7 +46,7 @@ export function DevNavMenu() {
         }),
       );
     } catch (err) {
-      console.error("Reset error:", err);
+      devError("Reset error:", err);
       if (Platform.OS === "web") {
         alert("Failed to reset: " + err.message);
       }
@@ -211,6 +212,8 @@ export function DevNavMenu() {
   if (!isOpen) {
     return (
       <TouchableOpacity
+        accessibilityLabel="Open dev navigation menu"
+        accessibilityRole="button"
         style={styles.menuButton}
         onPress={() => setIsOpen(true)}
       >
@@ -225,6 +228,8 @@ export function DevNavMenu() {
         <View style={styles.menuHeader}>
           <Text style={styles.menuTitle}>Dev Navigation</Text>
           <TouchableOpacity
+            accessibilityLabel="Close dev menu"
+            accessibilityRole="button"
             onPress={() => {
               setIsOpen(false);
               setExpandedStage(null);
@@ -238,6 +243,12 @@ export function DevNavMenu() {
           {STAGE_TREE.map((stageItem) => (
             <View key={stageItem.id}>
               <TouchableOpacity
+                accessibilityLabel={
+                  stageItem.isSettings
+                    ? `Settings: ${stageItem.name}`
+                    : `Stage ${stageItem.id}: ${stageItem.name}`
+                }
+                accessibilityRole="button"
                 style={[
                   styles.stageRow,
                   stageItem.isSettings && styles.settingsRow,
@@ -281,6 +292,8 @@ export function DevNavMenu() {
                 stageItem.subSteps.map((subStep) => (
                   <TouchableOpacity
                     key={subStep.id}
+                    accessibilityLabel={`Navigate to ${subStep.name}`}
+                    accessibilityRole="button"
                     style={[
                       styles.subStepRow,
                       stageItem.isSettings && styles.settingsSubStep,
@@ -295,6 +308,10 @@ export function DevNavMenu() {
         </ScrollView>
 
         <TouchableOpacity
+          accessibilityLabel={
+            isResetting ? "Resetting user data" : "Reset user data"
+          }
+          accessibilityRole="button"
           style={[styles.resetButton, isResetting && { opacity: 0.6 }]}
           onPress={handleReset}
           disabled={isResetting}
@@ -305,6 +322,8 @@ export function DevNavMenu() {
         </TouchableOpacity>
 
         <TouchableOpacity
+          accessibilityLabel="Open admin panel"
+          accessibilityRole="button"
           style={[
             styles.resetButton,
             { backgroundColor: "#3b2c1a", marginTop: 8 },

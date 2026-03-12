@@ -466,6 +466,128 @@ export const styles = StyleSheet.create({
     marginRight: 8,
   },
 
+  // Concert A
+  concertAInput: {
+    backgroundColor: colors.surfaceDark,
+    color: colors.gold,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    width: 60,
+    textAlign: "center",
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  concertAUnit: {
+    color: colors.goldDark,
+    fontSize: 12,
+    marginLeft: 4,
+  },
+
+  // Pitch center container
+  pitchCenterContainer: {
+    marginBottom: 12,
+  },
+  justIntonationLabel: {
+    color: colors.goldDark,
+    fontSize: 12,
+    textAlign: "center",
+    marginBottom: 4,
+  },
+
+  // Vibrato button
+  vibratoButtonActive: {
+    backgroundColor: colors.purple,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: colors.purple,
+  },
+  vibratoButtonInactive: {
+    backgroundColor: colors.surfaceDark,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: colors.border,
+  },
+  vibratoButtonTextActive: {
+    color: colors.textLight,
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  vibratoButtonTextInactive: {
+    color: colors.goldDark,
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+
+  // Octave highlight (for multi-octave note display)
+  octaveHighlightContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: "row",
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  octaveHighlightSlice: {
+    flex: 1,
+  },
+  octaveHighlightSliceActive: {
+    opacity: 0.7,
+  },
+  octaveHighlightSliceQueued: {
+    opacity: 0.3,
+  },
+
+  // Legend item
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 6,
+  },
+  legendColorBox: {
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+    marginRight: 2,
+  },
+  legendOctaveText: {
+    color: colors.textMuted,
+    fontSize: 10,
+  },
+
+  // Volume modal overlay and content
+  volumeModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  volumeModalContent: {
+    backgroundColor: colors.surfaceDark,
+    borderRadius: 16,
+    padding: 24,
+    width: 300,
+  },
+  volumeModalContentShadow: {
+    ...Platform.select({
+      web: { boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.5)" },
+      default: {
+        shadowColor: "#000",
+        shadowOpacity: 0.5,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 10,
+      },
+    }),
+  },
+
   // Volume modal
   volumeModalTitle: {
     color: colors.gold,

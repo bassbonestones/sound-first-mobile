@@ -16,6 +16,7 @@ import {
   Platform,
 } from "react-native";
 import { exercisePropTypes, exerciseDefaultProps } from "./shared";
+import { devWarn } from "../../../../utils/devLogger";
 
 // Audio context
 // Audio context - works on web, iOS, and Android
@@ -29,7 +30,7 @@ if (Platform.OS === "web") {
   try {
     AudioContextClass = require("react-native-audio-api").AudioContext;
   } catch (e) {
-    console.warn("react-native-audio-api not available");
+    devWarn("react-native-audio-api not available");
   }
 }
 
@@ -254,7 +255,12 @@ export default function OctaveMatchingExercise({
           </View>
         </View>
 
-        <TouchableOpacity style={styles.primaryButton} onPress={handleComplete}>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={handleComplete}
+          accessibilityLabel="Continue to next exercise"
+          accessibilityRole="button"
+        >
           <Text style={styles.primaryButtonText}>Continue →</Text>
         </TouchableOpacity>
       </View>
@@ -302,6 +308,14 @@ export default function OctaveMatchingExercise({
           ]}
           onPress={playPair}
           disabled={isPlaying}
+          accessibilityLabel={
+            isPlaying
+              ? "Playing audio"
+              : hasPlayed
+                ? "Play again"
+                : "Listen to the notes"
+          }
+          accessibilityRole="button"
         >
           <Text style={styles.playButtonEmoji}>
             {isPlaying ? "🔊" : hasPlayed ? "🔄" : "▶️"}
@@ -330,6 +344,8 @@ export default function OctaveMatchingExercise({
               ]}
               onPress={() => !showResult && handleAnswer(true)}
               disabled={showResult}
+              accessibilityLabel="Yes, these notes are an octave apart"
+              accessibilityRole="button"
             >
               <Text style={styles.answerButtonText}>Yes, Octave</Text>
               <Text style={styles.answerButtonEmoji}>✓</Text>
@@ -347,6 +363,8 @@ export default function OctaveMatchingExercise({
               ]}
               onPress={() => !showResult && handleAnswer(false)}
               disabled={showResult}
+              accessibilityLabel="No, these notes are different"
+              accessibilityRole="button"
             >
               <Text style={styles.answerButtonText}>No, Different</Text>
               <Text style={styles.answerButtonEmoji}>✗</Text>
@@ -378,7 +396,12 @@ export default function OctaveMatchingExercise({
 
       {/* Next button */}
       {showResult && (
-        <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={handleNext}
+          accessibilityLabel="Next question"
+          accessibilityRole="button"
+        >
           <Text style={styles.primaryButtonText}>Next →</Text>
         </TouchableOpacity>
       )}

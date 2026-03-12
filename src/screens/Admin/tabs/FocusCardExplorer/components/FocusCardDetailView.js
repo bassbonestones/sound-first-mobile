@@ -2,6 +2,7 @@
  * FocusCardDetailView - Detail view modal content for focus card
  */
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import styles from "../../../styles";
 import DetailRow from "./DetailRow";
@@ -19,7 +20,12 @@ export default function FocusCardDetailView({
       <View style={styles.detailModal}>
         <View style={styles.detailModalHeader}>
           <Text style={styles.detailModalTitle}>{focusCard.name}</Text>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity
+            accessibilityLabel="Close focus card detail"
+            accessibilityRole="button"
+            style={styles.closeButton}
+            onPress={onClose}
+          >
             <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -62,12 +68,16 @@ export default function FocusCardDetailView({
 
         <View style={styles.detailModalActions}>
           <TouchableOpacity
+            accessibilityLabel="Edit focus card"
+            accessibilityRole="button"
             style={[styles.actionButton, styles.modalEditButton]}
             onPress={onEdit}
           >
             <Text style={styles.actionButtonText}>Edit</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityLabel="Delete focus card"
+            accessibilityRole="button"
             style={[styles.actionButton, styles.deleteButton]}
             onPress={() => setShowDeleteConfirm(true)}
           >
@@ -82,12 +92,16 @@ export default function FocusCardDetailView({
               <Text style={styles.confirmText}>Delete "{focusCard.name}"?</Text>
               <View style={styles.confirmButtons}>
                 <TouchableOpacity
+                  accessibilityLabel="Cancel delete"
+                  accessibilityRole="button"
                   style={[styles.confirmButton, styles.cancelConfirmButton]}
                   onPress={() => setShowDeleteConfirm(false)}
                 >
                   <Text style={styles.confirmButtonText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
+                  accessibilityLabel="Confirm delete"
+                  accessibilityRole="button"
                   style={[styles.confirmButton, styles.deleteConfirmButton]}
                   onPress={onDelete}
                 >
@@ -103,3 +117,18 @@ export default function FocusCardDetailView({
     </View>
   );
 }
+
+FocusCardDetailView.propTypes = {
+  focusCard: PropTypes.shape({
+    id: PropTypes.number,
+    name: PropTypes.string,
+    category: PropTypes.string,
+    description: PropTypes.string,
+    attention_cue: PropTypes.string,
+    micro_cues: PropTypes.array,
+    prompts: PropTypes.object,
+  }).isRequired,
+  onClose: PropTypes.func.isRequired,
+  onEdit: PropTypes.func.isRequired,
+  onDelete: PropTypes.func.isRequired,
+};

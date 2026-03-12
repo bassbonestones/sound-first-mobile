@@ -9,6 +9,8 @@ import {
   Modal,
 } from "react-native";
 import Slider from "@react-native-community/slider";
+import PropTypes from "prop-types";
+import { devLog, devWarn } from "../utils/devLogger";
 
 // Import constants and utilities from extracted module
 import {
@@ -28,7 +30,7 @@ if (Platform.OS !== "web") {
   try {
     NativeAudioContext = require("react-native-audio-api").AudioContext;
   } catch (e) {
-    console.warn("react-native-audio-api not available:", e);
+    devWarn("react-native-audio-api not available:", e);
   }
 }
 
@@ -60,6 +62,7 @@ export default function Metronome({
   showSubdivision = true,
   muted = false,
   volume = 1.0, // Master volume multiplier (0-1)
+  hideInternalMute = false, // Hide internal mute button when controlled externally
   // Volume controls for cross-component modal
   droneVolume = 0.5,
   onVolumeChange,
@@ -185,7 +188,7 @@ export default function Metronome({
             const baseVolume = isBeatAccent ? 0.6 : subAccent * 0.5;
             const finalVolume = baseVolume * volumeRef.current; // Apply master volume
 
-            console.log(
+            devLog(
               `[Metronome] Beat ${beatCounter + 1}/${beatsPerMeasure}, sub=${index + 1}/${pattern.length}, freq=${frequency}Hz, vol=${finalVolume.toFixed(2)}`,
             );
             createClickSound(
@@ -222,7 +225,7 @@ export default function Metronome({
       subIntervalRef.current = [];
 
       const subdivisionPattern = SUBDIVISIONS[subdivision];
-      console.log(
+      devLog(
         `[Metronome] Starting at ${bpm} BPM, interval=${msPerBeat}ms, beatsPerMeasure=${beatsPerMeasure}, subdivision=${subdivision}, pattern=${subdivisionPattern.pattern.join(",")}`,
       );
 
@@ -331,7 +334,7 @@ export default function Metronome({
     <View style={styles.mainContainer}>
       {/* Mute Button - top right corner, only when playing */}
       {/* Tap to mute, long-press for volume controls */}
-      {isPlaying && (
+      {isPlaying && !hideInternalMute && (
         <Pressable
           onPress={toggleMute}
           onLongPress={() => setShowVolumeModal(true)}
@@ -340,6 +343,9 @@ export default function Metronome({
             styles.muteButton,
             { backgroundColor: muted ? "#555" : pressed ? "#444" : "#333" },
           ]}
+          accessibilityLabel={muted ? "Unmute metronome" : "Mute metronome"}
+          accessibilityHint="Long press to open volume controls"
+          accessibilityRole="button"
         >
           <Text style={styles.muteButtonText}>{muted ? "🔇" : "🔊"}</Text>
         </Pressable>
@@ -424,22 +430,13 @@ export default function Metronome({
 
       {/* Time Signature Picker */}
       {showTimeSigPicker && (
-        <View
-          style={{
-            backgroundColor: "#2d232e",
-            borderRadius: 12,
-            padding: 12,
-            marginBottom: 12,
-            width: "100%",
-            maxWidth: 340,
-          }}
-        >
+        <View style={styles.timeSigPickerPanel}>
           <Text style={[styles.pickerTitle, styles.pickerTitleGold]}>
             Time Signature
           </Text>
 
           {/* Beats per measure (top number) */}
-          <View style={{ marginBottom: 16 }}>
+          <View style={styles.beatsPerMeasureSection}>
             <Text style={styles.pickerLabel}>Beats per measure (1-12):</Text>
             <View style={styles.stepperRow}>
               <TouchableOpacity
@@ -495,10 +492,6 @@ export default function Metronome({
                         : styles.noteValueLabelInactive,
                     ]}
                   >
-                      color: noteValue === val ? "#5a4a3a" : "#666",
-                      fontSize: 9,
-                    }}
-                  >
                     {NOTE_VALUE_NAMES[val]}
                   </Text>
                 </TouchableOpacity>
@@ -508,36 +501,17 @@ export default function Metronome({
 
           <TouchableOpacity
             onPress={() => setShowTimeSigPicker(false)}
-            style={{
-              backgroundColor: "#FFD700",
-              paddingVertical: 10,
-              borderRadius: 8,
-              marginTop: 12,
-              alignItems: "center",
-            }}
+            style={styles.timeSigDoneButton}
           >
-            <Text style={{ color: "#3b2c1a", fontWeight: "bold" }}>Done</Text>
+            <Text style={styles.timeSigDoneButtonText}>Done</Text>
           </TouchableOpacity>
         </View>
       )}
 
       {/* Subdivision Picker */}
       {showSubdivisionPicker && (
-        <View
-          style={{
-            backgroundColor: "#2d232e",
-            borderRadius: 12,
-            padding: 12,
-            marginBottom: 12,
-            width: "100%",
-            maxWidth: 340,
-          }}
-        >
-          <Text
-            style={{ color: "#9C27B0", fontWeight: "bold", marginBottom: 8 }}
-          >
-            Subdivision Pattern
-          </Text>
+        <View style={styles.subdivisionPickerPanel}>
+          <Text style={styles.subdivisionPickerTitle}>Subdivision Pattern</Text>
           {noteValue !== 4 && (
             <Text style={styles.pickerNote}>
               Note: Swing patterns only available in /4 time
@@ -602,38 +576,26 @@ export default function Metronome({
       )}
 
       {/* Beat Indicator */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "center",
-          marginBottom: 20,
-          flexWrap: "wrap",
-          maxWidth: 320,
-        }}
-      >
-        {Array.from({ length: beatsPerMeasure }, (_, i) => (
-          <View
-            key={i}
-            style={{
-              width: 24,
-              height: 24,
-              borderRadius: 12,
-              margin: 4,
-              backgroundColor:
-                isPlaying && currentBeat === i
-                  ? i === 0 && accentFirst
-                    ? colors.accent
-                    : colors.gold
-                  : colors.surface,
-              borderWidth: 2,
-              borderColor: i === 0 && accentFirst ? colors.accent : colors.gold,
-              transform:
-                isPlaying && currentBeat === i
-                  ? [{ scale: 1.2 }]
-                  : [{ scale: 1 }],
-            }}
-          />
-        ))}
+      <View style={styles.beatIndicatorRow}>
+        {Array.from({ length: beatsPerMeasure }, (_, i) => {
+          const isCurrentBeat = isPlaying && currentBeat === i;
+          const isAccentBeat = i === 0 && accentFirst;
+          return (
+            <View
+              key={i}
+              style={[
+                styles.beatDot,
+                isCurrentBeat
+                  ? isAccentBeat
+                    ? styles.beatDotActiveAccent
+                    : styles.beatDotActive
+                  : isAccentBeat
+                    ? styles.beatDotInactiveAccent
+                    : styles.beatDotInactive,
+              ]}
+            />
+          );
+        })}
       </View>
 
       {/* Subdivision indicator (small dots under current beat) */}
@@ -694,6 +656,10 @@ export default function Metronome({
                 styles.playButton,
                 isPlaying ? styles.playButtonStop : styles.playButtonStart,
               ]}
+              accessibilityLabel={
+                isPlaying ? "Stop metronome" : "Start metronome"
+              }
+              accessibilityRole="button"
             >
               <Text style={styles.playButtonText}>
                 {isPlaying ? "⏹ Stop" : "▶ Start"}
@@ -703,6 +669,9 @@ export default function Metronome({
             <TouchableOpacity
               onPress={handleTapTempo}
               style={styles.tapButton}
+              accessibilityLabel="Tap tempo"
+              accessibilityHint="Tap repeatedly to set tempo from your taps"
+              accessibilityRole="button"
             >
               <Text style={styles.tapButtonText}>👆 Tap</Text>
             </TouchableOpacity>
@@ -750,30 +719,9 @@ export default function Metronome({
         transparent={true}
         onRequestClose={() => setShowVolumeModal(false)}
       >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.7)",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
+        <View style={styles.volumeModalOverlay}>
           <View
-            style={{
-              backgroundColor: "#2d232e",
-              borderRadius: 16,
-              padding: 24,
-              width: 300,
-              ...(Platform.OS === "web"
-                ? { boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.5)" }
-                : {
-                    shadowColor: "#000",
-                    shadowOpacity: 0.5,
-                    shadowRadius: 10,
-                    shadowOffset: { width: 0, height: 4 },
-                    elevation: 10,
-                  }),
-            }}
+            style={[styles.volumeModalContent, styles.volumeModalContentShadow]}
           >
             <Text style={styles.volumeModalTitle}>🔊 Volume Controls</Text>
 
@@ -851,3 +799,24 @@ export function CompactMetronome({
     </View>
   );
 }
+
+Metronome.propTypes = {
+  initialBpm: PropTypes.number,
+  minBpm: PropTypes.number,
+  maxBpm: PropTypes.number,
+  onBpmChange: PropTypes.func,
+  onPlayingChange: PropTypes.func,
+  onMuteChange: PropTypes.func,
+  beatsPerMeasure: PropTypes.number,
+  initialNoteValue: PropTypes.number,
+  accentFirst: PropTypes.bool,
+  showControls: PropTypes.bool,
+  autoStart: PropTypes.bool,
+  showTimeSignature: PropTypes.bool,
+  showSubdivision: PropTypes.bool,
+  muted: PropTypes.bool,
+  volume: PropTypes.number,
+  droneVolume: PropTypes.number,
+  onVolumeChange: PropTypes.func,
+  onDroneVolumeChange: PropTypes.func,
+};

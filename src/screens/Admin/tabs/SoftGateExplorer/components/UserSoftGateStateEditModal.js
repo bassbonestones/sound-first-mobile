@@ -2,6 +2,7 @@
  * UserSoftGateStateEditModal - Edit form for user soft gate state
  */
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -72,7 +73,12 @@ export default function UserSoftGateStateEditModal({
       <View style={styles.editModalPopup}>
         <View style={styles.detailModalHeader}>
           <Text style={styles.detailModalTitle}>{state.dimension_name}</Text>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity
+            accessibilityLabel="Close edit modal"
+            accessibilityRole="button"
+            style={styles.closeButton}
+            onPress={onClose}
+          >
             <Text style={[styles.closeButtonText, { color: "#fff" }]}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -112,6 +118,8 @@ export default function UserSoftGateStateEditModal({
           )}
 
           <TouchableOpacity
+            accessibilityLabel="Reset this dimension"
+            accessibilityRole="button"
             style={styles.resetDimensionButton}
             onPress={onReset}
           >
@@ -123,12 +131,16 @@ export default function UserSoftGateStateEditModal({
 
         <View style={styles.editModalFooter}>
           <TouchableOpacity
+            accessibilityLabel="Cancel"
+            accessibilityRole="button"
             style={[styles.editModalButton, styles.cancelButton]}
             onPress={onClose}
           >
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityLabel={saving ? "Saving" : "Save changes"}
+            accessibilityRole="button"
             style={[
               styles.editModalButton,
               styles.saveButton,
@@ -148,3 +160,17 @@ export default function UserSoftGateStateEditModal({
     </View>
   );
 }
+
+UserSoftGateStateEditModal.propTypes = {
+  state: PropTypes.shape({
+    id: PropTypes.number,
+    dimension_name: PropTypes.string,
+    comfortable_value: PropTypes.number,
+    max_demonstrated_value: PropTypes.number,
+    frontier_success_ema: PropTypes.number,
+    frontier_attempt_count_since_last_promo: PropTypes.number,
+  }).isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSave: PropTypes.func.isRequired,
+  onReset: PropTypes.func.isRequired,
+};

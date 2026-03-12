@@ -3,6 +3,7 @@
  */
 import { useCallback } from "react";
 import { getBackendUrl } from "../../../api/client";
+import { devLog, devError } from "../../../utils/devLogger";
 
 export default function useFirstNoteNavigation({
   userId,
@@ -32,7 +33,7 @@ export default function useFirstNoteNavigation({
           body: JSON.stringify({ day0_stage: newStage }),
         });
       } catch (err) {
-        console.error("Failed to save progress:", err);
+        devError("Failed to save progress:", err);
       }
     },
     [userId, instrumentId],
@@ -54,7 +55,7 @@ export default function useFirstNoteNavigation({
         });
         navigation.replace(destination);
       } catch (err) {
-        console.error("Failed to complete Day 0:", err);
+        devError("Failed to complete Day 0:", err);
         navigation.replace(destination);
       }
     },
@@ -90,7 +91,7 @@ export default function useFirstNoteNavigation({
 
     // Skip over any stages that are in skippableStages (max stage is 7)
     while (newStage < 7 && skippableStages.includes(newStage)) {
-      console.log(`[Day0] Skipping stage ${newStage} (already mastered)`);
+      devLog(`[Day0] Skipping stage ${newStage} (already mastered)`);
       newStage++;
     }
 

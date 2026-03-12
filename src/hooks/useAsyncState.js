@@ -16,6 +16,7 @@
  */
 
 import { useState, useCallback } from "react";
+import { devError } from "../utils/devLogger";
 
 /**
  * @typedef {Object} AsyncState
@@ -51,7 +52,7 @@ export function useAsyncState(initialData = null) {
       return result;
     } catch (err) {
       setError(err);
-      console.error("[useAsyncState] Error:", err);
+      devError("[useAsyncState] Error:", err);
       return null;
     } finally {
       setLoading(false);

@@ -2,6 +2,7 @@
  * FocusCardCreateModal - Create modal for new focus card
  */
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -85,7 +86,12 @@ export default function FocusCardCreateModal({
       <View style={styles.editModalPopup}>
         <View style={styles.detailModalHeader}>
           <Text style={styles.detailModalTitle}>Create Focus Card</Text>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity
+            accessibilityLabel="Close create modal"
+            accessibilityRole="button"
+            style={styles.closeButton}
+            onPress={onClose}
+          >
             <Text style={[styles.closeButtonText, { color: "#fff" }]}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -108,6 +114,8 @@ export default function FocusCardCreateModal({
                   {categories.map((cat) => (
                     <TouchableOpacity
                       key={cat}
+                      accessibilityLabel={`Select ${cat} category`}
+                      accessibilityRole="button"
                       style={[
                         styles.pickerOption,
                         formData.category === cat &&
@@ -127,6 +135,8 @@ export default function FocusCardCreateModal({
                     </TouchableOpacity>
                   ))}
                   <TouchableOpacity
+                    accessibilityLabel="Create new category"
+                    accessibilityRole="button"
                     style={styles.pickerOption}
                     onPress={() => setShowNewCategory(true)}
                   >
@@ -143,6 +153,8 @@ export default function FocusCardCreateModal({
                   placeholder="Enter new category"
                 />
                 <TouchableOpacity
+                  accessibilityLabel="Cancel new category"
+                  accessibilityRole="button"
                   style={styles.cancelNewButton}
                   onPress={() => {
                     setShowNewCategory(false);
@@ -220,12 +232,16 @@ export default function FocusCardCreateModal({
 
         <View style={styles.editModalFooter}>
           <TouchableOpacity
+            accessibilityLabel="Cancel"
+            accessibilityRole="button"
             style={[styles.editModalButton, styles.cancelButton]}
             onPress={onClose}
           >
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityLabel={saving ? "Creating" : "Create focus card"}
+            accessibilityRole="button"
             style={[
               styles.editModalButton,
               styles.saveButton,
@@ -245,3 +261,9 @@ export default function FocusCardCreateModal({
     </View>
   );
 }
+
+FocusCardCreateModal.propTypes = {
+  categories: PropTypes.arrayOf(PropTypes.string).isRequired,
+  onClose: PropTypes.func.isRequired,
+  onCreate: PropTypes.func.isRequired,
+};

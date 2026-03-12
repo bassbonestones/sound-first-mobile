@@ -17,6 +17,7 @@ import {
   Platform,
 } from "react-native";
 import { exercisePropTypes, exerciseDefaultProps } from "./shared";
+import { devWarn } from "../../../../utils/devLogger";
 
 // Audio context
 // Audio context - works on web, iOS, and Android
@@ -30,7 +31,7 @@ if (Platform.OS === "web") {
   try {
     AudioContextClass = require("react-native-audio-api").AudioContext;
   } catch (e) {
-    console.warn("react-native-audio-api not available");
+    devWarn("react-native-audio-api not available");
   }
 }
 
@@ -365,6 +366,8 @@ export default function DiatonicScalePatternExercise({
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => setPhase(PHASES.LISTEN)}
+          accessibilityLabel="Listen to the scale"
+          accessibilityRole="button"
         >
           <Text style={styles.primaryButtonText}>Listen to the Scale →</Text>
         </TouchableOpacity>
@@ -392,6 +395,8 @@ export default function DiatonicScalePatternExercise({
             style={[styles.playButton, isPlaying && styles.playButtonDisabled]}
             onPress={() => playScale(false)}
             disabled={isPlaying}
+            accessibilityLabel="Play the scale"
+            accessibilityRole="button"
           >
             <Text style={styles.playButtonText}>
               {isPlaying ? "Playing..." : "▶ Play the Scale"}
@@ -418,6 +423,8 @@ export default function DiatonicScalePatternExercise({
             setPhase(PHASES.PATTERN);
           }}
           disabled={!hasPlayedOnPhase}
+          accessibilityLabel="See the pattern"
+          accessibilityRole="button"
         >
           <Text
             style={[
@@ -470,6 +477,8 @@ export default function DiatonicScalePatternExercise({
             style={[styles.playButton, isPlaying && styles.playButtonDisabled]}
             onPress={() => playScale(true)}
             disabled={isPlaying}
+            accessibilityLabel="Replay the scale"
+            accessibilityRole="button"
           >
             <Text style={styles.playButtonText}>
               {isPlaying ? "Playing..." : "▶ Play Again"}
@@ -488,6 +497,8 @@ export default function DiatonicScalePatternExercise({
             setPhase(PHASES.IDENTIFY);
           }}
           disabled={!hasPlayedOnPhase}
+          accessibilityLabel="Hear each step"
+          accessibilityRole="button"
         >
           <Text
             style={[
@@ -522,6 +533,8 @@ export default function DiatonicScalePatternExercise({
                 ]}
                 onPress={() => playInterval(idx)}
                 disabled={isPlaying}
+                accessibilityLabel={`Play interval ${item.from} to ${item.to}`}
+                accessibilityRole="button"
               >
                 <Text style={styles.intervalFrom}>{item.from}</Text>
                 <Text style={styles.intervalArrow}>↓</Text>
@@ -555,6 +568,8 @@ export default function DiatonicScalePatternExercise({
           ]}
           onPress={() => setPhase(PHASES.QUIZ)}
           disabled={intervalsPlayed.size < 2}
+          accessibilityLabel="Start quiz"
+          accessibilityRole="button"
         >
           <Text
             style={[
@@ -610,6 +625,8 @@ export default function DiatonicScalePatternExercise({
                   ]}
                   onPress={() => !showResult && handleAnswer(option)}
                   disabled={showResult}
+                  accessibilityLabel={`Select ${option}`}
+                  accessibilityRole="button"
                 >
                   <Text
                     style={[
@@ -643,7 +660,16 @@ export default function DiatonicScalePatternExercise({
         </ScrollView>
 
         {showResult && (
-          <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={handleNext}
+            accessibilityLabel={
+              quizIndex < QUIZ_QUESTIONS.length - 1
+                ? "Next question"
+                : "See results"
+            }
+            accessibilityRole="button"
+          >
             <Text style={styles.primaryButtonText}>
               {quizIndex < QUIZ_QUESTIONS.length - 1
                 ? "Next →"
@@ -686,7 +712,12 @@ export default function DiatonicScalePatternExercise({
           </View>
         </ScrollView>
 
-        <TouchableOpacity style={styles.primaryButton} onPress={handleComplete}>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={handleComplete}
+          accessibilityLabel={passed ? "Continue" : "Try again"}
+          accessibilityRole="button"
+        >
           <Text style={styles.primaryButtonText}>
             {passed ? "Continue →" : "Try Again"}
           </Text>

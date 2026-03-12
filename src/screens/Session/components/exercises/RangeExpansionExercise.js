@@ -29,10 +29,14 @@ import {
 } from "../../../../constants/rangeExpansionPatterns";
 import EDMVisualizer from "../../../../components/EDMVisualizer";
 import { CircularVolumeIndicator } from "../../../../components/VolumeBar";
+import { devLog, devWarn } from "../../../../utils/devLogger";
 import { DAY0_FOCUS_CARDS } from "../../../FirstNote/data/focusCards";
 import {
   parseNoteName,
   noteToMidi,
+  midiToNote,
+  midiToNoteInContext,
+  shouldUseSharps,
   PITCH_DETECTION_OPTIONS,
   exercisePropTypes,
   exerciseDefaultProps,
@@ -48,7 +52,7 @@ let NotationDisplay = null;
 try {
   NotationDisplay = require("../../../../components/NotationDisplay").default;
 } catch (e) {
-  console.warn("NotationDisplay not available");
+  devWarn("NotationDisplay not available");
 }
 
 // Simplified phases matching Day 0 flow
@@ -80,93 +84,6 @@ function chromaticLower(noteName) {
   }
 
   return `${parsed.letter}${newAccidental}${parsed.octave}`;
-}
-
-const CHROMATIC_NOTES = [
-  "C",
-  "C#",
-  "D",
-  "D#",
-  "E",
-  "F",
-  "F#",
-  "G",
-  "G#",
-  "A",
-  "A#",
-  "B",
-];
-const FLAT_EQUIVALENTS = {
-  "C#": "Db",
-  "D#": "Eb",
-  "F#": "Gb",
-  "G#": "Ab",
-  "A#": "Bb",
-};
-
-function midiToNote(midi, preferFlats = true) {
-  const octave = Math.floor(midi / 12) - 1;
-  const noteIndex = midi % 12;
-  let noteName = CHROMATIC_NOTES[noteIndex];
-  if (preferFlats && FLAT_EQUIVALENTS[noteName]) {
-    noteName = FLAT_EQUIVALENTS[noteName];
-  }
-  return `${noteName}${octave}`;
-}
-
-// Determine if we should use sharps based on the root note
-// Sharp keys: G, D, A, E, B, F#, C# (and their relative minors)
-// Also use sharps if the note itself has a sharp
-function shouldUseSharps(noteName) {
-  if (!noteName) return false;
-  if (noteName.includes("#")) return true;
-  const letter = noteName.charAt(0).toUpperCase();
-  // Natural notes that typically use sharps in their key signatures
-  const sharpRoots = ["G", "D", "A", "E", "B"];
-  return sharpRoots.includes(letter);
-}
-
-// Smarter sharp/flat decision based on context
-// Returns the best enharmonic spelling for a MIDI note given a reference note
-function midiToNoteInContext(midi, referenceNote) {
-  const octave = Math.floor(midi / 12) - 1;
-  const noteIndex = midi % 12;
-  const sharpName = CHROMATIC_NOTES[noteIndex];
-  const flatName = FLAT_EQUIVALENTS[sharpName] || sharpName;
-
-  // If it's a natural note (no enharmonic choice), just return it
-  if (sharpName === flatName) {
-    return `${sharpName}${octave}`;
-  }
-
-  // Get reference base (letter + accidental, without octave)
-  const refBase = referenceNote ? referenceNote.replace(/\d+$/, "") : "";
-
-  // If reference already uses flat spelling (e.g., Eb), keep using flats
-  if (refBase.includes("b")) {
-    return `${flatName}${octave}`;
-  }
-
-  // If reference already uses sharp spelling (e.g., F#), keep using sharps
-  if (refBase.includes("#")) {
-    return `${sharpName}${octave}`;
-  }
-
-  // Get reference letter (without accidental or octave)
-  const refLetter = referenceNote ? referenceNote.charAt(0).toUpperCase() : "";
-
-  // If the sharp spelling would have the same letter as reference (e.g., D → D#),
-  // that's musically awkward - use the flat spelling instead (Eb)
-  if (sharpName.charAt(0) === refLetter) {
-    return `${flatName}${octave}`;
-  }
-
-  // Default: use sharp/flat preference based on key context
-  const useFlats = !shouldUseSharps(referenceNote);
-  if (useFlats) {
-    return `${flatName}${octave}`;
-  }
-  return `${sharpName}${octave}`;
 }
 
 // Generate MusicXML for single note on staff
@@ -349,12 +266,12 @@ export default function RangeExpansionExercise({
   const anchorMidi = noteToMidi(anchorNote);
   const anchorFreq = noteToFrequency(anchorNote);
 
-  console.log("[RangeExpansion] Props:", {
+  devLog("[RangeExpansion] Props:", {
     userRangeLow,
     userRangeHigh,
     direction,
   });
-  console.log("[RangeExpansion] Computed:", {
+  devLog("[RangeExpansion] Computed:", {
     anchorNote,
     anchorMidi,
     anchorFreq,
@@ -451,7 +368,7 @@ export default function RangeExpansionExercise({
           midi: roundedMidi,
           timestamp: pendingPitchRef.current.startTime,
         });
-        console.log(
+        devLog(
           `[RangeExpansion] Recorded pitch: MIDI ${roundedMidi} (${midiToNote(roundedMidi)}) after ${elapsed}ms`,
         );
         pendingPitchRef.current = null;
@@ -477,7 +394,7 @@ export default function RangeExpansionExercise({
           midi: pendingPitchRef.current.midi,
           timestamp: pendingPitchRef.current.startTime,
         });
-        console.log(
+        devLog(
           `[RangeExpansion] Committed pending pitch on silence: MIDI ${pendingPitchRef.current.midi} (${midiToNote(pendingPitchRef.current.midi)}) after ${elapsed}ms`,
         );
       }
@@ -521,7 +438,7 @@ export default function RangeExpansionExercise({
    */
   const finishRecording = useCallback(
     (success, message) => {
-      console.log(
+      devLog(
         `[RangeExpansion] Recording finished: ${success ? "SUCCESS" : "FAIL"} - ${message}`,
       );
 
@@ -553,9 +470,7 @@ export default function RangeExpansionExercise({
    */
   const analyzeContour = useCallback(() => {
     const history = pitchHistoryRef.current;
-    console.log(
-      `[RangeExpansion] Analyzing ${history.length} pitch readings...`,
-    );
+    devLog(`[RangeExpansion] Analyzing ${history.length} pitch readings...`);
 
     if (history.length < 2) {
       // Not enough data
@@ -597,7 +512,7 @@ export default function RangeExpansionExercise({
       notes.push(Math.round(medianMidi));
     }
 
-    console.log(
+    devLog(
       `[RangeExpansion] Detected notes: ${notes.map((m) => midiToNote(m)).join(" → ")}`,
     );
 
@@ -620,10 +535,10 @@ export default function RangeExpansionExercise({
       (interval) => (anchorPitchClass + interval + 120) % 12, // +120 to handle negative intervals
     );
 
-    console.log(
+    devLog(
       `[RangeExpansion] Expected pitch classes: [${expectedPitchClasses.join(", ")}] (from anchor ${anchorNote})`,
     );
-    console.log(
+    devLog(
       `[RangeExpansion] Detected notes: [${notes.map((m) => `${midiToNote(m)}(${m % 12})`).join(", ")}]`,
     );
 
@@ -649,7 +564,7 @@ export default function RangeExpansionExercise({
           found = true;
           foundIndices.push(j);
           searchFrom = j + 1; // Next search starts after this note
-          console.log(
+          devLog(
             `[RangeExpansion] Found expected pitch ${i + 1}/${expectedPitchClasses.length}: ` +
               `${midiToNote(notes[j])} (PC ${notePC}) matches target PC ${targetPC}`,
           );
@@ -658,7 +573,7 @@ export default function RangeExpansionExercise({
       }
 
       if (!found) {
-        console.log(
+        devLog(
           `[RangeExpansion] Missing pitch ${i + 1}/${expectedPitchClasses.length}: ` +
             `couldn't find pitch class ${targetPC} after index ${searchFrom}`,
         );
@@ -692,29 +607,24 @@ export default function RangeExpansionExercise({
   // For interval 0, use the anchor note directly to ensure consistency
   const patternNotes = useMemo(() => {
     if (!pattern?.intervals) return [];
-    console.log(
-      "[PatternNotes] anchorNote:",
-      anchorNote,
-      "anchorMidi:",
-      anchorMidi,
-    );
-    console.log("[PatternNotes] intervals:", pattern.intervals);
+    devLog("[PatternNotes] anchorNote:", anchorNote, "anchorMidi:", anchorMidi);
+    devLog("[PatternNotes] intervals:", pattern.intervals);
     const notes = pattern.intervals.map((interval, idx) => {
       if (interval === 0) {
         // Return anchor note directly for "home" positions
-        console.log(
+        devLog(
           `[PatternNotes] idx ${idx}: interval=0, returning anchorNote=${anchorNote}`,
         );
         return anchorNote;
       }
       const midi = anchorMidi + interval;
       const note = midiToNoteInContext(midi, anchorNote);
-      console.log(
+      devLog(
         `[PatternNotes] idx ${idx}: interval=${interval}, midi=${midi}, note=${note}`,
       );
       return note;
     });
-    console.log("[PatternNotes] result:", notes);
+    devLog("[PatternNotes] result:", notes);
     return notes;
   }, [pattern?.intervals, anchorMidi, anchorNote]);
 
@@ -774,7 +684,7 @@ export default function RangeExpansionExercise({
     pitchHistoryRef.current = [];
     setRecordingMode("sing");
     setIsRecording(true);
-    console.log("[RangeExpansion] Started recording for SING phase");
+    devLog("[RangeExpansion] Started recording for SING phase");
   }, []);
 
   const handleDoneSinging = useCallback(() => {
@@ -786,7 +696,7 @@ export default function RangeExpansionExercise({
       }
     }
     setPhase(PHASE.IMAGINE);
-    console.log("[RangeExpansion] Moving to IMAGINE phase");
+    devLog("[RangeExpansion] Moving to IMAGINE phase");
   }, [isRecording]);
 
   const handleTrySingAgain = useCallback(() => {
@@ -795,7 +705,7 @@ export default function RangeExpansionExercise({
     pitchHistoryRef.current = [];
     setRecordingMode("sing");
     setIsRecording(true);
-    console.log("[RangeExpansion] Trying sing again");
+    devLog("[RangeExpansion] Trying sing again");
   }, []);
 
   const handleDoneImagining = useCallback(() => {
@@ -804,7 +714,7 @@ export default function RangeExpansionExercise({
     pitchHistoryRef.current = [];
     setRecordingMode("play");
     setIsRecording(true);
-    console.log("[RangeExpansion] Started recording for PLAY phase");
+    devLog("[RangeExpansion] Started recording for PLAY phase");
   }, []);
 
   const handleDonePlaying = useCallback(() => {
@@ -813,7 +723,7 @@ export default function RangeExpansionExercise({
       analyzeContourRef.current();
     }
     setPhase(PHASE.FEEDBACK);
-    console.log("[RangeExpansion] Moving to FEEDBACK phase");
+    devLog("[RangeExpansion] Moving to FEEDBACK phase");
   }, [isRecording]);
 
   const handleTryPlayAgain = useCallback(() => {
@@ -822,7 +732,7 @@ export default function RangeExpansionExercise({
     pitchHistoryRef.current = [];
     setRecordingMode("play");
     setIsRecording(true);
-    console.log("[RangeExpansion] Trying play again");
+    devLog("[RangeExpansion] Trying play again");
   }, []);
 
   const handleFeedbackComplete = useCallback(() => {
@@ -914,6 +824,8 @@ export default function RangeExpansionExercise({
     <View style={styles.notationToggle}>
       {!showNotation ? (
         <TouchableOpacity
+          accessibilityLabel="Show notation"
+          accessibilityRole="button"
           style={styles.notationToggleButton}
           onPress={() => setShowNotation(true)}
         >
@@ -923,6 +835,8 @@ export default function RangeExpansionExercise({
         <View style={styles.notationToggleContainer}>
           <View style={styles.notationModeRow}>
             <TouchableOpacity
+              accessibilityLabel="Show starting note"
+              accessibilityRole="button"
               style={[
                 styles.notationModeButton,
                 notationMode === "starting" && styles.notationModeButtonActive,
@@ -939,6 +853,8 @@ export default function RangeExpansionExercise({
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
+              accessibilityLabel="Show full pattern"
+              accessibilityRole="button"
               style={[
                 styles.notationModeButton,
                 notationMode === "full" && styles.notationModeButtonActive,
@@ -957,6 +873,8 @@ export default function RangeExpansionExercise({
           </View>
           <StaffDisplay />
           <TouchableOpacity
+            accessibilityLabel="Hide notation"
+            accessibilityRole="button"
             style={styles.notationHideButton}
             onPress={() => setShowNotation(false)}
           >
@@ -1028,9 +946,12 @@ export default function RangeExpansionExercise({
 
         <View style={styles.fixedBottomButtons}>
           {showHeardItButton ? (
-            // After hearing once - Hear Again on top, I Heard It at bottom (closest to thumbs)
             <>
               <TouchableOpacity
+                accessibilityLabel={
+                  isPlaying ? "Playing pattern" : "Hear again"
+                }
+                accessibilityRole="button"
                 style={[
                   styles.secondaryButton,
                   isPlaying && styles.buttonDisabled,
@@ -1043,6 +964,8 @@ export default function RangeExpansionExercise({
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
+                accessibilityLabel="I heard it, continue"
+                accessibilityRole="button"
                 style={[styles.primaryButton, { marginTop: 8 }]}
                 onPress={handleHeardIt}
               >
@@ -1050,8 +973,11 @@ export default function RangeExpansionExercise({
               </TouchableOpacity>
             </>
           ) : (
-            // First time - just show Hear Pattern
             <TouchableOpacity
+              accessibilityLabel={
+                isPlaying ? "Playing pattern" : "Hear pattern"
+              }
+              accessibilityRole="button"
               style={[styles.primaryButton, isPlaying && styles.buttonDisabled]}
               onPress={handlePlayModel}
               disabled={isPlaying}
@@ -1120,15 +1046,18 @@ export default function RangeExpansionExercise({
 
         <View style={styles.fixedBottomButtons}>
           {singResult && !singResult.success ? (
-            // Show Try Again when singing was incorrect
             <>
               <TouchableOpacity
+                accessibilityLabel="Try singing again"
+                accessibilityRole="button"
                 style={styles.primaryButton}
                 onPress={handleTrySingAgain}
               >
                 <Text style={styles.primaryButtonText}>Try Again</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                accessibilityLabel="Continue anyway"
+                accessibilityRole="button"
                 style={[styles.secondaryButton, { marginTop: 8 }]}
                 onPress={handleDoneSinging}
               >
@@ -1139,6 +1068,10 @@ export default function RangeExpansionExercise({
             </>
           ) : (
             <TouchableOpacity
+              accessibilityLabel={
+                singResult?.success ? "Continue" : "Done singing, continue"
+              }
+              accessibilityRole="button"
               style={styles.primaryButton}
               onPress={handleDoneSinging}
             >

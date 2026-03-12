@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -6,6 +7,8 @@ import {
   Platform,
   ScrollView,
   TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
 } from "react-native";
 import ResetButton from "../components/ResetButton";
 
@@ -51,72 +54,125 @@ export default function RatingScreen({ navigation, route }) {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#1a1410" }}>
-    <ScrollView
-      contentContainerStyle={{
-        flexGrow: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: "#1a1410",
-        padding: 32,
-      }}
-    >
-      <Text
-        style={{
-          fontSize: 32,
-          fontWeight: "bold",
-          color: "#FFD700",
-          marginBottom: 20,
-          fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
-        }}
-      >
-        Rate Your Practice
-      </Text>
-      <View style={{ flexDirection: "row", marginBottom: 24 }}>
-        {[1, 2, 3, 4, 5].map((num) => (
-          <TouchableOpacity
-            key={num}
-            onPress={() => setRating(num)}
-            style={{
-              backgroundColor: rating === num ? "#FFD700" : "#3b2c1a",
-              borderRadius: 16,
-              padding: 16,
-              margin: 8,
-              borderWidth: 2,
-              borderColor: rating === num ? "#FFD700" : "#bfa76a",
-            }}
-          >
-            <Text
-              style={{
-                color: rating === num ? "#3b2c1a" : "#FFD700",
-                fontWeight: "bold",
-                fontSize: 22,
-              }}
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.title}>Rate Your Practice</Text>
+        <View style={styles.ratingRow}>
+          {[1, 2, 3, 4, 5].map((num) => (
+            <TouchableOpacity
+              key={num}
+              onPress={() => setRating(num)}
+              accessibilityLabel={`Rate ${num} out of 5${rating === num ? ", selected" : ""}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: rating === num }}
+              style={[
+                styles.ratingButton,
+                rating === num && styles.ratingButtonSelected,
+              ]}
             >
-              {num}
-            </Text>
+              <Text
+                style={[
+                  styles.ratingButtonText,
+                  rating === num && styles.ratingButtonTextSelected,
+                ]}
+              >
+                {num}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {rating && (
+          <TouchableOpacity
+            onPress={submitAttempt}
+            disabled={submitting}
+            accessibilityLabel={
+              submitting ? "Submitting rating" : "Submit rating"
+            }
+            accessibilityRole="button"
+            accessibilityState={{ disabled: submitting }}
+            style={[
+              styles.submitButton,
+              submitting && styles.submitButtonDisabled,
+            ]}
+          >
+            {submitting ? (
+              <ActivityIndicator size="small" color="#1a1410" />
+            ) : (
+              <Text style={styles.submitButtonText}>Submit</Text>
+            )}
           </TouchableOpacity>
-        ))}
-      </View>
-      {rating && (
-        <TouchableOpacity
-          onPress={submitAttempt}
-          disabled={submitting}
-          style={{
-            backgroundColor: submitting ? "#bfa76a" : "#FFD700",
-            borderRadius: 24,
-            paddingVertical: 16,
-            paddingHorizontal: 48,
-            marginTop: 12,
-          }}
-        >
-          <Text style={{ color: "#3b2c1a", fontWeight: "bold", fontSize: 20 }}>
-            {submitting ? "Submitting..." : "Submit"}
-          </Text>
-        </TouchableOpacity>
-      )}
-    </ScrollView>
-    <ResetButton />
+        )}
+      </ScrollView>
+      <ResetButton />
     </View>
   );
 }
+
+RatingScreen.propTypes = {
+  navigation: PropTypes.shape({
+    navigate: PropTypes.func.isRequired,
+  }).isRequired,
+  route: PropTypes.shape({
+    params: PropTypes.object,
+  }),
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#1a1410",
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#1a1410",
+    padding: 32,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#FFD700",
+    marginBottom: 20,
+    fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
+  },
+  ratingRow: {
+    flexDirection: "row",
+    marginBottom: 24,
+  },
+  ratingButton: {
+    backgroundColor: "#3b2c1a",
+    borderRadius: 16,
+    padding: 16,
+    margin: 8,
+    borderWidth: 2,
+    borderColor: "#bfa76a",
+  },
+  ratingButtonSelected: {
+    backgroundColor: "#FFD700",
+    borderColor: "#FFD700",
+  },
+  ratingButtonText: {
+    color: "#FFD700",
+    fontWeight: "bold",
+    fontSize: 22,
+  },
+  ratingButtonTextSelected: {
+    color: "#3b2c1a",
+  },
+  submitButton: {
+    backgroundColor: "#FFD700",
+    borderRadius: 24,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    marginTop: 12,
+  },
+  submitButtonDisabled: {
+    backgroundColor: "#bfa76a",
+  },
+  submitButtonText: {
+    color: "#3b2c1a",
+    fontWeight: "bold",
+    fontSize: 20,
+  },
+});

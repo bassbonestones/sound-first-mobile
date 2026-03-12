@@ -2,6 +2,7 @@
  * CurriculumSteps - Displays curriculum steps with completion status
  */
 import React from "react";
+import PropTypes from "prop-types";
 import { View, Text, TouchableOpacity } from "react-native";
 import { STEP_ICONS, STEP_LABELS } from "../data/stepTypes";
 import { styles, colors } from "./styles";
@@ -62,6 +63,8 @@ export default function CurriculumSteps({
         <TouchableOpacity
           style={styles.completeStepButton}
           onPress={() => onCompleteStep(currentStepIndex, rating)}
+          accessibilityLabel="Complete current step"
+          accessibilityRole="button"
         >
           <Text style={styles.completeStepButtonText}>Complete Step</Text>
         </TouchableOpacity>
@@ -69,3 +72,19 @@ export default function CurriculumSteps({
     </View>
   );
 }
+
+CurriculumSteps.propTypes = {
+  curriculumSteps: PropTypes.arrayOf(
+    PropTypes.shape({
+      type: PropTypes.string,
+      is_completed: PropTypes.bool,
+    }),
+  ).isRequired,
+  currentStepIndex: PropTypes.number.isRequired,
+  currentStep: PropTypes.shape({
+    type: PropTypes.string,
+    is_completed: PropTypes.bool,
+  }),
+  rating: PropTypes.number,
+  onCompleteStep: PropTypes.func.isRequired,
+};

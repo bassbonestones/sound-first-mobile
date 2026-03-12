@@ -17,6 +17,8 @@ import {
   Platform,
 } from "react-native";
 import { exercisePropTypes, exerciseDefaultProps } from "./shared";
+import { devWarn } from "../../../../utils/devLogger";
+import MiniKeyboard from "./shared/MiniKeyboard";
 
 // Audio context
 // Audio context - works on web, iOS, and Android
@@ -30,7 +32,7 @@ if (Platform.OS === "web") {
   try {
     AudioContextClass = require("react-native-audio-api").AudioContext;
   } catch (e) {
-    console.warn("react-native-audio-api not available");
+    devWarn("react-native-audio-api not available");
   }
 }
 
@@ -63,23 +65,6 @@ const NOTE_FREQUENCIES = {
   B4: 493.88,
   C5: 523.25,
 };
-
-// Piano key layout (one octave + C5)
-const PIANO_KEYS = [
-  { note: "C4", isBlack: false, label: "C" },
-  { note: "C#4", isBlack: true, label: "C#" },
-  { note: "D4", isBlack: false, label: "D" },
-  { note: "D#4", isBlack: true, label: "D#" },
-  { note: "E4", isBlack: false, label: "E" },
-  { note: "F4", isBlack: false, label: "F" },
-  { note: "F#4", isBlack: true, label: "F#" },
-  { note: "G4", isBlack: false, label: "G" },
-  { note: "G#4", isBlack: true, label: "G#" },
-  { note: "A4", isBlack: false, label: "A" },
-  { note: "A#4", isBlack: true, label: "A#" },
-  { note: "B4", isBlack: false, label: "B" },
-  { note: "C5", isBlack: false, label: "C" },
-];
 
 // Half step examples
 const HALF_STEP_EXAMPLES = [
@@ -117,168 +102,6 @@ const QUIZ_QUESTIONS = [
     options: ["7", "8", "10", "12"],
   },
 ];
-
-// ============================================================
-// MINI KEYBOARD COMPONENT
-// ============================================================
-
-function MiniKeyboard({
-  highlightNotes = [],
-  onKeyPress,
-  interactive = false,
-}) {
-  const whiteKeys = PIANO_KEYS.filter((k) => !k.isBlack);
-  const blackKeys = PIANO_KEYS.filter((k) => k.isBlack);
-
-  // White key dimensions: 40px width + 2px margin each side = 44px per key
-  const WHITE_KEY_WIDTH = 44;
-  const BLACK_KEY_WIDTH = 28;
-
-  return (
-    <View style={keyboardStyles.container}>
-      {/* Inner wrapper with fixed width to hold both rows */}
-      <View style={keyboardStyles.keyboardWrapper}>
-        {/* White keys */}
-        <View style={keyboardStyles.whiteKeysRow}>
-          {whiteKeys.map((key, idx) => {
-            const isHighlighted = highlightNotes.includes(key.note);
-            return (
-              <TouchableOpacity
-                key={key.note}
-                style={[
-                  keyboardStyles.whiteKey,
-                  isHighlighted && keyboardStyles.whiteKeyHighlighted,
-                ]}
-                onPress={() => interactive && onKeyPress?.(key.note)}
-                disabled={!interactive}
-              >
-                <Text
-                  style={[
-                    keyboardStyles.whiteKeyLabel,
-                    isHighlighted && keyboardStyles.keyLabelHighlighted,
-                  ]}
-                >
-                  {key.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        {/* Black keys - positioned absolutely within wrapper */}
-        <View style={keyboardStyles.blackKeysRow}>
-          {blackKeys.map((key) => {
-            const isHighlighted = highlightNotes.includes(key.note);
-            // Position black keys between white keys
-            // Black key sits at the right edge of its preceding white key
-            const whiteKeyIndices = {
-              "C#4": 0, // Between C(0) and D(1)
-              "D#4": 1, // Between D(1) and E(2)
-              "F#4": 3, // Between F(3) and G(4)
-              "G#4": 4, // Between G(4) and A(5)
-              "A#4": 5, // Between A(5) and B(6)
-            };
-            const whiteIdx = whiteKeyIndices[key.note];
-            if (whiteIdx === undefined) return null;
-
-            // Position: center of gap between white keys
-            const leftPos =
-              (whiteIdx + 1) * WHITE_KEY_WIDTH - BLACK_KEY_WIDTH / 2;
-
-            return (
-              <TouchableOpacity
-                key={key.note}
-                style={[
-                  keyboardStyles.blackKey,
-                  { left: leftPos },
-                  isHighlighted && keyboardStyles.blackKeyHighlighted,
-                ]}
-                onPress={() => interactive && onKeyPress?.(key.note)}
-                disabled={!interactive}
-              >
-                <Text
-                  style={[
-                    keyboardStyles.blackKeyLabel,
-                    isHighlighted && keyboardStyles.keyLabelHighlighted,
-                  ]}
-                >
-                  {key.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
-    </View>
-  );
-}
-
-const keyboardStyles = StyleSheet.create({
-  container: {
-    height: 140,
-    alignItems: "center",
-    marginVertical: 16,
-  },
-  keyboardWrapper: {
-    position: "relative",
-    width: 352, // 8 white keys * 44px (40px + 4px margin)
-    height: 120,
-  },
-  whiteKeysRow: {
-    flexDirection: "row",
-    height: 120,
-  },
-  whiteKey: {
-    width: 40,
-    height: 120,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#333",
-    borderRadius: 4,
-    marginHorizontal: 2,
-    justifyContent: "flex-end",
-    alignItems: "center",
-    paddingBottom: 8,
-  },
-  whiteKeyHighlighted: {
-    backgroundColor: "#4fc3f7",
-  },
-  whiteKeyLabel: {
-    fontSize: 14,
-    color: "#333",
-    fontWeight: "600",
-  },
-  blackKeysRow: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 80,
-  },
-  blackKey: {
-    position: "absolute",
-    width: 28,
-    height: 75,
-    backgroundColor: "#1a1a2e",
-    borderWidth: 1,
-    borderColor: "#000",
-    borderRadius: 4,
-    justifyContent: "flex-end",
-    alignItems: "center",
-    paddingBottom: 6,
-  },
-  blackKeyHighlighted: {
-    backgroundColor: "#ff9800",
-  },
-  blackKeyLabel: {
-    fontSize: 10,
-    color: "#888",
-    fontWeight: "600",
-  },
-  keyLabelHighlighted: {
-    color: "#1a1a2e",
-    fontWeight: "bold",
-  },
-});
 
 // ============================================================
 // MAIN COMPONENT
@@ -695,7 +518,7 @@ export default function HalfStepsTheoryExercise({
         </ScrollView>
 
         {showResult && (
-          <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
+          <TouchableOpacity style={styles.primaryButton} onPress={handleNext} accessibilityLabel="Next step" accessibilityRole="button">
             <Text style={styles.primaryButtonText}>
               {quizIndex < QUIZ_QUESTIONS.length - 1
                 ? "Next →"
@@ -733,7 +556,7 @@ export default function HalfStepsTheoryExercise({
           </View>
         </ScrollView>
 
-        <TouchableOpacity style={styles.primaryButton} onPress={handleComplete}>
+        <TouchableOpacity style={styles.primaryButton} onPress={handleComplete} accessibilityLabel="Complete lesson" accessibilityRole="button">
           <Text style={styles.primaryButtonText}>
             {passed ? "Continue →" : "Try Again"}
           </Text>

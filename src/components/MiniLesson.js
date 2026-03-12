@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -9,6 +10,7 @@ import {
   Platform,
   Image,
 } from "react-native";
+import { devWarn } from "../utils/devLogger";
 import { baseUrl } from "../api/client";
 
 // Step type icons for mini-lesson
@@ -97,7 +99,7 @@ export default function MiniLesson({
         }),
       });
     } catch (err) {
-      console.warn("Failed to record quiz result:", err);
+      devWarn("Failed to record quiz result:", err);
     }
   };
 
@@ -120,11 +122,21 @@ export default function MiniLesson({
     return (
       <View style={styles.container}>
         <Text style={styles.errorText}>Error: {error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={fetchLesson}>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={fetchLesson}
+          accessibilityLabel="Retry loading lesson"
+          accessibilityRole="button"
+        >
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
         {onCancel && (
-          <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={onCancel}
+            accessibilityLabel="Cancel lesson"
+            accessibilityRole="button"
+          >
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
         )}
@@ -137,7 +149,12 @@ export default function MiniLesson({
       <View style={styles.container}>
         <Text style={styles.errorText}>No lesson content available.</Text>
         {onCancel && (
-          <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={onCancel}
+            accessibilityLabel="Close lesson"
+            accessibilityRole="button"
+          >
             <Text style={styles.cancelButtonText}>Close</Text>
           </TouchableOpacity>
         )}
@@ -199,7 +216,11 @@ export default function MiniLesson({
         {/* Step Type Specific Content */}
         {currentStep.step_type === "LISTEN" && currentStep.audio_url && (
           <View style={styles.mediaContainer}>
-            <TouchableOpacity style={styles.playButton}>
+            <TouchableOpacity
+              style={styles.playButton}
+              accessibilityLabel="Play audio example"
+              accessibilityRole="button"
+            >
               <Text style={styles.playButtonText}>▶️ Play Audio Example</Text>
             </TouchableOpacity>
             <Text style={styles.mediaHint}>
@@ -247,6 +268,8 @@ export default function MiniLesson({
                         selectedAnswer === option && styles.quizOptionSelected,
                       ]}
                       onPress={() => handleQuizAnswer(option)}
+                      accessibilityLabel={`Quiz option ${idx + 1}: ${option}`}
+                      accessibilityRole="button"
                     >
                       <Text style={styles.quizOptionText}>{option}</Text>
                     </TouchableOpacity>
@@ -276,17 +299,24 @@ export default function MiniLesson({
       {/* Navigation Buttons */}
       <View style={styles.navigationContainer}>
         {currentStepIndex > 0 && (
-          <TouchableOpacity style={styles.navButton} onPress={handlePrevStep}>
+          <TouchableOpacity
+            style={styles.navButton}
+            onPress={handlePrevStep}
+            accessibilityLabel="Go to previous step"
+            accessibilityRole="button"
+          >
             <Text style={styles.navButtonText}>← Back</Text>
           </TouchableOpacity>
         )}
 
-        <View style={{ flex: 1 }} />
+        <View style={styles.spacer} />
 
         {isLastStep && isQuizStep && quizSubmitted ? (
           <TouchableOpacity
             style={[styles.navButton, styles.completeButton]}
             onPress={handleComplete}
+            accessibilityLabel="Complete lesson"
+            accessibilityRole="button"
           >
             <Text style={styles.completeButtonText}>Done ✓</Text>
           </TouchableOpacity>
@@ -294,12 +324,19 @@ export default function MiniLesson({
           <TouchableOpacity
             style={[styles.navButton, styles.completeButton]}
             onPress={handleComplete}
+            accessibilityLabel="Complete lesson"
+            accessibilityRole="button"
           >
             <Text style={styles.completeButtonText}>Done ✓</Text>
           </TouchableOpacity>
         ) : (
           !isQuizStep && (
-            <TouchableOpacity style={styles.navButton} onPress={handleNextStep}>
+            <TouchableOpacity
+              style={styles.navButton}
+              onPress={handleNextStep}
+              accessibilityLabel="Go to next step"
+              accessibilityRole="button"
+            >
               <Text style={styles.navButtonText}>Next →</Text>
             </TouchableOpacity>
           )
@@ -308,13 +345,26 @@ export default function MiniLesson({
 
       {/* Cancel button */}
       {onCancel && (
-        <TouchableOpacity style={styles.skipButton} onPress={onCancel}>
+        <TouchableOpacity
+          style={styles.skipButton}
+          onPress={onCancel}
+          accessibilityLabel="Skip lesson for now"
+          accessibilityRole="button"
+        >
           <Text style={styles.skipButtonText}>Skip for now</Text>
         </TouchableOpacity>
       )}
     </View>
   );
 }
+
+MiniLesson.propTypes = {
+  capabilityId: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+    .isRequired,
+  onComplete: PropTypes.func.isRequired,
+  onCancel: PropTypes.func,
+  userId: PropTypes.number,
+};
 
 const styles = {
   container: {
@@ -552,5 +602,8 @@ const styles = {
   cancelButtonText: {
     color: "#777777",
     fontSize: 14,
+  },
+  spacer: {
+    flex: 1,
   },
 };

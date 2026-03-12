@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -14,10 +15,12 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import ResetButton from "../../components/ResetButton";
+import { devLog, devError } from "../../utils/devLogger";
 import CapabilityRow from "./components/CapabilityRow";
 import AddCapabilityModal from "./components/AddCapabilityModal";
 import { CATEGORIES, STORAGE_KEY, DEFAULT_NEW_ITEM } from "./data/constants";
@@ -26,6 +29,7 @@ import styles from "./styles";
 
 export default function CapabilityPath({ navigation }) {
   const [capabilities, setCapabilities] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState("teaching_order");
   const [filterCategory, setFilterCategory] = useState("All");
   const [editingItem, setEditingItem] = useState(null);
@@ -39,12 +43,13 @@ export default function CapabilityPath({ navigation }) {
   }, []);
 
   const loadData = async () => {
+    setLoading(true);
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (INITIAL_DATA.length > parsed.length) {
-          console.log(
+          devLog(
             `[CapabilityPath] Upgrading from ${parsed.length} to ${INITIAL_DATA.length} capabilities`,
           );
           setCapabilities(INITIAL_DATA);
@@ -57,8 +62,10 @@ export default function CapabilityPath({ navigation }) {
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_DATA));
       }
     } catch (e) {
-      console.error("Failed to load capability data:", e);
+      devError("Failed to load capability data:", e);
       setCapabilities(INITIAL_DATA);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -68,7 +75,7 @@ export default function CapabilityPath({ navigation }) {
       setHasUnsavedChanges(false);
       Alert.alert("Saved", "Changes saved locally");
     } catch (e) {
-      console.error("Failed to save:", e);
+      devError("Failed to save:", e);
       Alert.alert("Error", "Failed to save changes");
     }
   };
@@ -226,11 +233,25 @@ export default function CapabilityPath({ navigation }) {
     />
   );
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2196F3" />
+        <Text style={styles.loadingText}>Loading capabilities...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
+        <TouchableOpacity
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+          style={styles.backBtn}
+          onPress={handleBack}
+        >
           <Text style={styles.backBtnText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Capability Path</Text>
@@ -241,6 +262,8 @@ export default function CapabilityPath({ navigation }) {
       <View style={styles.controls}>
         <View style={styles.sortButtons}>
           <TouchableOpacity
+            accessibilityLabel="Sort by teaching order"
+            accessibilityRole="button"
             style={[
               styles.sortBtn,
               sortBy === "teaching_order" && styles.sortBtnActive,
@@ -257,6 +280,8 @@ export default function CapabilityPath({ navigation }) {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityLabel="Sort by category"
+            accessibilityRole="button"
             style={[
               styles.sortBtn,
               sortBy === "category" && styles.sortBtnActive,
@@ -281,6 +306,8 @@ export default function CapabilityPath({ navigation }) {
           style={styles.filterScroll}
         >
           <TouchableOpacity
+            accessibilityLabel="Filter by all categories"
+            accessibilityRole="button"
             style={[
               styles.filterBtn,
               filterCategory === "All" && styles.filterBtnActive,
@@ -299,6 +326,8 @@ export default function CapabilityPath({ navigation }) {
           {CATEGORIES.map((cat) => (
             <TouchableOpacity
               key={cat}
+              accessibilityLabel={`Filter by ${cat} category`}
+              accessibilityRole="button"
               style={[
                 styles.filterBtn,
                 filterCategory === cat && styles.filterBtnActive,
@@ -330,6 +359,8 @@ export default function CapabilityPath({ navigation }) {
       {/* Bottom actions */}
       <View style={styles.bottomBar}>
         <TouchableOpacity
+          accessibilityLabel="Add new capability"
+          accessibilityRole="button"
           style={styles.addBtn}
           onPress={() => setShowAddModal(true)}
         >
@@ -337,6 +368,8 @@ export default function CapabilityPath({ navigation }) {
         </TouchableOpacity>
 
         <TouchableOpacity
+          accessibilityLabel="Save changes"
+          accessibilityRole="button"
           style={[styles.saveBtn, !hasUnsavedChanges && styles.saveBtnDisabled]}
           onPress={() => saveData(capabilities)}
           disabled={!hasUnsavedChanges}
@@ -344,11 +377,21 @@ export default function CapabilityPath({ navigation }) {
           <Text style={styles.saveBtnText}>Save</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.exportBtn} onPress={exportToClipboard}>
+        <TouchableOpacity
+          accessibilityLabel="Export to clipboard"
+          accessibilityRole="button"
+          style={styles.exportBtn}
+          onPress={exportToClipboard}
+        >
           <Text style={styles.exportBtnText}>Export</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.resetBtn} onPress={resetToDefaults}>
+        <TouchableOpacity
+          accessibilityLabel="Reset to defaults"
+          accessibilityRole="button"
+          style={styles.resetBtn}
+          onPress={resetToDefaults}
+        >
           <Text style={styles.resetBtnText}>Reset</Text>
         </TouchableOpacity>
       </View>
@@ -366,3 +409,10 @@ export default function CapabilityPath({ navigation }) {
     </View>
   );
 }
+
+CapabilityPath.propTypes = {
+  navigation: PropTypes.shape({
+    navigate: PropTypes.func,
+    goBack: PropTypes.func,
+  }),
+};

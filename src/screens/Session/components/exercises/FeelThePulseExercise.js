@@ -260,7 +260,12 @@ export default function FeelThePulseExercise({
             </Text>
           </View>
 
-          <TouchableOpacity style={styles.startButton} onPress={startRound}>
+          <TouchableOpacity
+            style={styles.startButton}
+            onPress={startRound}
+            accessibilityLabel="Start exercise"
+            accessibilityRole="button"
+          >
             <Text style={styles.startButtonText}>Start</Text>
           </TouchableOpacity>
 
@@ -309,6 +314,12 @@ export default function FeelThePulseExercise({
         onPress={handleTap}
         activeOpacity={0.8}
         disabled={phase !== PHASE_SILENT}
+        accessibilityLabel={
+          phase === PHASE_SILENT
+            ? "Tap to continue the beat"
+            : "Listen to the beat"
+        }
+        accessibilityRole="button"
       >
         <Animated.View
           style={[

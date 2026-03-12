@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Platform,
 } from "react-native";
+import { devError } from "../utils/devLogger";
 import ResetButton from "../components/ResetButton";
 import { baseUrl } from "../api/client";
 
@@ -46,7 +47,7 @@ export default function HistoryScreen() {
         setLoading(false);
       })
       .catch((err) => {
-        console.error("History load error:", err);
+        devError("History load error:", err);
         setLoading(false);
       });
   }, []);
@@ -56,6 +57,8 @@ export default function HistoryScreen() {
 
   const TabButton = ({ name, label }) => (
     <TouchableOpacity
+      accessibilityLabel={`${label} tab`}
+      accessibilityRole="button"
       onPress={() => setActiveTab(name)}
       style={[
         styles.tabButton,

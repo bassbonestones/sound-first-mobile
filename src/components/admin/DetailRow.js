@@ -6,6 +6,7 @@
 
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import PropTypes from "prop-types";
 import { colors, spacing, fontSizes } from "../../styles/theme";
 
 /**
@@ -25,6 +26,12 @@ export function DetailRow({ label, value, valueStyle }) {
     </View>
   );
 }
+
+DetailRow.propTypes = {
+  label: PropTypes.string.isRequired,
+  value: PropTypes.any,
+  valueStyle: PropTypes.object,
+};
 
 const styles = StyleSheet.create({
   row: {

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useMemo } from "react";
+import PropTypes from "prop-types";
 import { View, StyleSheet, Animated, Platform } from "react-native";
 
 /**
@@ -254,6 +255,13 @@ export default function EDMVisualizer({
   );
 }
 
+EDMVisualizer.propTypes = {
+  volume: PropTypes.number,
+  pitchAccuracy: PropTypes.oneOf(["correct", "off", "listening", null]),
+  barCount: PropTypes.number,
+  style: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
+};
+
 // Medium version - smaller but keeps pulse rings and orb
 export function EDMVisualizerMedium({
   volume = 0,
@@ -327,6 +335,13 @@ export function EDMVisualizerMedium({
   );
 }
 
+EDMVisualizerMedium.propTypes = {
+  volume: PropTypes.number,
+  pitchAccuracy: PropTypes.oneOf(["correct", "off", "listening", null]),
+  barCount: PropTypes.number,
+  style: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
+};
+
 // Compact version for inline use
 export function EDMVisualizerCompact({
   volume = 0,
@@ -374,6 +389,15 @@ export function EDMVisualizerCompact({
     </View>
   );
 }
+
+EDMVisualizerCompact.propTypes = {
+  volume: PropTypes.number,
+  pitchAccuracy: PropTypes.oneOf(["correct", "off", "listening", null]),
+  barCount: PropTypes.number,
+  width: PropTypes.number,
+  height: PropTypes.number,
+  style: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
+};
 
 const styles = StyleSheet.create({
   container: {

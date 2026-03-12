@@ -5,6 +5,7 @@
  */
 
 import React from "react";
+import PropTypes from "prop-types";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
@@ -21,6 +22,7 @@ import HistoryScreen from "../screens/HistoryScreen";
 import AdminScreen from "../screens/Admin";
 import FirstNoteScreen from "../screens/FirstNote";
 import ExerciseTestScreen from "../screens/ExerciseTestScreen";
+import TuneMasteryScreen from "../screens/TuneMastery";
 
 const Stack = createNativeStackNavigator();
 
@@ -145,9 +147,19 @@ export function AppNavigator({ initialRoute, initialParams }) {
           component={ExerciseTestScreen}
           options={{ title: "Exercise Tester", headerShown: false }}
         />
+        <Stack.Screen
+          name="TuneMastery"
+          component={TuneMasteryScreen}
+          options={{ title: "Tune Mastery", headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
+
+AppNavigator.propTypes = {
+  initialRoute: PropTypes.string,
+  initialParams: PropTypes.object,
+};
 
 export default AppNavigator;

@@ -41,6 +41,8 @@ export const Stage7Content = () => {
 
       {!showSummary && (
         <TouchableOpacity
+          accessibilityLabel="View what I learned today"
+          accessibilityRole="button"
           style={styles.summaryToggleButton}
           onPress={() => setShowSummary(true)}
         >
@@ -51,6 +53,8 @@ export const Stage7Content = () => {
       {showSummary && (
         <View style={styles.summaryContainer}>
           <TouchableOpacity
+            accessibilityLabel="Close summary"
+            accessibilityRole="button"
             style={styles.summaryCloseButton}
             onPress={() => setShowSummary(false)}
           >
@@ -108,12 +112,16 @@ export const Stage7Buttons = () => {
   return (
     <View style={styles.fixedBottomButtons}>
       <TouchableOpacity
+        accessibilityLabel="Go back"
+        accessibilityRole="button"
         style={styles.backTextButton}
         onPress={() => goBackTeaching(6, 4)}
       >
         <Text style={styles.backTextButtonText}>← Back</Text>
       </TouchableOpacity>
       <TouchableOpacity
+        accessibilityLabel={isPlaying ? "Playing note" : "Play your note"}
+        accessibilityRole="button"
         style={[styles.secondaryButton, isPlaying && styles.buttonDisabled]}
         onPress={playNote}
         disabled={isPlaying}
@@ -126,12 +134,16 @@ export const Stage7Buttons = () => {
       {/* Two completion options */}
       <View style={styles.completionButtons}>
         <TouchableOpacity
+          accessibilityLabel="Start practicing"
+          accessibilityRole="button"
           style={styles.primaryButton}
           onPress={() => completeDay0("StartPractice")}
         >
           <Text style={styles.primaryButtonText}>🎯 Start Practicing</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          accessibilityLabel="Go to home"
+          accessibilityRole="button"
           style={styles.homeButton}
           onPress={() => completeDay0("Home")}
         >

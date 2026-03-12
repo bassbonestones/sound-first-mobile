@@ -300,3 +300,225 @@ describe("exerciseConstants", () => {
     });
   });
 });
+
+describe("ExerciseErrorBoundary", () => {
+  // Import React and testing utilities
+  const React = require("react");
+  const { render, fireEvent } = require("@testing-library/react-native");
+  const { Text, View } = require("react-native");
+  const {
+    default: ExerciseErrorBoundary,
+    withExerciseErrorBoundary,
+  } = require("../src/screens/Session/components/exercises/shared/ExerciseErrorBoundary");
+
+  // Component that throws an error
+  const ThrowingComponent = () => {
+    throw new Error("Test error");
+  };
+
+  // Component that renders normally
+  const NormalComponent = () => <Text>Normal content</Text>;
+
+  beforeEach(() => {
+    // Suppress console.error for expected errors
+    jest.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    console.error.mockRestore();
+  });
+
+  describe("basic functionality", () => {
+    it("renders children when no error occurs", () => {
+      const { getByText } = render(
+        <ExerciseErrorBoundary>
+          <NormalComponent />
+        </ExerciseErrorBoundary>,
+      );
+
+      expect(getByText("Normal content")).toBeTruthy();
+    });
+
+    it("renders error UI when child throws", () => {
+      const { getByText } = render(
+        <ExerciseErrorBoundary>
+          <ThrowingComponent />
+        </ExerciseErrorBoundary>,
+      );
+
+      expect(getByText("Something went wrong")).toBeTruthy();
+      expect(getByText("Try Again")).toBeTruthy();
+    });
+
+    it("shows skip button when onSkip is provided", () => {
+      const mockOnSkip = jest.fn();
+      const { getByText } = render(
+        <ExerciseErrorBoundary onSkip={mockOnSkip}>
+          <ThrowingComponent />
+        </ExerciseErrorBoundary>,
+      );
+
+      expect(getByText("Skip Exercise")).toBeTruthy();
+    });
+
+    it("calls onSkip when skip button is pressed", () => {
+      const mockOnSkip = jest.fn();
+      const { getByText } = render(
+        <ExerciseErrorBoundary onSkip={mockOnSkip}>
+          <ThrowingComponent />
+        </ExerciseErrorBoundary>,
+      );
+
+      fireEvent.press(getByText("Skip Exercise"));
+      expect(mockOnSkip).toHaveBeenCalled();
+    });
+  });
+
+  describe("withExerciseErrorBoundary HOC", () => {
+    it("wraps component with error boundary", () => {
+      const WrappedNormal = withExerciseErrorBoundary(
+        NormalComponent,
+        "TestComponent",
+      );
+      const { getByText } = render(<WrappedNormal />);
+
+      expect(getByText("Normal content")).toBeTruthy();
+    });
+
+    it("catches errors from wrapped component", () => {
+      const WrappedThrowing = withExerciseErrorBoundary(
+        ThrowingComponent,
+        "ThrowingComponent",
+      );
+      const { getByText } = render(<WrappedThrowing />);
+
+      expect(getByText("Something went wrong")).toBeTruthy();
+    });
+
+    it("sets correct displayName", () => {
+      const WrappedComponent = withExerciseErrorBoundary(
+        NormalComponent,
+        "MyExercise",
+      );
+      expect(WrappedComponent.displayName).toBe(
+        "WithErrorBoundary(MyExercise)",
+      );
+    });
+
+    it("calls onComplete with error result when skipped", () => {
+      const mockOnComplete = jest.fn();
+      const WrappedThrowing = withExerciseErrorBoundary(
+        ThrowingComponent,
+        "ThrowingComponent",
+      );
+      const { getByText } = render(
+        <WrappedThrowing onComplete={mockOnComplete} />,
+      );
+
+      fireEvent.press(getByText("Skip Exercise"));
+
+      expect(mockOnComplete).toHaveBeenCalledWith({
+        success: false,
+        skipped: true,
+        error: "Exercise skipped due to error",
+      });
+    });
+  });
+});
+
+describe("AudioLoadingState", () => {
+  const React = require("react");
+  const { render, fireEvent } = require("@testing-library/react-native");
+  const {
+    AudioLoadingState,
+    WithAudioLoading,
+  } = require("../src/screens/Session/components/exercises/shared/AudioLoadingState");
+
+  describe("AudioLoadingState component", () => {
+    it("shows loading indicator when isLoading is true", () => {
+      const { getByText } = render(<AudioLoadingState isLoading={true} />);
+
+      expect(getByText("Initializing audio...")).toBeTruthy();
+    });
+
+    it("shows custom loading message", () => {
+      const { getByText } = render(
+        <AudioLoadingState isLoading={true} message="Setting up audio..." />,
+      );
+
+      expect(getByText("Setting up audio...")).toBeTruthy();
+    });
+
+    it("shows error state when error is provided", () => {
+      const { getByText } = render(
+        <AudioLoadingState
+          isLoading={false}
+          error={new Error("Test audio error")}
+        />,
+      );
+
+      expect(getByText("Audio Not Available")).toBeTruthy();
+      expect(getByText("Test audio error")).toBeTruthy();
+    });
+
+    it("shows retry button when onRetry is provided", () => {
+      const mockRetry = jest.fn();
+      const { getByText } = render(
+        <AudioLoadingState
+          isLoading={false}
+          error={new Error("Test error")}
+          onRetry={mockRetry}
+        />,
+      );
+
+      expect(getByText("Try Again")).toBeTruthy();
+      fireEvent.press(getByText("Try Again"));
+      expect(mockRetry).toHaveBeenCalled();
+    });
+
+    it("returns null when not loading and no error", () => {
+      const { toJSON } = render(
+        <AudioLoadingState isLoading={false} error={null} />,
+      );
+
+      expect(toJSON()).toBeNull();
+    });
+  });
+
+  describe("WithAudioLoading wrapper", () => {
+    const { Text } = require("react-native");
+
+    it("shows loading state when audio is not ready", () => {
+      const { getByText } = render(
+        <WithAudioLoading isAudioReady={false} audioError={null}>
+          <Text>Content</Text>
+        </WithAudioLoading>,
+      );
+
+      expect(getByText("Initializing audio...")).toBeTruthy();
+    });
+
+    it("shows error state when audioError is provided", () => {
+      const { getByText } = render(
+        <WithAudioLoading
+          isAudioReady={false}
+          audioError={new Error("Audio failed")}
+        >
+          <Text>Content</Text>
+        </WithAudioLoading>,
+      );
+
+      expect(getByText("Audio Not Available")).toBeTruthy();
+    });
+
+    it("renders children when audio is ready", () => {
+      const { getByText } = render(
+        <WithAudioLoading isAudioReady={true} audioError={null}>
+          <Text>Exercise Content</Text>
+        </WithAudioLoading>,
+      );
+
+      expect(getByText("Exercise Content")).toBeTruthy();
+    });
+  });
+});

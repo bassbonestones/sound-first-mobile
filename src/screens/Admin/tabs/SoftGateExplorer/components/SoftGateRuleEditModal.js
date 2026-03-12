@@ -2,6 +2,7 @@
  * SoftGateRuleEditModal - Edit form for soft gate rules
  */
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import {
   View,
   Text,
@@ -87,7 +88,12 @@ export default function SoftGateRuleEditModal({
       <View style={styles.editModalPopup}>
         <View style={styles.detailModalHeader}>
           <Text style={styles.detailModalTitle}>Edit Rule</Text>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity
+            accessibilityLabel="Close edit modal"
+            accessibilityRole="button"
+            style={styles.closeButton}
+            onPress={onClose}
+          >
             <Text style={[styles.closeButtonText, { color: "#fff" }]}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -150,6 +156,8 @@ export default function SoftGateRuleEditModal({
           )}
 
           <TouchableOpacity
+            accessibilityLabel="Delete rule"
+            accessibilityRole="button"
             style={[styles.deleteRuleButton]}
             onPress={() => setShowDeleteConfirm(true)}
           >
@@ -159,12 +167,16 @@ export default function SoftGateRuleEditModal({
 
         <View style={styles.editModalFooter}>
           <TouchableOpacity
+            accessibilityLabel="Cancel"
+            accessibilityRole="button"
             style={[styles.editModalButton, styles.cancelButton]}
             onPress={onClose}
           >
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityLabel={saving ? "Saving" : "Save changes"}
+            accessibilityRole="button"
             style={[
               styles.editModalButton,
               styles.saveButton,
@@ -190,12 +202,16 @@ export default function SoftGateRuleEditModal({
               </Text>
               <View style={styles.confirmButtons}>
                 <TouchableOpacity
+                  accessibilityLabel="Cancel delete"
+                  accessibilityRole="button"
                   style={[styles.confirmButton, styles.cancelConfirmButton]}
                   onPress={() => setShowDeleteConfirm(false)}
                 >
                   <Text style={styles.confirmButtonText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
+                  accessibilityLabel="Confirm delete"
+                  accessibilityRole="button"
                   style={[styles.confirmButton, styles.deleteConfirmButton]}
                   onPress={onDelete}
                 >
@@ -211,3 +227,20 @@ export default function SoftGateRuleEditModal({
     </View>
   );
 }
+
+SoftGateRuleEditModal.propTypes = {
+  rule: PropTypes.shape({
+    id: PropTypes.number,
+    dimension_name: PropTypes.string,
+    frontier_buffer: PropTypes.number,
+    promotion_step: PropTypes.number,
+    min_attempts: PropTypes.number,
+    success_rating_threshold: PropTypes.number,
+    success_required_count: PropTypes.number,
+    success_window_count: PropTypes.number,
+    decay_halflife_days: PropTypes.number,
+  }).isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSave: PropTypes.func.isRequired,
+  onDelete: PropTypes.func.isRequired,
+};
