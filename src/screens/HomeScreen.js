@@ -23,6 +23,13 @@ import ErrorBoundary from "../components/ErrorBoundary";
 import ResetButton from "../components/ResetButton";
 import { useUser } from "../context/UserContext";
 
+// Helper to blur active element before navigation (fixes aria-hidden focus issue on web)
+const blurActiveElement = () => {
+  if (Platform.OS === "web" && document.activeElement) {
+    document.activeElement.blur();
+  }
+};
+
 export default function HomeScreen({ navigation }) {
   const {
     instruments,
@@ -32,6 +39,15 @@ export default function HomeScreen({ navigation }) {
     loading,
   } = useUser();
   const [showPicker, setShowPicker] = useState(false);
+
+  // Navigation wrapper that blurs first on web
+  const navigateTo = useCallback(
+    (screen, params) => {
+      blurActiveElement();
+      navigation.navigate(screen, params);
+    },
+    [navigation],
+  );
 
   // Load instruments when screen gets focus (handles navigation back from FirstNote/Onboarding)
   useFocusEffect(
@@ -43,14 +59,14 @@ export default function HomeScreen({ navigation }) {
   const handleStartPractice = () => {
     // Check if selected instrument needs Day 0
     if (selectedInstrument && !selectedInstrument.day0_completed) {
-      navigation.navigate("FirstNote", {
+      navigateTo("FirstNote", {
         userId: 1,
         instrumentId: selectedInstrument.id,
         resonantNote: selectedInstrument.resonant_note,
         instrument: selectedInstrument.instrument_name,
       });
     } else {
-      navigation.navigate("StartPractice", {
+      navigateTo("StartPractice", {
         instrumentId: selectedInstrument?.id,
       });
     }
@@ -111,7 +127,7 @@ export default function HomeScreen({ navigation }) {
           ) : (
             <TouchableOpacity
               style={styles.addFirstInstrument}
-              onPress={() => navigation.navigate("Onboarding")}
+              onPress={() => navigateTo("Onboarding")}
               accessibilityLabel="Add your first instrument"
               accessibilityHint="Opens instrument setup"
               accessibilityRole="button"
@@ -179,7 +195,7 @@ export default function HomeScreen({ navigation }) {
           {/* Tune Mastery Tool */}
           <TouchableOpacity
             style={styles.tuneMasteryButton}
-            onPress={() => navigation.navigate("TuneMastery")}
+            onPress={() => navigateTo("TuneMastery")}
             accessibilityLabel="Tune Mastery tool"
             accessibilityHint="Practice tunes in all 12 keys"
             accessibilityRole="button"
@@ -236,7 +252,7 @@ export default function HomeScreen({ navigation }) {
                 style={styles.addInstrumentButton}
                 onPress={() => {
                   setShowPicker(false);
-                  navigation.navigate("Onboarding", { addingInstrument: true });
+                  navigateTo("Onboarding", { addingInstrument: true });
                 }}
               >
                 <Text style={styles.addInstrumentText}>

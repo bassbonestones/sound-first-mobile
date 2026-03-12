@@ -259,8 +259,8 @@ export default function PracticePanel({
           <Text style={styles.practiceTitle}>{tuneName}</Text>
           <Text style={styles.practiceKey}>in {tuneKey}</Text>
         </View>
-        {/* Mute and Volume buttons in header - always visible when tools are on */}
-        {metronomeExpanded || droneExpanded ? (
+        {/* Mute and Volume buttons in header - visible when any tool is active */}
+        {metronomeActive || droneActive ? (
           <View style={styles.headerButtonsContainer}>
             {/* Volume button */}
             <TouchableOpacity
@@ -421,6 +421,11 @@ export default function PracticePanel({
               styles.toolPanelMetronome,
               !metronomeExpanded && styles.toolPanelCollapsed,
             ]}
+            pointerEvents={metronomeExpanded ? "auto" : "none"}
+            accessibilityElementsHidden={!metronomeExpanded}
+            importantForAccessibility={
+              metronomeExpanded ? "auto" : "no-hide-descendants"
+            }
           >
             <Metronome
               initialBpm={metronomeBpm}
@@ -445,6 +450,11 @@ export default function PracticePanel({
               styles.toolPanelDrone,
               !droneExpanded && styles.toolPanelCollapsed,
             ]}
+            pointerEvents={droneExpanded ? "auto" : "none"}
+            accessibilityElementsHidden={!droneExpanded}
+            importantForAccessibility={
+              droneExpanded ? "auto" : "no-hide-descendants"
+            }
           >
             <PitchDrone
               initialNote={tuneKey}
@@ -773,11 +783,11 @@ const styles = StyleSheet.create({
   },
   toolPanelCollapsed: {
     height: 0,
+    maxHeight: 0,
     padding: 0,
     margin: 0,
     overflow: "hidden",
     opacity: 0,
-    position: "absolute",
   },
 
   // Rating
