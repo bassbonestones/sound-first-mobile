@@ -148,14 +148,21 @@ const Metronome: React.FC<MetronomeProps> = ({
   // Initialize AudioContext (all platforms)
   useEffect(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
-      const WebAudioContext = (window as typeof window & {
-        AudioContext?: typeof AudioContext;
-        webkitAudioContext?: typeof AudioContext;
-      }).AudioContext || (window as typeof window & {
-        webkitAudioContext?: typeof AudioContext;
-      }).webkitAudioContext;
+      const WebAudioContext =
+        (
+          window as typeof window & {
+            AudioContext?: typeof AudioContext;
+            webkitAudioContext?: typeof AudioContext;
+          }
+        ).AudioContext ||
+        (
+          window as typeof window & {
+            webkitAudioContext?: typeof AudioContext;
+          }
+        ).webkitAudioContext;
       if (WebAudioContext) {
-        audioContextRef.current = new WebAudioContext() as unknown as AudioContextType;
+        audioContextRef.current =
+          new WebAudioContext() as unknown as AudioContextType;
       }
     } else if (NativeAudioContext) {
       // Use react-native-audio-api on native platforms
@@ -185,7 +192,11 @@ const Metronome: React.FC<MetronomeProps> = ({
         // Accent on beat 1 if enabled
         const isAccent = accentFirst && beatNumber === 0;
         const frequency = isAccent ? 1200 : 800;
-        createClickSound(audioContextRef.current as unknown as AudioContext, frequency, 0.05);
+        createClickSound(
+          audioContextRef.current as unknown as AudioContext,
+          frequency,
+          0.05,
+        );
       }
     },
     [accentFirst],
@@ -209,7 +220,11 @@ const Metronome: React.FC<MetronomeProps> = ({
 
   // Play subdivision clicks within a beat
   const playSubdivisionClicks = useCallback(
-    (beatCounter: number, msPerBeat: number, isFirstBeat: boolean): ReturnType<typeof setTimeout>[] => {
+    (
+      beatCounter: number,
+      msPerBeat: number,
+      isFirstBeat: boolean,
+    ): ReturnType<typeof setTimeout>[] => {
       const subdivisionPattern = SUBDIVISIONS[subdivision];
       if (!subdivisionPattern || !audioContextRef.current) return [];
 
@@ -556,7 +571,11 @@ const Metronome: React.FC<MetronomeProps> = ({
             showsVerticalScrollIndicator={true}
           >
             {Object.entries(SUBDIVISIONS)
-              .filter(([key, sub]) => !(sub as { swingOnly?: boolean }).swingOnly || noteValue === 4)
+              .filter(
+                ([key, sub]) =>
+                  !(sub as { swingOnly?: boolean }).swingOnly ||
+                  noteValue === 4,
+              )
               .map(([key, sub]) => (
                 <TouchableOpacity
                   key={key}
@@ -741,7 +760,14 @@ const Metronome: React.FC<MetronomeProps> = ({
       )}
 
       {Platform.OS !== "web" && !NativeAudioContext && (
-        <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 12, textAlign: "center" }}>
+        <Text
+          style={{
+            color: colors.textMuted,
+            fontSize: 11,
+            marginTop: 12,
+            textAlign: "center",
+          }}
+        >
           Audio playback unavailable - react-native-audio-api not loaded
         </Text>
       )}
@@ -754,9 +780,7 @@ const Metronome: React.FC<MetronomeProps> = ({
         onRequestClose={() => setShowVolumeModal(false)}
       >
         <View style={styles.volumeModalOverlay}>
-          <View
-            style={[styles.volumeModalContent]}
-          >
+          <View style={[styles.volumeModalContent]}>
             <Text style={styles.volumeModalTitle}>🔊 Volume Controls</Text>
 
             {/* Metronome Volume */}
@@ -769,7 +793,9 @@ const Metronome: React.FC<MetronomeProps> = ({
                 minimumValue={0}
                 maximumValue={1}
                 value={volume}
-                onValueChange={(val: number) => onVolumeChange && onVolumeChange(val)}
+                onValueChange={(val: number) =>
+                  onVolumeChange && onVolumeChange(val)
+                }
                 minimumTrackTintColor="#9C27B0"
                 maximumTrackTintColor="#444"
                 thumbTintColor="#9C27B0"
@@ -825,7 +851,9 @@ export const CompactMetronome: React.FC<CompactMetronomeProps> = ({
 }) => {
   return (
     <View style={{ flexDirection: "row", alignItems: "center" }}>
-      <Text style={{ color: colors.gold, fontWeight: "bold", marginRight: 8 }}>{bpm} BPM</Text>
+      <Text style={{ color: colors.gold, fontWeight: "bold", marginRight: 8 }}>
+        {bpm} BPM
+      </Text>
       {Array.from({ length: beatsPerMeasure }, (_, i) => (
         <View
           key={i}

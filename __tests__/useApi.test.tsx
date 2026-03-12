@@ -131,7 +131,9 @@ describe("useApi", () => {
         await result.current.put("/update/1", { name: "updated" });
       });
 
-      expect(mockApi.put).toHaveBeenCalledWith("/update/1", { name: "updated" });
+      expect(mockApi.put).toHaveBeenCalledWith("/update/1", {
+        name: "updated",
+      });
       expect(result.current.data).toEqual(mockResponse);
     });
   });

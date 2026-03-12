@@ -40,7 +40,9 @@ interface ErrorBoundaryProps {
 // Mock ErrorBoundary
 jest.mock("../src/components/ErrorBoundary", () => {
   const React = require("react");
-  return function MockErrorBoundary({ children }: ErrorBoundaryProps): React.JSX.Element {
+  return function MockErrorBoundary({
+    children,
+  }: ErrorBoundaryProps): React.JSX.Element {
     return <>{children}</>;
   };
 });

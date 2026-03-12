@@ -14,14 +14,16 @@ jest.mock("react-native-webview", () => {
   const React = require("react");
   const { View } = require("react-native");
 
-  const WebView = React.forwardRef((props: Record<string, unknown>, ref: React.Ref<unknown>) => {
-    React.useImperativeHandle(ref, () => ({
-      postMessage: jest.fn(),
-      reload: jest.fn(),
-      injectJavaScript: jest.fn(),
-    }));
-    return <View testID="webview" {...props} />;
-  });
+  const WebView = React.forwardRef(
+    (props: Record<string, unknown>, ref: React.Ref<unknown>) => {
+      React.useImperativeHandle(ref, () => ({
+        postMessage: jest.fn(),
+        reload: jest.fn(),
+        injectJavaScript: jest.fn(),
+      }));
+      return <View testID="webview" {...props} />;
+    },
+  );
 
   return { WebView };
 });

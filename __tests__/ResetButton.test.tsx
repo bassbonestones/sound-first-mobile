@@ -17,7 +17,10 @@ jest.mock("@react-navigation/native", () => ({
     navigate: jest.fn(),
   }),
   CommonActions: {
-    reset: jest.fn((config: Record<string, unknown>) => ({ type: "RESET", ...config })),
+    reset: jest.fn((config: Record<string, unknown>) => ({
+      type: "RESET",
+      ...config,
+    })),
   },
 }));
 

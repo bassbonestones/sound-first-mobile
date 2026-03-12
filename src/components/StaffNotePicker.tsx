@@ -89,7 +89,10 @@ function noteToMusicXMLPitch(noteName: string): MusicXMLPitch {
 }
 
 // Generate MusicXML for a single note on a staff
-function generateSingleNoteMusicXML(noteName: string, clef: ClefType = "treble"): string {
+function generateSingleNoteMusicXML(
+  noteName: string,
+  clef: ClefType = "treble",
+): string {
   const pitch = noteToMusicXMLPitch(noteName);
   const clefSign = clef === "bass" ? "F" : "G";
   const clefLine = clef === "bass" ? "4" : "2";

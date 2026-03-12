@@ -102,7 +102,9 @@ export default function PitchDrone({
 
   const MAX_OCTAVES_PER_NOTE = 3;
 
-  const audioContextRef = useRef<AudioContext | NativeAudioContextType | null>(null);
+  const audioContextRef = useRef<AudioContext | NativeAudioContextType | null>(
+    null,
+  );
   const oscillatorsRef = useRef<Record<string, OscillatorNode>>({});
   const gainNodesRef = useRef<Record<string, GainNode>>({});
   const lfoRef = useRef<Record<string, OscillatorNode>>({});
@@ -165,7 +167,8 @@ export default function PitchDrone({
   useEffect(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
       const extWindow = window as ExtendedWindow;
-      const AudioContextClass = extWindow.AudioContext || extWindow.webkitAudioContext;
+      const AudioContextClass =
+        extWindow.AudioContext || extWindow.webkitAudioContext;
       if (AudioContextClass) {
         audioContextRef.current = new AudioContextClass();
       }
@@ -303,32 +306,45 @@ export default function PitchDrone({
   );
 
   // Stop a drone
-  const stopDrone = useCallback((semitone: number, noteOctave: number): void => {
-    const key = `${NOTES[semitone].name}-${noteOctave}`;
+  const stopDrone = useCallback(
+    (semitone: number, noteOctave: number): void => {
+      const key = `${NOTES[semitone].name}-${noteOctave}`;
 
-    const oscillator = oscillatorsRef.current[key];
-    const gainNode = gainNodesRef.current[key];
-    const lfo = lfoRef.current[key];
-    const lfoGain = lfoGainRef.current[key];
+      const oscillator = oscillatorsRef.current[key];
+      const gainNode = gainNodesRef.current[key];
+      const lfo = lfoRef.current[key];
+      const lfoGain = lfoGainRef.current[key];
 
-    if (oscillator) {
-      delete oscillatorsRef.current[key];
-      delete gainNodesRef.current[key];
-      delete lfoRef.current[key];
-      delete lfoGainRef.current[key];
+      if (oscillator) {
+        delete oscillatorsRef.current[key];
+        delete gainNodesRef.current[key];
+        delete lfoRef.current[key];
+        delete lfoGainRef.current[key];
 
-      try {
-        if (gainNode && audioContextRef.current) {
-          gainNode.gain.setValueAtTime(
-            gainNode.gain.value,
-            audioContextRef.current.currentTime,
-          );
-          gainNode.gain.exponentialRampToValueAtTime(
-            0.001,
-            audioContextRef.current.currentTime + 0.05,
-          );
-        }
-        setTimeout(() => {
+        try {
+          if (gainNode && audioContextRef.current) {
+            gainNode.gain.setValueAtTime(
+              gainNode.gain.value,
+              audioContextRef.current.currentTime,
+            );
+            gainNode.gain.exponentialRampToValueAtTime(
+              0.001,
+              audioContextRef.current.currentTime + 0.05,
+            );
+          }
+          setTimeout(() => {
+            try {
+              oscillator.stop();
+              oscillator.disconnect();
+              if (gainNode) gainNode.disconnect();
+              if (lfo) {
+                lfo.stop();
+                lfo.disconnect();
+              }
+              if (lfoGain) lfoGain.disconnect();
+            } catch (e) {}
+          }, 60);
+        } catch (e) {
           try {
             oscillator.stop();
             oscillator.disconnect();
@@ -338,30 +354,20 @@ export default function PitchDrone({
               lfo.disconnect();
             }
             if (lfoGain) lfoGain.disconnect();
-          } catch (e) {}
-        }, 60);
-      } catch (e) {
-        try {
-          oscillator.stop();
-          oscillator.disconnect();
-          if (gainNode) gainNode.disconnect();
-          if (lfo) {
-            lfo.stop();
-            lfo.disconnect();
-          }
-          if (lfoGain) lfoGain.disconnect();
-        } catch (e2) {}
+          } catch (e2) {}
+        }
+
+        setActiveDrones((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+
+        devLog(`[Drone] Stopped ${key}`);
       }
-
-      setActiveDrones((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-
-      devLog(`[Drone] Stopped ${key}`);
-    }
-  }, []);
+    },
+    [],
+  );
 
   // Stop all drones
   const stopAllDrones = useCallback((): void => {
@@ -545,7 +551,10 @@ export default function PitchDrone({
   };
 
   // Render multi-octave highlight
-  const renderOctaveHighlight = (semitone: number, activeOctaves: number[]): React.ReactElement | null => {
+  const renderOctaveHighlight = (
+    semitone: number,
+    activeOctaves: number[],
+  ): React.ReactElement | null => {
     if (activeOctaves.length === 0) return null;
 
     const noteName = NOTES[semitone].name;
@@ -902,7 +911,9 @@ export default function PitchDrone({
                 minimumValue={0}
                 maximumValue={1}
                 value={volume}
-                onValueChange={(val: number) => onVolumeChange && onVolumeChange(val)}
+                onValueChange={(val: number) =>
+                  onVolumeChange && onVolumeChange(val)
+                }
                 minimumTrackTintColor="#00BCD4"
                 maximumTrackTintColor="#444"
                 thumbTintColor="#00BCD4"

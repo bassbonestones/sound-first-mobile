@@ -1,6 +1,16 @@
 import React from "react";
-import { View, Text, StyleSheet, Platform, ViewStyle, TextStyle } from "react-native";
-import { usePitchDetection, UsePitchDetectionOptions } from "../hooks/usePitchDetection";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Platform,
+  ViewStyle,
+  TextStyle,
+} from "react-native";
+import {
+  usePitchDetection,
+  UsePitchDetectionOptions,
+} from "../hooks/usePitchDetection";
 
 /**
  * Mobile Audio Input using react-native-live-audio-stream

@@ -188,7 +188,10 @@ describe("useSelectionEngine", () => {
       const masteredTune = createMasteredTune("tune2", "Mastered");
 
       // Next is learning pick
-      const data1 = createMockData([incompleteTune, masteredTune], "reinforcement");
+      const data1 = createMockData(
+        [incompleteTune, masteredTune],
+        "reinforcement",
+      );
       const { result: result1 } = renderHook(() => useSelectionEngine(data1));
       const pick1 = result1.current.getNextPick();
       expect(pick1.pickType).toBe("learning");
@@ -203,11 +206,10 @@ describe("useSelectionEngine", () => {
 
   describe("stats", () => {
     it("calculates total tunes correctly", () => {
-      const data = createMockData([
-        createTune("1", "A"),
-        createTune("2", "B"),
-        createTune("3", "C"),
-      ], "reinforcement");
+      const data = createMockData(
+        [createTune("1", "A"), createTune("2", "B"), createTune("3", "C")],
+        "reinforcement",
+      );
 
       const { result } = renderHook(() => useSelectionEngine(data));
 
@@ -215,11 +217,14 @@ describe("useSelectionEngine", () => {
     });
 
     it("calculates mastered tunes correctly", () => {
-      const data = createMockData([
-        createMasteredTune("1", "Mastered1"),
-        createMasteredTune("2", "Mastered2"),
-        createTune("3", "NotMastered", { C: 50 }),
-      ], "reinforcement");
+      const data = createMockData(
+        [
+          createMasteredTune("1", "Mastered1"),
+          createMasteredTune("2", "Mastered2"),
+          createTune("3", "NotMastered", { C: 50 }),
+        ],
+        "reinforcement",
+      );
 
       const { result } = renderHook(() => useSelectionEngine(data));
 
@@ -253,7 +258,10 @@ describe("useSelectionEngine", () => {
 
   describe("getTuneName", () => {
     it("returns tune name by id", () => {
-      const data = createMockData([createTune("tune1", "All The Things")], "reinforcement");
+      const data = createMockData(
+        [createTune("tune1", "All The Things")],
+        "reinforcement",
+      );
 
       const { result } = renderHook(() => useSelectionEngine(data));
 

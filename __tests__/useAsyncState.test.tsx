@@ -96,9 +96,11 @@ describe("useAsyncState", () => {
 
       let returnValue: string | null;
       await act(async () => {
-        returnValue = await result.current.execute(async (): Promise<string> => {
-          throw new Error("fail");
-        });
+        returnValue = await result.current.execute(
+          async (): Promise<string> => {
+            throw new Error("fail");
+          },
+        );
       });
 
       expect(returnValue!).toBeNull();
@@ -108,9 +110,7 @@ describe("useAsyncState", () => {
 
   describe("setData", () => {
     it("manually sets data", () => {
-      const { result } = renderHook(() =>
-        useAsyncState<{ manual: boolean }>(),
-      );
+      const { result } = renderHook(() => useAsyncState<{ manual: boolean }>());
 
       act(() => {
         result.current.setData({ manual: true });

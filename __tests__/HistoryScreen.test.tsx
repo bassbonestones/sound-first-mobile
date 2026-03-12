@@ -61,7 +61,9 @@ const mockFetch = jest.fn((url: string) => {
   };
   const mockMaterials: MockMaterial[] = [{ material_id: 1, title: "Test" }];
   const mockFocusCards: MockFocusCard[] = [{ focus_card_id: 1, name: "Pitch" }];
-  const mockTimeline: MockTimeline[] = [{ date: "2024-01-15", session_count: 2 }];
+  const mockTimeline: MockTimeline[] = [
+    { date: "2024-01-15", session_count: 2 },
+  ];
 
   let data: MockData = null;
   if (url.includes("/history/summary")) data = mockSummary;

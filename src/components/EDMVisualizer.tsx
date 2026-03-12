@@ -1,5 +1,12 @@
 import React, { useEffect, useRef, useMemo } from "react";
-import { View, StyleSheet, Animated, Platform, ViewStyle, StyleProp } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Animated,
+  Platform,
+  ViewStyle,
+  StyleProp,
+} from "react-native";
 
 /**
  * EDMVisualizer - Exciting audio-reactive visualization
@@ -58,7 +65,13 @@ interface AnimatedBarProps {
 }
 
 // Individual bar component with animation
-function AnimatedBar({ index, volume, colorScheme, maxHeight, width }: AnimatedBarProps): React.ReactElement {
+function AnimatedBar({
+  index,
+  volume,
+  colorScheme,
+  maxHeight,
+  width,
+}: AnimatedBarProps): React.ReactElement {
   const heightAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0.3)).current;
 
@@ -150,7 +163,11 @@ interface PulseRingProps {
 }
 
 // Circular pulse ring effect
-function PulseRing({ volume, colorScheme, size }: PulseRingProps): React.ReactElement {
+function PulseRing({
+  volume,
+  colorScheme,
+  size,
+}: PulseRingProps): React.ReactElement {
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const opacityAnim = useRef(new Animated.Value(0.5)).current;
 

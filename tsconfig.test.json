@@ -9,11 +9,6 @@
     "noImplicitThis": false,
     "alwaysStrict": false
   },
-  "include": [
-    "__tests__/**/*",
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["__tests__/**/*", "src/**/*"],
+  "exclude": ["node_modules"]
 }

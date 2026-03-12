@@ -53,7 +53,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const [audioStatus, setAudioStatus] = useState<AudioStatus | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
 
   // Build audio URL from material ID and key
   const audioUrl =

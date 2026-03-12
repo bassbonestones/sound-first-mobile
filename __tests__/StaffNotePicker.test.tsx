@@ -15,7 +15,9 @@ interface MockNotationDisplayProps {
 // Mock NotationDisplay
 jest.mock("../src/components/NotationDisplay", () => {
   const { View, Text } = require("react-native");
-  return function MockNotationDisplay({ musicxml }: MockNotationDisplayProps): React.JSX.Element {
+  return function MockNotationDisplay({
+    musicxml,
+  }: MockNotationDisplayProps): React.JSX.Element {
     return (
       <View testID="notation-display">
         <Text>Notation Mock</Text>

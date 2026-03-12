@@ -29,7 +29,9 @@ jest.mock("../src/hooks/useSelectionEngine", () => ({
       key: "C",
       pickType: "learning",
     })),
-    getTuneName: jest.fn((id: string) => (id === "tune1" ? "Test Tune" : "Unknown")),
+    getTuneName: jest.fn((id: string) =>
+      id === "tune1" ? "Test Tune" : "Unknown",
+    ),
     isLearningPick: true,
     stats: { totalTunes: 1, totalMastered: 0, averageScore: 50 },
     MASTERY_THRESHOLD: 95,
@@ -45,7 +47,10 @@ interface MockPracticePanelProps {
 // Mock components that have complex dependencies
 jest.mock("../src/screens/TuneMastery/components/PracticePanel", () => {
   const { View, Text } = require("react-native");
-  return function MockPracticePanel({ tuneName, tuneKey }: MockPracticePanelProps): React.JSX.Element {
+  return function MockPracticePanel({
+    tuneName,
+    tuneKey,
+  }: MockPracticePanelProps): React.JSX.Element {
     return (
       <View testID="practice-panel">
         <Text>{tuneName}</Text>
@@ -117,7 +122,9 @@ interface MockHookReturn {
   seedTunes: jest.Mock;
 }
 
-const createMockHookReturn = (overrides: Partial<MockHookReturn> & { data?: Partial<MockData> } = {}): MockHookReturn => ({
+const createMockHookReturn = (
+  overrides: Partial<MockHookReturn> & { data?: Partial<MockData> } = {},
+): MockHookReturn => ({
   data: createMockData(overrides.data),
   loading: false,
   error: null,
@@ -137,7 +144,9 @@ const createMockHookReturn = (overrides: Partial<MockHookReturn> & { data?: Part
 });
 
 // Cast to typed mock
-const mockUseTuneMasteryData = useTuneMasteryData as jest.MockedFunction<typeof useTuneMasteryData>;
+const mockUseTuneMasteryData = useTuneMasteryData as jest.MockedFunction<
+  typeof useTuneMasteryData
+>;
 
 describe("TuneMasteryScreen", () => {
   beforeEach(() => {
@@ -150,7 +159,9 @@ describe("TuneMasteryScreen", () => {
   describe("rendering", () => {
     it("renders loading state", () => {
       mockUseTuneMasteryData.mockReturnValue(
-        createMockHookReturn({ loading: true }) as unknown as UseTuneMasteryDataReturn,
+        createMockHookReturn({
+          loading: true,
+        }) as unknown as UseTuneMasteryDataReturn,
       );
 
       const { getByText } = render(
@@ -162,7 +173,9 @@ describe("TuneMasteryScreen", () => {
 
     it("renders error state", () => {
       mockUseTuneMasteryData.mockReturnValue(
-        createMockHookReturn({ error: { message: "Test error" } }) as unknown as UseTuneMasteryDataReturn,
+        createMockHookReturn({
+          error: { message: "Test error" },
+        }) as unknown as UseTuneMasteryDataReturn,
       );
 
       const { getByText } = render(
@@ -227,7 +240,9 @@ describe("TuneMasteryScreen", () => {
     it("calls addTune with input value", async () => {
       const mockAddTune = jest.fn();
       mockUseTuneMasteryData.mockReturnValue(
-        createMockHookReturn({ addTune: mockAddTune }) as unknown as UseTuneMasteryDataReturn,
+        createMockHookReturn({
+          addTune: mockAddTune,
+        }) as unknown as UseTuneMasteryDataReturn,
       );
 
       const { getByText, getByPlaceholderText } = render(

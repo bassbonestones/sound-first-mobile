@@ -75,7 +75,7 @@ declare global {
     opensheetmusicdisplay?: {
       OpenSheetMusicDisplay: new (
         container: HTMLElement,
-        options: Record<string, unknown>
+        options: Record<string, unknown>,
       ) => OSMDInstance;
     };
   }
@@ -248,7 +248,15 @@ const NotationDisplay: React.FC<NotationDisplayProps> = ({
         osmdRef.current = null;
       }
     };
-  }, [musicxml, showTitle, showTimeSignature, fixedMeasureWidthPixels, zoom, width, height]);
+  }, [
+    musicxml,
+    showTitle,
+    showTimeSignature,
+    fixedMeasureWidthPixels,
+    zoom,
+    width,
+    height,
+  ]);
 
   // Update cursor position when currentNoteIndex changes (web only)
   useEffect(() => {

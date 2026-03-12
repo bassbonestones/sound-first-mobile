@@ -27,7 +27,9 @@ const mockNavigation: MockNavigation = {
 // Mock AudioInput component - simpler mock for navigation tests
 jest.mock("../src/components/AudioInput", () => {
   const React = require("react");
-  return function MockAudioInput(props: Record<string, unknown>): React.JSX.Element {
+  return function MockAudioInput(
+    props: Record<string, unknown>,
+  ): React.JSX.Element {
     return React.createElement("View", {
       testID: "mock-audio-input",
       ...props,
@@ -40,7 +42,9 @@ jest.mock("../src/components/VolumeBar", () => {
   const React = require("react");
   const VolumeBar = (props: Record<string, unknown>): React.JSX.Element =>
     React.createElement("View", { testID: "mock-volume-bar", ...props });
-  const CircularVolumeIndicator = (props: Record<string, unknown>): React.JSX.Element =>
+  const CircularVolumeIndicator = (
+    props: Record<string, unknown>,
+  ): React.JSX.Element =>
     React.createElement("View", {
       testID: "mock-circular-indicator",
       ...props,
@@ -64,17 +68,21 @@ interface MockAudioInstance {
 }
 
 // Mock Audio for web
-(global as unknown as { Audio: jest.Mock }).Audio = jest.fn().mockImplementation((): MockAudioInstance => ({
-  play: jest.fn().mockResolvedValue(undefined),
-  pause: jest.fn(),
-  addEventListener: jest.fn((event: string, handler: () => void) => {
-    if (event === "ended") {
-      // Simulate audio ending after a short delay
-      setTimeout(handler, 100);
-    }
-  }),
-  removeEventListener: jest.fn(),
-}));
+(global as unknown as { Audio: jest.Mock }).Audio = jest
+  .fn()
+  .mockImplementation(
+    (): MockAudioInstance => ({
+      play: jest.fn().mockResolvedValue(undefined),
+      pause: jest.fn(),
+      addEventListener: jest.fn((event: string, handler: () => void) => {
+        if (event === "ended") {
+          // Simulate audio ending after a short delay
+          setTimeout(handler, 100);
+        }
+      }),
+      removeEventListener: jest.fn(),
+    }),
+  );
 
 // Mock fetch
 const mockFetch = jest.fn().mockResolvedValue({

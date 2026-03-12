@@ -42,7 +42,9 @@ jest.mock("../src/hooks/usePitchDetection", () => ({
 
 // Import and cast to get typed mock reference
 import { usePitchDetection } from "../src/hooks/usePitchDetection";
-const mockUsePitchDetection = usePitchDetection as jest.MockedFunction<typeof usePitchDetection>;
+const mockUsePitchDetection = usePitchDetection as jest.MockedFunction<
+  typeof usePitchDetection
+>;
 
 describe("MobileAudioInput", () => {
   beforeEach(() => {
@@ -54,7 +56,12 @@ describe("MobileAudioInput", () => {
       mockUsePitchDetection.mockReturnValue(
         createMockPitchDetectionReturn({
           isListening: true,
-          currentPitch: { noteName: "A4", midiNote: 69, cents: 0, frequency: 440 },
+          currentPitch: {
+            noteName: "A4",
+            midiNote: 69,
+            cents: 0,
+            frequency: 440,
+          },
           volume: 0.5,
           isSounding: true,
         }),
@@ -67,7 +74,12 @@ describe("MobileAudioInput", () => {
       mockUsePitchDetection.mockReturnValue(
         createMockPitchDetectionReturn({
           isListening: true,
-          currentPitch: { noteName: "A4", midiNote: 69, cents: 0, frequency: 440 },
+          currentPitch: {
+            noteName: "A4",
+            midiNote: 69,
+            cents: 0,
+            frequency: 440,
+          },
           volume: 0.5,
           isSounding: true,
         }),
@@ -83,7 +95,12 @@ describe("MobileAudioInput", () => {
       mockUsePitchDetection.mockReturnValue(
         createMockPitchDetectionReturn({
           isListening: true,
-          currentPitch: { noteName: "A4", midiNote: 69, cents: 0, frequency: 440 },
+          currentPitch: {
+            noteName: "A4",
+            midiNote: 69,
+            cents: 0,
+            frequency: 440,
+          },
           volume: 0.3,
           isSounding: true,
         }),

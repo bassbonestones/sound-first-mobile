@@ -54,7 +54,9 @@ async function checkMicPermission(): Promise<PermissionState | null> {
     return null; // Can't check, will need to prompt
   }
   try {
-    const result = await navigator.permissions.query({ name: "microphone" as PermissionName });
+    const result = await navigator.permissions.query({
+      name: "microphone" as PermissionName,
+    });
     return result.state; // 'granted', 'denied', or 'prompt'
   } catch (e) {
     return null; // Browser doesn't support this query
@@ -161,7 +163,9 @@ export default function AudioInput({
 
   // Mobile expo-av recording ref
   const recordingRef = useRef<unknown>(null);
-  const meteringIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const meteringIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
 
   // Pitch stability tracking
   const pitchBufferRef = useRef<PitchReading[]>([]);
@@ -258,7 +262,8 @@ export default function AudioInput({
             if (data.pitch && onPitchDetected) onPitchDetected(data.pitch);
             break;
           case "pitchMatch":
-            if (data.pitch && onPitchMatch) onPitchMatch(data.isMatch || false, data.pitch);
+            if (data.pitch && onPitchMatch)
+              onPitchMatch(data.isMatch || false, data.pitch);
             break;
         }
       } catch (e) {
@@ -346,7 +351,8 @@ export default function AudioInput({
       setPermissionGranted(true);
 
       const extWindow = window as ExtendedWindow;
-      const AudioContextClass = extWindow.AudioContext || extWindow.webkitAudioContext;
+      const AudioContextClass =
+        extWindow.AudioContext || extWindow.webkitAudioContext;
       if (!AudioContextClass) {
         throw new Error("AudioContext not supported");
       }
