@@ -18,6 +18,7 @@ import {
   isPerfect,
   getMedian,
   computeDirectionBias,
+  computeDirectionalGuidance,
 } from "../src/screens/TuneMastery/components/Tuner/tunerHelpers";
 import { TUNER_COLORS } from "../src/screens/TuneMastery/components/Tuner/tunerConstants";
 
@@ -386,6 +387,89 @@ describe("tunerHelpers", () => {
       expect(result.hasEnoughData).toBe(true);
       expect(result.direction).toBe("neutral");
       expect(result.biasText).toBeNull();
+    });
+  });
+
+  describe("computeDirectionalGuidance", () => {
+    it("returns null text when centered (within threshold)", () => {
+      const result = computeDirectionalGuidance(0);
+      expect(result.text).toBeNull();
+      expect(result.shortText).toBeNull();
+      expect(result.direction).toBeNull();
+    });
+
+    it("returns null text at edge of centered threshold", () => {
+      const result = computeDirectionalGuidance(3);
+      expect(result.text).toBeNull();
+      expect(result.direction).toBeNull();
+    });
+
+    it("returns lower guidance for sharp (positive cents)", () => {
+      const result = computeDirectionalGuidance(5);
+      expect(result.direction).toBe("lower");
+      expect(result.text).toBe("Lower pitch slightly");
+      expect(result.shortText).toBe("Lower ↓");
+    });
+
+    it("returns raise guidance for flat (negative cents)", () => {
+      const result = computeDirectionalGuidance(-5);
+      expect(result.direction).toBe("raise");
+      expect(result.text).toBe("Raise pitch slightly");
+      expect(result.shortText).toBe("Raise ↑");
+    });
+
+    it("returns moderate guidance for 6-10 cents sharp", () => {
+      const result = computeDirectionalGuidance(8);
+      expect(result.direction).toBe("lower");
+      expect(result.text).toBe("Lower pitch");
+      expect(result.shortText).toBe("Lower");
+    });
+
+    it("returns moderate guidance for 6-10 cents flat", () => {
+      const result = computeDirectionalGuidance(-8);
+      expect(result.direction).toBe("raise");
+      expect(result.text).toBe("Raise pitch");
+      expect(result.shortText).toBe("Raise");
+    });
+
+    it("returns stronger guidance for 11-20 cents sharp", () => {
+      const result = computeDirectionalGuidance(15);
+      expect(result.direction).toBe("lower");
+      expect(result.text).toBe("Lower pitch more");
+      expect(result.shortText).toBe("Lower ↓↓");
+    });
+
+    it("returns stronger guidance for 11-20 cents flat", () => {
+      const result = computeDirectionalGuidance(-15);
+      expect(result.direction).toBe("raise");
+      expect(result.text).toBe("Raise pitch more");
+      expect(result.shortText).toBe("Raise ↑↑");
+    });
+
+    it("returns strongest guidance for >20 cents sharp", () => {
+      const result = computeDirectionalGuidance(30);
+      expect(result.direction).toBe("lower");
+      expect(result.text).toBe("Lower pitch a lot");
+      expect(result.shortText).toBe("Lower ↓↓↓");
+    });
+
+    it("returns strongest guidance for >20 cents flat", () => {
+      const result = computeDirectionalGuidance(-30);
+      expect(result.direction).toBe("raise");
+      expect(result.text).toBe("Raise pitch a lot");
+      expect(result.shortText).toBe("Raise ↑↑↑");
+    });
+
+    it("handles boundary at 4 cents (just outside centered)", () => {
+      const result = computeDirectionalGuidance(4);
+      expect(result.text).toBe("Lower pitch slightly");
+      expect(result.direction).toBe("lower");
+    });
+
+    it("handles boundary at -4 cents (just outside centered)", () => {
+      const result = computeDirectionalGuidance(-4);
+      expect(result.text).toBe("Raise pitch slightly");
+      expect(result.direction).toBe("raise");
     });
   });
 });

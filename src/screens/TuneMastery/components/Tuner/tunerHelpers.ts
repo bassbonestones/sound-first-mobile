@@ -323,3 +323,75 @@ export function computeDirectionBias(
     hasEnoughData: true,
   };
 }
+
+// ===========================================
+// DIRECTIONAL GUIDANCE (Phase 1C)
+// ===========================================
+
+export interface DirectionalGuidance {
+  /** The guidance text to display (e.g., "Lower pitch slightly") */
+  text: string | null;
+  /** Short instruction (e.g., "Lower") */
+  shortText: string | null;
+  /** Direction: 'lower', 'raise', or null if centered */
+  direction: "lower" | "raise" | null;
+}
+
+/**
+ * Compute directional guidance text based on cents deviation.
+ * Converts measurement into instruction (e.g., "+8 cents" → "Lower pitch slightly").
+ *
+ * Phase 1C feature: turns the tuner from measurement to instruction.
+ *
+ * @param cents - Current cents deviation from target pitch
+ * @returns DirectionalGuidance with text and direction
+ */
+export function computeDirectionalGuidance(cents: number): DirectionalGuidance {
+  const absCents = Math.abs(cents);
+
+  // Within centered threshold - no guidance needed
+  if (absCents <= CENTERED_THRESHOLD) {
+    return {
+      text: null,
+      shortText: null,
+      direction: null,
+    };
+  }
+
+  // Determine direction - sharp means lower, flat means raise
+  const direction: "lower" | "raise" = cents > 0 ? "lower" : "raise";
+  const actionWord = direction === "lower" ? "Lower" : "Raise";
+
+  // Graduated guidance based on how far off
+  let text: string;
+  let shortText: string;
+
+  if (absCents <= 5) {
+    // Slightly off (4-5 cents)
+    text = `${actionWord} pitch slightly`;
+    shortText = `${actionWord} ↓`;
+  } else if (absCents <= 10) {
+    // Moderately off (6-10 cents)
+    text = `${actionWord} pitch`;
+    shortText = actionWord;
+  } else if (absCents <= 20) {
+    // Significantly off (11-20 cents)
+    text = `${actionWord} pitch more`;
+    shortText = `${actionWord} ↓↓`;
+  } else {
+    // Way off (>20 cents)
+    text = `${actionWord} pitch a lot`;
+    shortText = `${actionWord} ↓↓↓`;
+  }
+
+  // Use proper arrows based on direction
+  if (direction === "raise") {
+    shortText = shortText.replace(/↓/g, "↑");
+  }
+
+  return {
+    text,
+    shortText,
+    direction,
+  };
+}

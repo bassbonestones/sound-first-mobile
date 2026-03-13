@@ -144,8 +144,8 @@ export const TUNER_FLAGS = {
   driftTrail: true,
   /** Phase 1C.3 - Direction bias indicator ("Slight sharp tendency") */
   directionBias: true,
-  /** Phase 1C - Coaching text (deferred) */
-  coachingText: false,
+  /** Phase 1C.4 - Directional guidance text ("Lower pitch slightly") */
+  directionalGuidance: true,
 } as const;
 
 // ===========================================

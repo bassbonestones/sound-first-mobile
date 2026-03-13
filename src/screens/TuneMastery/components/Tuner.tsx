@@ -53,6 +53,7 @@ import {
   getMedian,
   isCentered,
   computeDirectionBias,
+  computeDirectionalGuidance,
 } from "./Tuner/tunerHelpers";
 import {
   TUNER_FLAGS,
@@ -541,6 +542,9 @@ const Tuner = React.memo(function Tuner({
     biasHistoryRef.current.map((s) => s.cents),
   );
 
+  // Directional guidance (Phase 1C) - convert measurement to instruction
+  const directionalGuidance = computeDirectionalGuidance(cents);
+
   // Lock glow animation effect - triggers once when lock is first achieved
   useEffect(() => {
     if (showLock && !wasLockedRef.current) {
@@ -929,97 +933,123 @@ const Tuner = React.memo(function Tuner({
                       {cents} cents
                     </Text>
                   )}
-                  {/* Stability Indicator (Phase 1) */}
-                  {TUNER_FLAGS.stabilityIndicator &&
-                    !isDetectingPhase(tunerState) && (
-                      <View style={styles.stabilityRow}>
-                        <View
-                          style={[
-                            styles.stabilityDot,
-                            { backgroundColor: stabilityColor },
-                          ]}
-                        />
+                  {/* Fixed-height row for Directional Guidance (Phase 1C) */}
+                  <View style={styles.guidanceRow}>
+                    {TUNER_FLAGS.directionalGuidance &&
+                      directionalGuidance.text &&
+                      !isDetectingPhase(tunerState) && (
                         <Text
                           style={[
-                            styles.stabilityLabel,
-                            { color: stabilityColor },
+                            styles.guidanceText,
+                            {
+                              color:
+                                directionalGuidance.direction === "lower"
+                                  ? "#FF9800"
+                                  : "#2196F3",
+                            },
                           ]}
                         >
-                          {tunerState.stability.isStable
-                            ? "STABLE"
-                            : tunerState.stability.isModerate
-                              ? "DRIFTING"
-                              : "UNSTABLE"}
+                          {directionalGuidance.text}
                         </Text>
-                      </View>
-                    )}
-                  {/* Direction Bias Indicator (Phase 1C) */}
-                  {TUNER_FLAGS.directionBias &&
-                    directionBias.biasText &&
-                    !isDetectingPhase(tunerState) && (
-                      <Text
+                      )}
+                  </View>
+                  {/* Fixed-height row for Stability Indicator (Phase 1) */}
+                  <View style={styles.stabilityRow}>
+                    {TUNER_FLAGS.stabilityIndicator &&
+                      !isDetectingPhase(tunerState) && (
+                        <>
+                          <View
+                            style={[
+                              styles.stabilityDot,
+                              { backgroundColor: stabilityColor },
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              styles.stabilityLabel,
+                              { color: stabilityColor },
+                            ]}
+                          >
+                            {tunerState.stability.isStable
+                              ? "STABLE"
+                              : tunerState.stability.isModerate
+                                ? "DRIFTING"
+                                : "UNSTABLE"}
+                          </Text>
+                        </>
+                      )}
+                  </View>
+                  {/* Fixed-height row for Direction Bias Indicator (Phase 1C) */}
+                  <View style={styles.biasRow}>
+                    {TUNER_FLAGS.directionBias &&
+                      directionBias.biasText &&
+                      !isDetectingPhase(tunerState) && (
+                        <Text
+                          style={[
+                            styles.biasIndicator,
+                            {
+                              color:
+                                directionBias.direction === "sharp"
+                                  ? "#FF9800"
+                                  : "#2196F3",
+                            },
+                          ]}
+                        >
+                          {directionBias.biasText}
+                        </Text>
+                      )}
+                  </View>
+                  {/* Fixed-height row for Lock/Hold Indicator (Phase 1) */}
+                  <View style={styles.lockHoldRow}>
+                    {TUNER_FLAGS.holdIndicator && showLock && (
+                      <Animated.View
                         style={[
-                          styles.biasIndicator,
+                          styles.lockIndicator,
                           {
-                            color:
-                              directionBias.direction === "sharp"
-                                ? "#FF9800"
-                                : "#2196F3",
+                            backgroundColor: lockGlowAnim.interpolate({
+                              inputRange: [0, 0.5, 1],
+                              outputRange: [
+                                "rgba(0, 200, 0, 0.9)",
+                                "rgba(50, 220, 50, 0.95)",
+                                "rgba(100, 255, 100, 1)",
+                              ],
+                            }),
+                            borderColor: lockGlowAnim.interpolate({
+                              inputRange: [0, 0.5, 1],
+                              outputRange: [
+                                "rgba(0, 180, 0, 1)",
+                                "rgba(100, 255, 100, 1)",
+                                "rgba(200, 255, 200, 1)",
+                              ],
+                            }),
+                            borderWidth: 2,
+                            transform: [
+                              {
+                                scale: lockGlowAnim.interpolate({
+                                  inputRange: [0, 0.5, 1],
+                                  outputRange: [1, 1.05, 1.15],
+                                }),
+                              },
+                            ],
                           },
                         ]}
                       >
-                        {directionBias.biasText}
-                      </Text>
+                        <Text style={styles.lockText}>✓ LOCKED</Text>
+                      </Animated.View>
                     )}
-                  {/* Lock/Hold Indicator (Phase 1) with glow animation */}
-                  {TUNER_FLAGS.holdIndicator && showLock && (
-                    <Animated.View
-                      style={[
-                        styles.lockIndicator,
-                        {
-                          backgroundColor: lockGlowAnim.interpolate({
-                            inputRange: [0, 0.5, 1],
-                            outputRange: [
-                              "rgba(0, 200, 0, 0.9)",
-                              "rgba(50, 220, 50, 0.95)",
-                              "rgba(100, 255, 100, 1)",
-                            ],
-                          }),
-                          borderColor: lockGlowAnim.interpolate({
-                            inputRange: [0, 0.5, 1],
-                            outputRange: [
-                              "rgba(0, 180, 0, 1)",
-                              "rgba(100, 255, 100, 1)",
-                              "rgba(200, 255, 200, 1)",
-                            ],
-                          }),
-                          borderWidth: 2,
-                          transform: [
-                            {
-                              scale: lockGlowAnim.interpolate({
-                                inputRange: [0, 0.5, 1],
-                                outputRange: [1, 1.05, 1.15],
-                              }),
-                            },
-                          ],
-                        },
-                      ]}
-                    >
-                      <Text style={styles.lockText}>✓ LOCKED</Text>
-                    </Animated.View>
-                  )}
-                  {TUNER_FLAGS.holdIndicator &&
-                    !showLock &&
-                    holdProgress > 0 && (
-                      <View style={styles.holdProgressContainer}>
-                        <View
-                          style={[
-                            styles.holdProgressBar,
-                            { width: `${holdProgress * 100}%` },
-                          ]}
-                        />
-                      </View>
-                    )}
+                    {TUNER_FLAGS.holdIndicator &&
+                      !showLock &&
+                      holdProgress > 0 && (
+                        <View style={styles.holdProgressContainer}>
+                          <View
+                            style={[
+                              styles.holdProgressBar,
+                              { width: `${holdProgress * 100}%` },
+                            ]}
+                          />
+                        </View>
+                      )}
+                  </View>
                 </>
               ) : (
                 <Text style={styles.micIcon}>🎤</Text>
@@ -1044,51 +1074,75 @@ const Tuner = React.memo(function Tuner({
                     {cents} cents
                   </Text>
                 )}
+                {/* Fixed-height row for Directional Guidance (Phase 1C) */}
+                <View style={styles.guidanceRow}>
+                  {TUNER_FLAGS.directionalGuidance &&
+                    directionalGuidance.text &&
+                    !isDetectingPhase(tunerState) && (
+                      <Text
+                        style={[
+                          styles.guidanceText,
+                          {
+                            color:
+                              directionalGuidance.direction === "lower"
+                                ? "#FF9800"
+                                : "#2196F3",
+                          },
+                        ]}
+                      >
+                        {directionalGuidance.text}
+                      </Text>
+                    )}
+                </View>
                 <Text style={styles.textFreq}>
                   {frequency ? `${frequency.toFixed(1)} Hz` : ""}
                 </Text>
-                {/* Stability Indicator for text mode */}
-                {TUNER_FLAGS.stabilityIndicator &&
-                  !isDetectingPhase(tunerState) && (
-                    <View style={styles.stabilityRow}>
-                      <View
-                        style={[
-                          styles.stabilityDot,
-                          { backgroundColor: stabilityColor },
-                        ]}
-                      />
+                {/* Fixed-height row for Stability Indicator */}
+                <View style={styles.stabilityRow}>
+                  {TUNER_FLAGS.stabilityIndicator &&
+                    !isDetectingPhase(tunerState) && (
+                      <>
+                        <View
+                          style={[
+                            styles.stabilityDot,
+                            { backgroundColor: stabilityColor },
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.stabilityLabel,
+                            { color: stabilityColor },
+                          ]}
+                        >
+                          {tunerState.stability.isStable
+                            ? "STABLE"
+                            : tunerState.stability.isModerate
+                              ? "DRIFTING"
+                              : "UNSTABLE"}
+                        </Text>
+                      </>
+                    )}
+                </View>
+                {/* Fixed-height row for Direction Bias Indicator (Phase 1C) */}
+                <View style={styles.biasRow}>
+                  {TUNER_FLAGS.directionBias &&
+                    directionBias.biasText &&
+                    !isDetectingPhase(tunerState) && (
                       <Text
                         style={[
-                          styles.stabilityLabel,
-                          { color: stabilityColor },
+                          styles.biasIndicator,
+                          {
+                            color:
+                              directionBias.direction === "sharp"
+                                ? "#FF9800"
+                                : "#2196F3",
+                          },
                         ]}
                       >
-                        {tunerState.stability.isStable
-                          ? "STABLE"
-                          : tunerState.stability.isModerate
-                            ? "DRIFTING"
-                            : "UNSTABLE"}
+                        {directionBias.biasText}
                       </Text>
-                    </View>
-                  )}
-                {/* Direction Bias Indicator for text mode (Phase 1C) */}
-                {TUNER_FLAGS.directionBias &&
-                  directionBias.biasText &&
-                  !isDetectingPhase(tunerState) && (
-                    <Text
-                      style={[
-                        styles.biasIndicator,
-                        {
-                          color:
-                            directionBias.direction === "sharp"
-                              ? "#FF9800"
-                              : "#2196F3",
-                        },
-                      ]}
-                    >
-                      {directionBias.biasText}
-                    </Text>
-                  )}
+                    )}
+                </View>
               </>
             ) : (
               <Text style={styles.textMicIcon}>🎤</Text>
@@ -1371,11 +1425,12 @@ const styles = StyleSheet.create({
   noteContainer: {
     alignItems: "center",
     marginTop: 8,
-    minHeight: 60,
+    minHeight: 140, // Fixed height to prevent jumping
   },
   noteName: {
     fontSize: 36,
     fontWeight: "bold",
+    height: 42, // Fixed height
   },
   micIcon: {
     fontSize: 36,
@@ -1394,11 +1449,21 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginTop: 4,
     letterSpacing: 1,
+    height: 20, // Fixed height
+  },
+  // Fixed height container for guidance text row
+  guidanceRow: {
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 2,
   },
   stabilityRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 6,
+    justifyContent: "center",
+    marginTop: 4,
+    height: 16, // Fixed height
   },
   stabilityDot: {
     width: 10,
@@ -1415,11 +1480,28 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "500",
     fontStyle: "italic",
-    marginTop: 4,
     letterSpacing: 0.3,
   },
+  // Fixed height container for bias text row
+  biasRow: {
+    height: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  guidanceText: {
+    fontSize: 12,
+    fontWeight: "600",
+    letterSpacing: 0.3,
+  },
+  // Fixed height container for lock/hold area
+  lockHoldRow: {
+    height: 28,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 4,
+  },
   lockIndicator: {
-    marginTop: 8,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
