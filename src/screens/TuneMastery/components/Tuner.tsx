@@ -51,6 +51,7 @@ import {
   getHoldProgress,
   shouldShowHold,
   getMedian,
+  isCentered,
 } from "./Tuner/tunerHelpers";
 import {
   TUNER_FLAGS,
@@ -249,6 +250,10 @@ const Tuner = React.memo(function Tuner({
 
   // State machine for tuner state tracking (Phase 1 UX improvements)
   const [tunerState, dispatchTuner] = useReducer(tunerReducer, initialContext);
+
+  // Lock glow animation (Phase 1 UX)
+  const lockGlowAnim = useRef(new Animated.Value(0)).current;
+  const wasLockedRef = useRef(false);
 
   // Smoothing refs for reducing jitter
   const smoothedFrequencyRef = useRef<number | null>(null);
@@ -473,6 +478,33 @@ const Tuner = React.memo(function Tuner({
   const showHold = shouldShowHold(centeredStableDuration);
   const showLock = isLocked(tunerState);
 
+  // Is centered for target circle coloring
+  const centered = currentNote ? isCentered(cents) : false;
+
+  // Lock glow animation effect - triggers once when lock is first achieved
+  useEffect(() => {
+    if (showLock && !wasLockedRef.current) {
+      // Lock just achieved - trigger glow animation
+      // Brief pulse (0 -> 1) over 300ms, then settle to subtle glow (0.5)
+      Animated.sequence([
+        Animated.timing(lockGlowAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+        Animated.timing(lockGlowAnim, {
+          toValue: 0.5,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+      ]).start();
+    } else if (!showLock && wasLockedRef.current) {
+      // Lock lost - reset glow
+      lockGlowAnim.setValue(0);
+    }
+    wasLockedRef.current = showLock;
+  }, [showLock, lockGlowAnim]);
+
   // Calculate needle rotation (-50 to +50 cents = -90 to +90 degrees)
   // Returns 0 when no note is detected
   // Dead zone: needle snaps to center within ±3 cents for visual stability
@@ -681,6 +713,39 @@ const Tuner = React.memo(function Tuner({
                       />
                     );
                   })}
+                {/* Center Target Circle - visual aiming reference */}
+                {/* Position at top of arc (0 cents = 270° = (180, 40)) */}
+                <Circle
+                  cx={180}
+                  cy={40}
+                  r={8}
+                  fill={
+                    showLock
+                      ? "#4CAF50"
+                      : centered
+                        ? "rgba(76, 175, 80, 0.4)"
+                        : "rgba(100, 100, 100, 0.3)"
+                  }
+                  stroke={
+                    showLock
+                      ? "#4CAF50"
+                      : centered
+                        ? "rgba(76, 175, 80, 0.6)"
+                        : "rgba(150, 150, 150, 0.4)"
+                  }
+                  strokeWidth={showLock ? 2 : 1}
+                />
+                {/* Outer glow ring when locked */}
+                {showLock && (
+                  <Circle
+                    cx={180}
+                    cy={40}
+                    r={12}
+                    fill="none"
+                    stroke="rgba(76, 175, 80, 0.3)"
+                    strokeWidth={3}
+                  />
+                )}
               </Svg>
 
               {/* Needle - rotates around bottom center */}
@@ -768,16 +833,47 @@ const Tuner = React.memo(function Tuner({
                           {tunerState.stability.isStable
                             ? "STABLE"
                             : tunerState.stability.isModerate
-                              ? "SETTLING"
+                              ? "DRIFTING"
                               : "UNSTABLE"}
                         </Text>
                       </View>
                     )}
-                  {/* Lock/Hold Indicator (Phase 1) */}
+                  {/* Lock/Hold Indicator (Phase 1) with glow animation */}
                   {TUNER_FLAGS.holdIndicator && showLock && (
-                    <View style={styles.lockIndicator}>
+                    <Animated.View
+                      style={[
+                        styles.lockIndicator,
+                        {
+                          backgroundColor: lockGlowAnim.interpolate({
+                            inputRange: [0, 0.5, 1],
+                            outputRange: [
+                              "rgba(0, 200, 0, 0.9)",
+                              "rgba(50, 220, 50, 0.95)",
+                              "rgba(100, 255, 100, 1)",
+                            ],
+                          }),
+                          borderColor: lockGlowAnim.interpolate({
+                            inputRange: [0, 0.5, 1],
+                            outputRange: [
+                              "rgba(0, 180, 0, 1)",
+                              "rgba(100, 255, 100, 1)",
+                              "rgba(200, 255, 200, 1)",
+                            ],
+                          }),
+                          borderWidth: 2,
+                          transform: [
+                            {
+                              scale: lockGlowAnim.interpolate({
+                                inputRange: [0, 0.5, 1],
+                                outputRange: [1, 1.05, 1.15],
+                              }),
+                            },
+                          ],
+                        },
+                      ]}
+                    >
                       <Text style={styles.lockText}>✓ LOCKED</Text>
-                    </View>
+                    </Animated.View>
                   )}
                   {TUNER_FLAGS.holdIndicator &&
                     !showLock &&
@@ -837,7 +933,7 @@ const Tuner = React.memo(function Tuner({
                         {tunerState.stability.isStable
                           ? "STABLE"
                           : tunerState.stability.isModerate
-                            ? "SETTLING"
+                            ? "DRIFTING"
                             : "UNSTABLE"}
                       </Text>
                     </View>
@@ -1168,13 +1264,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingHorizontal: 12,
     paddingVertical: 4,
-    backgroundColor: "rgba(255, 215, 0, 0.2)",
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#FFD700",
   },
   lockText: {
-    color: "#FFD700",
+    color: "#FFFFFF",
     fontSize: 12,
     fontWeight: "bold",
     letterSpacing: 1,
