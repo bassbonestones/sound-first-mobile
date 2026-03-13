@@ -72,6 +72,16 @@ import {
   DIRECTION_BIAS_WINDOW_MS,
 } from "./Tuner/tunerConstants";
 
+// Import session stats for Phase 2A
+import {
+  createInitialSessionStats,
+  recordSessionSample,
+  resetSessionStats,
+  calculateSessionScores,
+  calculateAttackSummary,
+  type SessionStats,
+} from "./Tuner/tunerSessionStats";
+
 // Minor 7th system options
 export type Minor7System = "classical" | "pythagorean" | "harmonic";
 
@@ -259,6 +269,16 @@ const Tuner = React.memo(function Tuner({
   // State machine for tuner state tracking (Phase 1 UX improvements)
   const [tunerState, dispatchTuner] = useReducer(tunerReducer, initialContext);
 
+  // Refs to avoid stale closure in handlePitchDetected (must be declared before useEffect)
+  const warmupCompleteRef = useRef<boolean>(false);
+  const stabilityStdDevRef = useRef<number>(0);
+
+  // Keep refs in sync with tunerState for session stats (avoids stale closure)
+  useEffect(() => {
+    warmupCompleteRef.current = tunerState.warmupComplete;
+    stabilityStdDevRef.current = tunerState.stability.stdDev;
+  }, [tunerState.warmupComplete, tunerState.stability.stdDev]);
+
   // Lock glow animation (Phase 1 UX)
   const lockGlowAnim = useRef(new Animated.Value(0)).current;
   const wasLockedRef = useRef(false);
@@ -274,6 +294,15 @@ const Tuner = React.memo(function Tuner({
   const biasHistoryRef = useRef<Array<{ cents: number; timestamp: number }>>(
     [],
   );
+
+  // Session stats tracking (Phase 2A)
+  const [sessionStats, setSessionStats] = useState<SessionStats>(
+    createInitialSessionStats,
+  );
+  // Track if next sample after warmup is an attack sample
+  const isAttackSampleRef = useRef<boolean>(true);
+  // Track last note for attack detection (new note = new attack)
+  const attackNoteRef = useRef<string | null>(null);
 
   // Smoothing refs for reducing jitter
   const smoothedFrequencyRef = useRef<number | null>(null);
@@ -311,6 +340,9 @@ const Tuner = React.memo(function Tuner({
       lastNoteRef.current = null;
       centsHistoryRef.current = [];
       stabilityHistoryRef.current = [];
+      // Reset attack sample tracking (next note will be an attack)
+      isAttackSampleRef.current = true;
+      attackNoteRef.current = null;
       // Dispatch signal lost to state machine
       dispatchTuner({ type: "SIGNAL_LOST" });
     }, 300);
@@ -456,6 +488,28 @@ const Tuner = React.memo(function Tuner({
         });
         lastPitchTimeRef.current = now;
 
+        // Session stats recording (Phase 2A)
+        // Only record after warmup is complete (read from ref to avoid stale closure)
+        if (TUNER_FLAGS.sessionStats && warmupCompleteRef.current) {
+          // Detect attack: new note or first sample after warmup
+          const isNewNote = note !== attackNoteRef.current;
+          const isAttack = isNewNote || isAttackSampleRef.current;
+
+          if (isNewNote) {
+            attackNoteRef.current = note;
+          }
+          isAttackSampleRef.current = false;
+
+          setSessionStats((prev) =>
+            recordSessionSample(prev, {
+              cents: roundedCents,
+              stdDev: stabilityStdDevRef.current,
+              note,
+              isAttackSample: isAttack,
+            }),
+          );
+        }
+
         // Start silence detection timer
         clearNoteAfterSilence();
       } else {
@@ -470,6 +524,9 @@ const Tuner = React.memo(function Tuner({
         stabilityHistoryRef.current = [];
         // Clear drift trail when signal lost
         driftTrailRef.current = [];
+        // Reset attack sample tracking (next note will be an attack)
+        isAttackSampleRef.current = true;
+        attackNoteRef.current = null;
         // Dispatch signal lost to state machine
         dispatchTuner({ type: "SIGNAL_LOST" });
       }
@@ -915,15 +972,22 @@ const Tuner = React.memo(function Tuner({
               </View>
             </View>
 
-            {/* Note Display below gauge */}
+            {/* Note Display below gauge - fixed height container */}
             <View style={styles.noteContainer}>
-              {currentNote ? (
-                <>
+              {/* Note name row - always rendered with fixed height */}
+              <View style={styles.noteNameRow}>
+                {currentNote ? (
                   <Text style={[styles.noteName, { color: tuneColor }]}>
                     {currentNote}
                   </Text>
-                  {/* State text with stability-aware display (Phase 1) */}
-                  {TUNER_FLAGS.stateLanguage ? (
+                ) : (
+                  <Text style={styles.micIcon}>🎤</Text>
+                )}
+              </View>
+              {/* State text row - always rendered with fixed height */}
+              <View style={styles.stateTextRow}>
+                {currentNote &&
+                  (TUNER_FLAGS.stateLanguage ? (
                     <Text style={[styles.stateText, { color: tuneColor }]}>
                       {stateText}
                     </Text>
@@ -932,139 +996,148 @@ const Tuner = React.memo(function Tuner({
                       {cents > 0 ? "+" : ""}
                       {cents} cents
                     </Text>
+                  ))}
+              </View>
+              {/* Fixed-height row for Directional Guidance (Phase 1C) */}
+              <View style={styles.guidanceRow}>
+                {currentNote &&
+                  TUNER_FLAGS.directionalGuidance &&
+                  directionalGuidance.text &&
+                  !isDetectingPhase(tunerState) && (
+                    <Text
+                      style={[
+                        styles.guidanceText,
+                        {
+                          color:
+                            directionalGuidance.direction === "lower"
+                              ? "#FF9800"
+                              : "#2196F3",
+                        },
+                      ]}
+                    >
+                      {directionalGuidance.text}
+                    </Text>
                   )}
-                  {/* Fixed-height row for Directional Guidance (Phase 1C) */}
-                  <View style={styles.guidanceRow}>
-                    {TUNER_FLAGS.directionalGuidance &&
-                      directionalGuidance.text &&
-                      !isDetectingPhase(tunerState) && (
-                        <Text
-                          style={[
-                            styles.guidanceText,
-                            {
-                              color:
-                                directionalGuidance.direction === "lower"
-                                  ? "#FF9800"
-                                  : "#2196F3",
-                            },
-                          ]}
-                        >
-                          {directionalGuidance.text}
-                        </Text>
-                      )}
-                  </View>
-                  {/* Fixed-height row for Stability Indicator (Phase 1) */}
-                  <View style={styles.stabilityRow}>
-                    {TUNER_FLAGS.stabilityIndicator &&
-                      !isDetectingPhase(tunerState) && (
-                        <>
-                          <View
-                            style={[
-                              styles.stabilityDot,
-                              { backgroundColor: stabilityColor },
-                            ]}
-                          />
-                          <Text
-                            style={[
-                              styles.stabilityLabel,
-                              { color: stabilityColor },
-                            ]}
-                          >
-                            {tunerState.stability.isStable
-                              ? "STABLE"
-                              : tunerState.stability.isModerate
-                                ? "DRIFTING"
-                                : "UNSTABLE"}
-                          </Text>
-                        </>
-                      )}
-                  </View>
-                  {/* Fixed-height row for Direction Bias Indicator (Phase 1C) */}
-                  <View style={styles.biasRow}>
-                    {TUNER_FLAGS.directionBias &&
-                      directionBias.biasText &&
-                      !isDetectingPhase(tunerState) && (
-                        <Text
-                          style={[
-                            styles.biasIndicator,
-                            {
-                              color:
-                                directionBias.direction === "sharp"
-                                  ? "#FF9800"
-                                  : "#2196F3",
-                            },
-                          ]}
-                        >
-                          {directionBias.biasText}
-                        </Text>
-                      )}
-                  </View>
-                  {/* Fixed-height row for Lock/Hold Indicator (Phase 1) */}
-                  <View style={styles.lockHoldRow}>
-                    {TUNER_FLAGS.holdIndicator && showLock && (
-                      <Animated.View
+              </View>
+              {/* Fixed-height row for Stability Indicator (Phase 1) */}
+              <View style={styles.stabilityRow}>
+                {currentNote &&
+                  TUNER_FLAGS.stabilityIndicator &&
+                  !isDetectingPhase(tunerState) && (
+                    <>
+                      <View
                         style={[
-                          styles.lockIndicator,
-                          {
-                            backgroundColor: lockGlowAnim.interpolate({
-                              inputRange: [0, 0.5, 1],
-                              outputRange: [
-                                "rgba(0, 200, 0, 0.9)",
-                                "rgba(50, 220, 50, 0.95)",
-                                "rgba(100, 255, 100, 1)",
-                              ],
-                            }),
-                            borderColor: lockGlowAnim.interpolate({
-                              inputRange: [0, 0.5, 1],
-                              outputRange: [
-                                "rgba(0, 180, 0, 1)",
-                                "rgba(100, 255, 100, 1)",
-                                "rgba(200, 255, 200, 1)",
-                              ],
-                            }),
-                            borderWidth: 2,
-                            transform: [
-                              {
-                                scale: lockGlowAnim.interpolate({
-                                  inputRange: [0, 0.5, 1],
-                                  outputRange: [1, 1.05, 1.15],
-                                }),
-                              },
-                            ],
-                          },
+                          styles.stabilityDot,
+                          { backgroundColor: stabilityColor },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.stabilityLabel,
+                          { color: stabilityColor },
                         ]}
                       >
-                        <Text style={styles.lockText}>✓ LOCKED</Text>
-                      </Animated.View>
-                    )}
-                    {TUNER_FLAGS.holdIndicator &&
-                      !showLock &&
-                      holdProgress > 0 && (
-                        <View style={styles.holdProgressContainer}>
-                          <View
-                            style={[
-                              styles.holdProgressBar,
-                              { width: `${holdProgress * 100}%` },
-                            ]}
-                          />
-                        </View>
-                      )}
-                  </View>
-                </>
-              ) : (
-                <Text style={styles.micIcon}>🎤</Text>
-              )}
+                        {tunerState.stability.isStable
+                          ? "STABLE"
+                          : tunerState.stability.isModerate
+                            ? "DRIFTING"
+                            : "UNSTABLE"}
+                      </Text>
+                    </>
+                  )}
+              </View>
+              {/* Fixed-height row for Direction Bias Indicator (Phase 1C) */}
+              <View style={styles.biasRow}>
+                {currentNote &&
+                  TUNER_FLAGS.directionBias &&
+                  directionBias.biasText &&
+                  !isDetectingPhase(tunerState) && (
+                    <Text
+                      style={[
+                        styles.biasIndicator,
+                        {
+                          color:
+                            directionBias.direction === "sharp"
+                              ? "#FF9800"
+                              : "#2196F3",
+                        },
+                      ]}
+                    >
+                      {directionBias.biasText}
+                    </Text>
+                  )}
+              </View>
+              {/* Fixed-height row for Lock/Hold Indicator (Phase 1) */}
+              <View style={styles.lockHoldRow}>
+                {currentNote && TUNER_FLAGS.holdIndicator && showLock && (
+                  <Animated.View
+                    style={[
+                      styles.lockIndicator,
+                      {
+                        backgroundColor: lockGlowAnim.interpolate({
+                          inputRange: [0, 0.5, 1],
+                          outputRange: [
+                            "rgba(0, 200, 0, 0.9)",
+                            "rgba(50, 220, 50, 0.95)",
+                            "rgba(100, 255, 100, 1)",
+                          ],
+                        }),
+                        borderColor: lockGlowAnim.interpolate({
+                          inputRange: [0, 0.5, 1],
+                          outputRange: [
+                            "rgba(0, 180, 0, 1)",
+                            "rgba(100, 255, 100, 1)",
+                            "rgba(200, 255, 200, 1)",
+                          ],
+                        }),
+                        borderWidth: 2,
+                        transform: [
+                          {
+                            scale: lockGlowAnim.interpolate({
+                              inputRange: [0, 0.5, 1],
+                              outputRange: [1, 1.05, 1.15],
+                            }),
+                          },
+                        ],
+                      },
+                    ]}
+                  >
+                    <Text style={styles.lockText}>✓ LOCKED</Text>
+                  </Animated.View>
+                )}
+                {currentNote &&
+                  TUNER_FLAGS.holdIndicator &&
+                  !showLock &&
+                  holdProgress > 0 && (
+                    <View style={styles.holdProgressContainer}>
+                      <View
+                        style={[
+                          styles.holdProgressBar,
+                          { width: `${holdProgress * 100}%` },
+                        ]}
+                      />
+                    </View>
+                  )}
+              </View>
             </View>
           </View>
         ) : (
-          // Text Mode
+          // Text Mode - Single fixed-height container for both mic and note states
           <View style={styles.textContainer}>
-            {currentNote ? (
-              <>
+            {/* Note name or mic icon */}
+            <View style={styles.textNoteRow}>
+              {currentNote ? (
                 <Text style={[styles.textNote, { color: tuneColor }]}>
                   {currentNote}
                 </Text>
-                {TUNER_FLAGS.stateLanguage ? (
+              ) : (
+                <Text style={styles.textMicIcon}>🎤</Text>
+              )}
+            </View>
+            {/* State text row */}
+            <View style={styles.textCentsRow}>
+              {currentNote &&
+                (TUNER_FLAGS.stateLanguage ? (
                   <Text style={[styles.textCents, { color: tuneColor }]}>
                     {stateText}
                   </Text>
@@ -1073,83 +1146,152 @@ const Tuner = React.memo(function Tuner({
                     {cents > 0 ? "+" : ""}
                     {cents} cents
                   </Text>
+                ))}
+            </View>
+            {/* Fixed-height row for Directional Guidance (Phase 1C) */}
+            <View style={styles.guidanceRow}>
+              {currentNote &&
+                TUNER_FLAGS.directionalGuidance &&
+                directionalGuidance.text &&
+                !isDetectingPhase(tunerState) && (
+                  <Text
+                    style={[
+                      styles.guidanceText,
+                      {
+                        color:
+                          directionalGuidance.direction === "lower"
+                            ? "#FF9800"
+                            : "#2196F3",
+                      },
+                    ]}
+                  >
+                    {directionalGuidance.text}
+                  </Text>
                 )}
-                {/* Fixed-height row for Directional Guidance (Phase 1C) */}
-                <View style={styles.guidanceRow}>
-                  {TUNER_FLAGS.directionalGuidance &&
-                    directionalGuidance.text &&
-                    !isDetectingPhase(tunerState) && (
-                      <Text
-                        style={[
-                          styles.guidanceText,
-                          {
-                            color:
-                              directionalGuidance.direction === "lower"
-                                ? "#FF9800"
-                                : "#2196F3",
-                          },
-                        ]}
-                      >
-                        {directionalGuidance.text}
-                      </Text>
-                    )}
-                </View>
+            </View>
+            {/* Frequency row */}
+            <View style={styles.textFreqRow}>
+              {currentNote && (
                 <Text style={styles.textFreq}>
                   {frequency ? `${frequency.toFixed(1)} Hz` : ""}
                 </Text>
-                {/* Fixed-height row for Stability Indicator */}
-                <View style={styles.stabilityRow}>
-                  {TUNER_FLAGS.stabilityIndicator &&
-                    !isDetectingPhase(tunerState) && (
-                      <>
-                        <View
-                          style={[
-                            styles.stabilityDot,
-                            { backgroundColor: stabilityColor },
-                          ]}
-                        />
-                        <Text
-                          style={[
-                            styles.stabilityLabel,
-                            { color: stabilityColor },
-                          ]}
-                        >
-                          {tunerState.stability.isStable
-                            ? "STABLE"
-                            : tunerState.stability.isModerate
-                              ? "DRIFTING"
-                              : "UNSTABLE"}
-                        </Text>
-                      </>
-                    )}
-                </View>
-                {/* Fixed-height row for Direction Bias Indicator (Phase 1C) */}
-                <View style={styles.biasRow}>
-                  {TUNER_FLAGS.directionBias &&
-                    directionBias.biasText &&
-                    !isDetectingPhase(tunerState) && (
-                      <Text
-                        style={[
-                          styles.biasIndicator,
-                          {
-                            color:
-                              directionBias.direction === "sharp"
-                                ? "#FF9800"
-                                : "#2196F3",
-                          },
-                        ]}
-                      >
-                        {directionBias.biasText}
-                      </Text>
-                    )}
-                </View>
-              </>
-            ) : (
-              <Text style={styles.textMicIcon}>🎤</Text>
-            )}
+              )}
+            </View>
+            {/* Fixed-height row for Stability Indicator */}
+            <View style={styles.stabilityRow}>
+              {currentNote &&
+                TUNER_FLAGS.stabilityIndicator &&
+                !isDetectingPhase(tunerState) && (
+                  <>
+                    <View
+                      style={[
+                        styles.stabilityDot,
+                        { backgroundColor: stabilityColor },
+                      ]}
+                    />
+                    <Text
+                      style={[styles.stabilityLabel, { color: stabilityColor }]}
+                    >
+                      {tunerState.stability.isStable
+                        ? "STABLE"
+                        : tunerState.stability.isModerate
+                          ? "DRIFTING"
+                          : "UNSTABLE"}
+                    </Text>
+                  </>
+                )}
+            </View>
+            {/* Fixed-height row for Direction Bias Indicator (Phase 1C) */}
+            <View style={styles.biasRow}>
+              {currentNote &&
+                TUNER_FLAGS.directionBias &&
+                directionBias.biasText &&
+                !isDetectingPhase(tunerState) && (
+                  <Text
+                    style={[
+                      styles.biasIndicator,
+                      {
+                        color:
+                          directionBias.direction === "sharp"
+                            ? "#FF9800"
+                            : "#2196F3",
+                      },
+                    ]}
+                  >
+                    {directionBias.biasText}
+                  </Text>
+                )}
+            </View>
           </View>
         )}
       </View>
+
+      {/* Session Stats Panel (Phase 2A) - Always rendered with fixed height */}
+      {TUNER_FLAGS.sessionStats && (
+        <View style={styles.sessionStatsPanel}>
+          {sessionStats.hasEnoughData ? (
+            <>
+              <View style={styles.sessionStatsHeader}>
+                <Text style={styles.sessionStatsTitle}>Session Stats</Text>
+                <TouchableOpacity
+                  onPress={() => setSessionStats(resetSessionStats())}
+                  style={styles.sessionStatsReset}
+                  accessibilityLabel="Reset session stats"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.sessionStatsResetText}>Reset</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.sessionScoresRow}>
+                <View style={styles.sessionScoreItem}>
+                  <Text style={styles.sessionScoreValue}>
+                    {calculateSessionScores(sessionStats).accuracy}%
+                  </Text>
+                  <Text style={styles.sessionScoreLabel}>Accuracy</Text>
+                </View>
+                <View style={styles.sessionScoreItem}>
+                  <Text style={styles.sessionScoreValue}>
+                    {calculateSessionScores(sessionStats).stability}%
+                  </Text>
+                  <Text style={styles.sessionScoreLabel}>Stability</Text>
+                </View>
+                <View style={styles.sessionScoreItem}>
+                  <Text style={styles.sessionScoreValue}>
+                    {calculateSessionScores(sessionStats).control}%
+                  </Text>
+                  <Text style={styles.sessionScoreLabel}>Control</Text>
+                </View>
+              </View>
+              {/* Fixed-height row for attack summary to prevent layout jumps */}
+              <View style={styles.attackSummaryRow}>
+                {TUNER_FLAGS.attackSummary &&
+                  calculateAttackSummary(sessionStats).summaryText && (
+                    <Text
+                      style={[
+                        styles.attackSummaryText,
+                        {
+                          color:
+                            calculateAttackSummary(sessionStats)
+                              .attackDirection === "sharp"
+                              ? "#FF9800"
+                              : "#2196F3",
+                        },
+                      ]}
+                    >
+                      {calculateAttackSummary(sessionStats).summaryText}
+                    </Text>
+                  )}
+              </View>
+            </>
+          ) : (
+            <View style={styles.sessionStatsPlaceholder}>
+              <Text style={styles.sessionStatsPlaceholderText}>
+                Play for a few seconds to see stats...
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Temperament & Concert A Row */}
       <View style={styles.settingsRow}>
@@ -1425,12 +1567,16 @@ const styles = StyleSheet.create({
   noteContainer: {
     alignItems: "center",
     marginTop: 8,
-    minHeight: 140, // Fixed height to prevent jumping
+    height: 144, // Fixed height: 44+24+18+16+14+28 = 144
+  },
+  noteNameRow: {
+    height: 44, // Fixed height for note name or mic icon
+    justifyContent: "center",
+    alignItems: "center",
   },
   noteName: {
     fontSize: 36,
     fontWeight: "bold",
-    height: 42, // Fixed height
   },
   micIcon: {
     fontSize: 36,
@@ -1438,31 +1584,31 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 20,
   },
+  stateTextRow: {
+    height: 24, // Fixed height for state text
+    justifyContent: "center",
+    alignItems: "center",
+  },
   centsDisplay: {
     color: "#888",
     fontSize: 14,
-    marginTop: 4,
   },
   // Phase 1 UX Improvement Styles
   stateText: {
     fontSize: 16,
     fontWeight: "bold",
-    marginTop: 4,
     letterSpacing: 1,
-    height: 20, // Fixed height
   },
   // Fixed height container for guidance text row
   guidanceRow: {
     height: 18,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 2,
   },
   stabilityRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 4,
     height: 16, // Fixed height
   },
   stabilityDot: {
@@ -1487,7 +1633,6 @@ const styles = StyleSheet.create({
     height: 14,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 2,
   },
   guidanceText: {
     fontSize: 12,
@@ -1499,7 +1644,6 @@ const styles = StyleSheet.create({
     height: 28,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 4,
   },
   lockIndicator: {
     paddingHorizontal: 12,
@@ -1513,7 +1657,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   holdProgressContainer: {
-    marginTop: 6,
     width: 60,
     height: 4,
     backgroundColor: "#333",
@@ -1534,6 +1677,12 @@ const styles = StyleSheet.create({
   // Text Mode
   textContainer: {
     alignItems: "center",
+    height: 180, // Fixed height to prevent UI jumping when switching from mic icon to text
+  },
+  textNoteRow: {
+    height: 56, // Fixed height for note name or mic icon
+    justifyContent: "center",
+    alignItems: "center",
   },
   textNote: {
     fontSize: 48,
@@ -1545,14 +1694,22 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 20,
   },
+  textCentsRow: {
+    height: 32, // Fixed height for cents/state text
+    justifyContent: "center",
+    alignItems: "center",
+  },
   textCents: {
     fontSize: 24,
-    marginTop: 4,
+  },
+  textFreqRow: {
+    height: 20, // Fixed height for frequency
+    justifyContent: "center",
+    alignItems: "center",
   },
   textFreq: {
     color: "#666",
     fontSize: 14,
-    marginTop: 4,
   },
   tuningIndicator: {
     color: "#888",
@@ -1730,6 +1887,75 @@ const styles = StyleSheet.create({
   },
   keyOptionTextActive: {
     color: "#FFFFFF",
+  },
+  // Session Stats Styles (Phase 2A)
+  sessionStatsPanel: {
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 12,
+    padding: 12,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    height: 130, // Fixed height to prevent layout jumps
+  },
+  sessionStatsPlaceholder: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sessionStatsPlaceholderText: {
+    color: "#666",
+    fontSize: 13,
+    fontStyle: "italic",
+  },
+  sessionStatsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  sessionStatsTitle: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  sessionStatsReset: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 4,
+  },
+  sessionStatsResetText: {
+    color: "#888",
+    fontSize: 11,
+  },
+  sessionScoresRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 8,
+  },
+  sessionScoreItem: {
+    alignItems: "center",
+    minWidth: 70,
+  },
+  sessionScoreValue: {
+    color: "#4CAF50",
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  sessionScoreLabel: {
+    color: "#888",
+    fontSize: 11,
+    marginTop: 2,
+  },
+  attackSummaryRow: {
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  attackSummaryText: {
+    textAlign: "center",
+    fontSize: 12,
+    fontWeight: "500",
   },
 });
 

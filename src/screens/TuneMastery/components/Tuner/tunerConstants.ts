@@ -121,6 +121,19 @@ export const DIRECTION_BIAS_THRESHOLD = 3;
 export const DIRECTION_BIAS_WINDOW_MS = 5000;
 
 // ===========================================
+// SESSION STATS CONSTANTS (Phase 2A)
+// ===========================================
+
+/** Minimum samples before showing session stats */
+export const SESSION_MIN_SAMPLES = 30;
+
+/** Tolerance for "accurate" sample in session stats (cents) */
+export const SESSION_ACCURACY_TOLERANCE = 5;
+
+/** Divisor for converting stdDev to 0-100 stability score */
+export const SESSION_STABILITY_SCORE_DIVISOR = 10;
+
+// ===========================================
 // FEATURE FLAGS
 // ===========================================
 
@@ -146,6 +159,10 @@ export const TUNER_FLAGS = {
   directionBias: true,
   /** Phase 1C.4 - Directional guidance text ("Lower pitch slightly") */
   directionalGuidance: true,
+  /** Phase 2A.1 - Session stats (Pitch Accuracy/Stability/Control scores) */
+  sessionStats: true,
+  /** Phase 2A.2 - Attack summary ("Your attacks averaged +4¢ sharp") */
+  attackSummary: true,
 } as const;
 
 // ===========================================
