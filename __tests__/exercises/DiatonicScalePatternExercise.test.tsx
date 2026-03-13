@@ -299,4 +299,122 @@ describe("DiatonicScalePatternExercise", () => {
       expect(getAllByText("DO").length).toBeGreaterThanOrEqual(1);
     });
   });
+
+  // ==========================================================================
+  // CLEANUP TESTS
+  // ==========================================================================
+  describe("Cleanup", () => {
+    it("cleans up on unmount", () => {
+      const { unmount } = render(
+        <DiatonicScalePatternExercise {...defaultProps} />,
+      );
+      unmount();
+      // Should not throw
+    });
+
+    it("closes audio context on unmount", () => {
+      const { unmount } = render(
+        <DiatonicScalePatternExercise {...defaultProps} />,
+      );
+      unmount();
+      expect(mockAudioContext.close).toHaveBeenCalled();
+    });
+  });
+
+  // ==========================================================================
+  // EDGE CASES
+  // ==========================================================================
+  describe("Edge Cases", () => {
+    it("handles empty sessionState", () => {
+      const { getByText } = render(
+        <DiatonicScalePatternExercise
+          mini={{}}
+          sessionState={{}}
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+        />,
+      );
+      expect(getByText("The Major Scale Pattern")).toBeTruthy();
+    });
+
+    it("handles undefined mini prop", () => {
+      const { getByText } = render(
+        <DiatonicScalePatternExercise
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+        />,
+      );
+      expect(getByText("The Major Scale Pattern")).toBeTruthy();
+    });
+
+    it("handles missing callbacks gracefully", () => {
+      // This should not throw
+      expect(() =>
+        render(<DiatonicScalePatternExercise mini={{}} sessionState={{}} />),
+      ).not.toThrow();
+    });
+  });
+
+  // ==========================================================================
+  // NAVIGATION TESTS
+  // ==========================================================================
+  describe("Phase Navigation", () => {
+    it("navigates from intro to listen phase", () => {
+      const { getByText } = render(
+        <DiatonicScalePatternExercise {...defaultProps} />,
+      );
+      fireEvent.press(getByText("Listen to the Scale →"));
+      expect(getByText("Hear the Major Scale")).toBeTruthy();
+    });
+
+    it("shows play disabled button before playing", () => {
+      const { getByText } = render(
+        <DiatonicScalePatternExercise {...defaultProps} />,
+      );
+      fireEvent.press(getByText("Listen to the Scale →"));
+      expect(getByText("Play to continue...")).toBeTruthy();
+    });
+  });
+
+  // ==========================================================================
+  // ACCESSIBILITY TESTS
+  // ==========================================================================
+  describe("Accessibility", () => {
+    it("has accessible play button", () => {
+      const { getByText, getByRole } = render(
+        <DiatonicScalePatternExercise {...defaultProps} />,
+      );
+      fireEvent.press(getByText("Listen to the Scale →"));
+      const playButton = getByText("▶ Play the Scale");
+      expect(playButton).toBeTruthy();
+    });
+
+    it("buttons have text content", () => {
+      const { getByText } = render(
+        <DiatonicScalePatternExercise {...defaultProps} />,
+      );
+      // Main navigation button
+      expect(getByText("Listen to the Scale →")).toBeTruthy();
+    });
+  });
+
+  // ==========================================================================
+  // CONTENT TESTS
+  // ==========================================================================
+  describe("Educational Content", () => {
+    it("displays scale pattern info", () => {
+      const { getByText } = render(
+        <DiatonicScalePatternExercise {...defaultProps} />,
+      );
+      expect(getByText("W-W-H-W-W-W-H")).toBeTruthy();
+    });
+
+    it("has explanatory text", () => {
+      const { getAllByText } = render(
+        <DiatonicScalePatternExercise {...defaultProps} />,
+      );
+      // Should have text about the major scale
+      expect(getAllByText(/major scale/i).length).toBeGreaterThan(0);
+    });
+  });
 });

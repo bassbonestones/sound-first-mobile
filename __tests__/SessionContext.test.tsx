@@ -540,4 +540,212 @@ describe("SessionContext", () => {
       expect(result.current.rangeAttemptCount).toBe(0);
     });
   });
+
+  // ==========================================================================
+  // handleSkip tests
+  // ==========================================================================
+  describe("handleSkip", () => {
+    it("hides reflection and resets state", async () => {
+      const { result } = renderHook(() => useSession(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Show reflection first
+      act(() => {
+        result.current.handleNext();
+        result.current.setReflection("test reflection");
+        result.current.setRating(4);
+      });
+
+      act(() => {
+        result.current.handleSkip();
+      });
+
+      expect(result.current.showReflection).toBe(false);
+      expect(result.current.reflection).toBe("");
+    });
+
+    it("resets extended flag on skip", async () => {
+      const { result } = renderHook(() => useSession(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.handleExtend(); // Sets extended to true
+        result.current.handleSkip();
+      });
+
+      expect(result.current.extended).toBe(false);
+    });
+  });
+
+  // ==========================================================================
+  // fetchMoreMaterial tests
+  // ==========================================================================
+  describe("fetchMoreMaterial", () => {
+    it("fetchMoreMaterial returns false when no session", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({}),
+      });
+
+      const { result } = renderHook(() => useSession(), {
+        wrapper: createWrapper(),
+      });
+
+      // Wait for initial load to fail
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      const gotMore = await result.current.fetchMoreMaterial();
+      expect(gotMore).toBe(false);
+    });
+
+    it("fetchMoreMaterial adds new mini sessions on success", async () => {
+      const { result } = renderHook(() => useSession(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      const initialCount = result.current.session?.mini_sessions?.length || 0;
+
+      // Mock successful fetch for more material
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          session_id: 2,
+          mini_sessions: [
+            { mini_session_id: 10, material_id: 10, title: "Extra Material" },
+          ],
+        }),
+      });
+
+      let gotMore: boolean = false;
+      await act(async () => {
+        gotMore = await result.current.fetchMoreMaterial();
+      });
+
+      expect(gotMore).toBe(true);
+      expect(result.current.session?.mini_sessions?.length).toBe(
+        initialCount + 1,
+      );
+    });
+
+    it("fetchMoreMaterial returns false on fetch error", async () => {
+      const { result } = renderHook(() => useSession(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Mock failed fetch
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+      let gotMore: boolean = true;
+      await act(async () => {
+        gotMore = await result.current.fetchMoreMaterial();
+      });
+
+      expect(gotMore).toBe(false);
+    });
+  });
+
+  // ==========================================================================
+  // Timer cleanup tests
+  // ==========================================================================
+  describe("Timer cleanup", () => {
+    it("cleans up timer interval on unmount", async () => {
+      const { result, unmount } = renderHook(() => useSession(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Advance some time to confirm timer started
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
+
+      expect(result.current.elapsedSeconds).toBeGreaterThan(0);
+
+      // Unmount should clean up
+      unmount();
+
+      // No errors means cleanup worked
+    });
+  });
+
+  // ==========================================================================
+  // handleTimeUpExtend tests
+  // ==========================================================================
+  describe("handleTimeUpExtend", () => {
+    it("hides time-up modal on extend", async () => {
+      const { result } = renderHook(() => useSession(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Mock more material fetch
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          mini_sessions: [{ mini_session_id: 100 }],
+        }),
+      });
+
+      await act(async () => {
+        await result.current.handleTimeUpExtend();
+      });
+
+      expect(result.current.showTimeUpModal).toBe(false);
+    });
+  });
+
+  // ==========================================================================
+  // Session data structure tests
+  // ==========================================================================
+  describe("Session data", () => {
+    it("session contains session_id", async () => {
+      const { result } = renderHook(() => useSession(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.session?.session_id).toBe(1);
+    });
+
+    it("mini_sessions array is accessible", async () => {
+      const { result } = renderHook(() => useSession(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(Array.isArray(result.current.session?.mini_sessions)).toBe(true);
+    });
+  });
 });

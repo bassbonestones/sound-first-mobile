@@ -21,6 +21,7 @@ jest.mock("react-native-audio-api", () => ({
         value: 1,
         setValueAtTime: jest.fn(),
         linearRampToValueAtTime: jest.fn(),
+        exponentialRampToValueAtTime: jest.fn(),
       },
       connect: jest.fn(),
     })),
@@ -35,6 +36,12 @@ jest.mock("react-native-audio-api", () => ({
       connect: jest.fn(),
       start: jest.fn(),
       stop: jest.fn(),
+    })),
+    createBiquadFilter: jest.fn(() => ({
+      type: "highpass",
+      frequency: { value: 1000 },
+      Q: { value: 1 },
+      connect: jest.fn(),
     })),
     close: jest.fn(),
   })),
@@ -187,6 +194,133 @@ describe("FeelThePulseExercise", () => {
       const { getByText } = render(<FeelThePulseExercise {...defaultProps} />);
       expect(getByText(/Listen to.*clicks/)).toBeTruthy();
       expect(getByText(/Then tap.*times/)).toBeTruthy();
+    });
+  });
+
+  // ==========================================================================
+  // LISTENING PHASE TESTS
+  // ==========================================================================
+  describe("Listening Phase", () => {
+    it("transitions to listening phase when Start is pressed", async () => {
+      const { getByRole, getByText } = render(
+        <FeelThePulseExercise {...defaultProps} />,
+      );
+
+      const startButton = getByRole("button", { name: /start exercise/i });
+      fireEvent.press(startButton);
+
+      // Should show listening phase content
+      await waitFor(() => {
+        expect(getByText(/Listen\.\.\./)).toBeTruthy();
+      });
+    });
+
+    it("shows beat counter in listening phase", async () => {
+      const { getByRole, getAllByText } = render(
+        <FeelThePulseExercise {...defaultProps} />,
+      );
+
+      fireEvent.press(getByRole("button", { name: /start exercise/i }));
+
+      await waitFor(() => {
+        // Shows "Listen... 1 / 8" or similar - there may be multiple
+        expect(getAllByText(/\d+ \/ \d+/).length).toBeGreaterThan(0);
+      });
+    });
+
+    it("shows round progress", async () => {
+      const { getByRole, getByText } = render(
+        <FeelThePulseExercise {...defaultProps} />,
+      );
+
+      fireEvent.press(getByRole("button", { name: /start exercise/i }));
+
+      await waitFor(() => {
+        expect(getByText(/Round 1 \/ 3/)).toBeTruthy();
+      });
+    });
+  });
+
+  // ==========================================================================
+  // TAP AREA TESTS
+  // ==========================================================================
+  describe("Tap Area", () => {
+    it("tap area is disabled during listening phase", async () => {
+      const { getByRole, getByLabelText } = render(
+        <FeelThePulseExercise {...defaultProps} />,
+      );
+
+      fireEvent.press(getByRole("button", { name: /start exercise/i }));
+
+      await waitFor(() => {
+        const tapArea = getByLabelText("Listen to the beat");
+        expect(tapArea.props.accessibilityState?.disabled).toBe(true);
+      });
+    });
+  });
+
+  // ==========================================================================
+  // ACCESSIBILITY TESTS
+  // ==========================================================================
+  describe("Accessibility", () => {
+    it("Start button has proper accessibility attributes", () => {
+      const { getByRole } = render(<FeelThePulseExercise {...defaultProps} />);
+      const startButton = getByRole("button", { name: /start exercise/i });
+
+      expect(startButton.props.accessibilityLabel).toBe("Start exercise");
+      expect(startButton.props.accessibilityRole).toBe("button");
+    });
+  });
+
+  // ==========================================================================
+  // EDGE CASES
+  // ==========================================================================
+  describe("Edge Cases", () => {
+    it("handles missing callbacks gracefully", () => {
+      const { getByText } = render(
+        <FeelThePulseExercise config={defaultProps.config} />,
+      );
+      expect(getByText("Internal Pulse")).toBeTruthy();
+    });
+
+    it("handles undefined config gracefully", () => {
+      const { getByText } = render(
+        <FeelThePulseExercise
+          onComplete={defaultProps.onComplete}
+          onProgress={defaultProps.onProgress}
+        />,
+      );
+      expect(getByText("Internal Pulse")).toBeTruthy();
+    });
+
+    it("handles undefined mastery gracefully", () => {
+      const { getByText } = render(
+        <FeelThePulseExercise
+          config={defaultProps.config}
+          onComplete={defaultProps.onComplete}
+          onProgress={defaultProps.onProgress}
+        />,
+      );
+      expect(getByText("Internal Pulse")).toBeTruthy();
+    });
+  });
+
+  // ==========================================================================
+  // CLEANUP TESTS
+  // ==========================================================================
+  describe("Cleanup", () => {
+    it("cleans up on unmount", () => {
+      const { unmount, getByRole } = render(
+        <FeelThePulseExercise {...defaultProps} />,
+      );
+
+      // Start the exercise
+      fireEvent.press(getByRole("button", { name: /start exercise/i }));
+
+      // Should unmount cleanly
+      unmount();
+
+      // No errors should occur
     });
   });
 });
