@@ -147,9 +147,11 @@ function getJustIntonationFrequency(
   }
 
   // Debug logging
-  const keyName = KEY_DISPLAY_NAMES[keyIndex].split('/')[0];
+  const keyName = KEY_DISPLAY_NAMES[keyIndex].split("/")[0];
   const m7Info = semitonesAboveTonic === 10 ? `, m7=${minor7System}` : "";
-  console.log(`[JUST] note=${noteName}, key=${keyName}, noteIdx=${noteIndex}, keyIdx=${keyIndex}, semitones=${semitonesAboveTonic}, ratio=${justRatio.toFixed(4)}, tonicFreq=${tonicFreq.toFixed(2)}, equalTemp=${equalTempFreq?.toFixed(2)}, justFreq=${justFreq.toFixed(2)}${m7Info}`);
+  console.log(
+    `[JUST] note=${noteName}, key=${keyName}, noteIdx=${noteIndex}, keyIdx=${keyIndex}, semitones=${semitonesAboveTonic}, ratio=${justRatio.toFixed(4)}, tonicFreq=${tonicFreq.toFixed(2)}, equalTemp=${equalTempFreq?.toFixed(2)}, justFreq=${justFreq.toFixed(2)}${m7Info}`,
+  );
 
   return justFreq;
 }
@@ -294,12 +296,17 @@ const Tuner = React.memo(function Tuner({
         // Calculate target frequency based on temperament (read from refs)
         const currentTemperament = activeTemperamentRef.current;
         const currentKeyIndex = selectedKeyIndexRef.current;
-        
+
         let targetFreq: number | null = null;
         if (currentTemperament === "just") {
           // Use just intonation frequency based on selected key and m7 system
           const currentM7System = minor7SystemRef.current;
-          targetFreq = getJustIntonationFrequency(note, currentKeyIndex, a4, currentM7System);
+          targetFreq = getJustIntonationFrequency(
+            note,
+            currentKeyIndex,
+            a4,
+            currentM7System,
+          );
         } else {
           // Use noteToFrequency for equal temperament, scaled for custom A4
           const stdFreq = noteToFrequency(note);
@@ -787,7 +794,9 @@ const Tuner = React.memo(function Tuner({
                           selectedKeyIndex === index && styles.keyOptionActive,
                         ]}
                         onPress={() => {
-                          console.log(`[KEY_CLICK] User clicked key: ${index} (${KEY_DISPLAY_NAMES[index]?.split('/')[0]})`);
+                          console.log(
+                            `[KEY_CLICK] User clicked key: ${index} (${KEY_DISPLAY_NAMES[index]?.split("/")[0]})`,
+                          );
                           setSelectedKeyIndex(index);
                         }}
                         accessibilityLabel={`Key of ${keyName}`}

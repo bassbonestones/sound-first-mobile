@@ -538,7 +538,7 @@ describe("Tuner", () => {
 
       const { getByLabelText } = render(<Tuner />);
 
-      // Switch to just intonation  
+      // Switch to just intonation
       fireEvent.press(getByLabelText("Just intonation"));
 
       // Simulate flat note detection

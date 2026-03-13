@@ -85,7 +85,7 @@ export function autoCorrelate(buffer, sampleRate) {
 
   // YIN parameters - constrain to musical range
   const threshold = 0.1;
-  const minFreq = 70;   // Hz
+  const minFreq = 70; // Hz
   const maxFreq = 1400; // Hz
   const minPeriod = Math.floor(sampleRate / maxFreq); // ~34 at 48kHz
   const maxPeriod = Math.floor(sampleRate / minFreq); // ~686 at 48kHz
@@ -95,9 +95,9 @@ export function autoCorrelate(buffer, sampleRate) {
   // Step 1 & 2: Compute difference function and cumulative mean normalized difference
   const yinBuffer = new Float32Array(yinBufferSize);
   yinBuffer[0] = 1;
-  
+
   let runningSum = 0;
-  
+
   for (let tau = 1; tau < yinBufferSize; tau++) {
     let delta = 0;
     const windowSize = halfSize - tau;
@@ -105,7 +105,7 @@ export function autoCorrelate(buffer, sampleRate) {
       const diff = buffer[j] - buffer[j + tau];
       delta += diff * diff;
     }
-    
+
     runningSum += delta;
     yinBuffer[tau] = runningSum > 0 ? (delta * tau) / runningSum : 1;
   }
@@ -142,10 +142,10 @@ export function autoCorrelate(buffer, sampleRate) {
     const s0 = yinBuffer[tauEstimate - 1];
     const s1 = yinBuffer[tauEstimate];
     const s2 = yinBuffer[tauEstimate + 1];
-    
+
     const denom = s0 - 2 * s1 + s2;
     if (Math.abs(denom) > 1e-10) {
-      const adjustment = 0.5 * (s0 - s2) / denom;
+      const adjustment = (0.5 * (s0 - s2)) / denom;
       if (Math.abs(adjustment) < 1) {
         betterTau = tauEstimate + adjustment;
       }
