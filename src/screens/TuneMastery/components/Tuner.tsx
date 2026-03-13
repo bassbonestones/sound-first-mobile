@@ -21,8 +21,24 @@ import {
   noteNames,
 } from "../../../constants/notes";
 
+// Minor 7th system options
+export type Minor7System = "classical" | "pythagorean" | "harmonic";
+
+const MINOR_7TH_RATIOS: Record<Minor7System, number> = {
+  classical: 9 / 5, // ~1018 cents, +18 vs ET - Classical harmony
+  pythagorean: 16 / 9, // ~996 cents, +4 vs ET - Modal/melodic
+  harmonic: 7 / 4, // ~969 cents, -31 vs ET - Dominant 7 chords (natural harmonic series)
+};
+
+const MINOR_7TH_LABELS: Record<Minor7System, string> = {
+  classical: "9:5",
+  pythagorean: "16:9",
+  harmonic: "7:4",
+};
+
 // Just intonation ratios for chromatic scale degrees relative to tonic
 // Index corresponds to semitones above tonic
+// Note: Index 10 (minor 7th) will be overridden by the selected m7 system
 const JUST_RATIOS: number[] = [
   1, // 0: Unison (1/1)
   16 / 15, // 1: Minor 2nd
@@ -34,7 +50,7 @@ const JUST_RATIOS: number[] = [
   3 / 2, // 7: Perfect 5th
   8 / 5, // 8: Minor 6th
   5 / 3, // 9: Major 6th
-  9 / 5, // 10: Minor 7th
+  9 / 5, // 10: Minor 7th (default - will be overridden)
   15 / 8, // 11: Major 7th
 ];
 
@@ -65,6 +81,7 @@ function getJustIntonationFrequency(
   noteName: string | null,
   keyIndex: number,
   a4Frequency: number = 440,
+  minor7System: Minor7System = "pythagorean",
 ): number | null {
   if (!noteName) return null;
 
@@ -86,7 +103,11 @@ function getJustIntonationFrequency(
   const semitonesAboveTonic = (((noteIndex - keyIndex) % 12) + 12) % 12;
 
   // Get the just ratio for this scale degree
-  const justRatio = JUST_RATIOS[semitonesAboveTonic];
+  // Use the selected m7 system for minor 7th (semitones = 10)
+  const justRatio =
+    semitonesAboveTonic === 10
+      ? MINOR_7TH_RATIOS[minor7System]
+      : JUST_RATIOS[semitonesAboveTonic];
 
   // Find the tonic frequency for the correct octave
   // First, get the base tonic frequency in octave 4
@@ -127,7 +148,8 @@ function getJustIntonationFrequency(
 
   // Debug logging
   const keyName = KEY_DISPLAY_NAMES[keyIndex].split('/')[0];
-  console.log(`[JUST] note=${noteName}, key=${keyName}, noteIdx=${noteIndex}, keyIdx=${keyIndex}, semitones=${semitonesAboveTonic}, ratio=${justRatio.toFixed(4)}, tonicFreq=${tonicFreq.toFixed(2)}, equalTemp=${equalTempFreq?.toFixed(2)}, justFreq=${justFreq.toFixed(2)}`);
+  const m7Info = semitonesAboveTonic === 10 ? `, m7=${minor7System}` : "";
+  console.log(`[JUST] note=${noteName}, key=${keyName}, noteIdx=${noteIndex}, keyIdx=${keyIndex}, semitones=${semitonesAboveTonic}, ratio=${justRatio.toFixed(4)}, tonicFreq=${tonicFreq.toFixed(2)}, equalTemp=${equalTempFreq?.toFixed(2)}, justFreq=${justFreq.toFixed(2)}${m7Info}`);
 
   return justFreq;
 }
@@ -155,12 +177,14 @@ const Tuner = React.memo(function Tuner({
     useState<Temperament>(initialTemperament);
   const [selectedKeyIndex, setSelectedKeyIndex] = useState(initialKeyIndex); // 0 = C
   const [concertA, setConcertA] = useState(String(initialConcertA));
+  const [minor7System, setMinor7System] = useState<Minor7System>("pythagorean");
   const silenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Refs for callback to read current values (avoids stale closure in requestAnimationFrame loop)
   const selectedKeyIndexRef = useRef(initialKeyIndex);
   const activeTemperamentRef = useRef<Temperament>(initialTemperament);
   const concertARef = useRef(String(initialConcertA));
+  const minor7SystemRef = useRef<Minor7System>("pythagorean");
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -174,6 +198,10 @@ const Tuner = React.memo(function Tuner({
   useEffect(() => {
     concertARef.current = concertA;
   }, [concertA]);
+
+  useEffect(() => {
+    minor7SystemRef.current = minor7System;
+  }, [minor7System]);
 
   // Smoothing refs for reducing jitter
   const smoothedFrequencyRef = useRef<number | null>(null);
@@ -269,8 +297,9 @@ const Tuner = React.memo(function Tuner({
         
         let targetFreq: number | null = null;
         if (currentTemperament === "just") {
-          // Use just intonation frequency based on selected key
-          targetFreq = getJustIntonationFrequency(note, currentKeyIndex, a4);
+          // Use just intonation frequency based on selected key and m7 system
+          const currentM7System = minor7SystemRef.current;
+          targetFreq = getJustIntonationFrequency(note, currentKeyIndex, a4, currentM7System);
         } else {
           // Use noteToFrequency for equal temperament, scaled for custom A4
           const stdFreq = noteToFrequency(note);
@@ -782,6 +811,84 @@ const Tuner = React.memo(function Tuner({
           </View>
         </View>
       )}
+
+      {/* Minor 7th System Toggle (shown when Just Intonation is selected) */}
+      {activeTemperament === "just" && (
+        <View style={styles.m7SystemContainer}>
+          <Text style={styles.m7SystemLabel}>Minor 7th</Text>
+          <View style={styles.m7SystemToggle}>
+            <TouchableOpacity
+              onPress={() => setMinor7System("classical")}
+              style={[
+                styles.m7ButtonLeft,
+                minor7System === "classical"
+                  ? styles.m7ButtonActive
+                  : styles.m7ButtonInactive,
+              ]}
+              accessibilityLabel={`Classical 9:5${minor7System === "classical" ? ", selected" : ""}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: minor7System === "classical" }}
+            >
+              <Text
+                style={[
+                  styles.m7ButtonText,
+                  minor7System === "classical"
+                    ? styles.m7ButtonTextActive
+                    : styles.m7ButtonTextInactive,
+                ]}
+              >
+                9:5
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setMinor7System("pythagorean")}
+              style={[
+                styles.m7ButtonMiddle,
+                minor7System === "pythagorean"
+                  ? styles.m7ButtonActive
+                  : styles.m7ButtonInactive,
+              ]}
+              accessibilityLabel={`Pythagorean 16:9${minor7System === "pythagorean" ? ", selected" : ""}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: minor7System === "pythagorean" }}
+            >
+              <Text
+                style={[
+                  styles.m7ButtonText,
+                  minor7System === "pythagorean"
+                    ? styles.m7ButtonTextActive
+                    : styles.m7ButtonTextInactive,
+                ]}
+              >
+                16:9
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setMinor7System("harmonic")}
+              style={[
+                styles.m7ButtonRight,
+                minor7System === "harmonic"
+                  ? styles.m7ButtonActive
+                  : styles.m7ButtonInactive,
+              ]}
+              accessibilityLabel={`Harmonic 7:4${minor7System === "harmonic" ? ", selected" : ""}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: minor7System === "harmonic" }}
+            >
+              <Text
+                style={[
+                  styles.m7ButtonText,
+                  minor7System === "harmonic"
+                    ? styles.m7ButtonTextActive
+                    : styles.m7ButtonTextInactive,
+                ]}
+              >
+                7:4
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 });
@@ -965,6 +1072,61 @@ const styles = StyleSheet.create({
   },
   temperamentButtonTextInactive: {
     color: "#9C27B0",
+  },
+
+  // Minor 7th System Toggle (blue themed, 3-part)
+  m7SystemContainer: {
+    alignItems: "center",
+    marginTop: 12,
+  },
+  m7SystemLabel: {
+    color: "#64B5F6",
+    fontSize: 11,
+    marginBottom: 4,
+    fontWeight: "600",
+  },
+  m7SystemToggle: {
+    flexDirection: "row",
+  },
+  m7ButtonLeft: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderTopLeftRadius: 10,
+    borderBottomLeftRadius: 10,
+    borderWidth: 1,
+    borderColor: "#2196F3",
+  },
+  m7ButtonMiddle: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderLeftWidth: 0,
+    borderColor: "#2196F3",
+  },
+  m7ButtonRight: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
+    borderWidth: 1,
+    borderLeftWidth: 0,
+    borderColor: "#2196F3",
+  },
+  m7ButtonActive: {
+    backgroundColor: "#2196F3",
+  },
+  m7ButtonInactive: {
+    backgroundColor: "#1a2a3e",
+  },
+  m7ButtonText: {
+    fontSize: 11,
+    fontWeight: "bold",
+  },
+  m7ButtonTextActive: {
+    color: "#fff",
+  },
+  m7ButtonTextInactive: {
+    color: "#64B5F6",
   },
 
   // Concert A Input
