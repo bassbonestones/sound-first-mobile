@@ -85,6 +85,16 @@ export const CENTS_SMOOTHING = 0.1;
 export const MEDIAN_WINDOW_SIZE = 5;
 
 // ===========================================
+// SPRING NEEDLE CONSTANTS (Phase 1C)
+// ===========================================
+
+/** Spring tension for needle animation (higher = faster) */
+export const NEEDLE_SPRING_TENSION = 180;
+
+/** Spring friction for needle animation (higher = less bouncy) */
+export const NEEDLE_SPRING_FRICTION = 12;
+
+// ===========================================
 // FEATURE FLAGS
 // ===========================================
 
@@ -102,6 +112,8 @@ export const TUNER_FLAGS = {
   stateLanguage: true,
   /** Phase 1B.5 - Graduated color zones */
   graduatedColorZones: true,
+  /** Phase 1C.1 - Spring needle easing (overshoot + settle) */
+  springNeedle: true,
   /** Phase 1C - Pitch drift trail (deferred) */
   driftTrail: false,
   /** Phase 1C - Coaching text (deferred) */

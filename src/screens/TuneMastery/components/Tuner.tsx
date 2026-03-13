@@ -62,6 +62,8 @@ import {
   CENTS_SMOOTHING,
   MEDIAN_WINDOW_SIZE,
   STABILITY_WINDOW_MS,
+  NEEDLE_SPRING_TENSION,
+  NEEDLE_SPRING_FRICTION,
 } from "./Tuner/tunerConstants";
 
 // Minor 7th system options
@@ -254,6 +256,9 @@ const Tuner = React.memo(function Tuner({
   // Lock glow animation (Phase 1 UX)
   const lockGlowAnim = useRef(new Animated.Value(0)).current;
   const wasLockedRef = useRef(false);
+
+  // Spring needle animation (Phase 1C)
+  const needleRotationAnim = useRef(new Animated.Value(0)).current;
 
   // Smoothing refs for reducing jitter
   const smoothedFrequencyRef = useRef<number | null>(null);
@@ -516,6 +521,22 @@ const Tuner = React.memo(function Tuner({
     return (clampedCents / 50) * 90;
   };
 
+  // Spring needle animation - gives physical feeling of inertia (Phase 1C)
+  const targetRotation = getNeedleRotation();
+  useEffect(() => {
+    if (TUNER_FLAGS.springNeedle) {
+      Animated.spring(needleRotationAnim, {
+        toValue: targetRotation,
+        tension: NEEDLE_SPRING_TENSION,
+        friction: NEEDLE_SPRING_FRICTION,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      // Instant rotation when spring is disabled
+      needleRotationAnim.setValue(targetRotation);
+    }
+  }, [targetRotation, needleRotationAnim]);
+
   return (
     <View style={styles.container}>
       {/* Error Message */}
@@ -748,18 +769,27 @@ const Tuner = React.memo(function Tuner({
                 )}
               </Svg>
 
-              {/* Needle - rotates around bottom center */}
+              {/* Needle - rotates around bottom center with spring physics */}
               <View style={styles.needlePivotBase}>
-                <View
+                <Animated.View
                   style={[
                     styles.needleRotator,
-                    { transform: [{ rotate: `${getNeedleRotation()}deg` }] },
+                    {
+                      transform: [
+                        {
+                          rotate: needleRotationAnim.interpolate({
+                            inputRange: [-90, 90],
+                            outputRange: ["-90deg", "90deg"],
+                          }),
+                        },
+                      ],
+                    },
                   ]}
                 >
                   <View
                     style={[styles.needle, { backgroundColor: "#FFFFFF" }]}
                   />
-                </View>
+                </Animated.View>
                 {Math.abs(cents) <= 5 && currentNote ? (
                   <View style={styles.smileyContainer}>
                     <Svg width={24} height={24}>
