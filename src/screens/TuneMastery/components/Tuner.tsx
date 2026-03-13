@@ -1029,9 +1029,10 @@ const Tuner = React.memo(function Tuner({
                 accessibilityRole="button"
               >
                 <View style={styles.feedbackContent}>
-                  {feedbackMode === 0 && currentNote && (
+                  {feedbackMode === 0 &&
+                    currentNote &&
                     // Mode 0: Deviation (60¢ SHARP / PERFECT)
-                    TUNER_FLAGS.stateLanguage ? (
+                    (TUNER_FLAGS.stateLanguage ? (
                       <Text style={[styles.stateText, { color: tuneColor }]}>
                         {stateText}
                       </Text>
@@ -1040,11 +1041,12 @@ const Tuner = React.memo(function Tuner({
                         {cents > 0 ? "+" : ""}
                         {cents} cents
                       </Text>
-                    )
-                  )}
-                  {feedbackMode === 1 && currentNote && !isDetectingPhase(tunerState) && (
+                    ))}
+                  {feedbackMode === 1 &&
+                    currentNote &&
+                    !isDetectingPhase(tunerState) &&
                     // Mode 1: Guidance (Lower pitch a lot)
-                    directionalGuidance.text ? (
+                    (directionalGuidance.text ? (
                       <Text
                         style={[
                           styles.guidanceText,
@@ -1062,34 +1064,37 @@ const Tuner = React.memo(function Tuner({
                       <Text style={[styles.guidanceText, { color: "#4CAF50" }]}>
                         On target
                       </Text>
-                    )
-                  )}
-                  {feedbackMode === 2 && currentNote && !isDetectingPhase(tunerState) && (
-                    // Mode 2: Stability (STABLE / DRIFTING / UNSTABLE)
-                    <View style={styles.stabilityContent}>
-                      <View
-                        style={[
-                          styles.stabilityDot,
-                          { backgroundColor: stabilityColor },
-                        ]}
-                      />
-                      <Text
-                        style={[
-                          styles.stabilityLabel,
-                          { color: stabilityColor },
-                        ]}
-                      >
-                        {tunerState.stability.isStable
-                          ? "STABLE"
-                          : tunerState.stability.isModerate
-                            ? "DRIFTING"
-                            : "UNSTABLE"}
-                      </Text>
-                    </View>
-                  )}
-                  {feedbackMode === 3 && currentNote && !isDetectingPhase(tunerState) && (
+                    ))}
+                  {feedbackMode === 2 &&
+                    currentNote &&
+                    !isDetectingPhase(tunerState) && (
+                      // Mode 2: Stability (STABLE / DRIFTING / UNSTABLE)
+                      <View style={styles.stabilityContent}>
+                        <View
+                          style={[
+                            styles.stabilityDot,
+                            { backgroundColor: stabilityColor },
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.stabilityLabel,
+                            { color: stabilityColor },
+                          ]}
+                        >
+                          {tunerState.stability.isStable
+                            ? "STABLE"
+                            : tunerState.stability.isModerate
+                              ? "DRIFTING"
+                              : "UNSTABLE"}
+                        </Text>
+                      </View>
+                    )}
+                  {feedbackMode === 3 &&
+                    currentNote &&
+                    !isDetectingPhase(tunerState) &&
                     // Mode 3: Tendency (Strong sharp tendency)
-                    directionBias.biasText ? (
+                    (directionBias.biasText ? (
                       <Text
                         style={[
                           styles.biasIndicator,
@@ -1107,12 +1112,15 @@ const Tuner = React.memo(function Tuner({
                       <Text style={[styles.biasIndicator, { color: "#888" }]}>
                         No tendency yet
                       </Text>
-                    )
-                  )}
+                    ))}
                   {!currentNote && (
                     <Text style={styles.feedbackPlaceholder}>
                       <Text style={styles.feedbackModeName}>
-                        {["Deviation", "Guidance", "Stability", "Tendency"][feedbackMode]}
+                        {
+                          ["Deviation", "Guidance", "Stability", "Tendency"][
+                            feedbackMode
+                          ]
+                        }
                       </Text>
                       {" — Waiting for pitch..."}
                     </Text>
@@ -1215,9 +1223,10 @@ const Tuner = React.memo(function Tuner({
               accessibilityRole="button"
             >
               <View style={styles.feedbackContent}>
-                {feedbackMode === 0 && currentNote && (
+                {feedbackMode === 0 &&
+                  currentNote &&
                   // Mode 0: Deviation
-                  TUNER_FLAGS.stateLanguage ? (
+                  (TUNER_FLAGS.stateLanguage ? (
                     <Text style={[styles.textCents, { color: tuneColor }]}>
                       {stateText}
                     </Text>
@@ -1226,11 +1235,12 @@ const Tuner = React.memo(function Tuner({
                       {cents > 0 ? "+" : ""}
                       {cents} cents
                     </Text>
-                  )
-                )}
-                {feedbackMode === 1 && currentNote && !isDetectingPhase(tunerState) && (
+                  ))}
+                {feedbackMode === 1 &&
+                  currentNote &&
+                  !isDetectingPhase(tunerState) &&
                   // Mode 1: Guidance
-                  directionalGuidance.text ? (
+                  (directionalGuidance.text ? (
                     <Text
                       style={[
                         styles.guidanceText,
@@ -1248,31 +1258,37 @@ const Tuner = React.memo(function Tuner({
                     <Text style={[styles.guidanceText, { color: "#4CAF50" }]}>
                       On target
                     </Text>
-                  )
-                )}
-                {feedbackMode === 2 && currentNote && !isDetectingPhase(tunerState) && (
-                  // Mode 2: Stability
-                  <View style={styles.stabilityContent}>
-                    <View
-                      style={[
-                        styles.stabilityDot,
-                        { backgroundColor: stabilityColor },
-                      ]}
-                    />
-                    <Text
-                      style={[styles.stabilityLabel, { color: stabilityColor }]}
-                    >
-                      {tunerState.stability.isStable
-                        ? "STABLE"
-                        : tunerState.stability.isModerate
-                          ? "DRIFTING"
-                          : "UNSTABLE"}
-                    </Text>
-                  </View>
-                )}
-                {feedbackMode === 3 && currentNote && !isDetectingPhase(tunerState) && (
+                  ))}
+                {feedbackMode === 2 &&
+                  currentNote &&
+                  !isDetectingPhase(tunerState) && (
+                    // Mode 2: Stability
+                    <View style={styles.stabilityContent}>
+                      <View
+                        style={[
+                          styles.stabilityDot,
+                          { backgroundColor: stabilityColor },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.stabilityLabel,
+                          { color: stabilityColor },
+                        ]}
+                      >
+                        {tunerState.stability.isStable
+                          ? "STABLE"
+                          : tunerState.stability.isModerate
+                            ? "DRIFTING"
+                            : "UNSTABLE"}
+                      </Text>
+                    </View>
+                  )}
+                {feedbackMode === 3 &&
+                  currentNote &&
+                  !isDetectingPhase(tunerState) &&
                   // Mode 3: Tendency
-                  directionBias.biasText ? (
+                  (directionBias.biasText ? (
                     <Text
                       style={[
                         styles.biasIndicator,
@@ -1290,12 +1306,15 @@ const Tuner = React.memo(function Tuner({
                     <Text style={[styles.biasIndicator, { color: "#888" }]}>
                       No tendency yet
                     </Text>
-                  )
-                )}
+                  ))}
                 {!currentNote && (
                   <Text style={styles.feedbackPlaceholder}>
                     <Text style={styles.feedbackModeName}>
-                      {["Deviation", "Guidance", "Stability", "Tendency"][feedbackMode]}
+                      {
+                        ["Deviation", "Guidance", "Stability", "Tendency"][
+                          feedbackMode
+                        ]
+                      }
                     </Text>
                     {" — Waiting for pitch..."}
                   </Text>
@@ -1391,38 +1410,40 @@ const Tuner = React.memo(function Tuner({
           {challengeState.status === "idle" ? (
             // Challenge start UI
             <View style={styles.challengeStartContent}>
-              <Text style={styles.challengePanelTitle}>Target Tone Challenge</Text>
+              <Text style={styles.challengePanelTitle}>
+                Target Tone Challenge
+              </Text>
               <View style={styles.challengeDifficultyRow}>
-                {(Object.keys(CHALLENGE_DIFFICULTIES) as ChallengeDifficulty[]).map(
-                  (difficulty) => (
-                    <TouchableOpacity
-                      key={difficulty}
-                      onPress={() => {
-                        if (difficulty !== challengeDifficulty) {
-                          setChallengeDifficulty(difficulty);
-                          setChallengeState(createInitialChallengeState());
-                        }
-                      }}
+                {(
+                  Object.keys(CHALLENGE_DIFFICULTIES) as ChallengeDifficulty[]
+                ).map((difficulty) => (
+                  <TouchableOpacity
+                    key={difficulty}
+                    onPress={() => {
+                      if (difficulty !== challengeDifficulty) {
+                        setChallengeDifficulty(difficulty);
+                        setChallengeState(createInitialChallengeState());
+                      }
+                    }}
+                    style={[
+                      styles.challengeDifficultyButton,
+                      challengeDifficulty === difficulty &&
+                        styles.challengeDifficultyButtonActive,
+                    ]}
+                    accessibilityLabel={`${difficulty} difficulty${challengeDifficulty === difficulty ? ", selected" : ""}`}
+                    accessibilityRole="button"
+                  >
+                    <Text
                       style={[
-                        styles.challengeDifficultyButton,
+                        styles.challengeDifficultyText,
                         challengeDifficulty === difficulty &&
-                          styles.challengeDifficultyButtonActive,
+                          styles.challengeDifficultyTextActive,
                       ]}
-                      accessibilityLabel={`${difficulty} difficulty${challengeDifficulty === difficulty ? ", selected" : ""}`}
-                      accessibilityRole="button"
                     >
-                      <Text
-                        style={[
-                          styles.challengeDifficultyText,
-                          challengeDifficulty === difficulty &&
-                            styles.challengeDifficultyTextActive,
-                        ]}
-                      >
-                        {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  ),
-                )}
+                      {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
               <TouchableOpacity
                 onPress={() => {
@@ -1430,13 +1451,17 @@ const Tuner = React.memo(function Tuner({
                     DEFAULT_CHALLENGE_NOTES,
                     challengeDifficulty,
                   );
-                  setChallengeState(startChallenge(challengeState, newChallenge));
+                  setChallengeState(
+                    startChallenge(challengeState, newChallenge),
+                  );
                 }}
                 style={styles.challengeStartButton}
                 accessibilityLabel="Start challenge"
                 accessibilityRole="button"
               >
-                <Text style={styles.challengeStartButtonText}>Start Challenge</Text>
+                <Text style={styles.challengeStartButtonText}>
+                  Start Challenge
+                </Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -1455,7 +1480,12 @@ const Tuner = React.memo(function Tuner({
                       DEFAULT_CHALLENGE_NOTES,
                       challengeDifficulty,
                     );
-                    setChallengeState(startChallenge(cancelChallenge(challengeState), newChallenge));
+                    setChallengeState(
+                      startChallenge(
+                        cancelChallenge(challengeState),
+                        newChallenge,
+                      ),
+                    );
                   }}
                   style={styles.challengeSkipButton}
                   accessibilityLabel="Skip to next note"
@@ -1464,7 +1494,9 @@ const Tuner = React.memo(function Tuner({
                   <Text style={styles.challengeSkipText}>Skip</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => setChallengeState(cancelChallenge(challengeState))}
+                  onPress={() =>
+                    setChallengeState(cancelChallenge(challengeState))
+                  }
                   style={styles.challengeStopButton}
                   accessibilityLabel="Stop challenge"
                   accessibilityRole="button"
@@ -1472,7 +1504,7 @@ const Tuner = React.memo(function Tuner({
                   <Text style={styles.challengeStopText}>Stop</Text>
                 </TouchableOpacity>
               </View>
-              
+
               {challengeState.target && (
                 <View style={styles.challengeTargetDisplay}>
                   <Text style={styles.challengeTargetNote}>
@@ -1493,19 +1525,22 @@ const Tuner = React.memo(function Tuner({
               </View>
 
               {/* Progress bar */}
-              {challengeState.target && (challengeState.status === "waiting" || challengeState.status === "holding") && (
-                <View style={styles.challengeProgressBar}>
-                  <View
-                    style={[
-                      styles.challengeProgressFill,
-                      {
-                        width: `${Math.min(100, challengeState.progress * 100)}%`,
-                        backgroundColor: getChallengeProgressColor(challengeState),
-                      },
-                    ]}
-                  />
-                </View>
-              )}
+              {challengeState.target &&
+                (challengeState.status === "waiting" ||
+                  challengeState.status === "holding") && (
+                  <View style={styles.challengeProgressBar}>
+                    <View
+                      style={[
+                        styles.challengeProgressFill,
+                        {
+                          width: `${Math.min(100, challengeState.progress * 100)}%`,
+                          backgroundColor:
+                            getChallengeProgressColor(challengeState),
+                        },
+                      ]}
+                    />
+                  </View>
+                )}
 
               {/* Success/Fail actions */}
               {(challengeState.status === "success" ||
@@ -1540,7 +1575,9 @@ const Tuner = React.memo(function Tuner({
                   accessibilityRole="button"
                 >
                   <Text style={styles.challengeNextButtonText}>
-                    {challengeState.status === "success" ? "Next →" : "Try Again"}
+                    {challengeState.status === "success"
+                      ? "Next →"
+                      : "Try Again"}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -1681,7 +1718,8 @@ const Tuner = React.memo(function Tuner({
                                 key={keyName}
                                 style={[
                                   styles.keyOption,
-                                  selectedKeyIndex === index && styles.keyOptionActive,
+                                  selectedKeyIndex === index &&
+                                    styles.keyOptionActive,
                                 ]}
                                 onPress={() => setSelectedKeyIndex(index)}
                                 accessibilityLabel={`Key of ${keyName}`}
