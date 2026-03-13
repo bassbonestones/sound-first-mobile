@@ -122,34 +122,31 @@ describe("PracticePanel", () => {
     });
   });
 
-  describe("Tool Circles", () => {
-    it("renders tuner circle", () => {
+  describe("Tool Buttons", () => {
+    it("renders tuner button", () => {
       const { getByText, getByRole } = render(
         <PracticePanel {...defaultProps} />,
       );
 
       expect(getByText("🎯")).toBeTruthy();
-      expect(getByText("Tuner")).toBeTruthy();
       expect(getByRole("button", { name: /expand tuner/i })).toBeTruthy();
     });
 
-    it("renders metronome circle", () => {
+    it("renders metronome button", () => {
       const { getByText, getByRole } = render(
         <PracticePanel {...defaultProps} />,
       );
 
       expect(getByText("🥁")).toBeTruthy();
-      expect(getByText("Metro")).toBeTruthy();
       expect(getByRole("button", { name: /expand metronome/i })).toBeTruthy();
     });
 
-    it("renders drone circle", () => {
+    it("renders drone button", () => {
       const { getByText, getByRole } = render(
         <PracticePanel {...defaultProps} />,
       );
 
       expect(getByText("🎵")).toBeTruthy();
-      expect(getByText("Drone")).toBeTruthy();
       expect(getByRole("button", { name: /expand drone/i })).toBeTruthy();
     });
 

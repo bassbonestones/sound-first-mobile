@@ -309,192 +309,147 @@ export default function PracticePanel({
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Header - wraps to two lines on small screens */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={onCancel}
-          accessibilityLabel="Cancel practice"
-          accessibilityRole="button"
-        >
-          <Text style={styles.cancelButtonText}>←</Text>
-        </TouchableOpacity>
-        <View style={styles.titleContainer}>
-          <Text style={styles.practiceTitle}>{tuneName}</Text>
-          <Text style={styles.practiceKey}>in {tuneKey}</Text>
-        </View>
-        {/* Mute and Volume buttons in header - visible when any tool is active */}
-        {metronomeActive || droneActive ? (
-          <View style={styles.headerButtonsContainer}>
-            {/* Volume button */}
+        <View style={styles.headerTopRow}>
+          {/* Title group stays left-aligned */}
+          <View style={styles.headerTitleGroup}>
             <TouchableOpacity
-              onPress={() => setShowVolumeModal(true)}
-              activeOpacity={0.5}
-              style={styles.headerVolumeButton}
-              accessibilityLabel="Adjust volume"
+              style={styles.cancelButton}
+              onPress={onCancel}
+              accessibilityLabel="Cancel practice"
               accessibilityRole="button"
             >
-              <Text style={styles.headerMuteButtonText}>🎚️</Text>
+              <Text style={styles.cancelButtonText}>←</Text>
             </TouchableOpacity>
-            {/* Mute button */}
+            <View style={styles.titleContainer}>
+              <Text style={styles.practiceTitle} numberOfLines={1}>{tuneName}</Text>
+              <Text style={styles.practiceKey}>in {tuneKey}</Text>
+            </View>
+          </View>
+          {/* Tool Buttons - stay right-aligned */}
+          <View style={styles.headerToolsRow}>
+            {/* Tuner */}
             <TouchableOpacity
               style={[
-                styles.headerMuteButton,
-                audioMuted && styles.headerMuteButtonActive,
+                styles.headerToolButton,
+                tunerExpanded && styles.headerToolButtonActive,
               ]}
               onPress={() => {
-                setAudioMuted((prev) => !prev);
+                const willExpand = !tunerExpanded;
+                setTunerExpanded(willExpand);
+                if (willExpand) {
+                  setMetronomeExpanded(false);
+                  setDroneExpanded(false);
+                  setAudioMuted(true);
+                }
               }}
-              activeOpacity={0.5}
-              accessibilityLabel={audioMuted ? "Unmute" : "Mute"}
+              accessibilityLabel={tunerExpanded ? "Collapse tuner" : "Expand tuner"}
               accessibilityRole="button"
             >
-              <Text style={styles.headerMuteButtonText}>
-                {audioMuted ? "🔇" : "🔊"}
-              </Text>
+              <Text style={styles.headerToolEmoji}>🎯</Text>
             </TouchableOpacity>
+            {/* Metronome */}
+            <TouchableOpacity
+              style={[
+                styles.headerToolButton,
+                (metronomeExpanded || metronomeActive) && styles.headerToolButtonMetronome,
+              ]}
+              onPress={() => {
+                if (!metronomeActive) {
+                  setMetronomeActive(true);
+                  setMetronomeExpanded(true);
+                  setTunerExpanded(false);
+                  setDroneExpanded(false);
+                } else {
+                  const willExpand = !metronomeExpanded;
+                  setMetronomeExpanded(willExpand);
+                  if (willExpand) {
+                    setTunerExpanded(false);
+                    setDroneExpanded(false);
+                  }
+                }
+              }}
+              onLongPress={() => {
+                setMetronomeActive(false);
+                setMetronomeExpanded(false);
+              }}
+              accessibilityLabel={metronomeExpanded ? "Collapse metronome" : "Expand metronome"}
+              accessibilityRole="button"
+            >
+              <Text style={styles.headerToolEmoji}>🥁</Text>
+            </TouchableOpacity>
+            {/* Drone */}
+            <TouchableOpacity
+              style={[
+                styles.headerToolButton,
+                (droneExpanded || droneActive) && styles.headerToolButtonDrone,
+              ]}
+              onPress={() => {
+                if (!droneActive) {
+                  setDroneActive(true);
+                  setDroneExpanded(true);
+                  setTunerExpanded(false);
+                  setMetronomeExpanded(false);
+                } else {
+                  const willExpand = !droneExpanded;
+                  setDroneExpanded(willExpand);
+                  if (willExpand) {
+                    setTunerExpanded(false);
+                    setMetronomeExpanded(false);
+                  }
+                }
+              }}
+              onLongPress={() => {
+                setDroneActive(false);
+                setDroneExpanded(false);
+              }}
+              accessibilityLabel={droneExpanded ? "Collapse drone" : "Expand drone"}
+              accessibilityRole="button"
+            >
+              <Text style={styles.headerToolEmoji}>🎵</Text>
+            </TouchableOpacity>
+            {/* Gold divider + Volume/Mute - only when metronome or drone active */}
+            {(metronomeActive || droneActive) && (
+              <>
+                <View style={styles.headerToolDivider} />
+                <TouchableOpacity
+                  onPress={() => setShowVolumeModal(true)}
+                  style={styles.headerToolButton}
+                  accessibilityLabel="Adjust volume"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.headerToolEmoji}>🎚️</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.headerToolButton,
+                    audioMuted && styles.headerToolButtonMuted,
+                  ]}
+                  onPress={() => setAudioMuted((prev) => !prev)}
+                  accessibilityLabel={audioMuted ? "Unmute" : "Mute"}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.headerToolEmoji}>{audioMuted ? "🔇" : "🔊"}</Text>
+                </TouchableOpacity>
+              </>
+          )}
           </View>
-        ) : (
-          <View style={styles.headerSpacer} />
-        )}
+        </View>
       </View>
 
       <ScrollView
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
       >
-        {/* Focus Card */}
-        <View style={styles.focusCard}>
-          <Text style={styles.focusCardCategory}>{focusCard.category}</Text>
-          <Text style={styles.focusCardName}>{focusCard.name}</Text>
-          <Text style={styles.focusCardCue}>{focusCard.attention_cue}</Text>
-        </View>
-
-        {/* Tool Circles Row */}
-        <View style={styles.toolsRow}>
-          {/* Tuner Circle */}
-          <TouchableOpacity
-            style={[
-              styles.toolCircle,
-              tunerExpanded && styles.toolCircleActive,
-            ]}
-            onPress={() => {
-              const willExpand = !tunerExpanded;
-              setTunerExpanded(willExpand);
-              if (willExpand) {
-                // Close other tools when tuner opens
-                setMetronomeExpanded(false);
-                setDroneExpanded(false);
-                // Mute audio so tuner can listen clearly
-                setAudioMuted(true);
-              }
-            }}
-            accessibilityLabel={
-              tunerExpanded ? "Collapse tuner" : "Expand tuner"
-            }
-            accessibilityRole="button"
-          >
-            <Text style={styles.toolCircleEmoji}>🎯</Text>
-            <Text
-              style={[
-                styles.toolCircleLabel,
-                tunerExpanded && styles.toolCircleLabelActive,
-              ]}
-            >
-              Tuner
-            </Text>
-          </TouchableOpacity>
-
-          {/* Metronome Circle */}
-          <TouchableOpacity
-            style={[
-              styles.toolCircle,
-              (metronomeExpanded || metronomeActive) &&
-                styles.toolCircleMetronomeActive,
-            ]}
-            onPress={() => {
-              if (!metronomeActive) {
-                setMetronomeActive(true);
-                setMetronomeExpanded(true);
-                // Close other tools when metronome opens
-                setTunerExpanded(false);
-                setDroneExpanded(false);
-              } else {
-                const willExpand = !metronomeExpanded;
-                setMetronomeExpanded(willExpand);
-                if (willExpand) {
-                  // Close other tools when metronome panel expands
-                  setTunerExpanded(false);
-                  setDroneExpanded(false);
-                }
-              }
-            }}
-            onLongPress={() => {
-              // Long press to stop metronome
-              setMetronomeActive(false);
-              setMetronomeExpanded(false);
-            }}
-            accessibilityLabel={
-              metronomeExpanded ? "Collapse metronome" : "Expand metronome"
-            }
-            accessibilityRole="button"
-          >
-            <Text style={styles.toolCircleEmoji}>🥁</Text>
-            <Text
-              style={[
-                styles.toolCircleLabel,
-                (metronomeExpanded || metronomeActive) &&
-                  styles.toolCircleLabelActive,
-              ]}
-            >
-              Metro
-            </Text>
-          </TouchableOpacity>
-
-          {/* Drone Circle */}
-          <TouchableOpacity
-            style={[
-              styles.toolCircle,
-              (droneExpanded || droneActive) && styles.toolCircleDroneActive,
-            ]}
-            onPress={() => {
-              if (!droneActive) {
-                setDroneActive(true);
-                setDroneExpanded(true);
-                // Close other tools when drone opens
-                setTunerExpanded(false);
-                setMetronomeExpanded(false);
-              } else {
-                const willExpand = !droneExpanded;
-                setDroneExpanded(willExpand);
-                if (willExpand) {
-                  // Close other tools when drone panel expands
-                  setTunerExpanded(false);
-                  setMetronomeExpanded(false);
-                }
-              }
-            }}
-            onLongPress={() => {
-              // Long press to stop drone
-              setDroneActive(false);
-              setDroneExpanded(false);
-            }}
-            accessibilityLabel={
-              droneExpanded ? "Collapse drone" : "Expand drone"
-            }
-            accessibilityRole="button"
-          >
-            <Text style={styles.toolCircleEmoji}>🎵</Text>
-            <Text
-              style={[
-                styles.toolCircleLabel,
-                (droneExpanded || droneActive) && styles.toolCircleLabelActive,
-              ]}
-            >
-              Drone
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {/* Focus Card - hidden when any tool is expanded */}
+        {!(tunerExpanded || metronomeExpanded || droneExpanded) && (
+          <View style={styles.focusCard}>
+            <Text style={styles.focusCardCategory}>{focusCard.category}</Text>
+            <Text style={styles.focusCardName}>{focusCard.name}</Text>
+            <Text style={styles.focusCardCue}>{focusCard.attention_cue}</Text>
+          </View>
+        )}
 
         {/* Expanded Tool Panels */}
         {tunerExpanded && (
@@ -707,65 +662,91 @@ const styles = StyleSheet.create({
     backgroundColor: "#1a1a2e",
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#3a3a4e",
     backgroundColor: "#2a2a3e",
   },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    rowGap: 8,
+  },
+  headerTitleGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 80,
+  },
   cancelButton: {
-    padding: 8,
-    marginRight: 8,
+    padding: 6,
+    marginRight: 4,
   },
   cancelButtonText: {
     color: "#FFD700",
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "bold",
   },
   titleContainer: {
-    flex: 1,
-    alignItems: "center",
+    flexShrink: 1,
+    minWidth: 60,
+    alignItems: "flex-start",
+    marginLeft: 4,
   },
   practiceTitle: {
     color: "#FFFFFF",
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "bold",
   },
   practiceKey: {
     color: "#FFD700",
-    fontSize: 16,
-    marginTop: 2,
+    fontSize: 12,
+    marginTop: 1,
   },
-  headerSpacer: {
-    width: 88, // matches two buttons + gap
-  },
-  headerButtonsContainer: {
+  headerToolsRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 4,
+    marginLeft: "auto",
   },
-  headerVolumeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#333",
+  headerToolButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#3a3a4e",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#4a4a5e",
   },
-  headerMuteButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#333",
-    justifyContent: "center",
-    alignItems: "center",
+  headerToolButtonActive: {
+    backgroundColor: "#4a4a6e",
+    borderColor: "#FFD700",
   },
-  headerMuteButtonActive: {
+  headerToolButtonMetronome: {
+    backgroundColor: "#9C27B0",
+    borderColor: "#9C27B0",
+  },
+  headerToolButtonDrone: {
+    backgroundColor: "#00BCD4",
+    borderColor: "#00BCD4",
+  },
+  headerToolButtonMuted: {
     backgroundColor: "#ff6b6b",
+    borderColor: "#ff6b6b",
   },
-  headerMuteButtonText: {
+  headerToolEmoji: {
     fontSize: 20,
+  },
+  headerToolDivider: {
+    width: 2,
+    height: 28,
+    backgroundColor: "#FFD700",
+    marginHorizontal: 4,
+    borderRadius: 1,
   },
 
   // Content
@@ -804,47 +785,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
     lineHeight: 22,
-  },
-
-  // Tool Circles Row
-  toolsRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 20,
-    marginBottom: 20,
-  },
-  toolCircle: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: "#3a3a4e",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#4a4a5e",
-  },
-  toolCircleActive: {
-    backgroundColor: "#4a4a6e",
-    borderColor: "#FFD700",
-  },
-  toolCircleMetronomeActive: {
-    backgroundColor: "#9C27B0",
-    borderColor: "#9C27B0",
-  },
-  toolCircleDroneActive: {
-    backgroundColor: "#00BCD4",
-    borderColor: "#00BCD4",
-  },
-  toolCircleEmoji: {
-    fontSize: 24,
-  },
-  toolCircleLabel: {
-    color: "#888",
-    fontSize: 10,
-    marginTop: 2,
-  },
-  toolCircleLabelActive: {
-    color: "#FFFFFF",
   },
 
   // Tool Panels
