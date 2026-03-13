@@ -16,6 +16,8 @@ import {
   COLOR_ZONE_IN_TUNE,
   COLOR_ZONE_YELLOW,
   TUNER_COLORS,
+  DIRECTION_BIAS_MIN_SAMPLES,
+  DIRECTION_BIAS_THRESHOLD,
 } from "./tunerConstants";
 
 // ===========================================
@@ -245,4 +247,79 @@ export function getMedian(arr: number[]): number {
   return sorted.length % 2 !== 0
     ? sorted[mid]
     : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+// ===========================================
+// DIRECTION BIAS (Phase 1C)
+// ===========================================
+
+export type BiasDirection = "sharp" | "flat" | "neutral";
+
+export interface DirectionBiasResult {
+  /** Mean cents value over the window */
+  meanCents: number;
+  /** Direction of bias: 'sharp', 'flat', or 'neutral' */
+  direction: BiasDirection;
+  /** Human-readable text like "Slight sharp tendency" */
+  biasText: string | null;
+  /** Whether there's enough data to show bias */
+  hasEnoughData: boolean;
+}
+
+/**
+ * Compute direction bias from a history of cents values.
+ * Shows habitual sharp/flat tendency to help players self-correct.
+ *
+ * @param centsHistory - Array of recent cents values (typically last ~5 seconds)
+ * @returns DirectionBiasResult with mean, direction, and display text
+ */
+export function computeDirectionBias(
+  centsHistory: number[],
+): DirectionBiasResult {
+  // Need enough samples to be meaningful
+  if (centsHistory.length < DIRECTION_BIAS_MIN_SAMPLES) {
+    return {
+      meanCents: 0,
+      direction: "neutral",
+      biasText: null,
+      hasEnoughData: false,
+    };
+  }
+
+  // Calculate mean cents
+  const sum = centsHistory.reduce((acc, val) => acc + val, 0);
+  const meanCents = sum / centsHistory.length;
+
+  // Determine direction and text
+  const absMean = Math.abs(meanCents);
+
+  if (absMean < DIRECTION_BIAS_THRESHOLD) {
+    return {
+      meanCents,
+      direction: "neutral",
+      biasText: null,
+      hasEnoughData: true,
+    };
+  }
+
+  const direction: BiasDirection = meanCents > 0 ? "sharp" : "flat";
+
+  // Graduated bias text based on severity
+  let biasText: string;
+  if (absMean < 5) {
+    biasText =
+      direction === "sharp" ? "Slight sharp tendency" : "Slight flat tendency";
+  } else if (absMean < 10) {
+    biasText = direction === "sharp" ? "Sharp tendency" : "Flat tendency";
+  } else {
+    biasText =
+      direction === "sharp" ? "Strong sharp tendency" : "Strong flat tendency";
+  }
+
+  return {
+    meanCents,
+    direction,
+    biasText,
+    hasEnoughData: true,
+  };
 }

@@ -17,6 +17,7 @@ import {
   isCentered,
   isPerfect,
   getMedian,
+  computeDirectionBias,
 } from "../src/screens/TuneMastery/components/Tuner/tunerHelpers";
 import { TUNER_COLORS } from "../src/screens/TuneMastery/components/Tuner/tunerConstants";
 
@@ -289,6 +290,102 @@ describe("tunerHelpers", () => {
 
     it("handles negative values", () => {
       expect(getMedian([-5, -3, -1])).toBe(-3);
+    });
+  });
+
+  describe("computeDirectionBias", () => {
+    it("returns not enough data for empty array", () => {
+      const result = computeDirectionBias([]);
+      expect(result.hasEnoughData).toBe(false);
+      expect(result.biasText).toBeNull();
+      expect(result.direction).toBe("neutral");
+    });
+
+    it("returns not enough data for array below minimum samples", () => {
+      const result = computeDirectionBias([5, 5, 5, 5, 5]); // Only 5 samples
+      expect(result.hasEnoughData).toBe(false);
+      expect(result.biasText).toBeNull();
+    });
+
+    it("returns neutral for balanced cents around zero", () => {
+      // 15+ samples with mean near zero
+      const samples = Array(20)
+        .fill(0)
+        .map((_, i) => (i % 2 === 0 ? 1 : -1));
+      const result = computeDirectionBias(samples);
+      expect(result.hasEnoughData).toBe(true);
+      expect(result.direction).toBe("neutral");
+      expect(result.biasText).toBeNull();
+    });
+
+    it("detects slight sharp tendency", () => {
+      // 20 samples averaging around +4 cents
+      const samples = Array(20).fill(4);
+      const result = computeDirectionBias(samples);
+      expect(result.hasEnoughData).toBe(true);
+      expect(result.direction).toBe("sharp");
+      expect(result.biasText).toBe("Slight sharp tendency");
+      expect(result.meanCents).toBe(4);
+    });
+
+    it("detects slight flat tendency", () => {
+      // 20 samples averaging around -4 cents
+      const samples = Array(20).fill(-4);
+      const result = computeDirectionBias(samples);
+      expect(result.hasEnoughData).toBe(true);
+      expect(result.direction).toBe("flat");
+      expect(result.biasText).toBe("Slight flat tendency");
+      expect(result.meanCents).toBe(-4);
+    });
+
+    it("detects sharp tendency for moderate bias", () => {
+      // Mean around +7 cents
+      const samples = Array(20).fill(7);
+      const result = computeDirectionBias(samples);
+      expect(result.direction).toBe("sharp");
+      expect(result.biasText).toBe("Sharp tendency");
+    });
+
+    it("detects flat tendency for moderate bias", () => {
+      // Mean around -7 cents
+      const samples = Array(20).fill(-7);
+      const result = computeDirectionBias(samples);
+      expect(result.direction).toBe("flat");
+      expect(result.biasText).toBe("Flat tendency");
+    });
+
+    it("detects strong sharp tendency", () => {
+      // Mean around +12 cents
+      const samples = Array(20).fill(12);
+      const result = computeDirectionBias(samples);
+      expect(result.direction).toBe("sharp");
+      expect(result.biasText).toBe("Strong sharp tendency");
+    });
+
+    it("detects strong flat tendency", () => {
+      // Mean around -12 cents
+      const samples = Array(20).fill(-12);
+      const result = computeDirectionBias(samples);
+      expect(result.direction).toBe("flat");
+      expect(result.biasText).toBe("Strong flat tendency");
+    });
+
+    it("calculates correct mean from mixed values", () => {
+      // Values: [2, 4, 6, 4, 4] repeated = mean of 4
+      const samples = [2, 4, 6, 4, 4, 2, 4, 6, 4, 4, 2, 4, 6, 4, 4];
+      const result = computeDirectionBias(samples);
+      expect(result.meanCents).toBe(4);
+      expect(result.direction).toBe("sharp");
+      expect(result.biasText).toBe("Slight sharp tendency");
+    });
+
+    it("returns neutral when mean is below threshold", () => {
+      // Mean around +2 (below 3 threshold)
+      const samples = Array(20).fill(2);
+      const result = computeDirectionBias(samples);
+      expect(result.hasEnoughData).toBe(true);
+      expect(result.direction).toBe("neutral");
+      expect(result.biasText).toBeNull();
     });
   });
 });

@@ -108,6 +108,19 @@ export const DRIFT_TRAIL_SAMPLES = 30;
 export const DRIFT_TRAIL_INTERVAL_MS = 66; // ~15fps for trail
 
 // ===========================================
+// DIRECTION BIAS CONSTANTS (Phase 1C)
+// ===========================================
+
+/** Minimum samples needed to calculate direction bias */
+export const DIRECTION_BIAS_MIN_SAMPLES = 15;
+
+/** Threshold for showing bias indicator (mean cents) */
+export const DIRECTION_BIAS_THRESHOLD = 3;
+
+/** Duration of bias history window (ms) */
+export const DIRECTION_BIAS_WINDOW_MS = 5000;
+
+// ===========================================
 // FEATURE FLAGS
 // ===========================================
 
@@ -129,6 +142,8 @@ export const TUNER_FLAGS = {
   springNeedle: true,
   /** Phase 1C.2 - Pitch drift trail (ghost trail showing recent pitch) */
   driftTrail: true,
+  /** Phase 1C.3 - Direction bias indicator ("Slight sharp tendency") */
+  directionBias: true,
   /** Phase 1C - Coaching text (deferred) */
   coachingText: false,
 } as const;

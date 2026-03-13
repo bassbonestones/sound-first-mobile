@@ -52,6 +52,7 @@ import {
   shouldShowHold,
   getMedian,
   isCentered,
+  computeDirectionBias,
 } from "./Tuner/tunerHelpers";
 import {
   TUNER_FLAGS,
@@ -67,6 +68,7 @@ import {
   DRIFT_TRAIL_DURATION_MS,
   DRIFT_TRAIL_SAMPLES,
   DRIFT_TRAIL_INTERVAL_MS,
+  DIRECTION_BIAS_WINDOW_MS,
 } from "./Tuner/tunerConstants";
 
 // Minor 7th system options
@@ -267,6 +269,11 @@ const Tuner = React.memo(function Tuner({
   const driftTrailRef = useRef<Array<{ cents: number; timestamp: number }>>([]);
   const lastTrailSampleRef = useRef<number>(0);
 
+  // Direction bias history (Phase 1C) - stores {cents, timestamp} for longer window
+  const biasHistoryRef = useRef<Array<{ cents: number; timestamp: number }>>(
+    [],
+  );
+
   // Smoothing refs for reducing jitter
   const smoothedFrequencyRef = useRef<number | null>(null);
   const smoothedCentsRef = useRef<number>(0);
@@ -426,6 +433,19 @@ const Tuner = React.memo(function Tuner({
           }
         }
 
+        // Track direction bias history (Phase 1C) - longer window for tendency detection
+        if (TUNER_FLAGS.directionBias) {
+          biasHistoryRef.current.push({ cents: roundedCents, timestamp: now });
+          // Remove samples older than DIRECTION_BIAS_WINDOW_MS
+          const biasCutoffTime = now - DIRECTION_BIAS_WINDOW_MS;
+          while (
+            biasHistoryRef.current.length > 0 &&
+            biasHistoryRef.current[0].timestamp < biasCutoffTime
+          ) {
+            biasHistoryRef.current.shift();
+          }
+        }
+
         // Dispatch to state machine
         dispatchTuner({
           type: "SIGNAL_DETECTED",
@@ -515,6 +535,11 @@ const Tuner = React.memo(function Tuner({
 
   // Is centered for target circle coloring
   const centered = currentNote ? isCentered(cents) : false;
+
+  // Direction bias (Phase 1C) - detect habitual sharp/flat tendency
+  const directionBias = computeDirectionBias(
+    biasHistoryRef.current.map((s) => s.cents),
+  );
 
   // Lock glow animation effect - triggers once when lock is first achieved
   useEffect(() => {
@@ -928,6 +953,24 @@ const Tuner = React.memo(function Tuner({
                         </Text>
                       </View>
                     )}
+                  {/* Direction Bias Indicator (Phase 1C) */}
+                  {TUNER_FLAGS.directionBias &&
+                    directionBias.biasText &&
+                    !isDetectingPhase(tunerState) && (
+                      <Text
+                        style={[
+                          styles.biasIndicator,
+                          {
+                            color:
+                              directionBias.direction === "sharp"
+                                ? "#FF9800"
+                                : "#2196F3",
+                          },
+                        ]}
+                      >
+                        {directionBias.biasText}
+                      </Text>
+                    )}
                   {/* Lock/Hold Indicator (Phase 1) with glow animation */}
                   {TUNER_FLAGS.holdIndicator && showLock && (
                     <Animated.View
@@ -1027,6 +1070,24 @@ const Tuner = React.memo(function Tuner({
                             : "UNSTABLE"}
                       </Text>
                     </View>
+                  )}
+                {/* Direction Bias Indicator for text mode (Phase 1C) */}
+                {TUNER_FLAGS.directionBias &&
+                  directionBias.biasText &&
+                  !isDetectingPhase(tunerState) && (
+                    <Text
+                      style={[
+                        styles.biasIndicator,
+                        {
+                          color:
+                            directionBias.direction === "sharp"
+                              ? "#FF9800"
+                              : "#2196F3",
+                        },
+                      ]}
+                    >
+                      {directionBias.biasText}
+                    </Text>
                   )}
               </>
             ) : (
@@ -1349,6 +1410,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
     letterSpacing: 0.5,
+  },
+  biasIndicator: {
+    fontSize: 10,
+    fontWeight: "500",
+    fontStyle: "italic",
+    marginTop: 4,
+    letterSpacing: 0.3,
   },
   lockIndicator: {
     marginTop: 8,
