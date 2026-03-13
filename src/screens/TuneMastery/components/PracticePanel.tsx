@@ -323,7 +323,9 @@ export default function PracticePanel({
               <Text style={styles.cancelButtonText}>←</Text>
             </TouchableOpacity>
             <View style={styles.titleContainer}>
-              <Text style={styles.practiceTitle} numberOfLines={1}>{tuneName}</Text>
+              <Text style={styles.practiceTitle} numberOfLines={1}>
+                {tuneName}
+              </Text>
               <Text style={styles.practiceKey}>in {tuneKey}</Text>
             </View>
           </View>
@@ -344,7 +346,9 @@ export default function PracticePanel({
                   setAudioMuted(true);
                 }
               }}
-              accessibilityLabel={tunerExpanded ? "Collapse tuner" : "Expand tuner"}
+              accessibilityLabel={
+                tunerExpanded ? "Collapse tuner" : "Expand tuner"
+              }
               accessibilityRole="button"
             >
               <Text style={styles.headerToolEmoji}>🎯</Text>
@@ -353,7 +357,8 @@ export default function PracticePanel({
             <TouchableOpacity
               style={[
                 styles.headerToolButton,
-                (metronomeExpanded || metronomeActive) && styles.headerToolButtonMetronome,
+                (metronomeExpanded || metronomeActive) &&
+                  styles.headerToolButtonMetronome,
               ]}
               onPress={() => {
                 if (!metronomeActive) {
@@ -374,7 +379,9 @@ export default function PracticePanel({
                 setMetronomeActive(false);
                 setMetronomeExpanded(false);
               }}
-              accessibilityLabel={metronomeExpanded ? "Collapse metronome" : "Expand metronome"}
+              accessibilityLabel={
+                metronomeExpanded ? "Collapse metronome" : "Expand metronome"
+              }
               accessibilityRole="button"
             >
               <Text style={styles.headerToolEmoji}>🥁</Text>
@@ -404,7 +411,9 @@ export default function PracticePanel({
                 setDroneActive(false);
                 setDroneExpanded(false);
               }}
-              accessibilityLabel={droneExpanded ? "Collapse drone" : "Expand drone"}
+              accessibilityLabel={
+                droneExpanded ? "Collapse drone" : "Expand drone"
+              }
               accessibilityRole="button"
             >
               <Text style={styles.headerToolEmoji}>🎵</Text>
@@ -430,10 +439,12 @@ export default function PracticePanel({
                   accessibilityLabel={audioMuted ? "Unmute" : "Mute"}
                   accessibilityRole="button"
                 >
-                  <Text style={styles.headerToolEmoji}>{audioMuted ? "🔇" : "🔊"}</Text>
+                  <Text style={styles.headerToolEmoji}>
+                    {audioMuted ? "🔇" : "🔊"}
+                  </Text>
                 </TouchableOpacity>
               </>
-          )}
+            )}
           </View>
         </View>
       </View>
