@@ -28,11 +28,10 @@
   },
   "include": [
     "src/**/*",
-    "App.js"
+    "App.js",
+    "__tests__/**/*"
   ],
   "exclude": [
-    "node_modules",
-    "__tests__"
-  ],
-  "extends": "expo/tsconfig.base"
+    "node_modules"
+  ]
 }

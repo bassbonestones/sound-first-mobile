@@ -7,8 +7,9 @@
     "strictFunctionTypes": false,
     "strictPropertyInitialization": false,
     "noImplicitThis": false,
-    "alwaysStrict": false
+    "alwaysStrict": false,
+    "types": ["jest", "node", "react-native"]
   },
-  "include": ["__tests__/**/*", "src/**/*"],
+  "include": ["__tests__/**/*", "src/**/*", "jest.setup.js"],
   "exclude": ["node_modules"]
 }
