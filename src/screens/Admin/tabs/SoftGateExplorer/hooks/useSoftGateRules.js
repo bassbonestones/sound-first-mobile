@@ -8,7 +8,7 @@ import { devError } from "../../../../../utils/devLogger";
 
 /**
  * Hook for managing soft gate rules
- * @returns {Object} Rules state and CRUD functions
+ * @returns Rules state and CRUD functions
  */
 export function useSoftGateRules() {
   const [rules, setRules] = useState([]);

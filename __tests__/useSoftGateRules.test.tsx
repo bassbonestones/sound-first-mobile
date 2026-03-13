@@ -102,7 +102,10 @@ describe("useSoftGateRules", () => {
       });
 
       act(() => {
-        result.current.setSelectedRule(mockRules[0]);
+        // Cast needed because hook is JS and selectedRule state type cannot be inferred
+        (result.current.setSelectedRule as (rule: unknown) => void)(
+          mockRules[0],
+        );
       });
 
       expect(result.current.selectedRule).toEqual(mockRules[0]);
