@@ -60,6 +60,8 @@ export interface Tune {
   bpm: number | null;
   timeSignature: string;
   subdivision: number;
+  pitchSystem: Temperament;
+  aHertz: number;
 }
 
 // ============================================================================

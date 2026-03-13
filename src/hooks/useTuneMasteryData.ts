@@ -25,6 +25,7 @@ import type {
   TuneSession,
   TuneMasteryData,
   PickType,
+  Temperament,
 } from "../types/tuning";
 
 const STORAGE_KEY = "tuneMastery";
@@ -138,6 +139,8 @@ export interface TuneSettingsUpdate {
   bpm?: number | null;
   timeSignature?: string;
   subdivision?: number;
+  pitchSystem?: Temperament;
+  aHertz?: number | null;
 }
 
 export interface UseTuneMasteryDataReturn {
@@ -186,7 +189,21 @@ export function useTuneMasteryData(): UseTuneMasteryDataReturn {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored) as Partial<TuneMasteryData>;
-          setData({ ...DEFAULT_DATA, ...parsed });
+          // Migrate tunes to ensure all properties have defaults
+          const migrateTunes = (tunes: Tune[] | undefined): Tune[] => {
+            if (!tunes) return [];
+            return tunes.map((tune) => ({
+              ...tune,
+              pitchSystem: tune.pitchSystem || "just",
+              aHertz: tune.aHertz ?? 440,
+            }));
+          };
+          setData({
+            ...DEFAULT_DATA,
+            ...parsed,
+            activeTunes: migrateTunes(parsed.activeTunes),
+            archivedTunes: migrateTunes(parsed.archivedTunes),
+          });
         }
       } catch (err) {
         devError("[useTuneMasteryData] Failed to load:", err);
@@ -235,6 +252,8 @@ export function useTuneMasteryData(): UseTuneMasteryDataReturn {
         bpm: null,
         timeSignature: "4/4",
         subdivision: 1,
+        pitchSystem: "just",
+        aHertz: 440,
       };
       updateData((prev) => ({
         ...prev,
@@ -482,6 +501,8 @@ export function useTuneMasteryData(): UseTuneMasteryDataReturn {
         bpm: null,
         timeSignature: "4/4",
         subdivision: 1,
+        pitchSystem: "just",
+        aHertz: 440,
       }));
       updateData((prev) => ({
         ...prev,

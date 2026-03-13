@@ -62,6 +62,9 @@ interface PitchDroneProps {
   onMetronomeVolumeChange?: (volume: number) => void;
   initialNote?: string | null;
   autoStart?: boolean;
+  temperament?: "equal" | "just";
+  pitchCenter?: number;
+  concertA?: number;
 }
 
 interface ActiveDrones {
@@ -88,12 +91,17 @@ export default function PitchDrone({
   onMetronomeVolumeChange,
   initialNote = null,
   autoStart = false,
+  temperament: initialTemperament = "equal",
+  pitchCenter: initialPitchCenter = 0,
+  concertA: initialConcertA = 440,
 }: PitchDroneProps): React.ReactElement {
-  const [temperament, setTemperament] = useState<"equal" | "just">("equal");
-  const [pitchCenter, setPitchCenter] = useState(0);
-  const [concertA, setConcertA] = useState("440");
+  const [temperament, setTemperament] = useState<"equal" | "just">(
+    initialTemperament,
+  );
+  const [pitchCenter, setPitchCenter] = useState(initialPitchCenter);
+  const [concertA, setConcertA] = useState(String(initialConcertA));
   const [octave, setOctave] = useState(4);
-  const [sustain, setSustain] = useState(false);
+  const [sustain, setSustain] = useState(true);
   const [vibrato, setVibrato] = useState(false);
 
   const [activeDrones, setActiveDrones] = useState<ActiveDrones>({});
@@ -162,6 +170,11 @@ export default function PitchDrone({
       }
     });
   }, [vibrato]);
+
+  // Sync concertA from props when it changes
+  useEffect(() => {
+    setConcertA(String(initialConcertA));
+  }, [initialConcertA]);
 
   // Initialize AudioContext
   useEffect(() => {
@@ -244,7 +257,7 @@ export default function PitchDrone({
     (semitone: number, noteOctave: number): void => {
       if (!audioContextRef.current) return;
 
-      const key = `${NOTES[semitone].name}-${noteOctave}`;
+      const key = `${NOTES[semitone].name}${noteOctave}`;
 
       if (oscillatorsRef.current[key]) return;
       if (audioContextRef.current.state === "closed") return;
@@ -308,7 +321,7 @@ export default function PitchDrone({
   // Stop a drone
   const stopDrone = useCallback(
     (semitone: number, noteOctave: number): void => {
-      const key = `${NOTES[semitone].name}-${noteOctave}`;
+      const key = `${NOTES[semitone].name}${noteOctave}`;
 
       const oscillator = oscillatorsRef.current[key];
       const gainNode = gainNodesRef.current[key];
@@ -786,9 +799,10 @@ export default function PitchDrone({
         {/* Vibrato Button */}
         <TouchableOpacity
           onPress={() => setVibrato(!vibrato)}
-          style={
-            vibrato ? styles.vibratoButtonActive : styles.vibratoButtonInactive
-          }
+          style={[
+            styles.toggleButton,
+            vibrato ? styles.vibratoButtonActive : styles.vibratoButtonInactive,
+          ]}
         >
           <Text
             style={
@@ -848,7 +862,12 @@ export default function PitchDrone({
       {isAnyDronePlaying && (
         <View style={styles.activeDronesSummary}>
           <Text style={styles.activeDronesText}>
-            Active: {Object.keys(activeDrones).join(", ")}
+            Active:{" "}
+            {Object.keys(activeDrones)
+              .map((key) => {
+                return key.replace(/#/g, "♯").replace(/b(?=\d)/g, "♭");
+              })
+              .join(", ")}
           </Text>
         </View>
       )}

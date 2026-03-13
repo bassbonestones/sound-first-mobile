@@ -298,13 +298,16 @@ export function useSelectionEngine(
     const totalMastered = masteredTunes.length;
     const totalIncomplete = incompleteTunes.length;
 
-    // Calculate average score across all tunes/keys
+    // Calculate average score across started tunes only (at least one key > 0%)
     let totalScore = 0;
     let totalKeys = 0;
     for (const analysis of tuneAnalysis) {
-      for (const keyData of analysis.keyScores) {
-        totalScore += keyData.score;
-        totalKeys += 1;
+      // Only include tunes that have been started (at least one non-zero key)
+      if (analysis.isStarted) {
+        for (const keyData of analysis.keyScores) {
+          totalScore += keyData.score;
+          totalKeys += 1;
+        }
       }
     }
     const averageScore = totalKeys > 0 ? Math.round(totalScore / totalKeys) : 0;

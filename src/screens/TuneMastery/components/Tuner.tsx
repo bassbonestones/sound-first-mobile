@@ -5,13 +5,155 @@
  * Displays current pitch with visual feedback for tuning accuracy.
  */
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  TextInput,
+  StyleSheet,
+} from "react-native";
 import Svg, { Path, Line, Text as SvgText, Circle } from "react-native-svg";
 import { usePitchDetection } from "../../../hooks/usePitchDetection";
-import { frequencyToNote, getCentsDeviation, noteToFrequency } from "../../../constants/notes";
+import {
+  frequencyToNote,
+  getCentsDeviation,
+  noteToFrequency,
+  noteNames,
+} from "../../../constants/notes";
 
-// A4 frequency for calculations
-const A4_FREQUENCY = 440;
+// Just intonation ratios for chromatic scale degrees relative to tonic
+// Index corresponds to semitones above tonic
+const JUST_RATIOS: number[] = [
+  1, // 0: Unison (1/1)
+  16 / 15, // 1: Minor 2nd
+  9 / 8, // 2: Major 2nd
+  6 / 5, // 3: Minor 3rd
+  5 / 4, // 4: Major 3rd
+  4 / 3, // 5: Perfect 4th
+  45 / 32, // 6: Tritone (augmented 4th)
+  3 / 2, // 7: Perfect 5th
+  8 / 5, // 8: Minor 6th
+  5 / 3, // 9: Major 6th
+  9 / 5, // 10: Minor 7th
+  15 / 8, // 11: Major 7th
+];
+
+// Key display names with enharmonics
+const KEY_DISPLAY_NAMES: string[] = [
+  "C",
+  "C#/Db",
+  "D",
+  "D#/Eb",
+  "E",
+  "F",
+  "F#/Gb",
+  "G",
+  "G#/Ab",
+  "A",
+  "A#/Bb",
+  "B",
+];
+
+/**
+ * Get the just intonation frequency for a note in a given key
+ * @param noteName - Note being played (e.g., "E4")
+ * @param keyIndex - Index of the key (0=C, 1=C#, etc.)
+ * @param a4Frequency - Reference frequency for A4 (default 440 Hz)
+ * @returns Target frequency using just intonation ratios
+ */
+function getJustIntonationFrequency(
+  noteName: string | null,
+  keyIndex: number,
+  a4Frequency: number = 440,
+): number | null {
+  if (!noteName) return null;
+
+  // Parse the note to get letter and octave
+  const match = noteName.match(/^([A-G])([#b]?)(\d+)$/);
+  if (!match) return null;
+
+  let [, letter, accidental, octaveStr] = match;
+  const octave = parseInt(octaveStr, 10);
+
+  // Find note index in chromatic scale
+  let noteIndex = noteNames.indexOf(letter);
+  if (noteIndex === -1) return null;
+  if (accidental === "#") noteIndex += 1;
+  else if (accidental === "b") noteIndex -= 1;
+  noteIndex = ((noteIndex % 12) + 12) % 12;
+
+  // Calculate semitones above the tonic (key root)
+  const semitonesAboveTonic = (((noteIndex - keyIndex) % 12) + 12) % 12;
+
+  // Get the just ratio for this scale degree
+  const justRatio = JUST_RATIOS[semitonesAboveTonic];
+
+  // Find the tonic frequency for the correct octave
+  // First, get the base tonic frequency in octave 4
+  const tonicSemitonesFromA4 = keyIndex - 9; // A is index 9
+  const tonicOctave4Freq = a4Frequency * Math.pow(2, tonicSemitonesFromA4 / 12);
+
+  // Determine which octave the tonic should be in
+  // The note's octave might be above or below the tonic
+  let tonicOctave = octave;
+  // If the note is below the tonic in the chromatic scale,
+  // the tonic reference should be from the octave below
+  if (noteIndex < keyIndex) {
+    tonicOctave = octave; // Note is in upper part of scale
+  }
+  // Adjust tonic to correct octave
+  const tonicFreq = tonicOctave4Freq * Math.pow(2, tonicOctave - 4);
+
+  // Apply just ratio (may need octave adjustment)
+  let justFreq = tonicFreq * justRatio;
+
+  // If the ratio pushed us into a different octave than expected, adjust
+  // The detected note should be close to this frequency
+  const equalTempFreq =
+    a4Frequency *
+    Math.pow(
+      2,
+      (noteNames.indexOf(letter) +
+        (accidental === "#" ? 1 : accidental === "b" ? -1 : 0) +
+        (octave - 4) * 12 -
+        9) /
+        12,
+    );
+  if (equalTempFreq) {
+    // Ensure we're in the right octave (within half an octave)
+    while (justFreq > equalTempFreq * 1.4) justFreq /= 2;
+    while (justFreq < equalTempFreq * 0.7) justFreq *= 2;
+  }
+
+  return justFreq;
+}
+
+/**
+ * Get equal temperament frequency for a note using custom A4 reference
+ */
+function getEqualTemperamentFrequency(
+  noteName: string | null,
+  a4Frequency: number = 440,
+): number | null {
+  if (!noteName) return null;
+
+  const match = noteName.match(/^([A-G])([#b]?)(\d+)$/);
+  if (!match) return null;
+
+  let [, letter, accidental, octaveStr] = match;
+  const octave = parseInt(octaveStr, 10);
+
+  // Find note index in chromatic scale
+  let noteIndex = noteNames.indexOf(letter);
+  if (noteIndex === -1) return null;
+  if (accidental === "#") noteIndex += 1;
+  else if (accidental === "b") noteIndex -= 1;
+
+  // Calculate semitones from A4
+  const semitonesFromA4 = noteIndex - 9 + (octave - 4) * 12;
+
+  return a4Frequency * Math.pow(2, semitonesFromA4 / 12);
+}
 
 export type TunerMode = "needle" | "text";
 export type Temperament = "equal" | "just";
@@ -19,17 +161,37 @@ export type Temperament = "equal" | "just";
 export interface TunerProps {
   mode?: TunerMode;
   temperament?: Temperament;
+  selectedKeyIndex?: number;
+  concertA?: number;
 }
 
 const Tuner = React.memo(function Tuner({
   mode = "needle",
-  temperament = "equal",
+  temperament: initialTemperament = "equal",
+  selectedKeyIndex: initialKeyIndex = 0,
+  concertA: initialConcertA = 440,
 }: TunerProps): React.JSX.Element {
-  const [isActive, setIsActive] = useState(false);
   const [currentNote, setCurrentNote] = useState<string | null>(null);
   const [cents, setCents] = useState(0);
   const [frequency, setFrequency] = useState<number | null>(null);
+  const [activeTemperament, setActiveTemperament] =
+    useState<Temperament>(initialTemperament);
+  const [selectedKeyIndex, setSelectedKeyIndex] = useState(initialKeyIndex); // 0 = C
+  const [concertA, setConcertA] = useState(String(initialConcertA));
   const silenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync temperament and key from props when they change
+  useEffect(() => {
+    setActiveTemperament(initialTemperament);
+  }, [initialTemperament]);
+
+  useEffect(() => {
+    setSelectedKeyIndex(initialKeyIndex);
+  }, [initialKeyIndex]);
+
+  useEffect(() => {
+    setConcertA(String(initialConcertA));
+  }, [initialConcertA]);
 
   // Clear note if no pitch detected for 300ms
   const clearNoteAfterSilence = useCallback(() => {
@@ -54,9 +216,23 @@ const Tuner = React.memo(function Tuner({
         setFrequency(pitch.frequency);
         const note = frequencyToNote(pitch.frequency);
         setCurrentNote(note);
-        // Calculate cents deviation from the target note's frequency
-        const targetFreq = note ? noteToFrequency(note) : null;
-        const deviation = targetFreq ? getCentsDeviation(pitch.frequency, targetFreq) : 0;
+
+        // Get the reference A4 frequency
+        const a4 = parseFloat(concertA) || 440;
+
+        // Calculate target frequency based on temperament
+        let targetFreq: number | null = null;
+        if (activeTemperament === "just") {
+          // Use just intonation frequency based on selected key
+          targetFreq = getJustIntonationFrequency(note, selectedKeyIndex, a4);
+        } else {
+          // Use equal temperament frequency with custom A4
+          targetFreq = getEqualTemperamentFrequency(note, a4);
+        }
+
+        const deviation = targetFreq
+          ? getCentsDeviation(pitch.frequency, targetFreq)
+          : 0;
         setCents(Math.round(deviation));
         // Start silence detection timer
         clearNoteAfterSilence();
@@ -66,7 +242,7 @@ const Tuner = React.memo(function Tuner({
         setFrequency(null);
       }
     },
-    [clearNoteAfterSilence],
+    [clearNoteAfterSilence, activeTemperament, selectedKeyIndex, concertA],
   );
 
   const {
@@ -76,28 +252,16 @@ const Tuner = React.memo(function Tuner({
     error,
     permissionGranted,
   } = usePitchDetection({
-    enabled: isActive,
+    enabled: true,
     onPitchDetected: handlePitchDetected,
     onRealtimePitch: handlePitchDetected,
     volumeThreshold: 0.01,
   });
 
-  const handleToggle = useCallback(async () => {
-    if (isActive) {
-      stopListening();
-      setIsActive(false);
-      setCurrentNote(null);
-      setCents(0);
-      setFrequency(null);
-      if (silenceTimeoutRef.current) {
-        clearTimeout(silenceTimeoutRef.current);
-        silenceTimeoutRef.current = null;
-      }
-    } else {
-      setIsActive(true);
-      await startListening();
-    }
-  }, [isActive, startListening, stopListening]);
+  // Auto-start listening on mount
+  useEffect(() => {
+    startListening();
+  }, [startListening]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -131,112 +295,99 @@ const Tuner = React.memo(function Tuner({
 
   return (
     <View style={styles.container}>
-      {/* Toggle Button */}
-      <TouchableOpacity
-        style={[styles.toggleButton, isActive && styles.toggleButtonActive]}
-        onPress={handleToggle}
-        accessibilityLabel={isActive ? "Stop tuner" : "Start tuner"}
-        accessibilityRole="button"
-      >
-        <Text style={styles.toggleButtonIcon}>{isActive ? "🔴" : "🎤"}</Text>
-        <Text style={styles.toggleButtonText}>
-          {isActive ? "Stop" : "Start"}
-        </Text>
-      </TouchableOpacity>
-
       {/* Error Message */}
       {error && <Text style={styles.errorText}>{error}</Text>}
 
       {/* Tuner Display */}
-      {isActive && (
-        <View style={styles.tunerDisplay}>
-          {mode === "needle" ? (
-            // Needle Mode - Semicircular gauge
-            <View style={styles.needleContainer}>
-              {/* Gauge arc and needle */}
-              <View style={styles.gaugeArc}>
-                {/* Smooth angular gradient using 180 SVG arc segments */}
-                <Svg width={360} height={180} style={styles.svgContainer}>
-                  {/* Arc segments - 180 segments spanning 180° to 360° (left to right through top) */}
-                  {/* Center at (180, 160), fills entire semicircle from center to radius 120 */}
-                  {Array.from({ length: 180 }, (_, i) => {
-                    const cx = 180;
-                    const cy = 160;
-                    const outerR = 120;
-                    const segmentAngle = 180 / 180; // 1° per segment
-                    // Start at 180° (left), go through 270° (top), end at 360° (right)
-                    const startAngle = 180 + i * segmentAngle;
-                    const endAngle = 180 + (i + 1) * segmentAngle;
-                    const startRad = (startAngle * Math.PI) / 180;
-                    const endRad = (endAngle * Math.PI) / 180;
-                    
-                    // Interpolate color based on position (0 to 1 across the arc)
-                    const t = i / 179; // 0 at left edge, 1 at right edge
-                    // Color stops: red(0) -> orange(0.2) -> yellow(0.35) -> green(0.5) -> yellow(0.65) -> orange(0.8) -> red(1)
-                    const getColor = (pos: number): string => {
-                      const stops = [
-                        { p: 0, r: 244, g: 67, b: 54 },     // red
-                        { p: 0.2, r: 255, g: 152, b: 0 },   // orange
-                        { p: 0.35, r: 255, g: 193, b: 7 },  // yellow
-                        { p: 0.5, r: 76, g: 175, b: 80 },   // green
-                        { p: 0.65, r: 255, g: 193, b: 7 },  // yellow
-                        { p: 0.8, r: 255, g: 152, b: 0 },   // orange
-                        { p: 1, r: 244, g: 67, b: 54 },     // red
-                      ];
-                      let lower = stops[0], upper = stops[stops.length - 1];
-                      for (let j = 0; j < stops.length - 1; j++) {
-                        if (pos >= stops[j].p && pos <= stops[j + 1].p) {
-                          lower = stops[j];
-                          upper = stops[j + 1];
-                          break;
-                        }
+      <View style={styles.tunerDisplay}>
+        {mode === "needle" ? (
+          // Needle Mode - Semicircular gauge
+          <View style={styles.needleContainer}>
+            {/* Gauge arc and needle */}
+            <View style={styles.gaugeArc}>
+              {/* Smooth angular gradient using 180 SVG arc segments */}
+              <Svg width={360} height={180} style={styles.svgContainer}>
+                {/* Arc segments - 180 segments spanning 180° to 360° (left to right through top) */}
+                {/* Center at (180, 160), fills entire semicircle from center to radius 120 */}
+                {Array.from({ length: 180 }, (_, i) => {
+                  const cx = 180;
+                  const cy = 160;
+                  const outerR = 120;
+                  const segmentAngle = 180 / 180; // 1° per segment
+                  // Start at 180° (left), go through 270° (top), end at 360° (right)
+                  const startAngle = 180 + i * segmentAngle;
+                  const endAngle = 180 + (i + 1) * segmentAngle;
+                  const startRad = (startAngle * Math.PI) / 180;
+                  const endRad = (endAngle * Math.PI) / 180;
+
+                  // Interpolate color based on position (0 to 1 across the arc)
+                  const t = i / 179; // 0 at left edge, 1 at right edge
+                  // Color stops: red(0) -> orange(0.2) -> yellow(0.35) -> green(0.5) -> yellow(0.65) -> orange(0.8) -> red(1)
+                  const getColor = (pos: number): string => {
+                    const stops = [
+                      { p: 0, r: 244, g: 67, b: 54 }, // red
+                      { p: 0.2, r: 255, g: 152, b: 0 }, // orange
+                      { p: 0.35, r: 255, g: 193, b: 7 }, // yellow
+                      { p: 0.5, r: 76, g: 175, b: 80 }, // green
+                      { p: 0.65, r: 255, g: 193, b: 7 }, // yellow
+                      { p: 0.8, r: 255, g: 152, b: 0 }, // orange
+                      { p: 1, r: 244, g: 67, b: 54 }, // red
+                    ];
+                    let lower = stops[0],
+                      upper = stops[stops.length - 1];
+                    for (let j = 0; j < stops.length - 1; j++) {
+                      if (pos >= stops[j].p && pos <= stops[j + 1].p) {
+                        lower = stops[j];
+                        upper = stops[j + 1];
+                        break;
                       }
-                      const range = upper.p - lower.p;
-                      const localT = range > 0 ? (pos - lower.p) / range : 0;
-                      const r = Math.round(lower.r + (upper.r - lower.r) * localT);
-                      const g = Math.round(lower.g + (upper.g - lower.g) * localT);
-                      const b = Math.round(lower.b + (upper.b - lower.b) * localT);
-                      return `rgb(${r},${g},${b})`;
-                    };
-                    
-                    const color = getColor(t);
-                    
-                    // Pie slice: from center to outer arc
-                    const x1 = cx + outerR * Math.cos(startRad);
-                    const y1 = cy + outerR * Math.sin(startRad);
-                    const x2 = cx + outerR * Math.cos(endRad);
-                    const y2 = cy + outerR * Math.sin(endRad);
-                    
-                    // Path: center -> outer start -> arc -> outer end -> back to center
-                    const d = `M ${cx} ${cy} L ${x1} ${y1} A ${outerR} ${outerR} 0 0 1 ${x2} ${y2} Z`;
-                    
-                    return (
-                      <Path
-                        key={i}
-                        d={d}
-                        fill={color}
-                        opacity={0.7}
-                      />
+                    }
+                    const range = upper.p - lower.p;
+                    const localT = range > 0 ? (pos - lower.p) / range : 0;
+                    const r = Math.round(
+                      lower.r + (upper.r - lower.r) * localT,
                     );
-                  })}
-                  {/* Arc outline */}
-                  <Path
-                    d="M 60 160 A 120 120 0 0 1 300 160"
-                    stroke="#FFFFFF"
-                    strokeWidth={2}
-                    fill="none"
-                  />
-                  {/* Bottom line to complete the semicircle enclosure */}
-                  <Line
-                    x1={60}
-                    y1={160}
-                    x2={300}
-                    y2={160}
-                    stroke="#FFFFFF"
-                    strokeWidth={2}
-                  />
-                  {/* Tick marks at 0, ±10, ±20, ±30, ±40, ±50 cents */}
-                  {[-50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50].map((centsValue) => {
+                    const g = Math.round(
+                      lower.g + (upper.g - lower.g) * localT,
+                    );
+                    const b = Math.round(
+                      lower.b + (upper.b - lower.b) * localT,
+                    );
+                    return `rgb(${r},${g},${b})`;
+                  };
+
+                  const color = getColor(t);
+
+                  // Pie slice: from center to outer arc
+                  const x1 = cx + outerR * Math.cos(startRad);
+                  const y1 = cy + outerR * Math.sin(startRad);
+                  const x2 = cx + outerR * Math.cos(endRad);
+                  const y2 = cy + outerR * Math.sin(endRad);
+
+                  // Path: center -> outer start -> arc -> outer end -> back to center
+                  const d = `M ${cx} ${cy} L ${x1} ${y1} A ${outerR} ${outerR} 0 0 1 ${x2} ${y2} Z`;
+
+                  return <Path key={i} d={d} fill={color} opacity={0.7} />;
+                })}
+                {/* Arc outline */}
+                <Path
+                  d="M 60 160 A 120 120 0 0 1 300 160"
+                  stroke="#FFFFFF"
+                  strokeWidth={2}
+                  fill="none"
+                />
+                {/* Bottom line to complete the semicircle enclosure */}
+                <Line
+                  x1={60}
+                  y1={160}
+                  x2={300}
+                  y2={160}
+                  stroke="#FFFFFF"
+                  strokeWidth={2}
+                />
+                {/* Tick marks at 0, ±10, ±20, ±30, ±40, ±50 cents */}
+                {[-50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50].map(
+                  (centsValue) => {
                     const cx = 180;
                     const cy = 160;
                     const innerR = 120; // Starts at the arc (radius 120)
@@ -256,7 +407,12 @@ const Tuner = React.memo(function Tuner({
                     const labelR = centsValue === 0 ? 152 : 148;
                     const labelX = cx + labelR * Math.cos(rad);
                     const labelY = cy + labelR * Math.sin(rad);
-                    const labelText = centsValue === 0 ? "0" : (centsValue > 0 ? `+${centsValue}` : `${centsValue}`);
+                    const labelText =
+                      centsValue === 0
+                        ? "0"
+                        : centsValue > 0
+                          ? `+${centsValue}`
+                          : `${centsValue}`;
                     return (
                       <React.Fragment key={centsValue}>
                         <Line
@@ -280,9 +436,11 @@ const Tuner = React.memo(function Tuner({
                         </SvgText>
                       </React.Fragment>
                     );
-                  })}
-                  {/* Small tick marks at ±5, ±15, ±25, ±35, ±45 cents (half size) */}
-                  {[-45, -35, -25, -15, -5, 5, 15, 25, 35, 45].map((centsValue) => {
+                  },
+                )}
+                {/* Small tick marks at ±5, ±15, ±25, ±35, ±45 cents (half size) */}
+                {[-45, -35, -25, -15, -5, 5, 15, 25, 35, 45].map(
+                  (centsValue) => {
                     const cx = 180;
                     const cy = 160;
                     const innerR = 120;
@@ -304,127 +462,238 @@ const Tuner = React.memo(function Tuner({
                         strokeWidth={1.2}
                       />
                     );
+                  },
+                )}
+                {/* Tiny tick marks for every degree except 0, ±5, ±10, ±15, etc. */}
+                {Array.from({ length: 101 }, (_, i) => i - 50)
+                  .filter((v) => v % 5 !== 0) // Exclude multiples of 5 (already have ticks)
+                  .map((centsValue) => {
+                    const cx = 180;
+                    const cy = 160;
+                    const innerR = 120;
+                    const outerR = 123; // 3px length
+                    const angle = 270 + (centsValue / 50) * 90;
+                    const rad = (angle * Math.PI) / 180;
+                    const x1 = cx + innerR * Math.cos(rad);
+                    const y1 = cy + innerR * Math.sin(rad);
+                    const x2 = cx + outerR * Math.cos(rad);
+                    const y2 = cy + outerR * Math.sin(rad);
+                    return (
+                      <Line
+                        key={`tiny-${centsValue}`}
+                        x1={x1}
+                        y1={y1}
+                        x2={x2}
+                        y2={y2}
+                        stroke="#FFFFFF"
+                        strokeWidth={1}
+                      />
+                    );
                   })}
-                  {/* Tiny tick marks for every degree except 0, ±5, ±10, ±15, etc. */}
-                  {Array.from({ length: 101 }, (_, i) => i - 50)
-                    .filter((v) => v % 5 !== 0) // Exclude multiples of 5 (already have ticks)
-                    .map((centsValue) => {
-                      const cx = 180;
-                      const cy = 160;
-                      const innerR = 120;
-                      const outerR = 123; // 3px length
-                      const angle = 270 + (centsValue / 50) * 90;
-                      const rad = (angle * Math.PI) / 180;
-                      const x1 = cx + innerR * Math.cos(rad);
-                      const y1 = cy + innerR * Math.sin(rad);
-                      const x2 = cx + outerR * Math.cos(rad);
-                      const y2 = cy + outerR * Math.sin(rad);
-                      return (
-                        <Line
-                          key={`tiny-${centsValue}`}
-                          x1={x1}
-                          y1={y1}
-                          x2={x2}
-                          y2={y2}
-                          stroke="#FFFFFF"
-                          strokeWidth={1}
-                        />
-                      );
-                    })}
-                </Svg>
+              </Svg>
 
-                {/* Needle - rotates around bottom center */}
-                <View style={styles.needlePivotBase}>
+              {/* Needle - rotates around bottom center */}
+              <View style={styles.needlePivotBase}>
+                <View
+                  style={[
+                    styles.needleRotator,
+                    { transform: [{ rotate: `${getNeedleRotation()}deg` }] },
+                  ]}
+                >
                   <View
-                    style={[
-                      styles.needleRotator,
-                      { transform: [{ rotate: `${getNeedleRotation()}deg` }] },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.needle,
-                        { backgroundColor: "#FFFFFF" },
-                      ]}
-                    />
-                  </View>
-                  {Math.abs(cents) <= 5 && currentNote ? (
-                    <View style={styles.smileyContainer}>
-                      <Svg width={24} height={24}>
-                        {/* Face background */}
-                        <Circle cx={12} cy={12} r={11} fill="#FFD700" />
-                        <Circle cx={12} cy={12} r={11} stroke="#DAA520" strokeWidth={1} fill="none" />
-                        {/* Star eyes */}
-                        <SvgText x={6} y={11} fontSize={8} textAnchor="middle">⭐</SvgText>
-                        <SvgText x={18} y={11} fontSize={8} textAnchor="middle">⭐</SvgText>
-                        {/* Smile */}
-                        <Path
-                          d="M 6 14 Q 12 20 18 14"
-                          stroke="#333"
-                          strokeWidth={2}
-                          fill="none"
-                          strokeLinecap="round"
-                        />
-                      </Svg>
-                    </View>
-                  ) : (
-                    <View style={styles.pivotDot} />
-                  )}
+                    style={[styles.needle, { backgroundColor: "#FFFFFF" }]}
+                  />
                 </View>
-              </View>
-
-              {/* Note Display below gauge */}
-              <View style={styles.noteContainer}>
-                {currentNote ? (
-                  <>
-                    <Text style={[styles.noteName, { color: getTuneColor() }]}>
-                      {currentNote}
-                    </Text>
-                    <Text style={styles.centsDisplay}>
-                      {cents > 0 ? "+" : ""}
-                      {cents} cents
-                    </Text>
-                  </>
+                {Math.abs(cents) <= 5 && currentNote ? (
+                  <View style={styles.smileyContainer}>
+                    <Svg width={24} height={24}>
+                      {/* Face background */}
+                      <Circle cx={12} cy={12} r={11} fill="#FFD700" />
+                      <Circle
+                        cx={12}
+                        cy={12}
+                        r={11}
+                        stroke="#DAA520"
+                        strokeWidth={1}
+                        fill="none"
+                      />
+                      {/* Star eyes */}
+                      <SvgText x={6} y={11} fontSize={8} textAnchor="middle">
+                        ⭐
+                      </SvgText>
+                      <SvgText x={18} y={11} fontSize={8} textAnchor="middle">
+                        ⭐
+                      </SvgText>
+                      {/* Smile */}
+                      <Path
+                        d="M 6 14 Q 12 20 18 14"
+                        stroke="#333"
+                        strokeWidth={2}
+                        fill="none"
+                        strokeLinecap="round"
+                      />
+                    </Svg>
+                  </View>
                 ) : (
-                  <Text style={styles.micIcon}>🎤</Text>
+                  <View style={styles.pivotDot} />
                 )}
               </View>
             </View>
-          ) : (
-            // Text Mode
-            <View style={styles.textContainer}>
+
+            {/* Note Display below gauge */}
+            <View style={styles.noteContainer}>
               {currentNote ? (
                 <>
-                  <Text style={[styles.textNote, { color: getTuneColor() }]}>
+                  <Text style={[styles.noteName, { color: getTuneColor() }]}>
                     {currentNote}
                   </Text>
-                  <Text style={[styles.textCents, { color: getTuneColor() }]}>
+                  <Text style={styles.centsDisplay}>
                     {cents > 0 ? "+" : ""}
                     {cents} cents
                   </Text>
-                  <Text style={styles.textFreq}>
-                    {frequency ? `${frequency.toFixed(1)} Hz` : ""}
-                  </Text>
-                  <Text style={styles.tuningIndicator}>
-                    {Math.abs(cents) <= 5
-                      ? "✓ In Tune"
-                      : cents < 0
-                        ? "↓ Flat"
-                        : "↑ Sharp"}
-                  </Text>
                 </>
               ) : (
-                <Text style={styles.textMicIcon}>🎤</Text>
+                <Text style={styles.micIcon}>🎤</Text>
               )}
             </View>
-          )}
+          </View>
+        ) : (
+          // Text Mode
+          <View style={styles.textContainer}>
+            {currentNote ? (
+              <>
+                <Text style={[styles.textNote, { color: getTuneColor() }]}>
+                  {currentNote}
+                </Text>
+                <Text style={[styles.textCents, { color: getTuneColor() }]}>
+                  {cents > 0 ? "+" : ""}
+                  {cents} cents
+                </Text>
+                <Text style={styles.textFreq}>
+                  {frequency ? `${frequency.toFixed(1)} Hz` : ""}
+                </Text>
+                <Text style={styles.tuningIndicator}>
+                  {Math.abs(cents) <= 5
+                    ? "✓ In Tune"
+                    : cents < 0
+                      ? "↓ Flat"
+                      : "↑ Sharp"}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.textMicIcon}>🎤</Text>
+            )}
+          </View>
+        )}
+      </View>
+
+      {/* Temperament & Concert A Row */}
+      <View style={styles.settingsRow}>
+        {/* Temperament Toggle */}
+        <View style={styles.temperamentToggle}>
+          <TouchableOpacity
+            onPress={() => setActiveTemperament("equal")}
+            style={[
+              styles.temperamentButtonLeft,
+              activeTemperament === "equal"
+                ? styles.temperamentButtonActive
+                : styles.temperamentButtonInactive,
+            ]}
+            accessibilityLabel={`Equal temperament${activeTemperament === "equal" ? ", selected" : ""}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: activeTemperament === "equal" }}
+          >
+            <Text
+              style={[
+                styles.temperamentButtonText,
+                activeTemperament === "equal"
+                  ? styles.temperamentButtonTextActive
+                  : styles.temperamentButtonTextInactive,
+              ]}
+            >
+              Equal
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setActiveTemperament("just")}
+            style={[
+              styles.temperamentButtonRight,
+              activeTemperament === "just"
+                ? styles.temperamentButtonActive
+                : styles.temperamentButtonInactive,
+            ]}
+            accessibilityLabel={`Just intonation${activeTemperament === "just" ? ", selected" : ""}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: activeTemperament === "just" }}
+          >
+            <Text
+              style={[
+                styles.temperamentButtonText,
+                activeTemperament === "just"
+                  ? styles.temperamentButtonTextActive
+                  : styles.temperamentButtonTextInactive,
+              ]}
+            >
+              Just
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Concert A Input */}
+        <View style={styles.concertARow}>
+          <Text style={styles.concertALabel}>A=</Text>
+          <TextInput
+            value={concertA}
+            onChangeText={setConcertA}
+            keyboardType="numeric"
+            style={styles.concertAInput}
+            placeholder="440"
+            placeholderTextColor="#666"
+            accessibilityLabel="Concert A frequency"
+          />
+          <Text style={styles.concertAUnit}>Hz</Text>
+        </View>
+      </View>
+
+      {/* Key Selector (shown when Just Intonation is selected) */}
+      {activeTemperament === "just" && (
+        <View style={styles.keySelector}>
+          <Text style={styles.keySelectorLabel}>Key</Text>
+          <View style={styles.keyGrid}>
+            {[0, 1, 2].map((row) => (
+              <View key={row} style={styles.keyRow}>
+                {KEY_DISPLAY_NAMES.slice(row * 4, row * 4 + 4).map(
+                  (keyName, colIndex) => {
+                    const index = row * 4 + colIndex;
+                    return (
+                      <TouchableOpacity
+                        key={keyName}
+                        style={[
+                          styles.keyOption,
+                          selectedKeyIndex === index && styles.keyOptionActive,
+                        ]}
+                        onPress={() => setSelectedKeyIndex(index)}
+                        accessibilityLabel={`Key of ${keyName}`}
+                        accessibilityRole="button"
+                      >
+                        <Text
+                          style={[
+                            styles.keyOptionText,
+                            selectedKeyIndex === index &&
+                              styles.keyOptionTextActive,
+                          ]}
+                        >
+                          {keyName}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  },
+                )}
+              </View>
+            ))}
+          </View>
         </View>
       )}
-
-      {/* Temperament indicator */}
-      <Text style={styles.temperamentText}>
-        {temperament === "just" ? "Just Intonation" : "Equal Temperament"}
-      </Text>
     </View>
   );
 });
@@ -436,35 +705,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#1a1a2e",
     borderRadius: 12,
   },
-  toggleButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#3a3a4e",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  toggleButtonActive: {
-    backgroundColor: "rgba(255, 107, 107, 0.2)",
-  },
-  toggleButtonIcon: {
-    fontSize: 16,
-  },
-  toggleButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
-  },
   errorText: {
     color: "#FF6B6B",
     fontSize: 12,
-    marginTop: 8,
+    marginBottom: 8,
   },
 
   // Tuner Display
   tunerDisplay: {
-    marginTop: 16,
     width: "100%",
     alignItems: "center",
   },
@@ -583,12 +831,120 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // Temperament
-  temperamentText: {
-    color: "#444",
-    fontSize: 10,
-    marginTop: 8,
+  // Settings Row (Temperament + Concert A)
+  settingsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 16,
+  },
+
+  // Temperament Toggle (styled like PitchDrone)
+  temperamentToggle: {
+    flexDirection: "row",
+  },
+  temperamentButtonLeft: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+    borderWidth: 1,
+    borderColor: "#9C27B0",
+  },
+  temperamentButtonRight: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+    borderWidth: 1,
+    borderLeftWidth: 0,
+    borderColor: "#9C27B0",
+  },
+  temperamentButtonActive: {
+    backgroundColor: "#9C27B0",
+  },
+  temperamentButtonInactive: {
+    backgroundColor: "#2d232e",
+  },
+  temperamentButtonText: {
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  temperamentButtonTextActive: {
+    color: "#fff",
+  },
+  temperamentButtonTextInactive: {
+    color: "#9C27B0",
+  },
+
+  // Concert A Input
+  concertARow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  concertALabel: {
+    color: "#bfa76a",
+    fontSize: 12,
+    marginRight: 4,
+  },
+  concertAInput: {
+    backgroundColor: "#2d232e",
+    color: "#FFD700",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    width: 60,
+    textAlign: "center",
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: "#444",
+  },
+  concertAUnit: {
+    color: "#bfa76a",
+    fontSize: 12,
+    marginLeft: 4,
+  },
+
+  // Key Selector
+  keySelector: {
+    alignItems: "center",
+    marginTop: 12,
+  },
+  keySelectorLabel: {
+    color: "#888",
+    fontSize: 12,
+    marginBottom: 8,
     textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  keyGrid: {
+    alignItems: "center",
+    gap: 6,
+  },
+  keyRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  keyOption: {
+    width: 68,
+    height: 32,
+    borderRadius: 4,
+    backgroundColor: "#2a2a3e",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  keyOptionActive: {
+    backgroundColor: "#4CAF50",
+  },
+  keyOptionText: {
+    color: "#888",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  keyOptionTextActive: {
+    color: "#FFFFFF",
   },
 });
 

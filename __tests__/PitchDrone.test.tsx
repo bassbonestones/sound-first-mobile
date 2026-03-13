@@ -315,28 +315,28 @@ describe("PitchDrone", () => {
       const sustainButton = getByText(/Sustain/);
       fireEvent.press(sustainButton);
 
-      // Sustain should now be on (visual state change)
+      // Sustain should now be off (visual state change)
     });
 
-    it("shows lock icon when sustain is on", () => {
+    it("shows lock icon when sustain is on (default)", () => {
       const { getByText } = render(<PitchDrone />);
 
-      fireEvent.press(getByText(/Sustain/));
+      // Sustain is on by default
       expect(getByText(/🔒 Sustain/)).toBeTruthy();
     });
 
     it("shows unlock icon when sustain is off", () => {
       const { getByText } = render(<PitchDrone />);
 
+      // Turn off sustain (it's on by default)
+      fireEvent.press(getByText(/🔒 Sustain/));
       expect(getByText(/🔓 Sustain/)).toBeTruthy();
     });
 
     it("turns off sustain and stops all drones", () => {
       const { getByText } = render(<PitchDrone />);
 
-      // Enable sustain
-      fireEvent.press(getByText(/Sustain/));
-
+      // Sustain is already enabled by default
       // Press a note to start a drone
       fireEvent.press(getByText("B♯/C"));
 
@@ -347,8 +347,7 @@ describe("PitchDrone", () => {
     it("can toggle sustain multiple times", () => {
       const { getByText } = render(<PitchDrone />);
 
-      // Toggle on
-      fireEvent.press(getByText(/Sustain/));
+      // Sustain starts ON by default
       expect(getByText(/🔒 Sustain/)).toBeTruthy();
 
       // Toggle off

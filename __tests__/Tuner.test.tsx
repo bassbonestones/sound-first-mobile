@@ -33,6 +33,12 @@ jest.mock("../src/constants/notes", () => ({
     if (freq === 430) return -40;
     return 0;
   }),
+  noteToFrequency: jest.fn((note: string) => {
+    if (note === "A4") return 440;
+    if (note === "C4") return 261.63;
+    return 440;
+  }),
+  noteNames: ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"],
 }));
 
 import Tuner, { TunerProps } from "../src/screens/TuneMastery/components/Tuner";
@@ -52,13 +58,19 @@ describe("Tuner", () => {
 
   describe("rendering", () => {
     it("renders without crashing", () => {
-      const { getByText, getByLabelText } = render(<Tuner />);
-      expect(getByLabelText("Start tuner")).toBeTruthy();
+      const { getByText } = render(<Tuner />);
+      // Shows mic icon when no pitch detected
+      expect(getByText("🎤")).toBeTruthy();
     });
 
     it("renders with default needle mode", () => {
-      const { getByText } = render(<Tuner />);
+      const { getByText, getByLabelText } = render(<Tuner />);
       expect(getByText("🎤")).toBeTruthy();
+      // Temperament buttons are visible (Equal is selected by default)
+      expect(getByLabelText("Equal temperament, selected")).toBeTruthy();
+      expect(getByLabelText("Just intonation")).toBeTruthy();
+      // Concert A input is visible
+      expect(getByLabelText("Concert A frequency")).toBeTruthy();
     });
 
     it("renders with text mode", () => {
@@ -67,72 +79,26 @@ describe("Tuner", () => {
     });
   });
 
-  describe("toggle functionality", () => {
-    it("starts tuner when toggle button pressed", async () => {
-      const { getByLabelText } = render(<Tuner />);
-      const toggleButton = getByLabelText("Start tuner");
-
-      fireEvent.press(toggleButton);
+  describe("auto-start behavior", () => {
+    it("automatically starts listening on mount", async () => {
+      render(<Tuner />);
 
       await waitFor(() => {
         expect(mockStartListening).toHaveBeenCalled();
       });
     });
 
-    it("stops tuner when toggle button pressed while active", async () => {
-      // Mock isListening as true
-      (usePitchDetection as jest.Mock).mockReturnValue({
-        isListening: true,
-        startListening: mockStartListening,
-        stopListening: mockStopListening,
-        error: null,
-        permissionGranted: true,
-      });
-
-      const { getByLabelText, rerender } = render(<Tuner />);
-
-      // Simulate tuner being active by pressing toggle
-      const toggleButton = getByLabelText("Start tuner");
-      fireEvent.press(toggleButton);
-
-      // After starting, press again to stop
-      await waitFor(() => {
-        expect(mockStartListening).toHaveBeenCalled();
-      });
-    });
-
-    it("displays different icons based on active state", () => {
-      const { getByText, rerender } = render(<Tuner />);
-
-      // Initially shows microphone icon
-      expect(getByText("🎤")).toBeTruthy();
-    });
-  });
-
-  describe("pitch detection callback", () => {
-    it("calls usePitchDetection with correct options", () => {
+    it("calls usePitchDetection with enabled=true", () => {
       render(<Tuner />);
 
       expect(usePitchDetection).toHaveBeenCalledWith(
         expect.objectContaining({
-          enabled: false,
+          enabled: true,
           onPitchDetected: expect.any(Function),
           onRealtimePitch: expect.any(Function),
           volumeThreshold: 0.01,
         }),
       );
-    });
-  });
-
-  describe("accessibility", () => {
-    it("has accessible toggle button with correct label", () => {
-      const { getByLabelText } = render(<Tuner />);
-      expect(getByLabelText("Start tuner")).toBeTruthy();
-    });
-
-    it("toggle button has button role", () => {
-      const { getByRole } = render(<Tuner />);
-      expect(getByRole("button")).toBeTruthy();
     });
   });
 
@@ -153,6 +119,26 @@ describe("Tuner", () => {
       render(<Tuner />);
       // Component renders with defaults - mode="needle", temperament="equal"
       expect(usePitchDetection).toHaveBeenCalled();
+    });
+  });
+
+  describe("accessibility", () => {
+    it("temperament buttons have accessible labels", () => {
+      const { getByLabelText } = render(<Tuner />);
+      // Labels include ", selected" state for the active button (equal by default)
+      expect(getByLabelText("Equal temperament, selected")).toBeTruthy();
+      expect(getByLabelText("Just intonation")).toBeTruthy();
+    });
+
+    it("temperament buttons have button role", () => {
+      const { getAllByRole } = render(<Tuner />);
+      const buttons = getAllByRole("button");
+      expect(buttons.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("concert A input has accessible label", () => {
+      const { getByLabelText } = render(<Tuner />);
+      expect(getByLabelText("Concert A frequency")).toBeTruthy();
     });
   });
 
@@ -295,47 +281,8 @@ describe("Tuner", () => {
     });
   });
 
-  describe("toggle states", () => {
-    it("stops listening and clears state when toggled off", async () => {
-      let toggleCount = 0;
-      (usePitchDetection as jest.Mock).mockImplementation(() => ({
-        isListening: toggleCount > 0,
-        startListening: mockStartListening.mockImplementation(() => {
-          toggleCount++;
-          return Promise.resolve();
-        }),
-        stopListening: mockStopListening,
-        error: null,
-        permissionGranted: true,
-      }));
-
-      const { getByLabelText, rerender } = render(<Tuner />);
-      const toggleButton = getByLabelText("Start tuner");
-
-      // Start listening
-      fireEvent.press(toggleButton);
-      await waitFor(() => {
-        expect(mockStartListening).toHaveBeenCalled();
-      });
-
-      // Rerender with updated state
-      (usePitchDetection as jest.Mock).mockReturnValue({
-        isListening: true,
-        startListening: mockStartListening,
-        stopListening: mockStopListening,
-        error: null,
-        permissionGranted: true,
-      });
-      rerender(<Tuner />);
-
-      // Stop listening
-      fireEvent.press(toggleButton);
-      expect(mockStopListening).toHaveBeenCalled();
-    });
-  });
-
   describe("display modes", () => {
-    it("shows tuner display after toggle in needle mode", async () => {
+    it("shows tuner display in needle mode", async () => {
       let capturedOptions: { onPitchDetected?: Function } | null = null;
 
       (usePitchDetection as jest.Mock).mockImplementation(
@@ -351,21 +298,10 @@ describe("Tuner", () => {
         },
       );
 
-      const { getByLabelText, getByText, queryByText } = render(
-        <Tuner mode="needle" />,
-      );
+      const { getByText } = render(<Tuner mode="needle" />);
 
-      // Toggle on
-      const toggleButton = getByLabelText("Start tuner");
-      await act(async () => {
-        fireEvent.press(toggleButton);
-      });
-
-      // When active, needle mode should show scale markings
-      await waitFor(() => {
-        expect(queryByText("-50")).toBeTruthy();
-        expect(queryByText("+50")).toBeTruthy();
-      });
+      // Needle mode should show mic icon when no pitch detected
+      expect(getByText("🎤")).toBeTruthy();
 
       // Simulate pitch detection to set cents (tests getTuneColor)
       act(() => {
@@ -373,7 +309,7 @@ describe("Tuner", () => {
       });
     });
 
-    it("shows tuner display after toggle in text mode", async () => {
+    it("shows tuner display in text mode", async () => {
       (usePitchDetection as jest.Mock).mockReturnValue({
         isListening: true,
         startListening: mockStartListening,
@@ -382,19 +318,10 @@ describe("Tuner", () => {
         permissionGranted: true,
       });
 
-      const { getByLabelText, queryByText } = render(<Tuner mode="text" />);
+      const { getByText } = render(<Tuner mode="text" />);
 
-      // Toggle on
-      const toggleButton = getByLabelText("Start tuner");
-      await act(async () => {
-        fireEvent.press(toggleButton);
-      });
-
-      // When active in text mode, should show "---" (no note yet) and "0 cents"
-      await waitFor(() => {
-        expect(queryByText("---")).toBeTruthy();
-        expect(queryByText(/0 cents/)).toBeTruthy();
-      });
+      // Text mode should show mic icon when no note detected
+      expect(getByText("🎤")).toBeTruthy();
     });
 
     it("exercises pitch detection callback with various frequencies", async () => {
@@ -414,17 +341,7 @@ describe("Tuner", () => {
         },
       );
 
-      const { getByLabelText, queryByText } = render(<Tuner mode="needle" />);
-
-      // Toggle on
-      await act(async () => {
-        fireEvent.press(getByLabelText("Start tuner"));
-      });
-
-      // Verify tuner is active
-      await waitFor(() => {
-        expect(queryByText("-50")).toBeTruthy();
-      });
+      render(<Tuner mode="needle" />);
 
       // Exercise the pitch detection callback with different frequencies
       // This covers the handlePitchDetected code paths
@@ -435,8 +352,65 @@ describe("Tuner", () => {
         });
       }
 
-      // Verify at least one pitch was processed
+      // Verify callback was captured
       expect(latestCallback).toBeDefined();
+    });
+  });
+
+  describe("temperament selection", () => {
+    it("can switch to just intonation", async () => {
+      const { getByLabelText, queryByText } = render(<Tuner />);
+
+      // Press Just button
+      fireEvent.press(getByLabelText("Just intonation"));
+
+      // Should show key selector when Just is selected
+      await waitFor(() => {
+        expect(queryByText("Key")).toBeTruthy();
+      });
+    });
+
+    it("shows key selector with just intonation", async () => {
+      const { getByLabelText, queryByLabelText } = render(<Tuner />);
+
+      fireEvent.press(getByLabelText("Just intonation"));
+
+      // Should show key grid with 12 keys (check accessible labels)
+      await waitFor(() => {
+        expect(queryByLabelText("Key of C")).toBeTruthy();
+        expect(queryByLabelText("Key of F#/Gb")).toBeTruthy();
+      });
+    });
+
+    it("hides key selector with equal temperament", async () => {
+      const { getByLabelText, queryByText } = render(<Tuner />);
+
+      // Switch to just first
+      fireEvent.press(getByLabelText("Just intonation"));
+      await waitFor(() => {
+        expect(queryByText("Key")).toBeTruthy();
+      });
+
+      // Switch back to equal - now it shows ", selected" since Just was selected
+      fireEvent.press(getByLabelText("Equal temperament"));
+      await waitFor(() => {
+        expect(queryByText("Key")).toBeNull();
+      });
+    });
+  });
+
+  describe("error handling", () => {
+    it("displays error when there is a permission issue", () => {
+      (usePitchDetection as jest.Mock).mockReturnValue({
+        isListening: false,
+        startListening: mockStartListening,
+        stopListening: mockStopListening,
+        error: "Microphone permission denied",
+        permissionGranted: false,
+      });
+
+      const { getByText } = render(<Tuner />);
+      expect(getByText("Microphone permission denied")).toBeTruthy();
     });
   });
 });

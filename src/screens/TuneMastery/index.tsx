@@ -383,6 +383,8 @@ export default function TuneMasteryScreen({
                 bpm: (tune?.bpm as number | undefined) || undefined,
                 timeSignature: (tune?.timeSignature as string) || "4/4",
                 subdivision: (tune?.subdivision as number) || 1,
+                pitchSystem: (tune?.pitchSystem as "equal" | "just") || "just",
+                aHertz: (tune?.aHertz as number | undefined) || 440,
               };
             })()}
             onSubmitRating={handleSubmitRating}

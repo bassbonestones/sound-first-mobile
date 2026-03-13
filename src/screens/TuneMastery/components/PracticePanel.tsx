@@ -201,6 +201,8 @@ export interface TuneSettingsForPractice {
   bpm?: number;
   timeSignature?: string;
   subdivision?: number;
+  pitchSystem?: "equal" | "just";
+  aHertz?: number;
 }
 
 export interface PracticePanelProps {
@@ -221,6 +223,31 @@ const SUBDIVISION_MAP: Record<SubdivisionKey, SubdivisionValue> = {
   2: "halves",
   3: "triplet",
   4: "quarters",
+};
+
+// Map key names to chromatic index (0=C, 1=C#/Db, ..., 11=B)
+const KEY_TO_INDEX: Record<string, number> = {
+  C: 0,
+  "C#": 1,
+  Db: 1,
+  D: 2,
+  "D#": 3,
+  Eb: 3,
+  E: 4,
+  Fb: 4,
+  "E#": 5,
+  F: 5,
+  "F#": 6,
+  Gb: 6,
+  G: 7,
+  "G#": 8,
+  Ab: 8,
+  A: 9,
+  "A#": 10,
+  Bb: 10,
+  B: 11,
+  Cb: 11,
+  "B#": 0,
 };
 
 export default function PracticePanel({
@@ -265,6 +292,10 @@ export default function PracticePanel({
   const [beatsPerMeasure, noteValue] = metronomeTimeSignature
     .split("/")
     .map(Number);
+
+  // Get pitch system settings from tune
+  const tunePitchSystem = tuneSettings?.pitchSystem || "just";
+  const tuneKeyIndex = KEY_TO_INDEX[tuneKey] ?? 0;
 
   // Pick a random focus card when tune/key changes
   const focusCard = useMemo<FocusCard>(() => {
@@ -347,7 +378,17 @@ export default function PracticePanel({
               styles.toolCircle,
               tunerExpanded && styles.toolCircleActive,
             ]}
-            onPress={() => setTunerExpanded(!tunerExpanded)}
+            onPress={() => {
+              const willExpand = !tunerExpanded;
+              setTunerExpanded(willExpand);
+              if (willExpand) {
+                // Close other tools when tuner opens
+                setMetronomeExpanded(false);
+                setDroneExpanded(false);
+                // Mute audio so tuner can listen clearly
+                setAudioMuted(true);
+              }
+            }}
             accessibilityLabel={
               tunerExpanded ? "Collapse tuner" : "Expand tuner"
             }
@@ -375,8 +416,17 @@ export default function PracticePanel({
               if (!metronomeActive) {
                 setMetronomeActive(true);
                 setMetronomeExpanded(true);
+                // Close other tools when metronome opens
+                setTunerExpanded(false);
+                setDroneExpanded(false);
               } else {
-                setMetronomeExpanded(!metronomeExpanded);
+                const willExpand = !metronomeExpanded;
+                setMetronomeExpanded(willExpand);
+                if (willExpand) {
+                  // Close other tools when metronome panel expands
+                  setTunerExpanded(false);
+                  setDroneExpanded(false);
+                }
               }
             }}
             onLongPress={() => {
@@ -411,8 +461,17 @@ export default function PracticePanel({
               if (!droneActive) {
                 setDroneActive(true);
                 setDroneExpanded(true);
+                // Close other tools when drone opens
+                setTunerExpanded(false);
+                setMetronomeExpanded(false);
               } else {
-                setDroneExpanded(!droneExpanded);
+                const willExpand = !droneExpanded;
+                setDroneExpanded(willExpand);
+                if (willExpand) {
+                  // Close other tools when drone panel expands
+                  setTunerExpanded(false);
+                  setMetronomeExpanded(false);
+                }
               }
             }}
             onLongPress={() => {
@@ -442,7 +501,9 @@ export default function PracticePanel({
           <View style={styles.toolPanel}>
             <Tuner
               mode={settings?.tunerMode || "needle"}
-              temperament={settings?.temperament || "equal"}
+              temperament={tunePitchSystem}
+              selectedKeyIndex={tuneKeyIndex}
+              concertA={tuneSettings?.aHertz || 440}
             />
           </View>
         )}
@@ -495,69 +556,74 @@ export default function PracticePanel({
               muted={audioMuted}
               volume={droneVolume}
               hideInternalMute={true}
+              temperament={tunePitchSystem}
+              pitchCenter={tuneKeyIndex}
+              concertA={tuneSettings?.aHertz || 440}
             />
           </View>
         )}
 
-        {/* Rating Section */}
-        <View style={styles.ratingSection}>
-          <Text style={styles.ratingLabel}>How did it go?</Text>
+        {/* Rating Section - Hidden when tools are expanded */}
+        {!tunerExpanded && !metronomeExpanded && !droneExpanded && (
+          <View style={styles.ratingSection}>
+            <Text style={styles.ratingLabel}>How did it go?</Text>
 
-          {/* Score Display */}
-          <View style={styles.scoreDisplay}>
-            <Text style={styles.scoreValue}>{rating}%</Text>
-            <Text style={styles.scorePrevious}>(prev: {currentScore}%)</Text>
+            {/* Score Display */}
+            <View style={styles.scoreDisplay}>
+              <Text style={styles.scoreValue}>{rating}%</Text>
+              <Text style={styles.scorePrevious}>(prev: {currentScore}%)</Text>
+            </View>
+
+            {/* Slider */}
+            <Slider
+              style={styles.slider}
+              value={rating}
+              onValueChange={(value: number) => setRating(Math.round(value))}
+              minimumValue={0}
+              maximumValue={100}
+              step={1}
+              minimumTrackTintColor="#FFD700"
+              maximumTrackTintColor="#444"
+              thumbTintColor="#FFD700"
+            />
+
+            {/* Fine Tune Buttons */}
+            <View style={styles.fineTuneRow}>
+              <TouchableOpacity
+                style={styles.fineTuneButton}
+                onPress={() => handleFineTune(-5)}
+                accessibilityLabel="Decrease rating by 5"
+                accessibilityRole="button"
+              >
+                <Text style={styles.fineTuneButtonText}>-5</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.fineTuneButton}
+                onPress={() => handleFineTune(-1)}
+                accessibilityLabel="Decrease rating by 1"
+                accessibilityRole="button"
+              >
+                <Text style={styles.fineTuneButtonText}>-1</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.fineTuneButton}
+                onPress={() => handleFineTune(1)}
+                accessibilityLabel="Increase rating by 1"
+                accessibilityRole="button"
+              >
+                <Text style={styles.fineTuneButtonText}>+1</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.fineTuneButton}
+                onPress={() => handleFineTune(5)}
+                accessibilityLabel="Increase rating by 5"
+                accessibilityRole="button"
+              >
+                <Text style={styles.fineTuneButtonText}>+5</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-
-          {/* Slider */}
-          <Slider
-            style={styles.slider}
-            value={rating}
-            onValueChange={(value: number) => setRating(Math.round(value))}
-            minimumValue={0}
-            maximumValue={100}
-            step={1}
-            minimumTrackTintColor="#FFD700"
-            maximumTrackTintColor="#444"
-            thumbTintColor="#FFD700"
-          />
-
-          {/* Fine Tune Buttons */}
-          <View style={styles.fineTuneRow}>
-            <TouchableOpacity
-              style={styles.fineTuneButton}
-              onPress={() => handleFineTune(-5)}
-              accessibilityLabel="Decrease rating by 5"
-              accessibilityRole="button"
-            >
-              <Text style={styles.fineTuneButtonText}>-5</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.fineTuneButton}
-              onPress={() => handleFineTune(-1)}
-              accessibilityLabel="Decrease rating by 1"
-              accessibilityRole="button"
-            >
-              <Text style={styles.fineTuneButtonText}>-1</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.fineTuneButton}
-              onPress={() => handleFineTune(1)}
-              accessibilityLabel="Increase rating by 1"
-              accessibilityRole="button"
-            >
-              <Text style={styles.fineTuneButtonText}>+1</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.fineTuneButton}
-              onPress={() => handleFineTune(5)}
-              accessibilityLabel="Increase rating by 5"
-              accessibilityRole="button"
-            >
-              <Text style={styles.fineTuneButtonText}>+5</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        )}
       </ScrollView>
 
       {/* Submit Button - Hidden when tools are expanded */}

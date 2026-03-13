@@ -1,7 +1,7 @@
 /**
  * TuneCard - Single tune with 12-key score grid
  */
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -39,12 +39,16 @@ export interface TuneData {
   bpm?: number | null;
   timeSignature?: string;
   subdivision?: number;
+  pitchSystem?: "equal" | "just";
+  aHertz?: number | null;
 }
 
 export interface TuneSettings {
   bpm?: number | null;
   timeSignature?: string;
   subdivision?: number;
+  pitchSystem?: "equal" | "just";
+  aHertz?: number | null;
 }
 
 export interface TuneCardProps {
@@ -85,6 +89,14 @@ const TuneCard = React.memo(function TuneCard({
   const [editBpm, setEditBpm] = useState(
     tune.bpm !== null && tune.bpm !== undefined ? String(tune.bpm) : "",
   );
+  const [editAHertz, setEditAHertz] = useState(
+    tune.aHertz !== null && tune.aHertz !== undefined
+      ? String(tune.aHertz)
+      : "440",
+  );
+
+  // Tap tempo tracking
+  const tapTimesRef = useRef<number[]>([]);
 
   // Calculate tune progress
   const masteredCount = ALL_KEYS.filter(
@@ -109,6 +121,70 @@ const TuneCard = React.memo(function TuneCard({
     }
   }, [editBpm, tune.bpm, onUpdateSettings]);
 
+  const handleAHertzBlur = useCallback(() => {
+    const hertzValue =
+      editAHertz.trim() === "" ? null : parseInt(editAHertz, 10);
+    const currentValue = tune.aHertz ?? 440;
+    if (
+      hertzValue !== currentValue &&
+      (hertzValue === null || !isNaN(hertzValue))
+    ) {
+      onUpdateSettings?.({ aHertz: hertzValue });
+    }
+  }, [editAHertz, tune.aHertz, onUpdateSettings]);
+
+  // BPM adjustment handlers
+  const handleBpmChange = useCallback(
+    (newBpm: number) => {
+      const clampedBpm = Math.max(20, Math.min(350, newBpm));
+      setEditBpm(String(clampedBpm));
+      onUpdateSettings?.({ bpm: clampedBpm });
+    },
+    [onUpdateSettings],
+  );
+
+  const handleTapTempo = useCallback(() => {
+    const now = Date.now();
+    tapTimesRef.current.push(now);
+
+    // Keep only last 4 taps
+    if (tapTimesRef.current.length > 4) {
+      tapTimesRef.current.shift();
+    }
+
+    // Calculate average BPM from taps
+    if (tapTimesRef.current.length >= 2) {
+      const intervals: number[] = [];
+      for (let i = 1; i < tapTimesRef.current.length; i++) {
+        intervals.push(tapTimesRef.current[i] - tapTimesRef.current[i - 1]);
+      }
+      const avgInterval =
+        intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      const calculatedBpm = Math.round(60000 / avgInterval);
+      handleBpmChange(calculatedBpm);
+    }
+
+    // Reset if too much time passed
+    setTimeout(() => {
+      if (
+        tapTimesRef.current.length > 0 &&
+        Date.now() - tapTimesRef.current[tapTimesRef.current.length - 1] > 2000
+      ) {
+        tapTimesRef.current = [];
+      }
+    }, 2000);
+  }, [handleBpmChange]);
+
+  // aHertz adjustment handler
+  const handleAHertzChange = useCallback(
+    (newHz: number) => {
+      const clampedHz = Math.max(400, Math.min(480, newHz));
+      setEditAHertz(String(clampedHz));
+      onUpdateSettings?.({ aHertz: clampedHz });
+    },
+    [onUpdateSettings],
+  );
+
   const handleTimeSignatureChange = useCallback(
     (timeSig: string) => {
       if (timeSig !== tune.timeSignature) {
@@ -125,6 +201,15 @@ const TuneCard = React.memo(function TuneCard({
       }
     },
     [tune.subdivision, onUpdateSettings],
+  );
+
+  const handlePitchSystemChange = useCallback(
+    (pitchSystem: "equal" | "just") => {
+      if (pitchSystem !== tune.pitchSystem) {
+        onUpdateSettings?.({ pitchSystem });
+      }
+    },
+    [tune.pitchSystem, onUpdateSettings],
   );
 
   const handleLongPress = useCallback(() => {
@@ -238,16 +323,54 @@ const TuneCard = React.memo(function TuneCard({
               {/* BPM */}
               <View style={styles.tempoItem}>
                 <Text style={styles.tempoLabel}>BPM</Text>
-                <TextInput
-                  style={styles.bpmInput}
-                  value={editBpm}
-                  onChangeText={setEditBpm}
-                  onBlur={handleBpmBlur}
-                  keyboardType="numeric"
-                  placeholder="—"
-                  placeholderTextColor="#666"
-                  maxLength={3}
-                />
+                <View style={styles.adjustRow}>
+                  <TouchableOpacity
+                    style={styles.adjustButtonSmall}
+                    onPress={() => handleBpmChange((tune.bpm || 120) - 5)}
+                    accessibilityLabel="Decrease BPM by 5"
+                  >
+                    <Text style={styles.adjustButtonTextSmall}>−5</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.adjustButtonSmall}
+                    onPress={() => handleBpmChange((tune.bpm || 120) - 1)}
+                    accessibilityLabel="Decrease BPM by 1"
+                  >
+                    <Text style={styles.adjustButtonTextSmall}>−1</Text>
+                  </TouchableOpacity>
+                  <TextInput
+                    style={styles.bpmInput}
+                    value={editBpm}
+                    onChangeText={setEditBpm}
+                    onBlur={handleBpmBlur}
+                    keyboardType="numeric"
+                    placeholder="—"
+                    placeholderTextColor="#666"
+                    maxLength={3}
+                  />
+                  <TouchableOpacity
+                    style={styles.adjustButtonSmall}
+                    onPress={() => handleBpmChange((tune.bpm || 120) + 1)}
+                    accessibilityLabel="Increase BPM by 1"
+                  >
+                    <Text style={styles.adjustButtonTextSmall}>+1</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.adjustButtonSmall}
+                    onPress={() => handleBpmChange((tune.bpm || 120) + 5)}
+                    accessibilityLabel="Increase BPM by 5"
+                  >
+                    <Text style={styles.adjustButtonTextSmall}>+5</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.tapButton}
+                    onPress={handleTapTempo}
+                    accessibilityLabel="Tap tempo"
+                    accessibilityHint="Tap repeatedly to set tempo"
+                  >
+                    <Text style={styles.tapButtonText}>Tap</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Time Signature */}
@@ -301,6 +424,80 @@ const TuneCard = React.memo(function TuneCard({
                       </Text>
                     </TouchableOpacity>
                   ))}
+                </View>
+              </View>
+
+              {/* Pitch System */}
+              <View style={styles.tempoItem}>
+                <Text style={styles.tempoLabel}>Pitch</Text>
+                <View style={styles.pickerRow}>
+                  {(["equal", "just"] as const).map((ps) => (
+                    <TouchableOpacity
+                      key={ps}
+                      style={[
+                        styles.pickerOption,
+                        (tune.pitchSystem || "just") === ps &&
+                          styles.pickerOptionActive,
+                      ]}
+                      onPress={() => handlePitchSystemChange(ps)}
+                    >
+                      <Text
+                        style={[
+                          styles.pickerOptionText,
+                          (tune.pitchSystem || "just") === ps &&
+                            styles.pickerOptionTextActive,
+                        ]}
+                      >
+                        {ps === "equal" ? "Equal" : "Just"}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Concert A */}
+              <View style={styles.tempoItem}>
+                <Text style={styles.tempoLabel}>A=</Text>
+                <View style={styles.adjustRow}>
+                  <TouchableOpacity
+                    style={styles.adjustButtonSmall}
+                    onPress={() => handleAHertzChange((tune.aHertz || 440) - 5)}
+                    accessibilityLabel="Decrease Hz by 5"
+                  >
+                    <Text style={styles.adjustButtonTextSmall}>−5</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.adjustButtonSmall}
+                    onPress={() => handleAHertzChange((tune.aHertz || 440) - 1)}
+                    accessibilityLabel="Decrease Hz by 1"
+                  >
+                    <Text style={styles.adjustButtonTextSmall}>−1</Text>
+                  </TouchableOpacity>
+                  <TextInput
+                    style={styles.bpmInput}
+                    value={editAHertz}
+                    onChangeText={setEditAHertz}
+                    onBlur={handleAHertzBlur}
+                    keyboardType="numeric"
+                    placeholder="440"
+                    placeholderTextColor="#666"
+                    maxLength={3}
+                  />
+                  <TouchableOpacity
+                    style={styles.adjustButtonSmall}
+                    onPress={() => handleAHertzChange((tune.aHertz || 440) + 1)}
+                    accessibilityLabel="Increase Hz by 1"
+                  >
+                    <Text style={styles.adjustButtonTextSmall}>+1</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.adjustButtonSmall}
+                    onPress={() => handleAHertzChange((tune.aHertz || 440) + 5)}
+                    accessibilityLabel="Increase Hz by 5"
+                  >
+                    <Text style={styles.adjustButtonTextSmall}>+5</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.aHertzUnit}>Hz</Text>
                 </View>
               </View>
             </View>
@@ -500,6 +697,50 @@ const styles = StyleSheet.create({
   },
   pickerOptionTextActive: {
     color: "#1a1a2e",
+    fontWeight: "600",
+  },
+  aHertzRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  aHertzUnit: {
+    color: "#888",
+    fontSize: 12,
+  },
+  // Adjustment controls
+  adjustRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flexWrap: "wrap",
+  },
+  adjustButtonSmall: {
+    backgroundColor: "#3a3a4e",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#5a4a3a",
+  },
+  adjustButtonTextSmall: {
+    color: "#bfa76a",
+    fontSize: 12,
+  },
+  tapButton: {
+    backgroundColor: "#3a3a4e",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#FFD700",
+    marginLeft: 4,
+  },
+  tapButtonText: {
+    color: "#FFD700",
+    fontSize: 12,
     fontWeight: "600",
   },
 });
