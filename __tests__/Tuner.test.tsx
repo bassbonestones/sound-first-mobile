@@ -66,12 +66,14 @@ describe("Tuner", () => {
     it("renders with default needle mode", () => {
       const { getByText, getByLabelText } = render(<Tuner />);
       expect(getByText("🎤")).toBeTruthy();
-      // Temperament buttons are visible (Equal is selected by default)
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
+      // Temperament buttons are visible in modal (Equal is selected by default)
       expect(
         getByLabelText("Standard equal temperament, selected"),
       ).toBeTruthy();
       expect(getByLabelText("Resonance just intonation")).toBeTruthy();
-      // Concert A input is visible
+      // Concert A input is visible in modal
       expect(getByLabelText("Concert A frequency")).toBeTruthy();
     });
 
@@ -128,6 +130,7 @@ describe("Tuner", () => {
     it("temperament buttons have accessible labels", () => {
       const { getByLabelText } = render(<Tuner />);
       // Labels include ", selected" state for the active button (equal by default)
+      fireEvent.press(getByLabelText("Open tuning settings"));
       expect(
         getByLabelText("Standard equal temperament, selected"),
       ).toBeTruthy();
@@ -135,13 +138,15 @@ describe("Tuner", () => {
     });
 
     it("temperament buttons have button role", () => {
-      const { getAllByRole } = render(<Tuner />);
+      const { getAllByRole, getByLabelText } = render(<Tuner />);
+      fireEvent.press(getByLabelText("Open tuning settings"));
       const buttons = getAllByRole("button");
       expect(buttons.length).toBeGreaterThanOrEqual(2);
     });
 
     it("concert A input has accessible label", () => {
       const { getByLabelText } = render(<Tuner />);
+      fireEvent.press(getByLabelText("Open tuning settings"));
       expect(getByLabelText("Concert A frequency")).toBeTruthy();
     });
   });
@@ -365,17 +370,23 @@ describe("Tuner", () => {
     it("can switch to just intonation", async () => {
       const { getByLabelText, queryByText } = render(<Tuner />);
 
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
+
       // Press Just button
       fireEvent.press(getByLabelText("Resonance just intonation"));
 
       // Should show key selector when Just is selected
       await waitFor(() => {
-        expect(queryByText("Key")).toBeTruthy();
+        expect(queryByText("Key Center")).toBeTruthy();
       });
     });
 
     it("shows key selector with just intonation", async () => {
       const { getByLabelText, queryByLabelText } = render(<Tuner />);
+
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
 
       fireEvent.press(getByLabelText("Resonance just intonation"));
 
@@ -389,16 +400,19 @@ describe("Tuner", () => {
     it("hides key selector with equal temperament", async () => {
       const { getByLabelText, queryByText } = render(<Tuner />);
 
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
+
       // Switch to just first
       fireEvent.press(getByLabelText("Resonance just intonation"));
       await waitFor(() => {
-        expect(queryByText("Key")).toBeTruthy();
+        expect(queryByText("Key Center")).toBeTruthy();
       });
 
       // Switch back to equal - now it shows ", selected" since Just was selected
       fireEvent.press(getByLabelText("Standard equal temperament"));
       await waitFor(() => {
-        expect(queryByText("Key")).toBeNull();
+        expect(queryByText("Key Center")).toBeNull();
       });
     });
   });
@@ -437,6 +451,9 @@ describe("Tuner", () => {
 
       const { getByLabelText } = render(<Tuner />);
 
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
+
       // Switch to just intonation
       fireEvent.press(getByLabelText("Resonance just intonation"));
 
@@ -463,6 +480,9 @@ describe("Tuner", () => {
       );
 
       const { getByLabelText } = render(<Tuner />);
+
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
 
       // Switch to just intonation
       fireEvent.press(getByLabelText("Resonance just intonation"));
@@ -507,6 +527,9 @@ describe("Tuner", () => {
 
       const { getByLabelText } = render(<Tuner />);
 
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
+
       // Switch to just intonation
       fireEvent.press(getByLabelText("Resonance just intonation"));
 
@@ -542,6 +565,9 @@ describe("Tuner", () => {
 
       const { getByLabelText } = render(<Tuner />);
 
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
+
       // Switch to just intonation
       fireEvent.press(getByLabelText("Resonance just intonation"));
 
@@ -571,6 +597,9 @@ describe("Tuner", () => {
 
       const { getByLabelText } = render(<Tuner />);
 
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
+
       // Change concert A to 442
       fireEvent.changeText(getByLabelText("Concert A frequency"), "442");
 
@@ -597,6 +626,9 @@ describe("Tuner", () => {
       );
 
       const { getByLabelText } = render(<Tuner />);
+
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
 
       // Enter invalid concert A (empty string will parse to NaN, falls back to 440)
       fireEvent.changeText(getByLabelText("Concert A frequency"), "");

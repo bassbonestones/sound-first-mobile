@@ -163,7 +163,32 @@ export const TUNER_FLAGS = {
   sessionStats: true,
   /** Phase 2A.2 - Attack summary ("Your attacks averaged +4¢ sharp") */
   attackSummary: true,
+  /** Phase 2A.3 - Target tone challenge mode ("Hold C3 within ±5¢ for 4 seconds") */
+  targetToneChallenge: true,
 } as const;
+
+// ===========================================
+// TARGET TONE CHALLENGE CONSTANTS (Phase 2A)
+// ===========================================
+
+/** Default tolerance for target tone challenges (cents) */
+export const CHALLENGE_DEFAULT_TOLERANCE = 5;
+
+/** Default hold duration for target tone challenges (ms) */
+export const CHALLENGE_DEFAULT_DURATION_MS = 4000;
+
+/** Minimum hold duration before progress starts counting (ms) */
+export const CHALLENGE_MIN_HOLD_MS = 100;
+
+/** Challenge difficulty presets */
+export const CHALLENGE_DIFFICULTIES = {
+  easy: { tolerance: 10, durationMs: 3000, label: "Easy" },
+  medium: { tolerance: 5, durationMs: 4000, label: "Medium" },
+  hard: { tolerance: 3, durationMs: 5000, label: "Hard" },
+  expert: { tolerance: 2, durationMs: 6000, label: "Expert" },
+} as const;
+
+export type ChallengeDifficulty = keyof typeof CHALLENGE_DIFFICULTIES;
 
 // ===========================================
 // COLOR DEFINITIONS

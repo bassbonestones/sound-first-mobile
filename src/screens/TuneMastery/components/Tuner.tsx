@@ -25,6 +25,8 @@ import {
   TextInput,
   StyleSheet,
   Animated,
+  Modal,
+  ScrollView,
 } from "react-native";
 import Svg, { Path, Line, Text as SvgText, Circle } from "react-native-svg";
 import { usePitchDetection } from "../../../hooks/usePitchDetection";
@@ -81,6 +83,23 @@ import {
   calculateAttackSummary,
   type SessionStats,
 } from "./Tuner/tunerSessionStats";
+
+// Import challenge mode for Phase 2A
+import {
+  createInitialChallengeState,
+  createRandomChallenge,
+  startChallenge,
+  updateChallengeState,
+  cancelChallenge,
+  resetAfterSuccess,
+  getChallengeInstructionText,
+  getChallengeStatusText,
+  getChallengeProgressColor,
+  DEFAULT_CHALLENGE_NOTES,
+  type ChallengeState,
+  type ChallengeDifficulty,
+} from "./Tuner/tunerChallenge";
+import { CHALLENGE_DIFFICULTIES } from "./Tuner/tunerConstants";
 
 // Minor 7th system options
 export type Minor7System = "classical" | "pythagorean" | "harmonic";
@@ -241,6 +260,9 @@ const Tuner = React.memo(function Tuner({
   const [selectedKeyIndex, setSelectedKeyIndex] = useState(initialKeyIndex); // 0 = C
   const [concertA, setConcertA] = useState(String(initialConcertA));
   const [minor7System, setMinor7System] = useState<Minor7System>("pythagorean");
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  // Feedback display mode: 0=Deviation, 1=Guidance, 2=Stability, 3=Tendency
+  const [feedbackMode, setFeedbackMode] = useState(0);
   const silenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Refs for callback to read current values (avoids stale closure in requestAnimationFrame loop)
@@ -303,6 +325,13 @@ const Tuner = React.memo(function Tuner({
   const isAttackSampleRef = useRef<boolean>(true);
   // Track last note for attack detection (new note = new attack)
   const attackNoteRef = useRef<string | null>(null);
+
+  // Target tone challenge state (Phase 2A)
+  const [challengeState, setChallengeState] = useState<ChallengeState>(
+    createInitialChallengeState,
+  );
+  const [challengeDifficulty, setChallengeDifficulty] =
+    useState<ChallengeDifficulty>("medium");
 
   // Smoothing refs for reducing jitter
   const smoothedFrequencyRef = useRef<number | null>(null);
@@ -507,6 +536,13 @@ const Tuner = React.memo(function Tuner({
               note,
               isAttackSample: isAttack,
             }),
+          );
+        }
+
+        // Target tone challenge update (Phase 2A)
+        if (TUNER_FLAGS.targetToneChallenge) {
+          setChallengeState((prev) =>
+            updateChallengeState(prev, note, roundedCents, now),
           );
         }
 
@@ -984,47 +1020,53 @@ const Tuner = React.memo(function Tuner({
                   <Text style={styles.micIcon}>🎤</Text>
                 )}
               </View>
-              {/* State text row - always rendered with fixed height */}
-              <View style={styles.stateTextRow}>
-                {currentNote &&
-                  (TUNER_FLAGS.stateLanguage ? (
-                    <Text style={[styles.stateText, { color: tuneColor }]}>
-                      {stateText}
-                    </Text>
-                  ) : (
-                    <Text style={styles.centsDisplay}>
-                      {cents > 0 ? "+" : ""}
-                      {cents} cents
-                    </Text>
-                  ))}
-              </View>
-              {/* Fixed-height row for Directional Guidance (Phase 1C) */}
-              <View style={styles.guidanceRow}>
-                {currentNote &&
-                  TUNER_FLAGS.directionalGuidance &&
-                  directionalGuidance.text &&
-                  !isDetectingPhase(tunerState) && (
-                    <Text
-                      style={[
-                        styles.guidanceText,
-                        {
-                          color:
-                            directionalGuidance.direction === "lower"
-                              ? "#FF9800"
-                              : "#2196F3",
-                        },
-                      ]}
-                    >
-                      {directionalGuidance.text}
-                    </Text>
+              {/* Tappable feedback area - cycles through modes */}
+              <TouchableOpacity
+                style={styles.feedbackArea}
+                onPress={() => setFeedbackMode((prev) => (prev + 1) % 4)}
+                activeOpacity={0.7}
+                accessibilityLabel="Tap to cycle feedback display"
+                accessibilityRole="button"
+              >
+                <View style={styles.feedbackContent}>
+                  {feedbackMode === 0 && currentNote && (
+                    // Mode 0: Deviation (60¢ SHARP / PERFECT)
+                    TUNER_FLAGS.stateLanguage ? (
+                      <Text style={[styles.stateText, { color: tuneColor }]}>
+                        {stateText}
+                      </Text>
+                    ) : (
+                      <Text style={styles.centsDisplay}>
+                        {cents > 0 ? "+" : ""}
+                        {cents} cents
+                      </Text>
+                    )
                   )}
-              </View>
-              {/* Fixed-height row for Stability Indicator (Phase 1) */}
-              <View style={styles.stabilityRow}>
-                {currentNote &&
-                  TUNER_FLAGS.stabilityIndicator &&
-                  !isDetectingPhase(tunerState) && (
-                    <>
+                  {feedbackMode === 1 && currentNote && !isDetectingPhase(tunerState) && (
+                    // Mode 1: Guidance (Lower pitch a lot)
+                    directionalGuidance.text ? (
+                      <Text
+                        style={[
+                          styles.guidanceText,
+                          {
+                            color:
+                              directionalGuidance.direction === "lower"
+                                ? "#FF9800"
+                                : "#2196F3",
+                          },
+                        ]}
+                      >
+                        {directionalGuidance.text}
+                      </Text>
+                    ) : (
+                      <Text style={[styles.guidanceText, { color: "#4CAF50" }]}>
+                        On target
+                      </Text>
+                    )
+                  )}
+                  {feedbackMode === 2 && currentNote && !isDetectingPhase(tunerState) && (
+                    // Mode 2: Stability (STABLE / DRIFTING / UNSTABLE)
+                    <View style={styles.stabilityContent}>
                       <View
                         style={[
                           styles.stabilityDot,
@@ -1043,30 +1085,52 @@ const Tuner = React.memo(function Tuner({
                             ? "DRIFTING"
                             : "UNSTABLE"}
                       </Text>
-                    </>
+                    </View>
                   )}
-              </View>
-              {/* Fixed-height row for Direction Bias Indicator (Phase 1C) */}
-              <View style={styles.biasRow}>
-                {currentNote &&
-                  TUNER_FLAGS.directionBias &&
-                  directionBias.biasText &&
-                  !isDetectingPhase(tunerState) && (
-                    <Text
-                      style={[
-                        styles.biasIndicator,
-                        {
-                          color:
-                            directionBias.direction === "sharp"
-                              ? "#FF9800"
-                              : "#2196F3",
-                        },
-                      ]}
-                    >
-                      {directionBias.biasText}
+                  {feedbackMode === 3 && currentNote && !isDetectingPhase(tunerState) && (
+                    // Mode 3: Tendency (Strong sharp tendency)
+                    directionBias.biasText ? (
+                      <Text
+                        style={[
+                          styles.biasIndicator,
+                          {
+                            color:
+                              directionBias.direction === "sharp"
+                                ? "#FF9800"
+                                : "#2196F3",
+                          },
+                        ]}
+                      >
+                        {directionBias.biasText}
+                      </Text>
+                    ) : (
+                      <Text style={[styles.biasIndicator, { color: "#888" }]}>
+                        No tendency yet
+                      </Text>
+                    )
+                  )}
+                  {!currentNote && (
+                    <Text style={styles.feedbackPlaceholder}>
+                      <Text style={styles.feedbackModeName}>
+                        {["Deviation", "Guidance", "Stability", "Tendency"][feedbackMode]}
+                      </Text>
+                      {" — Waiting for pitch..."}
                     </Text>
                   )}
-              </View>
+                </View>
+                {/* Dot indicators */}
+                <View style={styles.feedbackDots}>
+                  {[0, 1, 2, 3].map((i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.feedbackDot,
+                        feedbackMode === i && styles.feedbackDotActive,
+                      ]}
+                    />
+                  ))}
+                </View>
+              </TouchableOpacity>
               {/* Fixed-height row for Lock/Hold Indicator (Phase 1) */}
               <View style={styles.lockHoldRow}>
                 {currentNote && TUNER_FLAGS.holdIndicator && showLock && (
@@ -1134,41 +1198,6 @@ const Tuner = React.memo(function Tuner({
                 <Text style={styles.textMicIcon}>🎤</Text>
               )}
             </View>
-            {/* State text row */}
-            <View style={styles.textCentsRow}>
-              {currentNote &&
-                (TUNER_FLAGS.stateLanguage ? (
-                  <Text style={[styles.textCents, { color: tuneColor }]}>
-                    {stateText}
-                  </Text>
-                ) : (
-                  <Text style={[styles.textCents, { color: tuneColor }]}>
-                    {cents > 0 ? "+" : ""}
-                    {cents} cents
-                  </Text>
-                ))}
-            </View>
-            {/* Fixed-height row for Directional Guidance (Phase 1C) */}
-            <View style={styles.guidanceRow}>
-              {currentNote &&
-                TUNER_FLAGS.directionalGuidance &&
-                directionalGuidance.text &&
-                !isDetectingPhase(tunerState) && (
-                  <Text
-                    style={[
-                      styles.guidanceText,
-                      {
-                        color:
-                          directionalGuidance.direction === "lower"
-                            ? "#FF9800"
-                            : "#2196F3",
-                      },
-                    ]}
-                  >
-                    {directionalGuidance.text}
-                  </Text>
-                )}
-            </View>
             {/* Frequency row */}
             <View style={styles.textFreqRow}>
               {currentNote && (
@@ -1177,12 +1206,53 @@ const Tuner = React.memo(function Tuner({
                 </Text>
               )}
             </View>
-            {/* Fixed-height row for Stability Indicator */}
-            <View style={styles.stabilityRow}>
-              {currentNote &&
-                TUNER_FLAGS.stabilityIndicator &&
-                !isDetectingPhase(tunerState) && (
-                  <>
+            {/* Tappable feedback area - cycles through modes */}
+            <TouchableOpacity
+              style={styles.feedbackArea}
+              onPress={() => setFeedbackMode((prev) => (prev + 1) % 4)}
+              activeOpacity={0.7}
+              accessibilityLabel="Tap to cycle feedback display"
+              accessibilityRole="button"
+            >
+              <View style={styles.feedbackContent}>
+                {feedbackMode === 0 && currentNote && (
+                  // Mode 0: Deviation
+                  TUNER_FLAGS.stateLanguage ? (
+                    <Text style={[styles.textCents, { color: tuneColor }]}>
+                      {stateText}
+                    </Text>
+                  ) : (
+                    <Text style={[styles.textCents, { color: tuneColor }]}>
+                      {cents > 0 ? "+" : ""}
+                      {cents} cents
+                    </Text>
+                  )
+                )}
+                {feedbackMode === 1 && currentNote && !isDetectingPhase(tunerState) && (
+                  // Mode 1: Guidance
+                  directionalGuidance.text ? (
+                    <Text
+                      style={[
+                        styles.guidanceText,
+                        {
+                          color:
+                            directionalGuidance.direction === "lower"
+                              ? "#FF9800"
+                              : "#2196F3",
+                        },
+                      ]}
+                    >
+                      {directionalGuidance.text}
+                    </Text>
+                  ) : (
+                    <Text style={[styles.guidanceText, { color: "#4CAF50" }]}>
+                      On target
+                    </Text>
+                  )
+                )}
+                {feedbackMode === 2 && currentNote && !isDetectingPhase(tunerState) && (
+                  // Mode 2: Stability
+                  <View style={styles.stabilityContent}>
                     <View
                       style={[
                         styles.stabilityDot,
@@ -1198,30 +1268,52 @@ const Tuner = React.memo(function Tuner({
                           ? "DRIFTING"
                           : "UNSTABLE"}
                     </Text>
-                  </>
+                  </View>
                 )}
-            </View>
-            {/* Fixed-height row for Direction Bias Indicator (Phase 1C) */}
-            <View style={styles.biasRow}>
-              {currentNote &&
-                TUNER_FLAGS.directionBias &&
-                directionBias.biasText &&
-                !isDetectingPhase(tunerState) && (
-                  <Text
-                    style={[
-                      styles.biasIndicator,
-                      {
-                        color:
-                          directionBias.direction === "sharp"
-                            ? "#FF9800"
-                            : "#2196F3",
-                      },
-                    ]}
-                  >
-                    {directionBias.biasText}
+                {feedbackMode === 3 && currentNote && !isDetectingPhase(tunerState) && (
+                  // Mode 3: Tendency
+                  directionBias.biasText ? (
+                    <Text
+                      style={[
+                        styles.biasIndicator,
+                        {
+                          color:
+                            directionBias.direction === "sharp"
+                              ? "#FF9800"
+                              : "#2196F3",
+                        },
+                      ]}
+                    >
+                      {directionBias.biasText}
+                    </Text>
+                  ) : (
+                    <Text style={[styles.biasIndicator, { color: "#888" }]}>
+                      No tendency yet
+                    </Text>
+                  )
+                )}
+                {!currentNote && (
+                  <Text style={styles.feedbackPlaceholder}>
+                    <Text style={styles.feedbackModeName}>
+                      {["Deviation", "Guidance", "Stability", "Tendency"][feedbackMode]}
+                    </Text>
+                    {" — Waiting for pitch..."}
                   </Text>
                 )}
-            </View>
+              </View>
+              {/* Dot indicators */}
+              <View style={styles.feedbackDots}>
+                {[0, 1, 2, 3].map((i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.feedbackDot,
+                      feedbackMode === i && styles.feedbackDotActive,
+                    ]}
+                  />
+                ))}
+              </View>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -1293,196 +1385,399 @@ const Tuner = React.memo(function Tuner({
         </View>
       )}
 
-      {/* Temperament & Concert A Row */}
-      <View style={styles.settingsRow}>
-        {/* Temperament Toggle - Renamed for clarity (Phase 1A) */}
-        <View style={styles.temperamentToggle}>
-          <TouchableOpacity
-            onPress={() => setActiveTemperament("equal")}
-            style={[
-              styles.temperamentButtonLeft,
-              activeTemperament === "equal"
-                ? styles.temperamentButtonActive
-                : styles.temperamentButtonInactive,
-            ]}
-            accessibilityLabel={`Standard equal temperament${activeTemperament === "equal" ? ", selected" : ""}`}
-            accessibilityRole="button"
-            accessibilityState={{ selected: activeTemperament === "equal" }}
-          >
-            <Text
-              style={[
-                styles.temperamentButtonText,
-                activeTemperament === "equal"
-                  ? styles.temperamentButtonTextActive
-                  : styles.temperamentButtonTextInactive,
-              ]}
-            >
-              Standard (ET)
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setActiveTemperament("just")}
-            style={[
-              styles.temperamentButtonRight,
-              activeTemperament === "just"
-                ? styles.temperamentButtonActive
-                : styles.temperamentButtonInactive,
-            ]}
-            accessibilityLabel={`Resonance just intonation${activeTemperament === "just" ? ", selected" : ""}`}
-            accessibilityRole="button"
-            accessibilityState={{ selected: activeTemperament === "just" }}
-          >
-            <Text
-              style={[
-                styles.temperamentButtonText,
-                activeTemperament === "just"
-                  ? styles.temperamentButtonTextActive
-                  : styles.temperamentButtonTextInactive,
-              ]}
-            >
-              Resonance (JI)
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Concert A Input */}
-        <View style={styles.concertARow}>
-          <Text style={styles.concertALabel}>A=</Text>
-          <TextInput
-            value={concertA}
-            onChangeText={setConcertA}
-            keyboardType="numeric"
-            style={styles.concertAInput}
-            placeholder="440"
-            placeholderTextColor="#666"
-            accessibilityLabel="Concert A frequency"
-          />
-          <Text style={styles.concertAUnit}>Hz</Text>
-        </View>
-      </View>
-
-      {/* Key Selector (shown when Just Intonation is selected) */}
-      {activeTemperament === "just" && (
-        <View style={styles.keySelector}>
-          <Text style={styles.keySelectorLabel}>Key</Text>
-          <View style={styles.keyGrid}>
-            {[0, 1, 2].map((row) => (
-              <View key={row} style={styles.keyRow}>
-                {KEY_DISPLAY_NAMES.slice(row * 4, row * 4 + 4).map(
-                  (keyName, colIndex) => {
-                    const index = row * 4 + colIndex;
-                    return (
-                      <TouchableOpacity
-                        key={keyName}
+      {/* Target Tone Challenge Panel (Phase 2A) */}
+      {TUNER_FLAGS.targetToneChallenge && (
+        <View style={styles.challengePanel}>
+          {challengeState.status === "idle" ? (
+            // Challenge start UI
+            <View style={styles.challengeStartContent}>
+              <Text style={styles.challengePanelTitle}>Target Tone Challenge</Text>
+              <View style={styles.challengeDifficultyRow}>
+                {(Object.keys(CHALLENGE_DIFFICULTIES) as ChallengeDifficulty[]).map(
+                  (difficulty) => (
+                    <TouchableOpacity
+                      key={difficulty}
+                      onPress={() => {
+                        if (difficulty !== challengeDifficulty) {
+                          setChallengeDifficulty(difficulty);
+                          setChallengeState(createInitialChallengeState());
+                        }
+                      }}
+                      style={[
+                        styles.challengeDifficultyButton,
+                        challengeDifficulty === difficulty &&
+                          styles.challengeDifficultyButtonActive,
+                      ]}
+                      accessibilityLabel={`${difficulty} difficulty${challengeDifficulty === difficulty ? ", selected" : ""}`}
+                      accessibilityRole="button"
+                    >
+                      <Text
                         style={[
-                          styles.keyOption,
-                          selectedKeyIndex === index && styles.keyOptionActive,
+                          styles.challengeDifficultyText,
+                          challengeDifficulty === difficulty &&
+                            styles.challengeDifficultyTextActive,
                         ]}
-                        onPress={() => {
-                          console.log(
-                            `[KEY_CLICK] User clicked key: ${index} (${KEY_DISPLAY_NAMES[index]?.split("/")[0]})`,
-                          );
-                          setSelectedKeyIndex(index);
-                        }}
-                        accessibilityLabel={`Key of ${keyName}`}
-                        accessibilityRole="button"
                       >
-                        <Text
-                          style={[
-                            styles.keyOptionText,
-                            selectedKeyIndex === index &&
-                              styles.keyOptionTextActive,
-                          ]}
-                        >
-                          {keyName}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  },
+                        {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ),
                 )}
               </View>
-            ))}
-          </View>
+              <TouchableOpacity
+                onPress={() => {
+                  const newChallenge = createRandomChallenge(
+                    DEFAULT_CHALLENGE_NOTES,
+                    challengeDifficulty,
+                  );
+                  setChallengeState(startChallenge(challengeState, newChallenge));
+                }}
+                style={styles.challengeStartButton}
+                accessibilityLabel="Start challenge"
+                accessibilityRole="button"
+              >
+                <Text style={styles.challengeStartButtonText}>Start Challenge</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            // Active challenge UI
+            <View style={styles.challengeActiveContent}>
+              <View style={styles.challengeHeader}>
+                <Text style={styles.challengeTargetLabel}>
+                  {challengeState.target
+                    ? getChallengeInstructionText(challengeState.target)
+                    : "Loading..."}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    // Skip generates a new random note
+                    const newChallenge = createRandomChallenge(
+                      DEFAULT_CHALLENGE_NOTES,
+                      challengeDifficulty,
+                    );
+                    setChallengeState(startChallenge(cancelChallenge(challengeState), newChallenge));
+                  }}
+                  style={styles.challengeSkipButton}
+                  accessibilityLabel="Skip to next note"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.challengeSkipText}>Skip</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setChallengeState(cancelChallenge(challengeState))}
+                  style={styles.challengeStopButton}
+                  accessibilityLabel="Stop challenge"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.challengeStopText}>Stop</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {challengeState.target && (
+                <View style={styles.challengeTargetDisplay}>
+                  <Text style={styles.challengeTargetNote}>
+                    {challengeState.target.note}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.challengeStatusRow}>
+                <Text
+                  style={[
+                    styles.challengeStatusText,
+                    { color: getChallengeProgressColor(challengeState) },
+                  ]}
+                >
+                  {getChallengeStatusText(challengeState)}
+                </Text>
+              </View>
+
+              {/* Progress bar */}
+              {challengeState.target && (challengeState.status === "waiting" || challengeState.status === "holding") && (
+                <View style={styles.challengeProgressBar}>
+                  <View
+                    style={[
+                      styles.challengeProgressFill,
+                      {
+                        width: `${Math.min(100, challengeState.progress * 100)}%`,
+                        backgroundColor: getChallengeProgressColor(challengeState),
+                      },
+                    ]}
+                  />
+                </View>
+              )}
+
+              {/* Success/Fail actions */}
+              {(challengeState.status === "success" ||
+                challengeState.status === "failed") && (
+                <TouchableOpacity
+                  onPress={() => {
+                    if (challengeState.status === "success") {
+                      // Auto-generate next challenge
+                      const newChallenge = createRandomChallenge(
+                        DEFAULT_CHALLENGE_NOTES,
+                        challengeDifficulty,
+                      );
+                      setChallengeState((prev) =>
+                        startChallenge(resetAfterSuccess(prev), newChallenge),
+                      );
+                    } else {
+                      // Reset to idle
+                      setChallengeState(cancelChallenge(challengeState));
+                    }
+                  }}
+                  style={[
+                    styles.challengeNextButton,
+                    challengeState.status === "success"
+                      ? styles.challengeNextButtonSuccess
+                      : styles.challengeNextButtonRetry,
+                  ]}
+                  accessibilityLabel={
+                    challengeState.status === "success"
+                      ? "Next challenge"
+                      : "Try again"
+                  }
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.challengeNextButtonText}>
+                    {challengeState.status === "success" ? "Next →" : "Try Again"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Score display */}
+              <View style={styles.challengeScoreRow}>
+                <Text style={styles.challengeScoreLabel}>Completed:</Text>
+                <Text style={styles.challengeScoreValue}>
+                  {challengeState.completedCount}
+                </Text>
+                <Text style={styles.challengeStreakLabel}>Attempts:</Text>
+                <Text style={styles.challengeStreakValue}>
+                  {challengeState.attemptCount}
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
       )}
 
-      {/* Minor 7th System Toggle (shown when Just Intonation is selected) */}
-      {activeTemperament === "just" && (
-        <View style={styles.m7SystemContainer}>
-          <Text style={styles.m7SystemLabel}>Minor 7th</Text>
-          <View style={styles.m7SystemToggle}>
-            <TouchableOpacity
-              onPress={() => setMinor7System("classical")}
-              style={[
-                styles.m7ButtonLeft,
-                minor7System === "classical"
-                  ? styles.m7ButtonActive
-                  : styles.m7ButtonInactive,
-              ]}
-              accessibilityLabel={`Classical 9:5${minor7System === "classical" ? ", selected" : ""}`}
-              accessibilityRole="button"
-              accessibilityState={{ selected: minor7System === "classical" }}
-            >
-              <Text
-                style={[
-                  styles.m7ButtonText,
-                  minor7System === "classical"
-                    ? styles.m7ButtonTextActive
-                    : styles.m7ButtonTextInactive,
-                ]}
+      {/* Settings Summary Button */}
+      <TouchableOpacity
+        style={styles.settingsSummaryButton}
+        onPress={() => setShowSettingsModal(true)}
+        accessibilityLabel="Open tuning settings"
+        accessibilityRole="button"
+      >
+        <Text style={styles.settingsSummaryText}>
+          {activeTemperament === "equal"
+            ? `ET  •  A=${concertA}Hz`
+            : `JI  •  ${KEY_DISPLAY_NAMES[selectedKeyIndex]}  •  A=${concertA}Hz  •  m7: ${MINOR_7TH_LABELS[minor7System]}`}
+        </Text>
+        <Text style={styles.settingsSummaryIcon}>⚙️</Text>
+      </TouchableOpacity>
+
+      {/* Settings Modal */}
+      <Modal
+        visible={showSettingsModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowSettingsModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Tuning Settings</Text>
+              <TouchableOpacity
+                onPress={() => setShowSettingsModal(false)}
+                style={styles.modalCloseButton}
+                accessibilityLabel="Close settings"
               >
-                9:5
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setMinor7System("pythagorean")}
-              style={[
-                styles.m7ButtonMiddle,
-                minor7System === "pythagorean"
-                  ? styles.m7ButtonActive
-                  : styles.m7ButtonInactive,
-              ]}
-              accessibilityLabel={`Pythagorean 16:9${minor7System === "pythagorean" ? ", selected" : ""}`}
-              accessibilityRole="button"
-              accessibilityState={{ selected: minor7System === "pythagorean" }}
-            >
-              <Text
-                style={[
-                  styles.m7ButtonText,
-                  minor7System === "pythagorean"
-                    ? styles.m7ButtonTextActive
-                    : styles.m7ButtonTextInactive,
-                ]}
-              >
-                16:9
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setMinor7System("harmonic")}
-              style={[
-                styles.m7ButtonRight,
-                minor7System === "harmonic"
-                  ? styles.m7ButtonActive
-                  : styles.m7ButtonInactive,
-              ]}
-              accessibilityLabel={`Harmonic 7:4${minor7System === "harmonic" ? ", selected" : ""}`}
-              accessibilityRole="button"
-              accessibilityState={{ selected: minor7System === "harmonic" }}
-            >
-              <Text
-                style={[
-                  styles.m7ButtonText,
-                  minor7System === "harmonic"
-                    ? styles.m7ButtonTextActive
-                    : styles.m7ButtonTextInactive,
-                ]}
-              >
-                7:4
-              </Text>
-            </TouchableOpacity>
+                <Text style={styles.modalCloseText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalBody}>
+              {/* Temperament */}
+              <View style={styles.modalSection}>
+                <Text style={styles.modalSectionTitle}>Temperament</Text>
+                <View style={styles.temperamentToggle}>
+                  <TouchableOpacity
+                    onPress={() => setActiveTemperament("equal")}
+                    style={[
+                      styles.temperamentButtonLeft,
+                      activeTemperament === "equal"
+                        ? styles.temperamentButtonActive
+                        : styles.temperamentButtonInactive,
+                    ]}
+                    accessibilityLabel={`Standard equal temperament${activeTemperament === "equal" ? ", selected" : ""}`}
+                    accessibilityRole="button"
+                  >
+                    <Text
+                      style={[
+                        styles.temperamentButtonText,
+                        activeTemperament === "equal"
+                          ? styles.temperamentButtonTextActive
+                          : styles.temperamentButtonTextInactive,
+                      ]}
+                    >
+                      Standard (ET)
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setActiveTemperament("just")}
+                    style={[
+                      styles.temperamentButtonRight,
+                      activeTemperament === "just"
+                        ? styles.temperamentButtonActive
+                        : styles.temperamentButtonInactive,
+                    ]}
+                    accessibilityLabel={`Resonance just intonation${activeTemperament === "just" ? ", selected" : ""}`}
+                    accessibilityRole="button"
+                  >
+                    <Text
+                      style={[
+                        styles.temperamentButtonText,
+                        activeTemperament === "just"
+                          ? styles.temperamentButtonTextActive
+                          : styles.temperamentButtonTextInactive,
+                      ]}
+                    >
+                      Resonance (JI)
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Concert A */}
+              <View style={styles.modalSection}>
+                <Text style={styles.modalSectionTitle}>Concert Pitch</Text>
+                <View style={styles.concertARow}>
+                  <Text style={styles.concertALabel}>A =</Text>
+                  <TextInput
+                    value={concertA}
+                    onChangeText={setConcertA}
+                    keyboardType="numeric"
+                    style={styles.concertAInput}
+                    placeholder="440"
+                    placeholderTextColor="#666"
+                    accessibilityLabel="Concert A frequency"
+                  />
+                  <Text style={styles.concertAUnit}>Hz</Text>
+                </View>
+              </View>
+
+              {/* Key Selector (JI only) */}
+              {activeTemperament === "just" && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Key Center</Text>
+                  <View style={styles.keyGrid}>
+                    {[0, 1, 2].map((row) => (
+                      <View key={row} style={styles.keyRow}>
+                        {KEY_DISPLAY_NAMES.slice(row * 4, row * 4 + 4).map(
+                          (keyName, colIndex) => {
+                            const index = row * 4 + colIndex;
+                            return (
+                              <TouchableOpacity
+                                key={keyName}
+                                style={[
+                                  styles.keyOption,
+                                  selectedKeyIndex === index && styles.keyOptionActive,
+                                ]}
+                                onPress={() => setSelectedKeyIndex(index)}
+                                accessibilityLabel={`Key of ${keyName}`}
+                                accessibilityRole="button"
+                              >
+                                <Text
+                                  style={[
+                                    styles.keyOptionText,
+                                    selectedKeyIndex === index &&
+                                      styles.keyOptionTextActive,
+                                  ]}
+                                >
+                                  {keyName}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          },
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Minor 7th (JI only) */}
+              {activeTemperament === "just" && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Minor 7th Ratio</Text>
+                  <View style={styles.m7SystemToggle}>
+                    <TouchableOpacity
+                      onPress={() => setMinor7System("classical")}
+                      style={[
+                        styles.m7ButtonLeft,
+                        minor7System === "classical"
+                          ? styles.m7ButtonActive
+                          : styles.m7ButtonInactive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.m7ButtonText,
+                          minor7System === "classical"
+                            ? styles.m7ButtonTextActive
+                            : styles.m7ButtonTextInactive,
+                        ]}
+                      >
+                        9:5
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setMinor7System("pythagorean")}
+                      style={[
+                        styles.m7ButtonMiddle,
+                        minor7System === "pythagorean"
+                          ? styles.m7ButtonActive
+                          : styles.m7ButtonInactive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.m7ButtonText,
+                          minor7System === "pythagorean"
+                            ? styles.m7ButtonTextActive
+                            : styles.m7ButtonTextInactive,
+                        ]}
+                      >
+                        16:9
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setMinor7System("harmonic")}
+                      style={[
+                        styles.m7ButtonRight,
+                        minor7System === "harmonic"
+                          ? styles.m7ButtonActive
+                          : styles.m7ButtonInactive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.m7ButtonText,
+                          minor7System === "harmonic"
+                            ? styles.m7ButtonTextActive
+                            : styles.m7ButtonTextInactive,
+                        ]}
+                      >
+                        7:4
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
           </View>
         </View>
-      )}
+      </Modal>
     </View>
   );
 });
@@ -1568,6 +1863,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 8,
     height: 144, // Fixed height: 44+24+18+16+14+28 = 144
+    width: "100%",
   },
   noteNameRow: {
     height: 44, // Fixed height for note name or mic icon
@@ -1584,6 +1880,52 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 20,
   },
+  // Tappable feedback area (tap to cycle modes)
+  feedbackArea: {
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 4,
+    alignItems: "center",
+    minHeight: 50,
+    alignSelf: "stretch",
+  },
+  feedbackContent: {
+    minHeight: 28,
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  feedbackPlaceholder: {
+    color: "#666",
+    fontSize: 13,
+    fontStyle: "italic",
+  },
+  feedbackModeName: {
+    color: "#9C27B0",
+    fontWeight: "600",
+    fontStyle: "normal",
+  },
+  feedbackDots: {
+    flexDirection: "row",
+    marginTop: 6,
+    gap: 6,
+  },
+  feedbackDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+  },
+  feedbackDotActive: {
+    backgroundColor: "#9C27B0",
+  },
+  stabilityContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   stateTextRow: {
     height: 24, // Fixed height for state text
     justifyContent: "center",
@@ -1595,9 +1937,9 @@ const styles = StyleSheet.create({
   },
   // Phase 1 UX Improvement Styles
   stateText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    letterSpacing: 1,
+    fontSize: 14,
+    fontWeight: "600",
+    letterSpacing: 0.5,
   },
   // Fixed height container for guidance text row
   guidanceRow: {
@@ -1618,15 +1960,14 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   stabilityLabel: {
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: "600",
     letterSpacing: 0.5,
   },
   biasIndicator: {
-    fontSize: 10,
-    fontWeight: "500",
-    fontStyle: "italic",
-    letterSpacing: 0.3,
+    fontSize: 14,
+    fontWeight: "600",
+    letterSpacing: 0.5,
   },
   // Fixed height container for bias text row
   biasRow: {
@@ -1635,9 +1976,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   guidanceText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "600",
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
   },
   // Fixed height container for lock/hold area
   lockHoldRow: {
@@ -1678,6 +2019,7 @@ const styles = StyleSheet.create({
   textContainer: {
     alignItems: "center",
     height: 180, // Fixed height to prevent UI jumping when switching from mic icon to text
+    width: "100%",
   },
   textNoteRow: {
     height: 56, // Fixed height for note name or mic icon
@@ -1718,7 +2060,83 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // Settings Row (Temperament + Concert A)
+  // Settings Summary Button
+  settingsSummaryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(156, 39, 176, 0.15)",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: "rgba(156, 39, 176, 0.3)",
+  },
+  settingsSummaryText: {
+    color: "#E1BEE7",
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  settingsSummaryIcon: {
+    fontSize: 16,
+    marginLeft: 8,
+  },
+
+  // Settings Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#1a1a2e",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "80%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.1)",
+  },
+  modalTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  modalCloseButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "#9C27B0",
+    borderRadius: 6,
+  },
+  modalCloseText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  modalBody: {
+    padding: 16,
+    alignItems: "center",
+  },
+  modalSection: {
+    marginBottom: 24,
+    alignItems: "center",
+    width: "100%",
+  },
+  modalSectionTitle: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+
+  // Settings Row (kept for backwards compatibility)
   settingsRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1728,7 +2146,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
 
-  // Temperament Toggle (styled like PitchDrone)
+  // Temperament Toggle
   temperamentToggle: {
     flexDirection: "row",
   },
@@ -1825,6 +2243,7 @@ const styles = StyleSheet.create({
   concertARow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
   },
   concertALabel: {
     color: "#bfa76a",
@@ -1956,6 +2375,165 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 12,
     fontWeight: "500",
+  },
+  // Challenge panel styles (Phase 2A)
+  challengePanel: {
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    minHeight: 140,
+  },
+  challengeStartContent: {
+    alignItems: "center",
+  },
+  challengePanelTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  challengeDifficultyRow: {
+    flexDirection: "row",
+    marginBottom: 12,
+  },
+  challengeDifficultyButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 6,
+    marginHorizontal: 3,
+  },
+  challengeDifficultyButtonActive: {
+    backgroundColor: "#4CAF50",
+  },
+  challengeDifficultyText: {
+    color: "#888",
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  challengeDifficultyTextActive: {
+    color: "#FFFFFF",
+  },
+  challengeStartButton: {
+    backgroundColor: "#2196F3",
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  challengeStartButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  challengeActiveContent: {
+    alignItems: "center",
+  },
+  challengeHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+    marginBottom: 4,
+  },
+  challengeTargetLabel: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    flex: 1,
+  },
+  challengeSkipButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 4,
+  },
+  challengeSkipText: {
+    color: "#888",
+    fontSize: 12,
+  },
+  challengeStopButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: "rgba(255, 100, 100, 0.2)",
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  challengeStopText: {
+    color: "#FF6B6B",
+    fontSize: 12,
+  },
+  challengeTargetDisplay: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  challengeTargetNote: {
+    color: "#FFEB3B",
+    fontSize: 32,
+    fontWeight: "700",
+  },
+  challengeStatusRow: {
+    marginBottom: 8,
+  },
+  challengeStatusText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  challengeProgressBar: {
+    width: "100%",
+    height: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 4,
+    marginBottom: 8,
+    overflow: "hidden",
+  },
+  challengeProgressFill: {
+    height: "100%",
+    borderRadius: 4,
+  },
+  challengeNextButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginBottom: 8,
+  },
+  challengeNextButtonSuccess: {
+    backgroundColor: "#4CAF50",
+  },
+  challengeNextButtonRetry: {
+    backgroundColor: "#FF9800",
+  },
+  challengeNextButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  challengeScoreRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  challengeScoreLabel: {
+    color: "#888",
+    fontSize: 12,
+  },
+  challengeScoreValue: {
+    color: "#4CAF50",
+    fontSize: 16,
+    fontWeight: "700",
+    marginRight: 12,
+  },
+  challengeStreakLabel: {
+    color: "#888",
+    fontSize: 12,
+  },
+  challengeStreakValue: {
+    color: "#FF9800",
+    fontSize: 16,
+    fontWeight: "700",
   },
 });
 
