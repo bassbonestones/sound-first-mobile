@@ -63,7 +63,7 @@ if (Platform.OS !== "web") {
 }
 
 const SAMPLE_RATE = 44100;
-const BUFFER_SIZE = 4096;
+const BUFFER_SIZE = 8192; // Larger buffer for better frequency resolution
 
 export interface SoundingFrequencyRange {
   min: number;

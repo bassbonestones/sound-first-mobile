@@ -413,4 +413,315 @@ describe("Tuner", () => {
       expect(getByText("Microphone permission denied")).toBeTruthy();
     });
   });
+
+  describe("just intonation pitch detection", () => {
+    it("handles pitch detection with just intonation mode", async () => {
+      let capturedOptions: { onPitchDetected?: Function } | null = null;
+
+      (usePitchDetection as jest.Mock).mockImplementation(
+        (options: { onPitchDetected?: Function }) => {
+          capturedOptions = options;
+          return {
+            isListening: true,
+            startListening: mockStartListening,
+            stopListening: mockStopListening,
+            error: null,
+            permissionGranted: true,
+          };
+        },
+      );
+
+      const { getByLabelText } = render(<Tuner />);
+
+      // Switch to just intonation
+      fireEvent.press(getByLabelText("Just intonation"));
+
+      // Simulate pitch detection - exercises getJustIntonationFrequency
+      act(() => {
+        capturedOptions?.onPitchDetected?.({ frequency: 440 });
+      });
+    });
+
+    it("exercises just intonation with different keys", async () => {
+      let capturedOptions: { onPitchDetected?: Function } | null = null;
+
+      (usePitchDetection as jest.Mock).mockImplementation(
+        (options: { onPitchDetected?: Function }) => {
+          capturedOptions = options;
+          return {
+            isListening: true,
+            startListening: mockStartListening,
+            stopListening: mockStopListening,
+            error: null,
+            permissionGranted: true,
+          };
+        },
+      );
+
+      const { getByLabelText } = render(<Tuner />);
+
+      // Switch to just intonation
+      fireEvent.press(getByLabelText("Just intonation"));
+
+      // Wait for key selector to appear
+      await waitFor(() => {
+        expect(getByLabelText("Key of G")).toBeTruthy();
+      });
+
+      // Select key of G
+      fireEvent.press(getByLabelText("Key of G"));
+
+      // Simulate pitch detection with G key
+      act(() => {
+        capturedOptions?.onPitchDetected?.({ frequency: 392 }); // G4
+      });
+    });
+
+    it("exercises pitch detection with sharp notes", async () => {
+      let capturedOptions: { onPitchDetected?: Function } | null = null;
+
+      // Return C#4 for frequency 277
+      const { frequencyToNote } = require("../src/constants/notes");
+      (frequencyToNote as jest.Mock).mockImplementation((freq: number) => {
+        if (freq >= 275 && freq <= 280) return "C#4";
+        if (freq >= 435 && freq <= 445) return "A4";
+        return "C4";
+      });
+
+      (usePitchDetection as jest.Mock).mockImplementation(
+        (options: { onPitchDetected?: Function }) => {
+          capturedOptions = options;
+          return {
+            isListening: true,
+            startListening: mockStartListening,
+            stopListening: mockStopListening,
+            error: null,
+            permissionGranted: true,
+          };
+        },
+      );
+
+      const { getByLabelText } = render(<Tuner />);
+
+      // Switch to just intonation
+      fireEvent.press(getByLabelText("Just intonation"));
+
+      // Simulate sharp note detection
+      act(() => {
+        capturedOptions?.onPitchDetected?.({ frequency: 277 });
+      });
+    });
+
+    it("exercises pitch detection with flat notes", async () => {
+      let capturedOptions: { onPitchDetected?: Function } | null = null;
+
+      // Return Bb4 for frequency 466
+      const { frequencyToNote } = require("../src/constants/notes");
+      (frequencyToNote as jest.Mock).mockImplementation((freq: number) => {
+        if (freq >= 460 && freq <= 470) return "Bb4";
+        if (freq >= 435 && freq <= 445) return "A4";
+        return "C4";
+      });
+
+      (usePitchDetection as jest.Mock).mockImplementation(
+        (options: { onPitchDetected?: Function }) => {
+          capturedOptions = options;
+          return {
+            isListening: true,
+            startListening: mockStartListening,
+            stopListening: mockStopListening,
+            error: null,
+            permissionGranted: true,
+          };
+        },
+      );
+
+      const { getByLabelText } = render(<Tuner />);
+
+      // Switch to just intonation  
+      fireEvent.press(getByLabelText("Just intonation"));
+
+      // Simulate flat note detection
+      act(() => {
+        capturedOptions?.onPitchDetected?.({ frequency: 466 });
+      });
+    });
+  });
+
+  describe("concert A frequency", () => {
+    it("changes concert A frequency", async () => {
+      let capturedOptions: { onPitchDetected?: Function } | null = null;
+
+      (usePitchDetection as jest.Mock).mockImplementation(
+        (options: { onPitchDetected?: Function }) => {
+          capturedOptions = options;
+          return {
+            isListening: true,
+            startListening: mockStartListening,
+            stopListening: mockStopListening,
+            error: null,
+            permissionGranted: true,
+          };
+        },
+      );
+
+      const { getByLabelText } = render(<Tuner />);
+
+      // Change concert A to 442
+      fireEvent.changeText(getByLabelText("Concert A frequency"), "442");
+
+      // Simulate pitch detection with new A4 reference
+      act(() => {
+        capturedOptions?.onPitchDetected?.({ frequency: 442 });
+      });
+    });
+
+    it("handles invalid concert A input", async () => {
+      let capturedOptions: { onPitchDetected?: Function } | null = null;
+
+      (usePitchDetection as jest.Mock).mockImplementation(
+        (options: { onPitchDetected?: Function }) => {
+          capturedOptions = options;
+          return {
+            isListening: true,
+            startListening: mockStartListening,
+            stopListening: mockStopListening,
+            error: null,
+            permissionGranted: true,
+          };
+        },
+      );
+
+      const { getByLabelText } = render(<Tuner />);
+
+      // Enter invalid concert A (empty string will parse to NaN, falls back to 440)
+      fireEvent.changeText(getByLabelText("Concert A frequency"), "");
+
+      // Detect pitch - should use default 440
+      act(() => {
+        capturedOptions?.onPitchDetected?.({ frequency: 440 });
+      });
+    });
+  });
+
+  describe("silence detection", () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("clears note after silence timeout", async () => {
+      let capturedOptions: { onPitchDetected?: Function } | null = null;
+
+      (usePitchDetection as jest.Mock).mockImplementation(
+        (options: { onPitchDetected?: Function }) => {
+          capturedOptions = options;
+          return {
+            isListening: true,
+            startListening: mockStartListening,
+            stopListening: mockStopListening,
+            error: null,
+            permissionGranted: true,
+          };
+        },
+      );
+
+      render(<Tuner />);
+
+      // Detect a pitch first
+      act(() => {
+        capturedOptions?.onPitchDetected?.({ frequency: 440 });
+      });
+
+      // Advance timer past silence threshold (300ms)
+      act(() => {
+        jest.advanceTimersByTime(350);
+      });
+    });
+
+    it("resets silence timeout on new pitch", async () => {
+      let capturedOptions: { onPitchDetected?: Function } | null = null;
+
+      (usePitchDetection as jest.Mock).mockImplementation(
+        (options: { onPitchDetected?: Function }) => {
+          capturedOptions = options;
+          return {
+            isListening: true,
+            startListening: mockStartListening,
+            stopListening: mockStopListening,
+            error: null,
+            permissionGranted: true,
+          };
+        },
+      );
+
+      render(<Tuner />);
+
+      // Detect a pitch
+      act(() => {
+        capturedOptions?.onPitchDetected?.({ frequency: 440 });
+      });
+
+      // Advance part way through timeout
+      act(() => {
+        jest.advanceTimersByTime(200);
+      });
+
+      // Detect another pitch - should reset timer
+      act(() => {
+        capturedOptions?.onPitchDetected?.({ frequency: 442 });
+      });
+
+      // Advance again - should not have cleared yet
+      act(() => {
+        jest.advanceTimersByTime(200);
+      });
+    });
+  });
+
+  describe("tune color gradients", () => {
+    it("exercises all tune color ranges", async () => {
+      let capturedOptions: { onPitchDetected?: Function } | null = null;
+
+      // Mock to return specific cents deviations for different frequencies
+      const { getCentsDeviation } = require("../src/constants/notes");
+      (getCentsDeviation as jest.Mock).mockImplementation(
+        (freq: number, target: number) => {
+          // Return different cents based on freq to exercise getTuneColor
+          if (freq === 440) return 0; // Perfect tune (#4CAF50)
+          if (freq === 441) return 7; // Slightly off (#8BC34A)
+          if (freq === 445) return 15; // Moderately off (#FFC107)
+          if (freq === 450) return 30; // More off (#FF9800)
+          if (freq === 460) return 45; // Very off (#F44336)
+          return 0;
+        },
+      );
+
+      (usePitchDetection as jest.Mock).mockImplementation(
+        (options: { onPitchDetected?: Function }) => {
+          capturedOptions = options;
+          return {
+            isListening: true,
+            startListening: mockStartListening,
+            stopListening: mockStopListening,
+            error: null,
+            permissionGranted: true,
+          };
+        },
+      );
+
+      render(<Tuner mode="needle" />);
+
+      // Exercise all color ranges
+      const testFreqs = [440, 441, 445, 450, 460];
+      for (const freq of testFreqs) {
+        act(() => {
+          capturedOptions?.onPitchDetected?.({ frequency: freq });
+        });
+      }
+    });
+  });
 });

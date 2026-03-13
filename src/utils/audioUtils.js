@@ -65,7 +65,7 @@ export function noteNameToMidi(noteName) {
 }
 
 /**
- * Autocorrelation pitch detection algorithm
+ * YIN pitch detection algorithm with debugging
  * @param {Float32Array} buffer - Audio samples
  * @param {number} sampleRate - Sample rate in Hz
  * @returns {Object} Detection result with frequency, rms, confidence
@@ -83,60 +83,80 @@ export function autoCorrelate(buffer, sampleRate) {
     return { frequency: -1, rms, confidence: 0 };
   }
 
-  // Only look at frequencies from 70Hz to 1400Hz
-  const minPeriod = Math.floor(sampleRate / 1400);
-  const maxPeriod = Math.floor(sampleRate / 70);
-  const correlations = [];
+  // YIN parameters - constrain to musical range
+  const threshold = 0.1;
+  const minFreq = 70;   // Hz
+  const maxFreq = 1400; // Hz
+  const minPeriod = Math.floor(sampleRate / maxFreq); // ~34 at 48kHz
+  const maxPeriod = Math.floor(sampleRate / minFreq); // ~686 at 48kHz
+  const halfSize = Math.floor(SIZE / 2);
+  const yinBufferSize = Math.min(maxPeriod + 1, halfSize);
 
-  for (let lag = minPeriod; lag <= maxPeriod && lag < SIZE / 2; lag++) {
-    let sum = 0,
-      norm1 = 0,
-      norm2 = 0;
-    for (let i = 0; i < SIZE - lag; i++) {
-      sum += buffer[i] * buffer[i + lag];
-      norm1 += buffer[i] * buffer[i];
-      norm2 += buffer[i + lag] * buffer[i + lag];
+  // Step 1 & 2: Compute difference function and cumulative mean normalized difference
+  const yinBuffer = new Float32Array(yinBufferSize);
+  yinBuffer[0] = 1;
+  
+  let runningSum = 0;
+  
+  for (let tau = 1; tau < yinBufferSize; tau++) {
+    let delta = 0;
+    const windowSize = halfSize - tau;
+    for (let j = 0; j < windowSize; j++) {
+      const diff = buffer[j] - buffer[j + tau];
+      delta += diff * diff;
     }
-    const norm = Math.sqrt(norm1 * norm2);
-    const correlation = norm > 0 ? sum / norm : 0;
-    correlations.push({ lag, correlation });
+    
+    runningSum += delta;
+    yinBuffer[tau] = runningSum > 0 ? (delta * tau) / runningSum : 1;
   }
 
-  if (correlations.length === 0) {
-    return { frequency: -1, rms, confidence: 0 };
-  }
-
-  // Find the best correlation peak
-  let bestLag = -1;
-  let bestCorrelation = 0;
-
-  for (let i = 1; i < correlations.length - 1; i++) {
-    const prev = correlations[i - 1].correlation;
-    const curr = correlations[i].correlation;
-    const next = correlations[i + 1].correlation;
-
-    // Local maximum with correlation > 0.5
-    if (curr > prev && curr > next && curr > 0.5 && curr > bestCorrelation) {
-      bestCorrelation = curr;
-      bestLag = correlations[i].lag;
-
-      // Parabolic interpolation for better accuracy
-      const denom = 2 * curr - prev - next;
-      if (denom !== 0) {
-        bestLag += (next - prev) / (2 * denom);
+  // Step 3: Find first tau below threshold, then find local minimum
+  let tauEstimate = -1;
+  for (let tau = minPeriod; tau < yinBufferSize; tau++) {
+    if (yinBuffer[tau] < threshold) {
+      while (tau + 1 < yinBufferSize && yinBuffer[tau + 1] < yinBuffer[tau]) {
+        tau++;
       }
-
-      // Stop at first good peak (fundamental frequency)
-      if (bestCorrelation > 0.7) break;
+      tauEstimate = tau;
+      break;
     }
   }
 
-  if (bestCorrelation > 0.5 && bestLag > 0) {
-    return {
-      frequency: sampleRate / bestLag,
-      rms,
-      confidence: bestCorrelation,
-    };
+  // Fallback: find global minimum in valid range
+  if (tauEstimate === -1) {
+    let minVal = Infinity;
+    for (let tau = minPeriod; tau < yinBufferSize; tau++) {
+      if (yinBuffer[tau] < minVal) {
+        minVal = yinBuffer[tau];
+        tauEstimate = tau;
+      }
+    }
+    if (minVal > 0.4) {
+      return { frequency: -1, rms, confidence: 0 };
+    }
+  }
+
+  // Step 4: Parabolic interpolation
+  let betterTau = tauEstimate;
+  if (tauEstimate > 0 && tauEstimate < yinBufferSize - 1) {
+    const s0 = yinBuffer[tauEstimate - 1];
+    const s1 = yinBuffer[tauEstimate];
+    const s2 = yinBuffer[tauEstimate + 1];
+    
+    const denom = s0 - 2 * s1 + s2;
+    if (Math.abs(denom) > 1e-10) {
+      const adjustment = 0.5 * (s0 - s2) / denom;
+      if (Math.abs(adjustment) < 1) {
+        betterTau = tauEstimate + adjustment;
+      }
+    }
+  }
+
+  const frequency = sampleRate / betterTau;
+  const confidence = 1 - yinBuffer[tauEstimate];
+
+  if (frequency >= minFreq && frequency <= maxFreq && confidence > 0.5) {
+    return { frequency, rms, confidence };
   }
 
   return { frequency: -1, rms, confidence: 0 };

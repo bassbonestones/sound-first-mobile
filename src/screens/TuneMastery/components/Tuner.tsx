@@ -125,34 +125,11 @@ function getJustIntonationFrequency(
     while (justFreq < equalTempFreq * 0.7) justFreq *= 2;
   }
 
+  // Debug logging
+  const keyName = KEY_DISPLAY_NAMES[keyIndex].split('/')[0];
+  console.log(`[JUST] note=${noteName}, key=${keyName}, noteIdx=${noteIndex}, keyIdx=${keyIndex}, semitones=${semitonesAboveTonic}, ratio=${justRatio.toFixed(4)}, tonicFreq=${tonicFreq.toFixed(2)}, equalTemp=${equalTempFreq?.toFixed(2)}, justFreq=${justFreq.toFixed(2)}`);
+
   return justFreq;
-}
-
-/**
- * Get equal temperament frequency for a note using custom A4 reference
- */
-function getEqualTemperamentFrequency(
-  noteName: string | null,
-  a4Frequency: number = 440,
-): number | null {
-  if (!noteName) return null;
-
-  const match = noteName.match(/^([A-G])([#b]?)(\d+)$/);
-  if (!match) return null;
-
-  let [, letter, accidental, octaveStr] = match;
-  const octave = parseInt(octaveStr, 10);
-
-  // Find note index in chromatic scale
-  let noteIndex = noteNames.indexOf(letter);
-  if (noteIndex === -1) return null;
-  if (accidental === "#") noteIndex += 1;
-  else if (accidental === "b") noteIndex -= 1;
-
-  // Calculate semitones from A4
-  const semitonesFromA4 = noteIndex - 9 + (octave - 4) * 12;
-
-  return a4Frequency * Math.pow(2, semitonesFromA4 / 12);
 }
 
 export type TunerMode = "needle" | "text";
@@ -180,14 +157,45 @@ const Tuner = React.memo(function Tuner({
   const [concertA, setConcertA] = useState(String(initialConcertA));
   const silenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync temperament and key from props when they change
+  // Refs for callback to read current values (avoids stale closure in requestAnimationFrame loop)
+  const selectedKeyIndexRef = useRef(initialKeyIndex);
+  const activeTemperamentRef = useRef<Temperament>(initialTemperament);
+  const concertARef = useRef(String(initialConcertA));
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    selectedKeyIndexRef.current = selectedKeyIndex;
+  }, [selectedKeyIndex]);
+
+  useEffect(() => {
+    activeTemperamentRef.current = activeTemperament;
+  }, [activeTemperament]);
+
+  useEffect(() => {
+    concertARef.current = concertA;
+  }, [concertA]);
+
+  // Smoothing refs for reducing jitter
+  const smoothedFrequencyRef = useRef<number | null>(null);
+  const smoothedCentsRef = useRef<number>(0);
+  const lastNoteRef = useRef<string | null>(null);
+  const centsHistoryRef = useRef<number[]>([]); // For median filtering
+
+  // Smoothing constants
+  const FREQUENCY_SMOOTHING = 0.15; // EMA factor: lower = smoother (was 0.3)
+  const CENTS_SMOOTHING = 0.1; // Separate smoothing for cents display (was 0.25)
+  const MIN_CENTS_CHANGE = 2; // Minimum cents change to trigger update
+  const NEEDLE_DEAD_ZONE = 3; // Needle snaps to center within ±3 cents (industry standard)
+  const MEDIAN_WINDOW_SIZE = 5; // Number of samples for median filter
+
+  // Sync temperament from props when they change
   useEffect(() => {
     setActiveTemperament(initialTemperament);
   }, [initialTemperament]);
 
-  useEffect(() => {
-    setSelectedKeyIndex(initialKeyIndex);
-  }, [initialKeyIndex]);
+  // Note: Key is NOT synced from props after initial mount
+  // This allows users to override the tune's key in the UI
+  // The tune's key is only used as the initial default via useState
 
   useEffect(() => {
     setConcertA(String(initialConcertA));
@@ -202,8 +210,23 @@ const Tuner = React.memo(function Tuner({
       setCurrentNote(null);
       setCents(0);
       setFrequency(null);
+      // Reset smoothing refs on silence
+      smoothedFrequencyRef.current = null;
+      smoothedCentsRef.current = 0;
+      lastNoteRef.current = null;
+      centsHistoryRef.current = [];
     }, 300);
   }, []);
+
+  // Helper: get median of array
+  const getMedian = (arr: number[]): number => {
+    if (arr.length === 0) return 0;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0
+      ? sorted[mid]
+      : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
 
   const handlePitchDetected = useCallback(
     (pitch: { frequency?: number } | null) => {
@@ -213,36 +236,95 @@ const Tuner = React.memo(function Tuner({
           clearTimeout(silenceTimeoutRef.current);
           silenceTimeoutRef.current = null;
         }
-        setFrequency(pitch.frequency);
-        const note = frequencyToNote(pitch.frequency);
-        setCurrentNote(note);
 
-        // Get the reference A4 frequency
-        const a4 = parseFloat(concertA) || 440;
+        const rawFrequency = pitch.frequency;
+        const note = frequencyToNote(rawFrequency);
 
-        // Calculate target frequency based on temperament
-        let targetFreq: number | null = null;
-        if (activeTemperament === "just") {
-          // Use just intonation frequency based on selected key
-          targetFreq = getJustIntonationFrequency(note, selectedKeyIndex, a4);
+        // Check if note changed - if so, reset smoothing for faster response
+        const noteChanged = note !== lastNoteRef.current;
+        if (noteChanged) {
+          centsHistoryRef.current = []; // Reset median buffer on note change
+        }
+        lastNoteRef.current = note;
+
+        // Apply exponential moving average smoothing to frequency
+        let smoothedFreq: number;
+        if (smoothedFrequencyRef.current === null || noteChanged) {
+          // First reading or note change: use raw value
+          smoothedFreq = rawFrequency;
         } else {
-          // Use equal temperament frequency with custom A4
-          targetFreq = getEqualTemperamentFrequency(note, a4);
+          // EMA: new = alpha * raw + (1 - alpha) * previous
+          smoothedFreq =
+            FREQUENCY_SMOOTHING * rawFrequency +
+            (1 - FREQUENCY_SMOOTHING) * smoothedFrequencyRef.current;
+        }
+        smoothedFrequencyRef.current = smoothedFreq;
+
+        // Get the reference A4 frequency (read from ref to avoid stale closure)
+        const a4 = parseFloat(concertARef.current) || 440;
+
+        // Calculate target frequency based on temperament (read from refs)
+        const currentTemperament = activeTemperamentRef.current;
+        const currentKeyIndex = selectedKeyIndexRef.current;
+        
+        let targetFreq: number | null = null;
+        if (currentTemperament === "just") {
+          // Use just intonation frequency based on selected key
+          targetFreq = getJustIntonationFrequency(note, currentKeyIndex, a4);
+        } else {
+          // Use noteToFrequency for equal temperament, scaled for custom A4
+          const stdFreq = noteToFrequency(note);
+          targetFreq = stdFreq ? stdFreq * (a4 / 440) : null;
         }
 
-        const deviation = targetFreq
-          ? getCentsDeviation(pitch.frequency, targetFreq)
+        // Calculate cents deviation using smoothed frequency
+        const rawDeviation = targetFreq
+          ? getCentsDeviation(smoothedFreq, targetFreq)
           : 0;
-        setCents(Math.round(deviation));
+
+        // Add to history for median filtering
+        centsHistoryRef.current.push(rawDeviation);
+        if (centsHistoryRef.current.length > MEDIAN_WINDOW_SIZE) {
+          centsHistoryRef.current.shift();
+        }
+
+        // Use median of recent values to reject outliers
+        const medianCents = getMedian(centsHistoryRef.current);
+
+        // Apply EMA smoothing on top of median for extra stability
+        let smoothedCents: number;
+        if (noteChanged || centsHistoryRef.current.length < 3) {
+          smoothedCents = medianCents;
+        } else {
+          smoothedCents =
+            CENTS_SMOOTHING * medianCents +
+            (1 - CENTS_SMOOTHING) * smoothedCentsRef.current;
+        }
+        smoothedCentsRef.current = smoothedCents;
+
+        // Only update state if note changed or cents moved enough
+        const roundedCents = Math.round(smoothedCents);
+        if (noteChanged || Math.abs(roundedCents - cents) >= MIN_CENTS_CHANGE) {
+          setFrequency(smoothedFreq);
+          setCurrentNote(note);
+          setCents(roundedCents);
+        }
+
         // Start silence detection timer
         clearNoteAfterSilence();
       } else {
         setCurrentNote(null);
         setCents(0);
         setFrequency(null);
+        // Reset smoothing refs
+        smoothedFrequencyRef.current = null;
+        smoothedCentsRef.current = 0;
+        lastNoteRef.current = null;
+        centsHistoryRef.current = [];
       }
     },
-    [clearNoteAfterSilence, activeTemperament, selectedKeyIndex, concertA],
+    // Note: Reading temperament/key/concertA from refs, so they're not deps
+    [clearNoteAfterSilence, cents],
   );
 
   const {
@@ -287,9 +369,12 @@ const Tuner = React.memo(function Tuner({
 
   // Calculate needle rotation (-50 to +50 cents = -90 to +90 degrees)
   // Returns 0 when no note is detected
+  // Dead zone: needle snaps to center within ±3 cents for visual stability
   const getNeedleRotation = (): number => {
     if (!currentNote) return 0; // Return to center when no sound
-    const clampedCents = Math.max(-50, Math.min(50, cents));
+    // Apply dead zone only for needle display (not cents number)
+    const displayCents = Math.abs(cents) <= NEEDLE_DEAD_ZONE ? 0 : cents;
+    const clampedCents = Math.max(-50, Math.min(50, displayCents));
     return (clampedCents / 50) * 90;
   };
 
@@ -672,7 +757,10 @@ const Tuner = React.memo(function Tuner({
                           styles.keyOption,
                           selectedKeyIndex === index && styles.keyOptionActive,
                         ]}
-                        onPress={() => setSelectedKeyIndex(index)}
+                        onPress={() => {
+                          console.log(`[KEY_CLICK] User clicked key: ${index} (${KEY_DISPLAY_NAMES[index]?.split('/')[0]})`);
+                          setSelectedKeyIndex(index);
+                        }}
                         accessibilityLabel={`Key of ${keyName}`}
                         accessibilityRole="button"
                       >
