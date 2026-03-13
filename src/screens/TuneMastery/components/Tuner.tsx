@@ -3,14 +3,28 @@
  *
  * Uses usePitchDetection hook for real-time pitch detection.
  * Displays current pitch with visual feedback for tuning accuracy.
+ *
+ * Phase 1 UX Improvements:
+ * - State machine for proper state transitions
+ * - Attack phase detection (ignores first 200ms)
+ * - Stability indicator (🟢🟡🔴)
+ * - State text (PERFECT/IN TUNE/CENTERED)
+ * - Center lock + hold indicators
  */
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useReducer,
+} from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   TextInput,
   StyleSheet,
+  Animated,
 } from "react-native";
 import Svg, { Path, Line, Text as SvgText, Circle } from "react-native-svg";
 import { usePitchDetection } from "../../../hooks/usePitchDetection";
@@ -20,6 +34,34 @@ import {
   noteToFrequency,
   noteNames,
 } from "../../../constants/notes";
+
+// Import tuner state machine and helpers
+import {
+  tunerReducer,
+  initialContext,
+  isDetectingPhase,
+  isLocked,
+  getCenteredStableDuration,
+  type TunerStateContext,
+} from "./Tuner/tunerStateMachine";
+import {
+  computeStateText,
+  getTuneColor,
+  getStabilityColor,
+  getHoldProgress,
+  shouldShowHold,
+  getMedian,
+} from "./Tuner/tunerHelpers";
+import {
+  TUNER_FLAGS,
+  TUNER_COLORS,
+  NEEDLE_DEAD_ZONE,
+  MIN_CENTS_CHANGE,
+  FREQUENCY_SMOOTHING,
+  CENTS_SMOOTHING,
+  MEDIAN_WINDOW_SIZE,
+  STABILITY_WINDOW_MS,
+} from "./Tuner/tunerConstants";
 
 // Minor 7th system options
 export type Minor7System = "classical" | "pythagorean" | "harmonic";
@@ -205,18 +247,16 @@ const Tuner = React.memo(function Tuner({
     minor7SystemRef.current = minor7System;
   }, [minor7System]);
 
+  // State machine for tuner state tracking (Phase 1 UX improvements)
+  const [tunerState, dispatchTuner] = useReducer(tunerReducer, initialContext);
+
   // Smoothing refs for reducing jitter
   const smoothedFrequencyRef = useRef<number | null>(null);
   const smoothedCentsRef = useRef<number>(0);
   const lastNoteRef = useRef<string | null>(null);
   const centsHistoryRef = useRef<number[]>([]); // For median filtering
-
-  // Smoothing constants
-  const FREQUENCY_SMOOTHING = 0.15; // EMA factor: lower = smoother (was 0.3)
-  const CENTS_SMOOTHING = 0.1; // Separate smoothing for cents display (was 0.25)
-  const MIN_CENTS_CHANGE = 2; // Minimum cents change to trigger update
-  const NEEDLE_DEAD_ZONE = 3; // Needle snaps to center within ±3 cents (industry standard)
-  const MEDIAN_WINDOW_SIZE = 5; // Number of samples for median filter
+  const stabilityHistoryRef = useRef<number[]>([]); // For stability calculation
+  const lastPitchTimeRef = useRef<number>(0); // For timing state machine
 
   // Sync temperament from props when they change
   useEffect(() => {
@@ -245,18 +285,11 @@ const Tuner = React.memo(function Tuner({
       smoothedCentsRef.current = 0;
       lastNoteRef.current = null;
       centsHistoryRef.current = [];
+      stabilityHistoryRef.current = [];
+      // Dispatch signal lost to state machine
+      dispatchTuner({ type: "SIGNAL_LOST" });
     }, 300);
   }, []);
-
-  // Helper: get median of array
-  const getMedian = (arr: number[]): number => {
-    if (arr.length === 0) return 0;
-    const sorted = [...arr].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 !== 0
-      ? sorted[mid]
-      : (sorted[mid - 1] + sorted[mid]) / 2;
-  };
 
   const handlePitchDetected = useCallback(
     (pitch: { frequency?: number } | null) => {
@@ -346,6 +379,24 @@ const Tuner = React.memo(function Tuner({
           setCents(roundedCents);
         }
 
+        // Track stability history for state machine (Phase 1)
+        const now = Date.now();
+        stabilityHistoryRef.current.push(roundedCents);
+        // Keep ~750ms of history based on typical update rate (~60fps = 16ms/frame → ~47 samples)
+        const maxSamples = Math.ceil(STABILITY_WINDOW_MS / 16);
+        while (stabilityHistoryRef.current.length > maxSamples) {
+          stabilityHistoryRef.current.shift();
+        }
+
+        // Dispatch to state machine
+        dispatchTuner({
+          type: "SIGNAL_DETECTED",
+          cents: roundedCents,
+          centsHistory: stabilityHistoryRef.current,
+          timestamp: now,
+        });
+        lastPitchTimeRef.current = now;
+
         // Start silence detection timer
         clearNoteAfterSilence();
       } else {
@@ -357,6 +408,9 @@ const Tuner = React.memo(function Tuner({
         smoothedCentsRef.current = 0;
         lastNoteRef.current = null;
         centsHistoryRef.current = [];
+        stabilityHistoryRef.current = [];
+        // Dispatch signal lost to state machine
+        dispatchTuner({ type: "SIGNAL_LOST" });
       }
     },
     // Note: Reading temperament/key/concertA from refs, so they're not deps
@@ -393,15 +447,31 @@ const Tuner = React.memo(function Tuner({
     };
   }, [isListening, stopListening]);
 
-  // Get tuning quality color
-  const getTuneColor = (): string => {
-    const absCents = Math.abs(cents);
-    if (absCents <= 5) return "#4CAF50"; // In tune
-    if (absCents <= 10) return "#8BC34A";
-    if (absCents <= 20) return "#FFC107";
-    if (absCents <= 35) return "#FF9800";
-    return "#F44336"; // Very out of tune
-  };
+  // ============================================
+  // COMPUTED VALUES FOR UI (Phase 1 Improvements)
+  // ============================================
+
+  // Get tuning quality color (now uses graduated zones from tunerHelpers)
+  const tuneColor = getTuneColor(cents);
+
+  // Get stability indicator color
+  const stabilityColor = getStabilityColor(tunerState.stability);
+
+  // Get state text (PERFECT/IN TUNE/CENTERED/Xcents SHARP/FLAT)
+  const stateText = computeStateText(
+    cents,
+    tunerState.stability.isStable,
+    isDetectingPhase(tunerState),
+  );
+
+  // Lock/hold progress
+  const centeredStableDuration = getCenteredStableDuration(
+    tunerState,
+    Date.now(),
+  );
+  const holdProgress = getHoldProgress(centeredStableDuration);
+  const showHold = shouldShowHold(centeredStableDuration);
+  const showLock = isLocked(tunerState);
 
   // Calculate needle rotation (-50 to +50 cents = -90 to +90 degrees)
   // Returns 0 when no note is detected
@@ -665,13 +735,62 @@ const Tuner = React.memo(function Tuner({
             <View style={styles.noteContainer}>
               {currentNote ? (
                 <>
-                  <Text style={[styles.noteName, { color: getTuneColor() }]}>
+                  <Text style={[styles.noteName, { color: tuneColor }]}>
                     {currentNote}
                   </Text>
-                  <Text style={styles.centsDisplay}>
-                    {cents > 0 ? "+" : ""}
-                    {cents} cents
-                  </Text>
+                  {/* State text with stability-aware display (Phase 1) */}
+                  {TUNER_FLAGS.stateLanguage ? (
+                    <Text style={[styles.stateText, { color: tuneColor }]}>
+                      {stateText}
+                    </Text>
+                  ) : (
+                    <Text style={styles.centsDisplay}>
+                      {cents > 0 ? "+" : ""}
+                      {cents} cents
+                    </Text>
+                  )}
+                  {/* Stability Indicator (Phase 1) */}
+                  {TUNER_FLAGS.stabilityIndicator &&
+                    !isDetectingPhase(tunerState) && (
+                      <View style={styles.stabilityRow}>
+                        <View
+                          style={[
+                            styles.stabilityDot,
+                            { backgroundColor: stabilityColor },
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.stabilityLabel,
+                            { color: stabilityColor },
+                          ]}
+                        >
+                          {tunerState.stability.isStable
+                            ? "STABLE"
+                            : tunerState.stability.isModerate
+                              ? "SETTLING"
+                              : "UNSTABLE"}
+                        </Text>
+                      </View>
+                    )}
+                  {/* Lock/Hold Indicator (Phase 1) */}
+                  {TUNER_FLAGS.holdIndicator && showLock && (
+                    <View style={styles.lockIndicator}>
+                      <Text style={styles.lockText}>✓ LOCKED</Text>
+                    </View>
+                  )}
+                  {TUNER_FLAGS.holdIndicator &&
+                    !showLock &&
+                    holdProgress > 0 && (
+                      <View style={styles.holdProgressContainer}>
+                        <View
+                          style={[
+                            styles.holdProgressBar,
+                            { width: `${holdProgress * 100}%` },
+                          ]}
+                        />
+                      </View>
+                    )}
                 </>
               ) : (
                 <Text style={styles.micIcon}>🎤</Text>
@@ -683,23 +802,46 @@ const Tuner = React.memo(function Tuner({
           <View style={styles.textContainer}>
             {currentNote ? (
               <>
-                <Text style={[styles.textNote, { color: getTuneColor() }]}>
+                <Text style={[styles.textNote, { color: tuneColor }]}>
                   {currentNote}
                 </Text>
-                <Text style={[styles.textCents, { color: getTuneColor() }]}>
-                  {cents > 0 ? "+" : ""}
-                  {cents} cents
-                </Text>
+                {TUNER_FLAGS.stateLanguage ? (
+                  <Text style={[styles.textCents, { color: tuneColor }]}>
+                    {stateText}
+                  </Text>
+                ) : (
+                  <Text style={[styles.textCents, { color: tuneColor }]}>
+                    {cents > 0 ? "+" : ""}
+                    {cents} cents
+                  </Text>
+                )}
                 <Text style={styles.textFreq}>
                   {frequency ? `${frequency.toFixed(1)} Hz` : ""}
                 </Text>
-                <Text style={styles.tuningIndicator}>
-                  {Math.abs(cents) <= 5
-                    ? "✓ In Tune"
-                    : cents < 0
-                      ? "↓ Flat"
-                      : "↑ Sharp"}
-                </Text>
+                {/* Stability Indicator for text mode */}
+                {TUNER_FLAGS.stabilityIndicator &&
+                  !isDetectingPhase(tunerState) && (
+                    <View style={styles.stabilityRow}>
+                      <View
+                        style={[
+                          styles.stabilityDot,
+                          { backgroundColor: stabilityColor },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.stabilityLabel,
+                          { color: stabilityColor },
+                        ]}
+                      >
+                        {tunerState.stability.isStable
+                          ? "STABLE"
+                          : tunerState.stability.isModerate
+                            ? "SETTLING"
+                            : "UNSTABLE"}
+                      </Text>
+                    </View>
+                  )}
               </>
             ) : (
               <Text style={styles.textMicIcon}>🎤</Text>
@@ -710,7 +852,7 @@ const Tuner = React.memo(function Tuner({
 
       {/* Temperament & Concert A Row */}
       <View style={styles.settingsRow}>
-        {/* Temperament Toggle */}
+        {/* Temperament Toggle - Renamed for clarity (Phase 1A) */}
         <View style={styles.temperamentToggle}>
           <TouchableOpacity
             onPress={() => setActiveTemperament("equal")}
@@ -720,7 +862,7 @@ const Tuner = React.memo(function Tuner({
                 ? styles.temperamentButtonActive
                 : styles.temperamentButtonInactive,
             ]}
-            accessibilityLabel={`Equal temperament${activeTemperament === "equal" ? ", selected" : ""}`}
+            accessibilityLabel={`Standard equal temperament${activeTemperament === "equal" ? ", selected" : ""}`}
             accessibilityRole="button"
             accessibilityState={{ selected: activeTemperament === "equal" }}
           >
@@ -732,7 +874,7 @@ const Tuner = React.memo(function Tuner({
                   : styles.temperamentButtonTextInactive,
               ]}
             >
-              Equal
+              Standard (ET)
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -743,7 +885,7 @@ const Tuner = React.memo(function Tuner({
                 ? styles.temperamentButtonActive
                 : styles.temperamentButtonInactive,
             ]}
-            accessibilityLabel={`Just intonation${activeTemperament === "just" ? ", selected" : ""}`}
+            accessibilityLabel={`Resonance just intonation${activeTemperament === "just" ? ", selected" : ""}`}
             accessibilityRole="button"
             accessibilityState={{ selected: activeTemperament === "just" }}
           >
@@ -755,7 +897,7 @@ const Tuner = React.memo(function Tuner({
                   : styles.temperamentButtonTextInactive,
               ]}
             >
-              Just
+              Resonance (JI)
             </Text>
           </TouchableOpacity>
         </View>
@@ -998,6 +1140,57 @@ const styles = StyleSheet.create({
     color: "#888",
     fontSize: 14,
     marginTop: 4,
+  },
+  // Phase 1 UX Improvement Styles
+  stateText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginTop: 4,
+    letterSpacing: 1,
+  },
+  stabilityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+  },
+  stabilityDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 6,
+  },
+  stabilityLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+  },
+  lockIndicator: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: "rgba(255, 215, 0, 0.2)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FFD700",
+  },
+  lockText: {
+    color: "#FFD700",
+    fontSize: 12,
+    fontWeight: "bold",
+    letterSpacing: 1,
+  },
+  holdProgressContainer: {
+    marginTop: 6,
+    width: 60,
+    height: 4,
+    backgroundColor: "#333",
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  holdProgressBar: {
+    height: "100%",
+    backgroundColor: "#4CAF50",
+    borderRadius: 2,
   },
   listeningText: {
     color: "#666",

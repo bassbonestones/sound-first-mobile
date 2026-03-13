@@ -67,8 +67,10 @@ describe("Tuner", () => {
       const { getByText, getByLabelText } = render(<Tuner />);
       expect(getByText("🎤")).toBeTruthy();
       // Temperament buttons are visible (Equal is selected by default)
-      expect(getByLabelText("Equal temperament, selected")).toBeTruthy();
-      expect(getByLabelText("Just intonation")).toBeTruthy();
+      expect(
+        getByLabelText("Standard equal temperament, selected"),
+      ).toBeTruthy();
+      expect(getByLabelText("Resonance just intonation")).toBeTruthy();
       // Concert A input is visible
       expect(getByLabelText("Concert A frequency")).toBeTruthy();
     });
@@ -126,8 +128,10 @@ describe("Tuner", () => {
     it("temperament buttons have accessible labels", () => {
       const { getByLabelText } = render(<Tuner />);
       // Labels include ", selected" state for the active button (equal by default)
-      expect(getByLabelText("Equal temperament, selected")).toBeTruthy();
-      expect(getByLabelText("Just intonation")).toBeTruthy();
+      expect(
+        getByLabelText("Standard equal temperament, selected"),
+      ).toBeTruthy();
+      expect(getByLabelText("Resonance just intonation")).toBeTruthy();
     });
 
     it("temperament buttons have button role", () => {
@@ -362,7 +366,7 @@ describe("Tuner", () => {
       const { getByLabelText, queryByText } = render(<Tuner />);
 
       // Press Just button
-      fireEvent.press(getByLabelText("Just intonation"));
+      fireEvent.press(getByLabelText("Resonance just intonation"));
 
       // Should show key selector when Just is selected
       await waitFor(() => {
@@ -373,7 +377,7 @@ describe("Tuner", () => {
     it("shows key selector with just intonation", async () => {
       const { getByLabelText, queryByLabelText } = render(<Tuner />);
 
-      fireEvent.press(getByLabelText("Just intonation"));
+      fireEvent.press(getByLabelText("Resonance just intonation"));
 
       // Should show key grid with 12 keys (check accessible labels)
       await waitFor(() => {
@@ -386,13 +390,13 @@ describe("Tuner", () => {
       const { getByLabelText, queryByText } = render(<Tuner />);
 
       // Switch to just first
-      fireEvent.press(getByLabelText("Just intonation"));
+      fireEvent.press(getByLabelText("Resonance just intonation"));
       await waitFor(() => {
         expect(queryByText("Key")).toBeTruthy();
       });
 
       // Switch back to equal - now it shows ", selected" since Just was selected
-      fireEvent.press(getByLabelText("Equal temperament"));
+      fireEvent.press(getByLabelText("Standard equal temperament"));
       await waitFor(() => {
         expect(queryByText("Key")).toBeNull();
       });
@@ -434,7 +438,7 @@ describe("Tuner", () => {
       const { getByLabelText } = render(<Tuner />);
 
       // Switch to just intonation
-      fireEvent.press(getByLabelText("Just intonation"));
+      fireEvent.press(getByLabelText("Resonance just intonation"));
 
       // Simulate pitch detection - exercises getJustIntonationFrequency
       act(() => {
@@ -461,7 +465,7 @@ describe("Tuner", () => {
       const { getByLabelText } = render(<Tuner />);
 
       // Switch to just intonation
-      fireEvent.press(getByLabelText("Just intonation"));
+      fireEvent.press(getByLabelText("Resonance just intonation"));
 
       // Wait for key selector to appear
       await waitFor(() => {
@@ -504,7 +508,7 @@ describe("Tuner", () => {
       const { getByLabelText } = render(<Tuner />);
 
       // Switch to just intonation
-      fireEvent.press(getByLabelText("Just intonation"));
+      fireEvent.press(getByLabelText("Resonance just intonation"));
 
       // Simulate sharp note detection
       act(() => {
@@ -539,7 +543,7 @@ describe("Tuner", () => {
       const { getByLabelText } = render(<Tuner />);
 
       // Switch to just intonation
-      fireEvent.press(getByLabelText("Just intonation"));
+      fireEvent.press(getByLabelText("Resonance just intonation"));
 
       // Simulate flat note detection
       act(() => {
