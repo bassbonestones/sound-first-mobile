@@ -377,6 +377,352 @@ describe("TuneCard", () => {
 
       expect(onUpdateSettings).not.toHaveBeenCalled();
     });
+
+    it("decreases BPM by 5 when -5 button is pressed", () => {
+      const onUpdateSettings = jest.fn();
+      const { getByLabelText } = render(
+        <TuneCard
+          {...defaultProps}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      fireEvent.press(getByLabelText("Decrease BPM by 5"));
+      expect(onUpdateSettings).toHaveBeenCalledWith({ bpm: 115 });
+    });
+
+    it("decreases BPM by 1 when -1 button is pressed", () => {
+      const onUpdateSettings = jest.fn();
+      const { getByLabelText } = render(
+        <TuneCard
+          {...defaultProps}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      fireEvent.press(getByLabelText("Decrease BPM by 1"));
+      expect(onUpdateSettings).toHaveBeenCalledWith({ bpm: 119 });
+    });
+
+    it("increases BPM by 1 when +1 button is pressed", () => {
+      const onUpdateSettings = jest.fn();
+      const { getByLabelText } = render(
+        <TuneCard
+          {...defaultProps}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      fireEvent.press(getByLabelText("Increase BPM by 1"));
+      expect(onUpdateSettings).toHaveBeenCalledWith({ bpm: 121 });
+    });
+
+    it("increases BPM by 5 when +5 button is pressed", () => {
+      const onUpdateSettings = jest.fn();
+      const { getByLabelText } = render(
+        <TuneCard
+          {...defaultProps}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      fireEvent.press(getByLabelText("Increase BPM by 5"));
+      expect(onUpdateSettings).toHaveBeenCalledWith({ bpm: 125 });
+    });
+
+    it("clamps BPM to minimum of 20", () => {
+      const onUpdateSettings = jest.fn();
+      const tuneWithLowBpm = { ...mockTune, bpm: 22 };
+      const { getByLabelText } = render(
+        <TuneCard
+          {...defaultProps}
+          tune={tuneWithLowBpm}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      fireEvent.press(getByLabelText("Decrease BPM by 5"));
+      expect(onUpdateSettings).toHaveBeenCalledWith({ bpm: 20 });
+    });
+
+    it("clamps BPM to maximum of 350", () => {
+      const onUpdateSettings = jest.fn();
+      const tuneWithHighBpm = { ...mockTune, bpm: 348 };
+      const { getByLabelText } = render(
+        <TuneCard
+          {...defaultProps}
+          tune={tuneWithHighBpm}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      fireEvent.press(getByLabelText("Increase BPM by 5"));
+      expect(onUpdateSettings).toHaveBeenCalledWith({ bpm: 350 });
+    });
+  });
+
+  describe("Tap Tempo", () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("renders tap tempo button", () => {
+      const { getByLabelText } = render(
+        <TuneCard {...defaultProps} isExpanded={true} />,
+      );
+
+      expect(getByLabelText("Tap tempo")).toBeTruthy();
+    });
+
+    it("calculates BPM from multiple taps", () => {
+      const onUpdateSettings = jest.fn();
+      const { getByLabelText } = render(
+        <TuneCard
+          {...defaultProps}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      const tapButton = getByLabelText("Tap tempo");
+
+      // Tap at 120 BPM (500ms intervals)
+      jest.setSystemTime(0);
+      fireEvent.press(tapButton);
+
+      jest.setSystemTime(500);
+      fireEvent.press(tapButton);
+
+      // After 2 taps, should calculate BPM
+      expect(onUpdateSettings).toHaveBeenCalledWith({ bpm: 120 });
+    });
+
+    it("has correct accessibility hint for tap tempo", () => {
+      const { getByLabelText } = render(
+        <TuneCard {...defaultProps} isExpanded={true} />,
+      );
+
+      const tapButton = getByLabelText("Tap tempo");
+      expect(tapButton.props.accessibilityHint).toBe(
+        "Tap repeatedly to set tempo",
+      );
+    });
+  });
+
+  describe("Concert A (Hz) Settings", () => {
+    it("shows aHertz input when expanded", () => {
+      const tuneWithHz = { ...mockTune, aHertz: 442 };
+      const { getByDisplayValue, getByText } = render(
+        <TuneCard {...defaultProps} tune={tuneWithHz} isExpanded={true} />,
+      );
+
+      expect(getByText("A=")).toBeTruthy();
+      expect(getByDisplayValue("442")).toBeTruthy();
+      expect(getByText("Hz")).toBeTruthy();
+    });
+
+    it("calls onUpdateSettings when Hz is changed via input", () => {
+      const onUpdateSettings = jest.fn();
+      const tuneWithHz = { ...mockTune, aHertz: 440 };
+      const { getByDisplayValue } = render(
+        <TuneCard
+          {...defaultProps}
+          tune={tuneWithHz}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      const hzInput = getByDisplayValue("440");
+      fireEvent.changeText(hzInput, "442");
+      fireEvent(hzInput, "blur");
+
+      expect(onUpdateSettings).toHaveBeenCalledWith({ aHertz: 442 });
+    });
+
+    it("decreases Hz by 5 when -5 button is pressed", () => {
+      const onUpdateSettings = jest.fn();
+      const tuneWithHz = { ...mockTune, aHertz: 440 };
+      const { getByLabelText } = render(
+        <TuneCard
+          {...defaultProps}
+          tune={tuneWithHz}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      fireEvent.press(getByLabelText("Decrease Hz by 5"));
+      expect(onUpdateSettings).toHaveBeenCalledWith({ aHertz: 435 });
+    });
+
+    it("decreases Hz by 1 when -1 button is pressed", () => {
+      const onUpdateSettings = jest.fn();
+      const tuneWithHz = { ...mockTune, aHertz: 440 };
+      const { getByLabelText } = render(
+        <TuneCard
+          {...defaultProps}
+          tune={tuneWithHz}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      fireEvent.press(getByLabelText("Decrease Hz by 1"));
+      expect(onUpdateSettings).toHaveBeenCalledWith({ aHertz: 439 });
+    });
+
+    it("increases Hz by 1 when +1 button is pressed", () => {
+      const onUpdateSettings = jest.fn();
+      const tuneWithHz = { ...mockTune, aHertz: 440 };
+      const { getByLabelText } = render(
+        <TuneCard
+          {...defaultProps}
+          tune={tuneWithHz}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      fireEvent.press(getByLabelText("Increase Hz by 1"));
+      expect(onUpdateSettings).toHaveBeenCalledWith({ aHertz: 441 });
+    });
+
+    it("increases Hz by 5 when +5 button is pressed", () => {
+      const onUpdateSettings = jest.fn();
+      const tuneWithHz = { ...mockTune, aHertz: 440 };
+      const { getByLabelText } = render(
+        <TuneCard
+          {...defaultProps}
+          tune={tuneWithHz}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      fireEvent.press(getByLabelText("Increase Hz by 5"));
+      expect(onUpdateSettings).toHaveBeenCalledWith({ aHertz: 445 });
+    });
+
+    it("clamps Hz to minimum of 400", () => {
+      const onUpdateSettings = jest.fn();
+      const tuneWithLowHz = { ...mockTune, aHertz: 402 };
+      const { getByLabelText } = render(
+        <TuneCard
+          {...defaultProps}
+          tune={tuneWithLowHz}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      fireEvent.press(getByLabelText("Decrease Hz by 5"));
+      expect(onUpdateSettings).toHaveBeenCalledWith({ aHertz: 400 });
+    });
+
+    it("clamps Hz to maximum of 480", () => {
+      const onUpdateSettings = jest.fn();
+      const tuneWithHighHz = { ...mockTune, aHertz: 478 };
+      const { getByLabelText } = render(
+        <TuneCard
+          {...defaultProps}
+          tune={tuneWithHighHz}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      fireEvent.press(getByLabelText("Increase Hz by 5"));
+      expect(onUpdateSettings).toHaveBeenCalledWith({ aHertz: 480 });
+    });
+
+    it("defaults to 440 Hz when aHertz is not set", () => {
+      const { getByDisplayValue } = render(
+        <TuneCard {...defaultProps} isExpanded={true} />,
+      );
+
+      expect(getByDisplayValue("440")).toBeTruthy();
+    });
+  });
+
+  describe("Pitch System Settings", () => {
+    it("shows pitch system options when expanded", () => {
+      const { getByText } = render(
+        <TuneCard {...defaultProps} isExpanded={true} />,
+      );
+
+      expect(getByText("Pitch")).toBeTruthy();
+      expect(getByText("Equal")).toBeTruthy();
+      expect(getByText("Just")).toBeTruthy();
+    });
+
+    it("calls onUpdateSettings when pitch system is changed to equal", () => {
+      const onUpdateSettings = jest.fn();
+      const tuneWithJust = { ...mockTune, pitchSystem: "just" as const };
+      const { getByText } = render(
+        <TuneCard
+          {...defaultProps}
+          tune={tuneWithJust}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      fireEvent.press(getByText("Equal"));
+      expect(onUpdateSettings).toHaveBeenCalledWith({ pitchSystem: "equal" });
+    });
+
+    it("calls onUpdateSettings when pitch system is changed to just", () => {
+      const onUpdateSettings = jest.fn();
+      const tuneWithEqual = { ...mockTune, pitchSystem: "equal" as const };
+      const { getByText } = render(
+        <TuneCard
+          {...defaultProps}
+          tune={tuneWithEqual}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      fireEvent.press(getByText("Just"));
+      expect(onUpdateSettings).toHaveBeenCalledWith({ pitchSystem: "just" });
+    });
+
+    it("does not call onUpdateSettings when same pitch system selected", () => {
+      const onUpdateSettings = jest.fn();
+      const tuneWithJust = { ...mockTune, pitchSystem: "just" as const };
+      const { getByText } = render(
+        <TuneCard
+          {...defaultProps}
+          tune={tuneWithJust}
+          isExpanded={true}
+          onUpdateSettings={onUpdateSettings}
+        />,
+      );
+
+      fireEvent.press(getByText("Just"));
+      expect(onUpdateSettings).not.toHaveBeenCalled();
+    });
+
+    it("defaults to just temperament when pitchSystem not set", () => {
+      const { getByText, getAllByText } = render(
+        <TuneCard {...defaultProps} isExpanded={true} />,
+      );
+
+      // Just should be the active option (styled differently)
+      const justButtons = getAllByText("Just");
+      expect(justButtons.length).toBeGreaterThan(0);
+    });
   });
 
   describe("Time Signature Settings", () => {

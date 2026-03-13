@@ -6,6 +6,7 @@ import {
   parseNoteName,
   noteToMusicXMLPitch,
   generateSingleNoteMusicXML,
+  noteToFrequency,
 } from "../../src/screens/FirstNote/utils/noteHelpers";
 
 describe("noteHelpers", () => {
@@ -159,6 +160,81 @@ describe("noteHelpers", () => {
       expect(xml).toContain("<score-partwise");
       expect(xml).toContain("<part-list>");
       expect(xml).toContain('<measure number="1">');
+    });
+  });
+
+  // ==========================================================================
+  // noteToFrequency Tests
+  // ==========================================================================
+  describe("noteToFrequency", () => {
+    it("returns 440 Hz for A4", () => {
+      const freq = noteToFrequency("A4");
+      expect(freq).toBeCloseTo(440, 1);
+    });
+
+    it("converts C4 (middle C) correctly", () => {
+      const freq = noteToFrequency("C4");
+      expect(freq).toBeCloseTo(261.63, 1);
+    });
+
+    it("converts E4 correctly", () => {
+      const freq = noteToFrequency("E4");
+      expect(freq).toBeCloseTo(329.63, 1);
+    });
+
+    it("converts sharp notes correctly", () => {
+      const freq = noteToFrequency("C#4");
+      expect(freq).toBeCloseTo(277.18, 1);
+    });
+
+    it("converts flat notes correctly", () => {
+      const freq = noteToFrequency("Bb3");
+      expect(freq).toBeCloseTo(233.08, 1);
+    });
+
+    it("handles higher octaves", () => {
+      const freq = noteToFrequency("A5");
+      expect(freq).toBeCloseTo(880, 1);
+    });
+
+    it("handles lower octaves", () => {
+      const freq = noteToFrequency("A3");
+      expect(freq).toBeCloseTo(220, 1);
+    });
+
+    it("handles lowercase letters", () => {
+      const freq = noteToFrequency("a4");
+      expect(freq).toBeCloseTo(440, 1);
+    });
+
+    it("returns 440 for invalid input", () => {
+      const freq = noteToFrequency("invalid");
+      expect(freq).toBe(440);
+    });
+
+    it("returns 440 for empty string", () => {
+      const freq = noteToFrequency("");
+      expect(freq).toBe(440);
+    });
+
+    it("converts G#4 correctly", () => {
+      const freq = noteToFrequency("G#4");
+      expect(freq).toBeCloseTo(415.3, 1);
+    });
+
+    it("converts Eb3 correctly", () => {
+      const freq = noteToFrequency("Eb3");
+      expect(freq).toBeCloseTo(155.56, 1);
+    });
+
+    it("handles octave 2", () => {
+      const freq = noteToFrequency("C2");
+      expect(freq).toBeCloseTo(65.41, 1);
+    });
+
+    it("handles octave 6", () => {
+      const freq = noteToFrequency("C6");
+      expect(freq).toBeCloseTo(1046.5, 1);
     });
   });
 });
