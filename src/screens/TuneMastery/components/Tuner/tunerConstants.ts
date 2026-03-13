@@ -95,6 +95,19 @@ export const NEEDLE_SPRING_TENSION = 180;
 export const NEEDLE_SPRING_FRICTION = 12;
 
 // ===========================================
+// DRIFT TRAIL CONSTANTS (Phase 1C)
+// ===========================================
+
+/** Duration of drift trail history (ms) */
+export const DRIFT_TRAIL_DURATION_MS = 2000;
+
+/** Number of samples to keep in drift trail */
+export const DRIFT_TRAIL_SAMPLES = 30;
+
+/** Sample interval for drift trail (ms) */
+export const DRIFT_TRAIL_INTERVAL_MS = 66; // ~15fps for trail
+
+// ===========================================
 // FEATURE FLAGS
 // ===========================================
 
@@ -114,8 +127,8 @@ export const TUNER_FLAGS = {
   graduatedColorZones: true,
   /** Phase 1C.1 - Spring needle easing (overshoot + settle) */
   springNeedle: true,
-  /** Phase 1C - Pitch drift trail (deferred) */
-  driftTrail: false,
+  /** Phase 1C.2 - Pitch drift trail (ghost trail showing recent pitch) */
+  driftTrail: true,
   /** Phase 1C - Coaching text (deferred) */
   coachingText: false,
 } as const;

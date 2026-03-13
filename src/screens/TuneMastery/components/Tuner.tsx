@@ -64,6 +64,9 @@ import {
   STABILITY_WINDOW_MS,
   NEEDLE_SPRING_TENSION,
   NEEDLE_SPRING_FRICTION,
+  DRIFT_TRAIL_DURATION_MS,
+  DRIFT_TRAIL_SAMPLES,
+  DRIFT_TRAIL_INTERVAL_MS,
 } from "./Tuner/tunerConstants";
 
 // Minor 7th system options
@@ -260,6 +263,10 @@ const Tuner = React.memo(function Tuner({
   // Spring needle animation (Phase 1C)
   const needleRotationAnim = useRef(new Animated.Value(0)).current;
 
+  // Drift trail history (Phase 1C) - stores {cents, timestamp} for fading trail
+  const driftTrailRef = useRef<Array<{ cents: number; timestamp: number }>>([]);
+  const lastTrailSampleRef = useRef<number>(0);
+
   // Smoothing refs for reducing jitter
   const smoothedFrequencyRef = useRef<number | null>(null);
   const smoothedCentsRef = useRef<number>(0);
@@ -398,6 +405,27 @@ const Tuner = React.memo(function Tuner({
           stabilityHistoryRef.current.shift();
         }
 
+        // Track drift trail history (Phase 1C) - sample at lower rate for performance
+        if (
+          TUNER_FLAGS.driftTrail &&
+          now - lastTrailSampleRef.current >= DRIFT_TRAIL_INTERVAL_MS
+        ) {
+          driftTrailRef.current.push({ cents: roundedCents, timestamp: now });
+          lastTrailSampleRef.current = now;
+          // Remove samples older than DRIFT_TRAIL_DURATION_MS
+          const cutoffTime = now - DRIFT_TRAIL_DURATION_MS;
+          while (
+            driftTrailRef.current.length > 0 &&
+            driftTrailRef.current[0].timestamp < cutoffTime
+          ) {
+            driftTrailRef.current.shift();
+          }
+          // Also cap at max samples
+          while (driftTrailRef.current.length > DRIFT_TRAIL_SAMPLES) {
+            driftTrailRef.current.shift();
+          }
+        }
+
         // Dispatch to state machine
         dispatchTuner({
           type: "SIGNAL_DETECTED",
@@ -419,6 +447,8 @@ const Tuner = React.memo(function Tuner({
         lastNoteRef.current = null;
         centsHistoryRef.current = [];
         stabilityHistoryRef.current = [];
+        // Clear drift trail when signal lost
+        driftTrailRef.current = [];
         // Dispatch signal lost to state machine
         dispatchTuner({ type: "SIGNAL_LOST" });
       }
@@ -731,6 +761,36 @@ const Tuner = React.memo(function Tuner({
                         y2={y2}
                         stroke="#FFFFFF"
                         strokeWidth={1}
+                      />
+                    );
+                  })}
+                {/* Drift Trail - faint ghost trail showing recent pitch movement (Phase 1C) */}
+                {TUNER_FLAGS.driftTrail &&
+                  currentNote &&
+                  driftTrailRef.current.map((sample, index) => {
+                    const cx = 180;
+                    const cy = 160;
+                    const trailR = 105; // Slightly inside the gauge arc
+                    // Clamp cents to -50/+50 range for angle calculation
+                    const clampedCents = Math.max(
+                      -50,
+                      Math.min(50, sample.cents),
+                    );
+                    const angle = 270 + (clampedCents / 50) * 90;
+                    const rad = (angle * Math.PI) / 180;
+                    const x = cx + trailR * Math.cos(rad);
+                    const y = cy + trailR * Math.sin(rad);
+                    // Opacity fades from newest (last) to oldest (first)
+                    const ageRatio =
+                      index / Math.max(1, driftTrailRef.current.length - 1);
+                    const opacity = 0.1 + 0.35 * (1 - ageRatio); // 0.45 newest → 0.1 oldest
+                    return (
+                      <Circle
+                        key={`trail-${index}-${sample.timestamp}`}
+                        cx={x}
+                        cy={y}
+                        r={3}
+                        fill={`rgba(100, 200, 255, ${opacity})`}
                       />
                     );
                   })}
