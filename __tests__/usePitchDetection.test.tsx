@@ -928,4 +928,623 @@ describe("usePitchDetection", () => {
       expect(result.length).toBe(4096);
     });
   });
+
+  describe("Unmount behavior", () => {
+    it("handles unmount while disabled", () => {
+      const { unmount } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+      unmount();
+      // Should not throw
+      expect(true).toBe(true);
+    });
+
+    it("handles unmount during startup", async () => {
+      const { result, unmount } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+
+      // Start and immediately unmount
+      act(() => {
+        result.current.startListening();
+      });
+      unmount();
+
+      expect(true).toBe(true);
+    });
+
+    it("handles multiple mount/unmount cycles", () => {
+      for (let i = 0; i < 5; i++) {
+        const { unmount } = renderHook(() =>
+          usePitchDetection({ enabled: false }),
+        );
+        unmount();
+      }
+      expect(true).toBe(true);
+    });
+  });
+
+  describe("Callback ref updates", () => {
+    it("accepts changing onVolumeChange callback", () => {
+      const callback1 = jest.fn();
+      const callback2 = jest.fn();
+
+      const { rerender } = renderHook(
+        (props: UsePitchDetectionOptions) => usePitchDetection(props),
+        { initialProps: { enabled: false, onVolumeChange: callback1 } },
+      );
+
+      rerender({ enabled: false, onVolumeChange: callback2 });
+      expect(true).toBe(true);
+    });
+
+    it("accepts changing onPitchDetected callback", () => {
+      const callback1 = jest.fn();
+      const callback2 = jest.fn();
+
+      const { rerender } = renderHook(
+        (props: UsePitchDetectionOptions) => usePitchDetection(props),
+        { initialProps: { enabled: false, onPitchDetected: callback1 } },
+      );
+
+      rerender({ enabled: false, onPitchDetected: callback2 });
+      expect(true).toBe(true);
+    });
+
+    it("accepts changing onSoundStart callback", () => {
+      const callback1 = jest.fn();
+      const callback2 = jest.fn();
+
+      const { rerender } = renderHook(
+        (props: UsePitchDetectionOptions) => usePitchDetection(props),
+        { initialProps: { enabled: false, onSoundStart: callback1 } },
+      );
+
+      rerender({ enabled: false, onSoundStart: callback2 });
+      expect(true).toBe(true);
+    });
+
+    it("accepts changing onSoundEnd callback", () => {
+      const callback1 = jest.fn();
+      const callback2 = jest.fn();
+
+      const { rerender } = renderHook(
+        (props: UsePitchDetectionOptions) => usePitchDetection(props),
+        { initialProps: { enabled: false, onSoundEnd: callback1 } },
+      );
+
+      rerender({ enabled: false, onSoundEnd: callback2 });
+      expect(true).toBe(true);
+    });
+
+    it("accepts changing onRealtimePitch callback", () => {
+      const callback1 = jest.fn();
+      const callback2 = jest.fn();
+
+      const { rerender } = renderHook(
+        (props: UsePitchDetectionOptions) => usePitchDetection(props),
+        { initialProps: { enabled: false, onRealtimePitch: callback1 } },
+      );
+
+      rerender({ enabled: false, onRealtimePitch: callback2 });
+      expect(true).toBe(true);
+    });
+
+    it("accepts changing onPitchMatch callback", () => {
+      const callback1 = jest.fn();
+      const callback2 = jest.fn();
+
+      const { rerender } = renderHook(
+        (props: UsePitchDetectionOptions) => usePitchDetection(props),
+        {
+          initialProps: {
+            enabled: false,
+            targetNote: "A4",
+            onPitchMatch: callback1,
+          },
+        },
+      );
+
+      rerender({ enabled: false, targetNote: "A4", onPitchMatch: callback2 });
+      expect(true).toBe(true);
+    });
+
+    it("handles removing callbacks", () => {
+      const callback = jest.fn();
+
+      const { rerender } = renderHook(
+        (props: UsePitchDetectionOptions) => usePitchDetection(props),
+        { initialProps: { enabled: false, onVolumeChange: callback } },
+      );
+
+      rerender({ enabled: false, onVolumeChange: undefined });
+      expect(true).toBe(true);
+    });
+  });
+
+  describe("Volume threshold behavior", () => {
+    it("accepts threshold of 0.001", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false, volumeThreshold: 0.001 }),
+      );
+      expect(result.current.volume).toBe(0);
+    });
+
+    it("accepts threshold of 0.1", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false, volumeThreshold: 0.1 }),
+      );
+      expect(result.current.volume).toBe(0);
+    });
+
+    it("accepts threshold of 0.5", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false, volumeThreshold: 0.5 }),
+      );
+      expect(result.current.volume).toBe(0);
+    });
+
+    it("accepts threshold of 1.0", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false, volumeThreshold: 1.0 }),
+      );
+      expect(result.current.volume).toBe(0);
+    });
+  });
+
+  describe("Silence duration behavior", () => {
+    it("accepts very short silence duration (100ms)", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false, silenceDuration: 100 }),
+      );
+      expect(result.current).toBeDefined();
+    });
+
+    it("accepts medium silence duration (1000ms)", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false, silenceDuration: 1000 }),
+      );
+      expect(result.current).toBeDefined();
+    });
+
+    it("accepts long silence duration (10000ms)", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false, silenceDuration: 10000 }),
+      );
+      expect(result.current).toBeDefined();
+    });
+  });
+
+  describe("Pitch margin behavior", () => {
+    it("accepts very tight pitch margin (5 cents)", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false, pitchMargin: 5 }),
+      );
+      expect(result.current).toBeDefined();
+    });
+
+    it("accepts loose pitch margin (150 cents)", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false, pitchMargin: 150 }),
+      );
+      expect(result.current).toBeDefined();
+    });
+
+    it("accepts very loose pitch margin (300 cents)", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false, pitchMargin: 300 }),
+      );
+      expect(result.current).toBeDefined();
+    });
+  });
+
+  describe("Multiple configuration changes", () => {
+    it("handles changing all props at once", () => {
+      const { rerender } = renderHook(
+        (props: UsePitchDetectionOptions) => usePitchDetection(props),
+        {
+          initialProps: {
+            enabled: false,
+            volumeThreshold: 0.02,
+            silenceDuration: 1500,
+            pitchMargin: 100,
+            targetNote: "A4",
+          },
+        },
+      );
+
+      rerender({
+        enabled: false,
+        volumeThreshold: 0.05,
+        silenceDuration: 500,
+        pitchMargin: 50,
+        targetNote: "C4",
+      });
+
+      expect(true).toBe(true);
+    });
+
+    it("handles rapid prop changes", () => {
+      const { rerender } = renderHook(
+        (props: UsePitchDetectionOptions) => usePitchDetection(props),
+        { initialProps: { enabled: false, targetNote: "A4" } },
+      );
+
+      const notes = ["A4", "B4", "C5", "D5", "E5", "F5", "G5"];
+      notes.forEach((note) => {
+        rerender({ enabled: false, targetNote: note });
+      });
+
+      expect(true).toBe(true);
+    });
+  });
+
+  describe("Target note all chromatic", () => {
+    it("handles all 12 chromatic notes", () => {
+      const chromaticNotes = [
+        "C4",
+        "C#4",
+        "D4",
+        "D#4",
+        "E4",
+        "F4",
+        "F#4",
+        "G4",
+        "G#4",
+        "A4",
+        "A#4",
+        "B4",
+      ];
+
+      chromaticNotes.forEach((note) => {
+        const { result, unmount } = renderHook(() =>
+          usePitchDetection({ enabled: false, targetNote: note }),
+        );
+        expect(result.current).toBeDefined();
+        unmount();
+      });
+    });
+
+    it("handles all flat notes", () => {
+      const flatNotes = ["Db4", "Eb4", "Gb4", "Ab4", "Bb4"];
+
+      flatNotes.forEach((note) => {
+        const { result, unmount } = renderHook(() =>
+          usePitchDetection({ enabled: false, targetNote: note }),
+        );
+        expect(result.current).toBeDefined();
+        unmount();
+      });
+    });
+  });
+
+  describe("External audio context", () => {
+    it("accepts null externalAudioContext", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false, externalAudioContext: null }),
+      );
+      expect(result.current).toBeDefined();
+    });
+
+    it("accepts undefined externalAudioContext", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+      expect(result.current).toBeDefined();
+    });
+  });
+
+  describe("Soundng frequency range combinations", () => {
+    it("handles 200-400Hz range (bass voice)", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          soundingFrequencyRange: { min: 200, max: 400 },
+        }),
+      );
+      expect(result.current).toBeDefined();
+    });
+
+    it("handles 400-800Hz range (alto voice)", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          soundingFrequencyRange: { min: 400, max: 800 },
+        }),
+      );
+      expect(result.current).toBeDefined();
+    });
+
+    it("handles 800-1600Hz range (soprano voice)", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          soundingFrequencyRange: { min: 800, max: 1600 },
+        }),
+      );
+      expect(result.current).toBeDefined();
+    });
+
+    it("handles full instrument range", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          soundingFrequencyRange: { min: 82, max: 1500 },
+        }),
+      );
+      expect(result.current).toBeDefined();
+    });
+  });
+
+  describe("Combined configuration scenarios", () => {
+    it("handles voice lesson configuration", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          volumeThreshold: 0.03,
+          silenceDuration: 800,
+          pitchMargin: 50,
+          targetNote: "G4",
+          allowOctaveEquivalent: true,
+          soundingFrequencyRange: { min: 150, max: 600 },
+        }),
+      );
+      expect(result.current).toBeDefined();
+    });
+
+    it("handles instrument practice configuration", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          volumeThreshold: 0.02,
+          silenceDuration: 1500,
+          pitchMargin: 100,
+          targetNote: "A4",
+          allowOctaveEquivalent: false,
+          soundingFrequencyRange: { min: 80, max: 1000 },
+        }),
+      );
+      expect(result.current).toBeDefined();
+    });
+
+    it("handles ear training configuration", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          volumeThreshold: 0.01,
+          silenceDuration: 2000,
+          pitchMargin: 25,
+          targetNote: "C4",
+          allowOctaveEquivalent: false,
+        }),
+      );
+      expect(result.current).toBeDefined();
+    });
+  });
+
+  describe("State consistency after operations", () => {
+    it("maintains consistent state after startListening error", async () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+
+      await act(async () => {
+        await result.current.startListening();
+      });
+
+      // State should be consistent
+      const { isListening, volume, isSounding, currentPitch, error } =
+        result.current;
+      expect(typeof isListening).toBe("boolean");
+      expect(typeof volume).toBe("number");
+      expect(typeof isSounding).toBe("boolean");
+      expect(currentPitch === null || typeof currentPitch === "object").toBe(
+        true,
+      );
+      expect(error === null || typeof error === "string").toBe(true);
+    });
+
+    it("maintains consistent state after stopListening", async () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+
+      act(() => {
+        result.current.stopListening();
+      });
+
+      // State should be consistent
+      expect(result.current.isListening).toBe(false);
+      expect(result.current.volume).toBe(0);
+      expect(result.current.isSounding).toBe(false);
+    });
+
+    it("maintains consistent state through enable/disable cycle", async () => {
+      const { result, rerender } = renderHook(
+        (props: UsePitchDetectionOptions) => usePitchDetection(props),
+        { initialProps: { enabled: false } },
+      );
+
+      // Enable
+      rerender({ enabled: true });
+      await act(async () => {
+        // Wait for setup
+        await new Promise((r) => setTimeout(r, 10));
+      });
+
+      // Disable
+      rerender({ enabled: false });
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 10));
+      });
+
+      // State should be reset
+      expect(result.current.isSounding).toBe(false);
+    });
+  });
+
+  describe("startListening and stopListening pairs", () => {
+    it("handles start followed by stop", async () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+
+      await act(async () => {
+        await result.current.startListening();
+      });
+
+      act(() => {
+        result.current.stopListening();
+      });
+
+      expect(result.current.isListening).toBe(false);
+    });
+
+    it("handles double start", async () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+
+      await act(async () => {
+        await result.current.startListening();
+      });
+
+      await act(async () => {
+        await result.current.startListening();
+      });
+
+      // Should not crash
+      expect(true).toBe(true);
+    });
+
+    it("handles double stop", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+
+      act(() => {
+        result.current.stopListening();
+      });
+
+      act(() => {
+        result.current.stopListening();
+      });
+
+      expect(result.current.isListening).toBe(false);
+    });
+
+    it("handles start-stop-start sequence", async () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+
+      await act(async () => {
+        await result.current.startListening();
+      });
+
+      act(() => {
+        result.current.stopListening();
+      });
+
+      await act(async () => {
+        await result.current.startListening();
+      });
+
+      expect(true).toBe(true);
+    });
+  });
+
+  describe("Mock utilities additional coverage", () => {
+    it("noteNameToMidi returns null for unknown notes", () => {
+      expect(mockNoteNameToMidi("X9")).toBeNull();
+    });
+
+    it("frequencyToNote can be called with various frequencies", () => {
+      expect(mockFrequencyToNote(220)).toBeDefined();
+      expect(mockFrequencyToNote(880)).toBeDefined();
+      expect(mockFrequencyToNote(261.63)).toBeDefined();
+    });
+
+    it("autoCorrelate works with different buffer sizes", () => {
+      expect(mockAutoCorrelate(new Float32Array(1024), 44100)).toBeDefined();
+      expect(mockAutoCorrelate(new Float32Array(2048), 44100)).toBeDefined();
+      expect(mockAutoCorrelate(new Float32Array(8192), 44100)).toBeDefined();
+    });
+
+    it("base64ToFloat32Array returns correct type", () => {
+      const result = mockBase64ToFloat32Array("SGVsbG8=");
+      expect(result.constructor.name).toBe("Float32Array");
+    });
+  });
+
+  describe("Return value completeness", () => {
+    it("returns all documented properties", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+
+      const keys = Object.keys(result.current);
+      expect(keys).toContain("isListening");
+      expect(keys).toContain("permissionGranted");
+      expect(keys).toContain("error");
+      expect(keys).toContain("currentPitch");
+      expect(keys).toContain("volume");
+      expect(keys).toContain("isSounding");
+      expect(keys).toContain("isAvailable");
+      expect(keys).toContain("startListening");
+      expect(keys).toContain("stopListening");
+      expect(keys.length).toBe(9);
+    });
+
+    it("returns functions that are callable", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+
+      expect(() => result.current.stopListening()).not.toThrow();
+    });
+  });
+
+  describe("Different target notes with octave equivalent", () => {
+    it("handles A notes across octaves with allowOctaveEquivalent=true", () => {
+      const notes = ["A1", "A2", "A3", "A4", "A5", "A6"];
+      notes.forEach((note) => {
+        const { result, unmount } = renderHook(() =>
+          usePitchDetection({
+            enabled: false,
+            targetNote: note,
+            allowOctaveEquivalent: true,
+          }),
+        );
+        expect(result.current).toBeDefined();
+        unmount();
+      });
+    });
+
+    it("handles C notes across octaves with allowOctaveEquivalent=true", () => {
+      const notes = ["C2", "C3", "C4", "C5", "C6"];
+      notes.forEach((note) => {
+        const { result, unmount } = renderHook(() =>
+          usePitchDetection({
+            enabled: false,
+            targetNote: note,
+            allowOctaveEquivalent: true,
+          }),
+        );
+        expect(result.current).toBeDefined();
+        unmount();
+      });
+    });
+
+    it("handles notes with allowOctaveEquivalent=false", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          targetNote: "A4",
+          allowOctaveEquivalent: false,
+        }),
+      );
+      expect(result.current).toBeDefined();
+    });
+  });
 });

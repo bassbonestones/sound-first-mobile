@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">10% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>6/60</span>
+                <span class='fraction'>0/60</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">6.25% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>2/32</span>
+                <span class='fraction'>0/32</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">33.33% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/6</span>
+                <span class='fraction'>0/6</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">10.71% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>6/56</span>
+                <span class='fraction'>0/56</span>
             </div>
         
             
@@ -256,20 +256,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">22x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">22x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">22x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -279,9 +265,23 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">22x</span>
-<span class="cline-any cline-yes">22x</span>
-<span class="cline-any cline-yes">22x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -429,8 +429,8 @@ type OscillatorType = "sine" | "triangle" | "square" | "sawtooth";
 /**
  * Get the appropriate AudioContext class for the current platform
  */
-export function getAudioContextClass(): (new () =&gt; AudioContextType) | null {
-  <span class="missing-if-branch" title="if path not taken" >I</span>if (Platform.OS === "web") {
+export function <span class="fstat-no" title="function not covered" >getAudioContextClass(</span>): (new () =&gt; AudioContextType) | null {
+<span class="cstat-no" title="statement not covered" >  if (Platform.OS === "web") {</span>
 <span class="cstat-no" title="statement not covered" >    return typeof window !== "undefined"</span>
       ? window.AudioContext ||
           (window as unknown as { webkitAudioContext?: typeof AudioContext })
@@ -440,9 +440,9 @@ export function getAudioContextClass(): (new () =&gt; AudioContextType) | null {
   }
 &nbsp;
   // Native platforms (iOS/Android)
-  try {
+<span class="cstat-no" title="statement not covered" >  try {</span>
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require("react-native-audio-api").AudioContext;
+<span class="cstat-no" title="statement not covered" >    return require("react-native-audio-api").AudioContext;</span>
   } catch {
 <span class="cstat-no" title="statement not covered" >    devWarn("react-native-audio-api not available");</span>
 <span class="cstat-no" title="statement not covered" >    return null;</span>
@@ -452,10 +452,10 @@ export function getAudioContextClass(): (new () =&gt; AudioContextType) | null {
 /**
  * Create an AudioContext instance for the current platform
  */
-export function createAudioContext(): AudioContextType | null {
-  const AudioContextClass = getAudioContextClass();
-  <span class="missing-if-branch" title="if path not taken" >I</span>if (!AudioContextClass) <span class="cstat-no" title="statement not covered" >return null;</span>
-  return new AudioContextClass();
+export function <span class="fstat-no" title="function not covered" >createAudioContext(</span>): AudioContextType | null {
+  const AudioContextClass = <span class="cstat-no" title="statement not covered" >getAudioContextClass();</span>
+<span class="cstat-no" title="statement not covered" >  if (!AudioContextClass) <span class="cstat-no" title="statement not covered" >return null;</span></span>
+<span class="cstat-no" title="statement not covered" >  return new AudioContextClass();</span>
 }
 &nbsp;
 /**
@@ -592,7 +592,7 @@ export async function <span class="fstat-no" title="function not covered" >clean
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-12T19:48:45.993Z
+                at 2026-03-13T06:04:17.912Z
             </div>
         <script src="../../../../../prettify.js"></script>
         <script>

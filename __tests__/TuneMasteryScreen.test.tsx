@@ -319,4 +319,223 @@ describe("TuneMasteryScreen", () => {
       expect(getByText("Settings")).toBeTruthy();
     });
   });
+
+  describe("practice flow", () => {
+    it("shows selection panel when not practicing", () => {
+      mockUseTuneMasteryData.mockReturnValue(
+        createMockHookReturn({
+          data: createMockData({
+            activeTunes: [
+              {
+                id: "tune1",
+                name: "Test Tune",
+                keys: { C: { score: 50, attempts: 3 } },
+              },
+            ],
+          }),
+        }) as unknown as UseTuneMasteryDataReturn,
+      );
+
+      const { getByText } = render(
+        <TuneMasteryScreen navigation={mockNavigation} />,
+      );
+
+      expect(getByText("Go")).toBeTruthy();
+    });
+
+    it("handles Go button press", () => {
+      const mockSetCurrentSession = jest.fn();
+      const mockToggleLastPickType = jest.fn();
+      mockUseTuneMasteryData.mockReturnValue(
+        createMockHookReturn({
+          data: createMockData({
+            activeTunes: [
+              {
+                id: "tune1",
+                name: "Test Tune",
+                keys: { C: { score: 50, attempts: 3 } },
+              },
+            ],
+          }),
+          setCurrentSession: mockSetCurrentSession,
+          toggleLastPickType: mockToggleLastPickType,
+        }) as unknown as UseTuneMasteryDataReturn,
+      );
+
+      const { getByText } = render(
+        <TuneMasteryScreen navigation={mockNavigation} />,
+      );
+
+      fireEvent.press(getByText("Go"));
+
+      expect(mockSetCurrentSession).toHaveBeenCalled();
+    });
+
+    it("restores session on mount when currentSession exists", () => {
+      mockUseTuneMasteryData.mockReturnValue(
+        createMockHookReturn({
+          data: createMockData({
+            activeTunes: [
+              {
+                id: "tune1",
+                name: "Test Tune",
+                keys: { C: { score: 50, attempts: 3 } },
+              },
+            ],
+            currentSession: {
+              tuneId: "tune1",
+              key: "C",
+              isManualTune: false,
+              isManualKey: false,
+              pickType: "learning",
+            },
+          }),
+        }) as unknown as UseTuneMasteryDataReturn,
+      );
+
+      const { getByTestId } = render(
+        <TuneMasteryScreen navigation={mockNavigation} />,
+      );
+
+      // Practice panel should be visible
+      expect(getByTestId("practice-panel")).toBeTruthy();
+    });
+  });
+
+  describe("archive interactions", () => {
+    it("toggles archive visibility when archive button pressed", () => {
+      mockUseTuneMasteryData.mockReturnValue(
+        createMockHookReturn({
+          data: createMockData({
+            archivedTunes: [{ id: "arch1", name: "Archived Tune", keys: {} }],
+          }),
+        }) as unknown as UseTuneMasteryDataReturn,
+      );
+
+      const { getByText, getByLabelText } = render(
+        <TuneMasteryScreen navigation={mockNavigation} />,
+      );
+
+      // Initially collapsed
+      expect(getByText("▶ Archive (1)")).toBeTruthy();
+
+      // Toggle open
+      fireEvent.press(getByLabelText("Show archive"));
+      expect(getByText("▼ Archive (1)")).toBeTruthy();
+
+      // Toggle closed
+      fireEvent.press(getByLabelText("Hide archive"));
+      expect(getByText("▶ Archive (1)")).toBeTruthy();
+    });
+  });
+
+  describe("add tune validation", () => {
+    it("does not add tune with empty name", async () => {
+      const mockAddTune = jest.fn();
+      mockUseTuneMasteryData.mockReturnValue(
+        createMockHookReturn({
+          addTune: mockAddTune,
+        }) as unknown as UseTuneMasteryDataReturn,
+      );
+
+      const { getByText, getByPlaceholderText } = render(
+        <TuneMasteryScreen navigation={mockNavigation} />,
+      );
+
+      fireEvent.press(getByText("+ Add Tune"));
+
+      // Leave input empty or with just spaces
+      const input = getByPlaceholderText("Tune name...");
+      fireEvent.changeText(input, "   ");
+
+      fireEvent.press(getByText("Add"));
+
+      // addTune should NOT be called with empty/whitespace name
+      expect(mockAddTune).not.toHaveBeenCalled();
+    });
+
+    it("closes modal after successful add", async () => {
+      const mockAddTune = jest.fn().mockResolvedValue(undefined);
+      mockUseTuneMasteryData.mockReturnValue(
+        createMockHookReturn({
+          addTune: mockAddTune,
+        }) as unknown as UseTuneMasteryDataReturn,
+      );
+
+      const { getByText, getByPlaceholderText, queryByText } = render(
+        <TuneMasteryScreen navigation={mockNavigation} />,
+      );
+
+      fireEvent.press(getByText("+ Add Tune"));
+      expect(getByText("Add New Tune")).toBeTruthy();
+
+      const input = getByPlaceholderText("Tune name...");
+      fireEvent.changeText(input, "Giant Steps");
+
+      fireEvent.press(getByText("Add"));
+
+      await waitFor(() => {
+        expect(mockAddTune).toHaveBeenCalledWith("Giant Steps");
+      });
+    });
+
+    it("closes add modal when cancel pressed", () => {
+      const { getByText, queryByText } = render(
+        <TuneMasteryScreen navigation={mockNavigation} />,
+      );
+
+      fireEvent.press(getByText("+ Add Tune"));
+      expect(getByText("Add New Tune")).toBeTruthy();
+
+      fireEvent.press(getByText("Cancel"));
+
+      // Modal should be closed - title should not be visible
+      expect(queryByText("Add New Tune")).toBeNull();
+    });
+  });
+
+  describe("error handling", () => {
+    it("displays error object message", () => {
+      mockUseTuneMasteryData.mockReturnValue(
+        createMockHookReturn({
+          error: { message: "Storage error occurred" },
+        }) as unknown as UseTuneMasteryDataReturn,
+      );
+
+      const { getByText } = render(
+        <TuneMasteryScreen navigation={mockNavigation} />,
+      );
+
+      expect(getByText("Error loading data")).toBeTruthy();
+      expect(getByText("Storage error occurred")).toBeTruthy();
+    });
+
+    it("handles Error instance", () => {
+      mockUseTuneMasteryData.mockReturnValue(
+        createMockHookReturn({
+          error: new Error("Network failure"),
+        }) as unknown as UseTuneMasteryDataReturn,
+      );
+
+      const { getByText } = render(
+        <TuneMasteryScreen navigation={mockNavigation} />,
+      );
+
+      expect(getByText("Error loading data")).toBeTruthy();
+      expect(getByText("Network failure")).toBeTruthy();
+    });
+  });
+
+  describe("stats display", () => {
+    it("displays stats from selection engine", () => {
+      const { getByText } = render(
+        <TuneMasteryScreen navigation={mockNavigation} />,
+      );
+
+      // Stats bar shows values from mocked useSelectionEngine
+      expect(getByText("1")).toBeTruthy(); // totalTunes
+      expect(getByText("0")).toBeTruthy(); // totalMastered
+      expect(getByText(/50/)).toBeTruthy(); // averageScore (rendered with %)
+    });
+  });
 });

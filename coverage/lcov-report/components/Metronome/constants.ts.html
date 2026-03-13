@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>7/7</span>
+                <span class='fraction'>0/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">50% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>2/4</span>
+                <span class='fraction'>0/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>0/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>7/7</span>
+                <span class='fraction'>0/7</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line high'></div>
+    <div class='status-line low'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -250,12 +250,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -287,7 +287,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -320,9 +320,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -337,7 +337,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -345,7 +345,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -429,12 +429,12 @@
 /**
  * Available note values for time signature denominator
  */
-export const NOTE_VALUES: readonly number[] = [1, 2, 4, 8, 16, 32];
+export const NOTE_VALUES: readonly number[] = <span class="cstat-no" title="statement not covered" >[1, 2, 4, 8, 16, 32];</span>
 &nbsp;
 /**
  * Note value names for display
  */
-export const NOTE_VALUE_NAMES: Record&lt;number, string&gt; = {
+export const NOTE_VALUE_NAMES: Record&lt;number, string&gt; = <span class="cstat-no" title="statement not covered" >{</span>
   1: "whole",
   2: "half",
   4: "quarter",
@@ -461,12 +461,12 @@ export interface SubdivisionPattern {
  * @param noteValue - Current note value (1, 2, 4, 8, 16, 32)
  * @returns Human-readable label
  */
-export function getSubdivisionLabel(
+export function <span class="fstat-no" title="function not covered" >getSubdivisionLabel(</span>
   subdivisionKey: string,
   noteValue: number,
 ): string {
   // Map beat note value to actual rhythm names for subdivisions
-  const noteNames: Record&lt;number, Record&lt;string, string&gt;&gt; = {
+  const noteNames: Record&lt;number, Record&lt;string, string&gt;&gt; = <span class="cstat-no" title="statement not covered" >{</span>
     1: {
       half: "half notes",
       quarter: "quarter notes",
@@ -499,9 +499,9 @@ export function getSubdivisionLabel(
     },
   };
 &nbsp;
-  const n = noteNames[noteValue] || <span class="branch-1 cbranch-no" title="branch not covered" >noteNames[4];</span>
+  const n = <span class="cstat-no" title="statement not covered" >noteNames[noteValue] || noteNames[4];</span>
 &nbsp;
-  const labels: Record&lt;string, string&gt; = {
+  const labels: Record&lt;string, string&gt; = <span class="cstat-no" title="statement not covered" >{</span>
     none: "None",
     halves: n.half,
     triplet: n.triplet,
@@ -516,7 +516,7 @@ export function getSubdivisionLabel(
     swing: "Swing",
   };
 &nbsp;
-  return labels[subdivisionKey] || <span class="branch-1 cbranch-no" title="branch not covered" >subdivisionKey;</span>
+<span class="cstat-no" title="statement not covered" >  return labels[subdivisionKey] || subdivisionKey;</span>
 }
 &nbsp;
 /**
@@ -524,7 +524,7 @@ export function getSubdivisionLabel(
  * pattern: array of positions within beat (0-1)
  * accent: array of volume multipliers for each click
  */
-export const SUBDIVISIONS: Record&lt;string, SubdivisionPattern&gt; = {
+export const SUBDIVISIONS: Record&lt;string, SubdivisionPattern&gt; = <span class="cstat-no" title="statement not covered" >{</span>
   none: {
     key: "none",
     description: "1 click per beat",
@@ -607,7 +607,7 @@ export { createClickSound } from "../../screens/Session/components/exercises/sha
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-12T19:48:45.993Z
+                at 2026-03-13T06:04:17.912Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>20/20</span>
+                <span class='fraction'>0/20</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">66.66% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>2/3</span>
+                <span class='fraction'>0/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>3/3</span>
+                <span class='fraction'>0/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>20/20</span>
+                <span class='fraction'>0/20</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line high'></div>
+    <div class='status-line low'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -182,43 +182,43 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">18x</span>
-<span class="cline-any cline-yes">18x</span>
-<span class="cline-any cline-yes">18x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">18x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">18x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">18x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -261,31 +261,31 @@ export interface AsyncState&lt;T&gt; {
  * @param initialData - Initial data value
  * @returns State and control functions
  */
-export function useAsyncState&lt;T = unknown&gt;(
-  initialData: T | null = null,
+export function <span class="fstat-no" title="function not covered" >useAsyncState&lt;</span>T = unknown&gt;(
+  initialData: T | null = <span class="branch-0 cbranch-no" title="branch not covered" >null,</span>
 ): AsyncState&lt;T&gt; {
-  const [data, setData] = useState&lt;T | null&gt;(initialData);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState&lt;Error | null&gt;(null);
+  const [data, setData] = <span class="cstat-no" title="statement not covered" >useState&lt;T | null&gt;(initialData);</span>
+  const [loading, setLoading] = <span class="cstat-no" title="statement not covered" >useState(false);</span>
+  const [error, setError] = <span class="cstat-no" title="statement not covered" >useState&lt;Error | null&gt;(null);</span>
 &nbsp;
   /**
    * Execute an async function with automatic loading/error state
    */
-  const execute = useCallback(
-    async &lt;R = T&gt;(asyncFn: () =&gt; Promise&lt;R&gt;): Promise&lt;R | null&gt; =&gt; {
-      setLoading(true);
-      setError(null);
-      try {
-        const result = await asyncFn();
-        setData(result as unknown as T);
-        return result;
+  const execute = <span class="cstat-no" title="statement not covered" >useCallback(</span>
+<span class="fstat-no" title="function not covered" >    as</span>ync &lt;R = T&gt;(asyncFn: () =&gt; Promise&lt;R&gt;): Promise&lt;R | null&gt; =&gt; {
+<span class="cstat-no" title="statement not covered" >      setLoading(true);</span>
+<span class="cstat-no" title="statement not covered" >      setError(null);</span>
+<span class="cstat-no" title="statement not covered" >      try {</span>
+        const result = <span class="cstat-no" title="statement not covered" >await asyncFn();</span>
+<span class="cstat-no" title="statement not covered" >        setData(result as unknown as T);</span>
+<span class="cstat-no" title="statement not covered" >        return result;</span>
       } catch (err) {
-        const error = err instanceof Error ? err : <span class="branch-1 cbranch-no" title="branch not covered" >new Error(String(err));</span>
-        setError(error);
-        devError("[useAsyncState] Error:", error);
-        return null;
+        const error = <span class="cstat-no" title="statement not covered" >err instanceof Error ? err : new Error(String(err));</span>
+<span class="cstat-no" title="statement not covered" >        setError(error);</span>
+<span class="cstat-no" title="statement not covered" >        devError("[useAsyncState] Error:", error);</span>
+<span class="cstat-no" title="statement not covered" >        return null;</span>
       } finally {
-        setLoading(false);
+<span class="cstat-no" title="statement not covered" >        setLoading(false);</span>
       }
     },
     [],
@@ -294,13 +294,13 @@ export function useAsyncState&lt;T = unknown&gt;(
   /**
    * Reset to initial state
    */
-  const reset = useCallback(() =&gt; {
-    setData(initialData);
-    setLoading(false);
-    setError(null);
+  const reset = <span class="cstat-no" title="statement not covered" >useCallback(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >    setData(initialData);</span>
+<span class="cstat-no" title="statement not covered" >    setLoading(false);</span>
+<span class="cstat-no" title="statement not covered" >    setError(null);</span>
   }, [initialData]);
 &nbsp;
-  return {
+<span class="cstat-no" title="statement not covered" >  return {</span>
     data,
     loading,
     error,
@@ -316,7 +316,7 @@ export function useAsyncState&lt;T = unknown&gt;(
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-12T19:48:45.993Z
+                at 2026-03-13T06:04:17.912Z
             </div>
         <script src="../prettify.js"></script>
         <script>

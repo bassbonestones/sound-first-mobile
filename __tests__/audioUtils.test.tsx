@@ -233,7 +233,7 @@ describe("audioUtils", () => {
     it("handles buffer with all same values", () => {
       const buffer = new Float32Array(1024).fill(0.5);
       const result = autoCorrelate(buffer, 44100);
-      
+
       expect(result).toHaveProperty("frequency");
       expect(result).toHaveProperty("rms");
     });
@@ -272,7 +272,7 @@ describe("audioUtils", () => {
     it("handles empty buffer", () => {
       const buffer = new Float32Array(0);
       const result = autoCorrelate(buffer, 44100);
-      
+
       expect(result.frequency).toBe(-1);
       // RMS is NaN for empty buffer (0/0), but frequency detection still works
       expect(typeof result.rms).toBe("number");
@@ -307,7 +307,7 @@ describe("audioUtils", () => {
       // 4 bytes of zeros encoded as base64
       const base64 = "AAAAAAAA"; // 6 bytes -> 3 16-bit samples of zeros
       const result = base64ToFloat32Array(base64);
-      
+
       // Each sample should be 0
       for (let i = 0; i < result.length; i++) {
         expect(result[i]).toBe(0);
@@ -321,7 +321,7 @@ describe("audioUtils", () => {
       const bytes = new Uint8Array([0x00, 0x40]); // 0x4000 = 16384 -> 0.5 normalized
       const base64 = Buffer.from(bytes).toString("base64");
       const result = base64ToFloat32Array(base64);
-      
+
       expect(result.length).toBe(1);
       expect(result[0]).toBeCloseTo(0.5, 1);
     });
@@ -329,10 +329,10 @@ describe("audioUtils", () => {
     it("handles negative 16-bit samples", () => {
       // Negative sample: -16384 in 16-bit = 0xC000
       // Little endian: 00 C0
-      const bytes = new Uint8Array([0x00, 0xC0]);
+      const bytes = new Uint8Array([0x00, 0xc0]);
       const base64 = Buffer.from(bytes).toString("base64");
       const result = base64ToFloat32Array(base64);
-      
+
       expect(result.length).toBe(1);
       expect(result[0]).toBeLessThan(0);
     });
@@ -340,13 +340,16 @@ describe("audioUtils", () => {
     it("normalizes samples to -1 to 1 range", () => {
       // Several samples
       const bytes = new Uint8Array([
-        0xFF, 0x7F, // Max positive: 32767 -> ~1.0
-        0x00, 0x00, // Zero
-        0x01, 0x80, // Near max negative: -32767 -> ~-1.0
+        0xff,
+        0x7f, // Max positive: 32767 -> ~1.0
+        0x00,
+        0x00, // Zero
+        0x01,
+        0x80, // Near max negative: -32767 -> ~-1.0
       ]);
       const base64 = Buffer.from(bytes).toString("base64");
       const result = base64ToFloat32Array(base64);
-      
+
       expect(result.length).toBe(3);
       expect(result[0]).toBeCloseTo(1.0, 1);
       expect(result[1]).toBe(0);
@@ -479,8 +482,18 @@ describe("audioUtils", () => {
   describe("NOTE_NAMES array", () => {
     it("has correct order of notes", () => {
       expect(NOTE_NAMES).toEqual([
-        "C", "C#", "D", "D#", "E", "F",
-        "F#", "G", "G#", "A", "A#", "B",
+        "C",
+        "C#",
+        "D",
+        "D#",
+        "E",
+        "F",
+        "F#",
+        "G",
+        "G#",
+        "A",
+        "A#",
+        "B",
       ]);
     });
 
@@ -507,7 +520,7 @@ describe("audioUtils", () => {
   describe("Frequency-MIDI round trip", () => {
     it("converts frequency to note and back to MIDI consistently", () => {
       const frequencies = [261.63, 440, 880, 523.25];
-      
+
       frequencies.forEach((freq) => {
         const noteInfo = frequencyToNote(freq);
         if (noteInfo) {

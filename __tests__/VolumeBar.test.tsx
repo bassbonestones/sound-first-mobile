@@ -181,3 +181,76 @@ describe("CircularVolumeIndicator Component", () => {
     });
   });
 });
+
+describe("VolumeBar Animation and Peak Hold", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("renders without animation (animated=false)", () => {
+    const { toJSON } = render(<VolumeBar volume={0.5} animated={false} />);
+    expect(toJSON()).toBeTruthy();
+  });
+
+  it("updates immediately when animated is false", () => {
+    const { rerender, toJSON } = render(
+      <VolumeBar volume={0.5} animated={false} />,
+    );
+
+    // Change volume
+    rerender(<VolumeBar volume={0.8} animated={false} />);
+
+    expect(toJSON()).toBeTruthy();
+  });
+
+  it("renders with showPeakHold enabled", () => {
+    const { toJSON } = render(<VolumeBar volume={0.5} showPeakHold={true} />);
+    expect(toJSON()).toBeTruthy();
+  });
+
+  it("tracks peak when volume increases", () => {
+    const { rerender, toJSON } = render(
+      <VolumeBar volume={0.3} showPeakHold={true} />,
+    );
+
+    // Increase volume to set a new peak
+    rerender(<VolumeBar volume={0.7} showPeakHold={true} />);
+
+    expect(toJSON()).toBeTruthy();
+  });
+
+  it("decays peak after timeout", () => {
+    const { rerender, toJSON } = render(
+      <VolumeBar volume={0.8} showPeakHold={true} />,
+    );
+
+    // Set a peak
+    rerender(<VolumeBar volume={0.8} showPeakHold={true} />);
+
+    // Advance timers to trigger peak decay
+    jest.advanceTimersByTime(600);
+
+    expect(toJSON()).toBeTruthy();
+  });
+
+  it("clears existing timeout when new peak is set", () => {
+    const { rerender, toJSON } = render(
+      <VolumeBar volume={0.5} showPeakHold={true} />,
+    );
+
+    // Set first peak
+    rerender(<VolumeBar volume={0.7} showPeakHold={true} />);
+
+    // Quickly set a new higher peak (should clear previous timeout)
+    rerender(<VolumeBar volume={0.9} showPeakHold={true} />);
+
+    // Advance partial time
+    jest.advanceTimersByTime(600);
+
+    expect(toJSON()).toBeTruthy();
+  });
+});

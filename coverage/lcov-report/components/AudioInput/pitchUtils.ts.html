@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">18.18% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>16/88</span>
+                <span class='fraction'>0/88</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">19.44% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>7/36</span>
+                <span class='fraction'>0/36</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">20% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/5</span>
+                <span class='fraction'>0/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">18.42% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>14/76</span>
+                <span class='fraction'>0/76</span>
             </div>
         
             
@@ -296,7 +296,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -373,32 +373,32 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -521,7 +521,7 @@
 /**
  * Standard note names in chromatic order
  */
-export const NOTE_NAMES: readonly string[] = [
+export const NOTE_NAMES: readonly string[] = <span class="cstat-no" title="statement not covered" >[</span>
   "C",
   "C#",
   "D",
@@ -597,16 +597,16 @@ export function <span class="fstat-no" title="function not covered" >frequencyTo
  * @param noteName - Note name like "Bb3", "F#4", "C5"
  * @returns MIDI note number or null if invalid
  */
-export function noteNameToMidi(noteName: string): number | null {
-  <span class="missing-if-branch" title="if path not taken" >I</span>if (!noteName) <span class="cstat-no" title="statement not covered" >return null;</span>
+export function <span class="fstat-no" title="function not covered" >noteNameToMidi(</span>noteName: string): number | null {
+<span class="cstat-no" title="statement not covered" >  if (!noteName) <span class="cstat-no" title="statement not covered" >return null;</span></span>
 &nbsp;
-  const match = noteName.match(/^([A-Ga-g])([#b]?)(\d)$/);
-  <span class="missing-if-branch" title="if path not taken" >I</span>if (!match) <span class="cstat-no" title="statement not covered" >return null;</span>
+  const match = <span class="cstat-no" title="statement not covered" >noteName.match(/^([A-Ga-g])([#b]?)(\d)$/);</span>
+<span class="cstat-no" title="statement not covered" >  if (!match) <span class="cstat-no" title="statement not covered" >return null;</span></span>
 &nbsp;
-  const [, letter, accidental, octaveStr] = match;
-  const octave = parseInt(octaveStr, 10);
+  const [, letter, accidental, octaveStr] = <span class="cstat-no" title="statement not covered" >match;</span>
+  const octave = <span class="cstat-no" title="statement not covered" >parseInt(octaveStr, 10);</span>
 &nbsp;
-  const letterMap: Record&lt;string, number&gt; = {
+  const letterMap: Record&lt;string, number&gt; = <span class="cstat-no" title="statement not covered" >{</span>
     C: 0,
     D: 2,
     E: 4,
@@ -615,15 +615,15 @@ export function noteNameToMidi(noteName: string): number | null {
     A: 9,
     B: 11,
   };
-  const letterIndex = letterMap[letter.toUpperCase()];
-  <span class="missing-if-branch" title="if path not taken" >I</span>if (letterIndex === undefined) <span class="cstat-no" title="statement not covered" >return null;</span>
+  const letterIndex = <span class="cstat-no" title="statement not covered" >letterMap[letter.toUpperCase()];</span>
+<span class="cstat-no" title="statement not covered" >  if (letterIndex === undefined) <span class="cstat-no" title="statement not covered" >return null;</span></span>
 &nbsp;
-  let noteIndex = letterIndex;
-  if (accidental === "#") noteIndex += 1;
-  if (accidental === "b") noteIndex -= 1;
-  noteIndex = ((noteIndex % 12) + 12) % 12;
+  let noteIndex = <span class="cstat-no" title="statement not covered" >letterIndex;</span>
+<span class="cstat-no" title="statement not covered" >  if (accidental === "#") <span class="cstat-no" title="statement not covered" >noteIndex += 1;</span></span>
+<span class="cstat-no" title="statement not covered" >  if (accidental === "b") <span class="cstat-no" title="statement not covered" >noteIndex -= 1;</span></span>
+<span class="cstat-no" title="statement not covered" >  noteIndex = ((noteIndex % 12) + 12) % 12;</span>
 &nbsp;
-  return (octave + 1) * 12 + noteIndex;
+<span class="cstat-no" title="statement not covered" >  return (octave + 1) * 12 + noteIndex;</span>
 }
 &nbsp;
 /**
@@ -745,7 +745,7 @@ export function <span class="fstat-no" title="function not covered" >getPitchCla
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-12T19:48:45.993Z
+                at 2026-03-13T06:04:17.912Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

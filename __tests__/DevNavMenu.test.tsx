@@ -195,6 +195,141 @@ describe("DevNavMenu", () => {
         { method: "POST" },
       );
     });
+
+    it("shows error alert when fetch throws", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+      const { getByLabelText } = render(<DevNavMenu userId={5} />);
+
+      fireEvent.press(getByLabelText("Open developer navigation menu"));
+      fireEvent.press(getByLabelText("Reset user data"));
+
+      const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+      const resetButton = alertCall[2].find(
+        (b: { text: string }) => b.text === "Reset",
+      );
+
+      await resetButton.onPress();
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          "Error",
+          "Failed to reset: Network error",
+        );
+      });
+    });
+
+    it("shows error alert when response not ok", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: false });
+      const { getByLabelText } = render(<DevNavMenu userId={5} />);
+
+      fireEvent.press(getByLabelText("Open developer navigation menu"));
+      fireEvent.press(getByLabelText("Reset user data"));
+
+      const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+      const resetButton = alertCall[2].find(
+        (b: { text: string }) => b.text === "Reset",
+      );
+
+      await resetButton.onPress();
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          "Error",
+          "Failed to reset: Failed to reset",
+        );
+      });
+    });
+
+    it("handles non-Error thrown values", async () => {
+      mockFetch.mockRejectedValueOnce("string error");
+      const { getByLabelText } = render(<DevNavMenu userId={5} />);
+
+      fireEvent.press(getByLabelText("Open developer navigation menu"));
+      fireEvent.press(getByLabelText("Reset user data"));
+
+      const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+      const resetButton = alertCall[2].find(
+        (b: { text: string }) => b.text === "Reset",
+      );
+
+      await resetButton.onPress();
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          "Error",
+          "Failed to reset: Unknown error occurred",
+        );
+      });
+    });
+  });
+
+  describe("web platform", () => {
+    const originalPlatform = Platform.OS;
+    const originalConfirm = global.window?.confirm;
+    const originalAlert = global.alert;
+
+    beforeEach(() => {
+      (Platform as any).OS = "web";
+      global.window = global.window || ({} as any);
+      global.window.confirm = jest.fn();
+      global.alert = jest.fn();
+    });
+
+    afterEach(() => {
+      (Platform as any).OS = originalPlatform;
+      if (originalConfirm) global.window.confirm = originalConfirm;
+      global.alert = originalAlert;
+    });
+
+    it("uses window.confirm on web platform", () => {
+      (global.window.confirm as jest.Mock).mockReturnValue(false);
+      const { getByLabelText } = render(<DevNavMenu userId={5} />);
+
+      fireEvent.press(getByLabelText("Open developer navigation menu"));
+      fireEvent.press(getByLabelText("Reset user data"));
+
+      expect(global.window.confirm).toHaveBeenCalledWith(
+        "Reset all progress and start over?",
+      );
+    });
+
+    it("performs reset when confirm returns true", async () => {
+      (global.window.confirm as jest.Mock).mockReturnValue(true);
+      const { getByLabelText } = render(<DevNavMenu userId={5} />);
+
+      fireEvent.press(getByLabelText("Open developer navigation menu"));
+      fireEvent.press(getByLabelText("Reset user data"));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith(
+          "http://localhost:8080/users/5/reset",
+          { method: "POST" },
+        );
+      });
+    });
+
+    it("does not reset when confirm returns false", () => {
+      (global.window.confirm as jest.Mock).mockReturnValue(false);
+      const { getByLabelText } = render(<DevNavMenu userId={5} />);
+
+      fireEvent.press(getByLabelText("Open developer navigation menu"));
+      fireEvent.press(getByLabelText("Reset user data"));
+
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("uses browser alert for errors on web", async () => {
+      (global.window.confirm as jest.Mock).mockReturnValue(true);
+      mockFetch.mockRejectedValueOnce(new Error("Web error"));
+      const { getByLabelText } = render(<DevNavMenu userId={5} />);
+
+      fireEvent.press(getByLabelText("Open developer navigation menu"));
+      fireEvent.press(getByLabelText("Reset user data"));
+
+      await waitFor(() => {
+        expect(global.alert).toHaveBeenCalledWith("Failed to reset: Web error");
+      });
+    });
   });
 
   describe("accessibility", () => {

@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">35.71% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>5/14</span>
+                <span class='fraction'>0/14</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">34.61% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>9/26</span>
+                <span class='fraction'>0/26</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">40% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/5</span>
+                <span class='fraction'>0/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">35.71% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>5/14</span>
+                <span class='fraction'>0/14</span>
             </div>
         
             
@@ -243,9 +243,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">32x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">32x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -309,10 +309,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">32x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">32x</span>
-<span class="cline-any cline-yes">32x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -409,10 +409,10 @@ import { styles } from "../styles";
  * Stage 0: Listen and Sing
  * User listens to their note, sings it, then imagines it
  */
-export function Stage0Content() {
-  const { noteInfo, subStep, volume, setVolume } = useFirstNote();
+export function <span class="fstat-no" title="function not covered" >Stage0Content(</span>) {
+  const { noteInfo, subStep, volume, setVolume } = <span class="cstat-no" title="statement not covered" >useFirstNote();</span>
 &nbsp;
-  return (
+<span class="cstat-no" title="statement not covered" >  return (</span>
     &lt;View style={styles.stageContainer}&gt;
       &lt;Text style={styles.stageTitle}&gt;Let's Start With Your Note&lt;/Text&gt;
       &lt;Text style={styles.noteDisplay}&gt;
@@ -429,7 +429,7 @@ export function Stage0Content() {
       )}
 &nbsp;
       {subStep === 1 &amp;&amp; (
-<span class="branch-1 cbranch-no" title="branch not covered" >        &lt;&gt;</span>
+        &lt;&gt;
           &lt;Text style={styles.instruction}&gt;
             Now sing that note using an "Oh" sound.{"\n"}Match the pitch you
             just heard.
@@ -445,7 +445,7 @@ export function Stage0Content() {
       )}
 &nbsp;
       {subStep === 2 &amp;&amp; (
-<span class="branch-1 cbranch-no" title="branch not covered" >        &lt;&gt;</span>
+        &lt;&gt;
           &lt;Text style={styles.instruction}&gt;
             Great! Now imagine that note clearly in your head.{"\n\n"}
             Hear it in your instrument's sound—with resonance and projection.
@@ -467,7 +467,7 @@ export function Stage0Content() {
 /**
  * Stage 0 bottom buttons
  */
-export function Stage0Buttons() {
+export function <span class="fstat-no" title="function not covered" >Stage0Buttons(</span>) {
   const {
     subStep,
     setSubStep,
@@ -476,24 +476,24 @@ export function Stage0Buttons() {
     stopAudio,
     showHeardItButton,
     nextStage,
-  } = useFirstNote();
+  } = <span class="cstat-no" title="statement not covered" >useFirstNote();</span>
 &nbsp;
-  <span class="missing-if-branch" title="else path not taken" >E</span>if (subStep === 0) {
-    return (
+<span class="cstat-no" title="statement not covered" >  if (subStep === 0) {</span>
+<span class="cstat-no" title="statement not covered" >    return (</span>
       &lt;View style={styles.fixedBottomButtons}&gt;
         &lt;TouchableOpacity
-          accessibilityLabel={isPlaying ? <span class="branch-0 cbranch-no" title="branch not covered" >"Playing note" </span>: "Play note"}
+          accessibilityLabel={isPlaying ? "Playing note" : "Play note"}
           accessibilityRole="button"
-          style={[styles.primaryButton, isPlaying &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >styles.buttonDisabled]</span>}
+          style={[styles.primaryButton, isPlaying &amp;&amp; styles.buttonDisabled]}
           onPress={playNote}
           disabled={isPlaying}
         &gt;
           &lt;Text style={styles.primaryButtonText}&gt;
-            {isPlaying ? <span class="branch-0 cbranch-no" title="branch not covered" >"🔊 Playing..." </span>: "▶️ Play"}
+            {isPlaying ? "🔊 Playing..." : "▶️ Play"}
           &lt;/Text&gt;
         &lt;/TouchableOpacity&gt;
         {showHeardItButton &amp;&amp; (
-<span class="branch-1 cbranch-no" title="branch not covered" >          &lt;TouchableOpacity</span>
+          &lt;TouchableOpacity
             accessibilityLabel="I heard the note, continue"
             accessibilityRole="button"
             style={[styles.primaryButton, { marginTop: 12 }]}
@@ -571,7 +571,7 @@ export function Stage0Buttons() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-12T19:48:45.993Z
+                at 2026-03-13T06:04:17.912Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

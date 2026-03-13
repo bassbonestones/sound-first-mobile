@@ -226,16 +226,14 @@ describe("AudioPlayer", () => {
     });
 
     it("renders placeholder when targetKey is missing", () => {
-      const { getByText } = render(
-        <AudioPlayer materialId="1" targetKey="" />,
-      );
+      const { getByText } = render(<AudioPlayer materialId="1" targetKey="" />);
 
       expect(getByText("Listen to the model")).toBeTruthy();
     });
 
     it("handles different targetKey formats", () => {
       const keys = ["C major", "Bb minor", "F# major", "Db minor"];
-      
+
       keys.forEach((key) => {
         const { unmount, getByText } = render(
           <AudioPlayer materialId="1" targetKey={key} />,
@@ -247,10 +245,14 @@ describe("AudioPlayer", () => {
 
     it("handles different instrument values", () => {
       const instruments = ["piano", "trumpet", "clarinet", "violin", "flute"];
-      
+
       instruments.forEach((instrument) => {
         const { unmount, getByText } = render(
-          <AudioPlayer materialId="1" targetKey="C major" instrument={instrument} />,
+          <AudioPlayer
+            materialId="1"
+            targetKey="C major"
+            instrument={instrument}
+          />,
         );
         expect(getByText("Listen to the model")).toBeTruthy();
         unmount();
@@ -565,19 +567,23 @@ describe("AudioPlayer (Web Platform)", () => {
       play: jest.fn().mockResolvedValue(undefined),
       pause: jest.fn(),
       load: jest.fn(),
-      addEventListener: jest.fn((event: string, callback: (...args: unknown[]) => void) => {
-        if (!mockAudioInstance.listeners[event]) {
-          mockAudioInstance.listeners[event] = [];
-        }
-        mockAudioInstance.listeners[event].push(callback);
-      }),
-      removeEventListener: jest.fn((event: string, callback: (...args: unknown[]) => void) => {
-        if (mockAudioInstance.listeners[event]) {
-          mockAudioInstance.listeners[event] = mockAudioInstance.listeners[event].filter(
-            (cb) => cb !== callback,
-          );
-        }
-      }),
+      addEventListener: jest.fn(
+        (event: string, callback: (...args: unknown[]) => void) => {
+          if (!mockAudioInstance.listeners[event]) {
+            mockAudioInstance.listeners[event] = [];
+          }
+          mockAudioInstance.listeners[event].push(callback);
+        },
+      ),
+      removeEventListener: jest.fn(
+        (event: string, callback: (...args: unknown[]) => void) => {
+          if (mockAudioInstance.listeners[event]) {
+            mockAudioInstance.listeners[event] = mockAudioInstance.listeners[
+              event
+            ].filter((cb) => cb !== callback);
+          }
+        },
+      ),
       duration: 30,
       currentTime: 0,
       src: "",
@@ -589,7 +595,9 @@ describe("AudioPlayer (Web Platform)", () => {
       },
     };
 
-    (global as unknown as { Audio: unknown }).Audio = jest.fn(() => mockAudioInstance);
+    (global as unknown as { Audio: unknown }).Audio = jest.fn(
+      () => mockAudioInstance,
+    );
   });
 
   afterAll(() => {
@@ -740,7 +748,11 @@ describe("AudioPlayer (Web Platform)", () => {
     it("handles ended event and calls onComplete", async () => {
       const onComplete = jest.fn();
       render(
-        <AudioPlayer materialId="1" targetKey="C major" onComplete={onComplete} />,
+        <AudioPlayer
+          materialId="1"
+          targetKey="C major"
+          onComplete={onComplete}
+        />,
       );
 
       await act(async () => {
@@ -861,7 +873,7 @@ describe("AudioPlayer (Web Platform)", () => {
 
     it("displays current position during playback", async () => {
       jest.useFakeTimers();
-      
+
       const { getByText } = render(
         <AudioPlayer materialId="1" targetKey="C major" />,
       );
@@ -877,7 +889,7 @@ describe("AudioPlayer (Web Platform)", () => {
 
       // Simulate time passing
       mockAudioInstance.currentTime = 15;
-      
+
       await act(async () => {
         jest.advanceTimersByTime(200);
       });
@@ -941,7 +953,11 @@ describe("AudioPlayer (Web Platform)", () => {
 
     it("encodes instrument in URL", async () => {
       render(
-        <AudioPlayer materialId="1" targetKey="C major" instrument="French horn" />,
+        <AudioPlayer
+          materialId="1"
+          targetKey="C major"
+          instrument="French horn"
+        />,
       );
 
       await waitFor(() => {

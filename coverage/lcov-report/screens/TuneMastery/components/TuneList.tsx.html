@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">61.11% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>11/18</span>
+                <span class='fraction'>0/18</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">64.28% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>18/28</span>
+                <span class='fraction'>0/28</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">41.66% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>5/12</span>
+                <span class='fraction'>0/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">58.82% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>10/17</span>
+                <span class='fraction'>0/17</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line medium'></div>
+    <div class='status-line low'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -190,7 +190,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -201,16 +201,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">15x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">15x</span>
-<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -228,18 +226,20 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -265,7 +265,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -298,25 +298,25 @@ export interface TuneListProps {
   masteryThreshold?: number;
 }
 &nbsp;
-const TuneList = React.memo(function TuneList({
+const TuneList = <span class="cstat-no" title="statement not covered" >React.memo(function <span class="fstat-no" title="function not covered" >TuneList(</span>{</span>
   tunes,
-  isArchive = false,
+  isArchive = <span class="branch-0 cbranch-no" title="branch not covered" >false,</span>
   onReorder,
   onArchive,
   onRestore,
   onDelete,
   onRename,
   onUpdateSettings,
-  masteryThreshold = 95,
+  masteryThreshold = <span class="branch-0 cbranch-no" title="branch not covered" >95,</span>
 }: TuneListProps): React.JSX.Element {
-  const [expandedId, setExpandedId] = useState&lt;string | null&gt;(null);
+  const [expandedId, setExpandedId] = <span class="cstat-no" title="statement not covered" >useState&lt;string | null&gt;(null);</span>
 &nbsp;
-  const handleToggleExpand = useCallback((tuneId: string) =&gt; {
-    setExpandedId((prev) =&gt; (prev === tuneId ? <span class="branch-0 cbranch-no" title="branch not covered" >null </span>: tuneId));
+  const handleToggleExpand = <span class="cstat-no" title="statement not covered" >useCallback(<span class="fstat-no" title="function not covered" >(t</span>uneId: string) =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >    setExpandedId(<span class="fstat-no" title="function not covered" >(p</span>rev) =&gt; (<span class="cstat-no" title="statement not covered" >prev === tuneId ? null : tuneId)</span>);</span>
   }, []);
 &nbsp;
-  if (tunes.length === 0) {
-    return (
+<span class="cstat-no" title="statement not covered" >  if (tunes.length === 0) {</span>
+<span class="cstat-no" title="statement not covered" >    return (</span>
       &lt;View
         style={styles.emptyContainer}
         accessible={true}
@@ -336,32 +336,32 @@ const TuneList = React.memo(function TuneList({
     );
   }
 &nbsp;
-  return (
+<span class="cstat-no" title="statement not covered" >  return (</span>
     &lt;View
       style={styles.container}
       accessible={false}
-      accessibilityLabel={`${isArchive ? <span class="branch-0 cbranch-no" title="branch not covered" >"Archived" </span>: "Active"} tune list with ${tunes.length} ${tunes.length === 1 ? <span class="branch-0 cbranch-no" title="branch not covered" >"tune" </span>: "tunes"}`}
+      accessibilityLabel={`${isArchive ? "Archived" : "Active"} tune list with ${tunes.length} ${tunes.length === 1 ? "tune" : "tunes"}`}
     &gt;
-      {tunes.map((tune, index) =&gt; (
-        &lt;TuneCard
+      {tunes.map(<span class="fstat-no" title="function not covered" >(t</span>une, index) =&gt; (
+<span class="cstat-no" title="statement not covered" >        &lt;TuneCard</span>
           key={tune.id}
           tune={tune}
           isExpanded={expandedId === tune.id}
-          onToggleExpand={() =&gt; handleToggleExpand(tune.id)}
+          onToggleExpand={<span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >handleToggleExpand(tune.id)}</span>
           isFirst={index === 0}
           isLast={index === tunes.length - 1}
           isArchive={isArchive}
-          onMoveUp={onReorder ? <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >onReorder(tune.id, -1) </span>: <span class="branch-1 cbranch-no" title="branch not covered" >undefined}</span>
-          onMoveDown={onReorder ? <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >onReorder(tune.id, 1) </span>: <span class="branch-1 cbranch-no" title="branch not covered" >undefined}</span>
-          onArchive={onArchive ? <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >onArchive(tune.id) </span>: <span class="branch-1 cbranch-no" title="branch not covered" >undefined}</span>
-          onRestore={onRestore ? <span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >onRestore(tune.id) </span></span>: undefined}
-          onDelete={onDelete ? <span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >onDelete(tune.id) </span></span>: undefined}
+          onMoveUp={onReorder ? <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >onReorder(tune.id, -1) </span>: undefined}
+          onMoveDown={onReorder ? <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >onReorder(tune.id, 1) </span>: undefined}
+          onArchive={onArchive ? <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >onArchive(tune.id) </span>: undefined}
+          onRestore={onRestore ? <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >onRestore(tune.id) </span>: undefined}
+          onDelete={onDelete ? <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >onDelete(tune.id) </span>: undefined}
           onRename={
-            onRename ? <span class="fstat-no" title="function not covered" >(n</span>ame: string) =&gt; <span class="cstat-no" title="statement not covered" >onRename(tune.id, name) </span>: <span class="branch-1 cbranch-no" title="branch not covered" >undefined</span>
+            onRename ? <span class="fstat-no" title="function not covered" >(n</span>ame: string) =&gt; <span class="cstat-no" title="statement not covered" >onRename(tune.id, name) </span>: undefined
           }
           onUpdateSettings={
             onUpdateSettings
-              ? <span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" >(s</span>ettings: TuneSettings) =&gt; <span class="cstat-no" title="statement not covered" >onUpdateSettings(tune.id, settings)</span></span>
+              ? <span class="fstat-no" title="function not covered" >(s</span>ettings: TuneSettings) =&gt; <span class="cstat-no" title="statement not covered" >onUpdateSettings(tune.id, settings)</span>
               : undefined
           }
           masteryThreshold={masteryThreshold}
@@ -373,7 +373,7 @@ const TuneList = React.memo(function TuneList({
 &nbsp;
 export default TuneList;
 &nbsp;
-const styles = StyleSheet.create({
+const styles = <span class="cstat-no" title="statement not covered" >StyleSheet.create({</span>
   container: {
     gap: 8,
   },
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-12T19:48:45.993Z
+                at 2026-03-13T06:04:17.912Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

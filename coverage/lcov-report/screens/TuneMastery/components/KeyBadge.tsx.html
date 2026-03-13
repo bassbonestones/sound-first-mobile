@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">84.21% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>16/19</span>
+                <span class='fraction'>0/19</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">84.21% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>16/19</span>
+                <span class='fraction'>0/19</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/2</span>
+                <span class='fraction'>0/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">84.61% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>11/13</span>
+                <span class='fraction'>0/13</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line high'></div>
+    <div class='status-line low'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -146,27 +146,27 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">52x</span>
-<span class="cline-any cline-yes">52x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">52x</span>
-<span class="cline-any cline-yes">104x</span>
-<span class="cline-any cline-yes">42x</span>
-<span class="cline-any cline-yes">34x</span>
-<span class="cline-any cline-yes">22x</span>
-<span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">52x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -183,7 +183,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -216,27 +216,27 @@ export interface KeyBadgeProps {
   masteryThreshold?: number;
 }
 &nbsp;
-const KeyBadge = React.memo(function KeyBadge({
+const KeyBadge = <span class="cstat-no" title="statement not covered" >React.memo(function <span class="fstat-no" title="function not covered" >KeyBadge(</span>{</span>
   keyName,
   score,
   attempts,
-  masteryThreshold = 95,
+  masteryThreshold = <span class="branch-0 cbranch-no" title="branch not covered" >95,</span>
 }: KeyBadgeProps): React.JSX.Element {
-  const isMastered = score &gt;= masteryThreshold;
-  const isStarted = attempts &gt; 0;
+  const isMastered = <span class="cstat-no" title="statement not covered" >score &gt;= masteryThreshold;</span>
+  const isStarted = <span class="cstat-no" title="statement not covered" >attempts &gt; 0;</span>
 &nbsp;
   // Color gradient based on score
-  const getScoreColor = (): string =&gt; {
-    if (!isStarted) return "#444";
-    if (isMastered) return "#4CAF50";
-    if (score &gt;= 80) return "#8BC34A";
-    if (score &gt;= 60) return "#FFC107";
-    <span class="missing-if-branch" title="else path not taken" >E</span>if (score &gt;= 40) return "#FF9800";
+  const getScoreColor = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >()</span>: string =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >    if (!isStarted) <span class="cstat-no" title="statement not covered" >return "#444";</span></span>
+<span class="cstat-no" title="statement not covered" >    if (isMastered) <span class="cstat-no" title="statement not covered" >return "#4CAF50";</span></span>
+<span class="cstat-no" title="statement not covered" >    if (score &gt;= 80) <span class="cstat-no" title="statement not covered" >return "#8BC34A";</span></span>
+<span class="cstat-no" title="statement not covered" >    if (score &gt;= 60) <span class="cstat-no" title="statement not covered" >return "#FFC107";</span></span>
+<span class="cstat-no" title="statement not covered" >    if (score &gt;= 40) <span class="cstat-no" title="statement not covered" >return "#FF9800";</span></span>
 <span class="cstat-no" title="statement not covered" >    if (score &gt;= 20) <span class="cstat-no" title="statement not covered" >return "#FF5722";</span></span>
 <span class="cstat-no" title="statement not covered" >    return "#F44336";</span>
   };
 &nbsp;
-  return (
+<span class="cstat-no" title="statement not covered" >  return (</span>
     &lt;View
       style={[styles.container, { borderColor: getScoreColor() }]}
       accessible={true}
@@ -253,7 +253,7 @@ const KeyBadge = React.memo(function KeyBadge({
 &nbsp;
 export default KeyBadge;
 &nbsp;
-const styles = StyleSheet.create({
+const styles = <span class="cstat-no" title="statement not covered" >StyleSheet.create({</span>
   container: {
     width: 44,
     height: 44,
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-12T19:48:45.993Z
+                at 2026-03-13T06:04:17.912Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>
