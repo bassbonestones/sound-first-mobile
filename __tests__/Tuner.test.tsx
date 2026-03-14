@@ -760,4 +760,248 @@ describe("Tuner", () => {
       }
     });
   });
+
+  describe("settings modal interactions", () => {
+    it("opens and closes settings modal", async () => {
+      const { getByLabelText, queryByText } = render(<Tuner />);
+
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
+      expect(queryByText("Tuning Settings")).toBeTruthy();
+
+      // Close settings modal
+      fireEvent.press(getByLabelText("Close settings"));
+      await waitFor(() => {
+        expect(queryByText("Tuning Settings")).toBeNull();
+      });
+    });
+
+    it("toggles between equal and just temperament", async () => {
+      const { getByLabelText, queryByText } = render(<Tuner />);
+
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
+
+      // Initially equal temperament selected
+      expect(
+        getByLabelText("Standard equal temperament, selected"),
+      ).toBeTruthy();
+
+      // Switch to just intonation
+      fireEvent.press(getByLabelText("Resonance just intonation"));
+      await waitFor(() => {
+        expect(queryByText("Key Center")).toBeTruthy();
+      });
+
+      // Switch back to equal
+      fireEvent.press(getByLabelText("Standard equal temperament"));
+      await waitFor(() => {
+        expect(queryByText("Key Center")).toBeNull();
+      });
+    });
+
+    it("selects minor 7th system options", async () => {
+      const { getByLabelText, getByText, queryByText } = render(<Tuner />);
+
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
+
+      // Switch to just intonation to see minor 7th options
+      fireEvent.press(getByLabelText("Resonance just intonation"));
+
+      await waitFor(() => {
+        // The actual text is "Minor 7th Ratio"
+        expect(queryByText("Minor 7th Ratio")).toBeTruthy();
+      });
+
+      // Find and press the minor 7th buttons (9:5, 16:9, 7:4)
+      fireEvent.press(getByText("9:5"));
+      fireEvent.press(getByText("16:9"));
+      fireEvent.press(getByText("7:4"));
+    });
+
+    it("selects different keys in just intonation", async () => {
+      const { getByLabelText } = render(<Tuner />);
+
+      // Open settings modal and switch to just intonation
+      fireEvent.press(getByLabelText("Open tuning settings"));
+      fireEvent.press(getByLabelText("Resonance just intonation"));
+
+      // Wait for keys to appear and select various keys
+      await waitFor(() => {
+        expect(getByLabelText("Key of C")).toBeTruthy();
+      });
+
+      fireEvent.press(getByLabelText("Key of C"));
+      fireEvent.press(getByLabelText("Key of G"));
+      fireEvent.press(getByLabelText("Key of D"));
+      fireEvent.press(getByLabelText("Key of F#/Gb"));
+      fireEvent.press(getByLabelText("Key of A#/Bb"));
+    });
+  });
+
+  describe("challenge panel UI", () => {
+    it("opens and closes challenge panel", async () => {
+      const { getByLabelText, queryByLabelText } = render(<Tuner />);
+
+      // Open challenge panel
+      fireEvent.press(getByLabelText("Open challenge panel"));
+
+      await waitFor(() => {
+        // Challenge panel should show Start challenge button and difficulty options
+        expect(queryByLabelText("Start challenge")).toBeTruthy();
+        expect(queryByLabelText(/easy difficulty/i)).toBeTruthy();
+      });
+
+      // Close challenge panel
+      fireEvent.press(getByLabelText("Close challenge panel"));
+
+      await waitFor(() => {
+        // Panel toggle button should reappear when panel is closed
+        expect(queryByLabelText("Open challenge panel")).toBeTruthy();
+      });
+    });
+
+    it("selects different difficulty levels", async () => {
+      const { getByLabelText, queryByLabelText } = render(<Tuner />);
+
+      // Open challenge panel
+      fireEvent.press(getByLabelText("Open challenge panel"));
+
+      await waitFor(() => {
+        expect(queryByLabelText(/easy difficulty/i)).toBeTruthy();
+      });
+
+      // Select different difficulties using accessibility labels
+      fireEvent.press(getByLabelText(/easy difficulty/i));
+      fireEvent.press(getByLabelText(/medium difficulty/i));
+      fireEvent.press(getByLabelText(/hard difficulty/i));
+      fireEvent.press(getByLabelText(/expert difficulty/i));
+    });
+
+    it("starts and stops a challenge", async () => {
+      const { getByLabelText, queryByLabelText } = render(<Tuner />);
+
+      // Open challenge panel
+      fireEvent.press(getByLabelText("Open challenge panel"));
+
+      await waitFor(() => {
+        expect(queryByLabelText("Start challenge")).toBeTruthy();
+      });
+
+      // Start a challenge
+      fireEvent.press(getByLabelText("Start challenge"));
+
+      // Stop the challenge
+      await waitFor(() => {
+        expect(queryByLabelText("Stop challenge")).toBeTruthy();
+      });
+      fireEvent.press(getByLabelText("Stop challenge"));
+    });
+
+    it("skips to next note during active challenge", async () => {
+      let capturedOptions: { onPitchDetected?: Function } | null = null;
+
+      (usePitchDetection as jest.Mock).mockImplementation(
+        (options: { onPitchDetected?: Function }) => {
+          capturedOptions = options;
+          return {
+            isListening: true,
+            startListening: mockStartListening,
+            stopListening: mockStopListening,
+            error: null,
+            permissionGranted: true,
+          };
+        },
+      );
+
+      const { getByLabelText, queryByLabelText } = render(<Tuner />);
+
+      // Open challenge panel and start a challenge
+      fireEvent.press(getByLabelText("Open challenge panel"));
+      await waitFor(() => {
+        expect(queryByLabelText("Start challenge")).toBeTruthy();
+      });
+      fireEvent.press(getByLabelText("Start challenge"));
+
+      // Skip button should be available during active challenge
+      await waitFor(() => {
+        expect(queryByLabelText("Skip to next note")).toBeTruthy();
+      });
+      fireEvent.press(getByLabelText("Skip to next note"));
+    });
+  });
+
+  describe("stats panel UI", () => {
+    it("opens and closes stats panel", async () => {
+      const { getByLabelText, queryByText } = render(<Tuner />);
+
+      // Open stats panel
+      fireEvent.press(getByLabelText("Open stats panel"));
+
+      await waitFor(() => {
+        // Look for emoji + text combination
+        expect(queryByText(/Stats/)).toBeTruthy();
+      });
+
+      // Close stats panel
+      fireEvent.press(getByLabelText("Close stats panel"));
+
+      await waitFor(() => {
+        // Panel toggle button should reappear when panel is closed
+        expect(getByLabelText("Open stats panel")).toBeTruthy();
+      });
+    });
+
+    it("resets session stats", async () => {
+      const { getByLabelText, queryByLabelText } = render(<Tuner />);
+
+      // Open stats panel
+      fireEvent.press(getByLabelText("Open stats panel"));
+
+      await waitFor(() => {
+        expect(queryByLabelText("Reset session stats")).toBeTruthy();
+      });
+
+      // Reset stats
+      fireEvent.press(getByLabelText("Reset session stats"));
+    });
+  });
+
+  describe("feedback mode cycling", () => {
+    it("cycles through feedback modes on tap", async () => {
+      let capturedOptions: { onPitchDetected?: Function } | null = null;
+
+      (usePitchDetection as jest.Mock).mockImplementation(
+        (options: { onPitchDetected?: Function }) => {
+          capturedOptions = options;
+          return {
+            isListening: true,
+            startListening: mockStartListening,
+            stopListening: mockStopListening,
+            error: null,
+            permissionGranted: true,
+          };
+        },
+      );
+
+      const { getByLabelText } = render(<Tuner mode="needle" />);
+
+      // Detect a pitch first so feedback area shows content
+      act(() => {
+        capturedOptions?.onPitchDetected?.({ frequency: 440 });
+      });
+
+      // Tap to cycle feedback display - we cycle through 4 modes (0,1,2,3)
+      // Mode 0: Deviation
+      // Mode 1: Frequency
+      // Mode 2: Note name only
+      // Mode 3: Hide feedback
+      const feedbackButton = getByLabelText("Tap to cycle feedback display");
+      fireEvent.press(feedbackButton); // Mode 0 -> 1
+      fireEvent.press(feedbackButton); // Mode 1 -> 2
+      fireEvent.press(feedbackButton); // Mode 2 -> 3
+      fireEvent.press(feedbackButton); // Mode 3 -> 0
+    });
+  });
 });

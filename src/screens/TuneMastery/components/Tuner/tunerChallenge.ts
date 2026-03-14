@@ -273,8 +273,23 @@ export function updateChallengeState(
       graceUsed,
     };
   } else {
-    // Wrong note or out of tolerance - handle grace period
-    // (Grace period helps with brief overtone detection glitches)
+    // Wrong note or out of tolerance
+
+    // If playing a completely different note, reset to waiting immediately
+    // (User intentionally switched notes - no grace period for that)
+    if (!isCorrectNote) {
+      return {
+        ...state,
+        status: "waiting",
+        holdStartTime: null,
+        progress: 0,
+        graceStartTime: null,
+        graceUsed: false, // Reset grace for new attempt
+      };
+    }
+
+    // Correct note but out of tolerance - use grace period
+    // (Grace period helps with brief pitch drift glitches)
 
     // If grace period already used, fail immediately
     if (state.graceUsed) {
