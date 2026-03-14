@@ -253,8 +253,10 @@ const Tuner = React.memo(function Tuner({
   selectedKeyIndex: initialKeyIndex = 0,
   concertA: initialConcertA = 440,
 }: TunerProps): React.JSX.Element {
-  // Responsive gauge sizing - scales to fit screen width
-  const { width: screenWidth } = useWindowDimensions();
+  // Responsive sizing - scales to fit screen
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  
+  // Horizontal: gauge scaling
   const GAUGE_BASE_WIDTH = 360; // SVG width
   const GAUGE_BASE_HEIGHT = 180;
   // Visual width including -50/+50 labels that extend beyond SVG (~15px each side)
@@ -262,6 +264,16 @@ const Tuner = React.memo(function Tuner({
   // Account for tuner container padding (12px each side)
   const maxGaugeWidth = screenWidth - 48;
   const gaugeScale = Math.min(1, maxGaugeWidth / GAUGE_VISUAL_WIDTH);
+
+  // Vertical: responsive gaps between stacked elements
+  // Min screen: 568px -> gaps of 2px
+  // Max comfortable: 700px+ -> gaps of 20px
+  const MIN_HEIGHT = 568;
+  const MAX_HEIGHT = 700;
+  const MIN_GAP = 2;
+  const MAX_GAP = 20;
+  const heightRatio = Math.min(1, Math.max(0, (screenHeight - MIN_HEIGHT) / (MAX_HEIGHT - MIN_HEIGHT)));
+  const verticalGap = Math.round(MIN_GAP + heightRatio * (MAX_GAP - MIN_GAP));
 
   const [currentNote, setCurrentNote] = useState<string | null>(null);
   const [cents, setCents] = useState(0);
@@ -274,6 +286,10 @@ const Tuner = React.memo(function Tuner({
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   // Feedback display mode: 0=Deviation, 1=Guidance, 2=Stability, 3=Tendency
   const [feedbackMode, setFeedbackMode] = useState(0);
+  // Active panel: "stats", "challenge", or null (just buttons)
+  const [activePanel, setActivePanel] = useState<
+    "stats" | "challenge" | null
+  >(null);
   const silenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Refs for callback to read current values (avoids stale closure in requestAnimationFrame loop)
@@ -704,11 +720,40 @@ const Tuner = React.memo(function Tuner({
     <View style={styles.container}>
       <ScrollView
         style={styles.tunerScrollView}
-        contentContainerStyle={styles.tunerScrollContent}
+        contentContainerStyle={[styles.tunerScrollContent, { paddingTop: verticalGap + 4 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Error Message */}
         {error && <Text style={styles.errorText}>{error}</Text>}
+
+        {/* Settings Summary Button - positioned above tuner display */}
+        <TouchableOpacity
+          style={[styles.settingsSummaryButton, { marginBottom: verticalGap + 2 }]}
+          onPress={() => setShowSettingsModal(true)}
+          accessibilityLabel="Open tuning settings"
+          accessibilityRole="button"
+        >
+          <View style={styles.settingsSummaryMetrics}>
+            {activeTemperament === "equal" ? (
+              <>
+                <Text style={styles.settingsSummaryMetric}>ET</Text>
+                <Text style={styles.settingsSummaryMetric}>A={concertA}Hz</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.settingsSummaryMetric}>JI</Text>
+                <Text style={styles.settingsSummaryMetric}>
+                  {KEY_DISPLAY_NAMES[selectedKeyIndex]}
+                </Text>
+                <Text style={styles.settingsSummaryMetric}>A={concertA}Hz</Text>
+                <Text style={styles.settingsSummaryMetric}>
+                  m7: {MINOR_7TH_LABELS[minor7System]}
+                </Text>
+              </>
+            )}
+          </View>
+          <Text style={styles.settingsSummaryIcon}>⚙️</Text>
+        </TouchableOpacity>
 
         {/* Tuner Display */}
         <View style={styles.tunerDisplay}>
@@ -1052,9 +1097,35 @@ const Tuner = React.memo(function Tuner({
               </View>
 
               {/* Note Display below gauge - fixed height container */}
-              <View style={styles.noteContainer}>
+              <View style={[styles.noteContainer, { marginTop: -8 + verticalGap }]}>
                 {/* Note name row - always rendered with fixed height */}
                 <View style={styles.noteNameRow}>
+                  {/* Skip button - shown during active challenge */}
+                  {activePanel === "challenge" && challengeState.isActive && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        const newChallenge = createRandomChallenge(
+                          DEFAULT_CHALLENGE_NOTES,
+                          challengeDifficulty,
+                        );
+                        setChallengeState(
+                          startChallenge(
+                            cancelChallenge(challengeState),
+                            newChallenge,
+                          ),
+                        );
+                      }}
+                      style={styles.noteRowSkipButton}
+                      accessibilityLabel="Skip to next note"
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.noteRowSkipText}>Skip</Text>
+                    </TouchableOpacity>
+                  )}
+                  {/* Spacer when no skip button */}
+                  {!(activePanel === "challenge" && challengeState.isActive) && (
+                    <View style={styles.noteRowButtonSpacer} />
+                  )}
                   {currentNote ? (
                     <Text style={[styles.noteName, { color: tuneColor }]}>
                       {currentNote}
@@ -1062,10 +1133,28 @@ const Tuner = React.memo(function Tuner({
                   ) : (
                     <Text style={styles.micIcon}>🎤</Text>
                   )}
+                  {/* Stop button - shown during active challenge */}
+                  {activePanel === "challenge" && challengeState.isActive && (
+                    <TouchableOpacity
+                      onPress={() =>
+                        setChallengeState(cancelChallenge(challengeState))
+                      }
+                      style={styles.noteRowStopButton}
+                      accessibilityLabel="Stop challenge"
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.noteRowStopText}>Stop</Text>
+                    </TouchableOpacity>
+                  )}
+                  {/* Spacer when no stop button */}
+                  {!(activePanel === "challenge" && challengeState.isActive) && (
+                    <View style={styles.noteRowButtonSpacer} />
+                  )}
                 </View>
-                {/* Tappable feedback area - cycles through modes */}
+                {/* Tappable feedback area - cycles through modes (hidden during challenge) */}
+                {activePanel !== "challenge" && (
                 <TouchableOpacity
-                  style={styles.feedbackArea}
+                  style={[styles.feedbackArea, { marginTop: verticalGap }]}
                   onPress={() => setFeedbackMode((prev) => (prev + 1) % 4)}
                   activeOpacity={0.7}
                   accessibilityLabel="Tap to cycle feedback display"
@@ -1184,6 +1273,7 @@ const Tuner = React.memo(function Tuner({
                     ))}
                   </View>
                 </TouchableOpacity>
+                )}
                 {/* Fixed-height row for Lock/Hold Indicator (Phase 1) */}
                 <View style={styles.lockHoldRow}>
                   {currentNote && TUNER_FLAGS.holdIndicator && showLock && (
@@ -1259,9 +1349,10 @@ const Tuner = React.memo(function Tuner({
                   </Text>
                 )}
               </View>
-              {/* Tappable feedback area - cycles through modes */}
+              {/* Tappable feedback area - cycles through modes (hidden during challenge) */}
+              {activePanel !== "challenge" && (
               <TouchableOpacity
-                style={styles.feedbackArea}
+                style={[styles.feedbackArea, { marginTop: verticalGap }]}
                 onPress={() => setFeedbackMode((prev) => (prev + 1) % 4)}
                 activeOpacity={0.7}
                 accessibilityLabel="Tap to cycle feedback display"
@@ -1378,26 +1469,68 @@ const Tuner = React.memo(function Tuner({
                   ))}
                 </View>
               </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
 
-        {/* Session Stats Panel (Phase 2A) - Always rendered with fixed height */}
-        {TUNER_FLAGS.sessionStats && (
-          <View style={styles.sessionStatsPanel}>
+        {/* Panel Buttons - shown when no panel is expanded */}
+        {(TUNER_FLAGS.sessionStats || TUNER_FLAGS.targetToneChallenge) &&
+          activePanel === null && (
+            <View style={styles.panelToggle}>
+              {TUNER_FLAGS.sessionStats && (
+                <TouchableOpacity
+                  style={styles.panelToggleButton}
+                  onPress={() => setActivePanel("stats")}
+                  accessibilityLabel="Open stats panel"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.panelToggleText} numberOfLines={1}>
+                    📊 Stats
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {TUNER_FLAGS.targetToneChallenge && (
+                <TouchableOpacity
+                  style={styles.panelToggleButton}
+                  onPress={() => setActivePanel("challenge")}
+                  accessibilityLabel="Open challenge panel"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.panelToggleText} numberOfLines={1}>
+                    🎯 Challenge
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+        {/* Session Stats Panel - shown when activePanel === "stats" */}
+        {TUNER_FLAGS.sessionStats && activePanel === "stats" && (
+          <View style={[styles.sessionStatsPanel, { marginTop: verticalGap - 5 }]}>
+            <View style={styles.sessionStatsHeader}>
+              <Text style={styles.sessionStatsTitle}>📊 Session Stats</Text>
+              <View style={styles.panelHeaderButtons}>
+                <TouchableOpacity
+                  onPress={() => setSessionStats(resetSessionStats())}
+                  style={styles.sessionStatsReset}
+                  accessibilityLabel="Reset session stats"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.sessionStatsResetText}>Reset</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setActivePanel(null)}
+                  style={styles.panelCloseButton}
+                  accessibilityLabel="Close stats panel"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.panelCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
             {sessionStats.hasEnoughData ? (
               <>
-                <View style={styles.sessionStatsHeader}>
-                  <Text style={styles.sessionStatsTitle}>Session Stats</Text>
-                  <TouchableOpacity
-                    onPress={() => setSessionStats(resetSessionStats())}
-                    style={styles.sessionStatsReset}
-                    accessibilityLabel="Reset session stats"
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.sessionStatsResetText}>Reset</Text>
-                  </TouchableOpacity>
-                </View>
                 <View style={styles.sessionScoresRow}>
                   <View style={styles.sessionScoreItem}>
                     <Text style={styles.sessionScoreValue}>
@@ -1449,15 +1582,24 @@ const Tuner = React.memo(function Tuner({
           </View>
         )}
 
-        {/* Target Tone Challenge Panel (Phase 2A) */}
-        {TUNER_FLAGS.targetToneChallenge && (
-          <View style={styles.challengePanel}>
+        {/* Target Tone Challenge Panel - shown when activePanel === "challenge" */}
+        {TUNER_FLAGS.targetToneChallenge && activePanel === "challenge" && (
+          <View style={[styles.challengePanel, { marginTop: verticalGap - 5 }]}>
+            {/* Challenge header with close button */}
+            <View style={styles.challengePanelHeader}>
+              <Text style={styles.challengePanelTitle}>🎯 Challenge</Text>
+              <TouchableOpacity
+                onPress={() => setActivePanel(null)}
+                style={styles.panelCloseButton}
+                accessibilityLabel="Close challenge panel"
+                accessibilityRole="button"
+              >
+                <Text style={styles.panelCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
             {challengeState.status === "idle" ? (
               // Challenge start UI
               <View style={styles.challengeStartContent}>
-                <Text style={styles.challengePanelTitle}>
-                  Target Tone Challenge
-                </Text>
                 <View style={styles.challengeDifficultyRow}>
                   {(
                     Object.keys(CHALLENGE_DIFFICULTIES) as ChallengeDifficulty[]
@@ -1513,62 +1655,93 @@ const Tuner = React.memo(function Tuner({
             ) : (
               // Active challenge UI
               <View style={styles.challengeActiveContent}>
-                <View style={styles.challengeHeader}>
-                  <Text style={styles.challengeTargetLabel}>
-                    {challengeState.target
-                      ? getChallengeInstructionText(challengeState.target)
-                      : "Loading..."}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      // Skip generates a new random note
-                      const newChallenge = createRandomChallenge(
-                        DEFAULT_CHALLENGE_NOTES,
-                        challengeDifficulty,
-                      );
-                      setChallengeState(
-                        startChallenge(
-                          cancelChallenge(challengeState),
-                          newChallenge,
-                        ),
-                      );
-                    }}
-                    style={styles.challengeSkipButton}
-                    accessibilityLabel="Skip to next note"
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.challengeSkipText}>Skip</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() =>
-                      setChallengeState(cancelChallenge(challengeState))
-                    }
-                    style={styles.challengeStopButton}
-                    accessibilityLabel="Stop challenge"
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.challengeStopText}>Stop</Text>
-                  </TouchableOpacity>
-                </View>
+                {challengeState.status === "success" ? (
+                  <View style={styles.challengeInstructionRow}>
+                    <Text style={styles.challengeSuccessText}>🎉 Success!</Text>
+                  </View>
+                ) : (
+                  challengeState.target && (
+                    <View style={styles.challengeInstructionRow}>
+                      <Text style={styles.challengeInstructionText}>Hold </Text>
+                      <View style={styles.challengeInlineNote}>
+                        <Text style={styles.challengeInlineNoteText}>
+                          {challengeState.target.note}
+                        </Text>
+                      </View>
+                      <Text style={styles.challengeInstructionText}>
+                        {" "}±{challengeState.target.tolerance}¢ for{" "}
+                        {(challengeState.target.durationMs / 1000).toFixed(1)}s
+                      </Text>
+                    </View>
+                  )
+                )}
 
-                {challengeState.target && (
-                  <View style={styles.challengeTargetDisplay}>
-                    <Text style={styles.challengeTargetNote}>
-                      {challengeState.target.note}
-                    </Text>
+                {/* Skip and Stop buttons - shown when NOT successful */}
+                {challengeState.status !== "success" && (
+                  <View style={styles.challengeButtonRow}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        const newChallenge = createRandomChallenge(
+                          DEFAULT_CHALLENGE_NOTES,
+                          challengeDifficulty,
+                        );
+                        setChallengeState(
+                          startChallenge(
+                            cancelChallenge(challengeState),
+                            newChallenge,
+                          ),
+                        );
+                      }}
+                      style={styles.challengeSkipButton}
+                      accessibilityLabel="Skip to next note"
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.challengeSkipText}>Skip</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() =>
+                        setChallengeState(cancelChallenge(challengeState))
+                      }
+                      style={styles.challengeStopButton}
+                      accessibilityLabel="Stop challenge"
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.challengeStopText}>Stop</Text>
+                    </TouchableOpacity>
                   </View>
                 )}
 
-                <View style={styles.challengeStatusRow}>
-                  <Text
-                    style={[
-                      styles.challengeStatusText,
-                      { color: getChallengeProgressColor(challengeState) },
-                    ]}
-                  >
-                    {getChallengeStatusText(challengeState)}
-                  </Text>
-                </View>
+                {/* Stop and Next buttons - shown on success */}
+                {challengeState.status === "success" && (
+                  <View style={styles.challengeButtonRow}>
+                    <TouchableOpacity
+                      onPress={() =>
+                        setChallengeState(cancelChallenge(challengeState))
+                      }
+                      style={styles.challengeStopButton}
+                      accessibilityLabel="Stop challenge"
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.challengeStopText}>Stop</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        const newChallenge = createRandomChallenge(
+                          DEFAULT_CHALLENGE_NOTES,
+                          challengeDifficulty,
+                        );
+                        setChallengeState((prev) =>
+                          startChallenge(resetAfterSuccess(prev), newChallenge),
+                        );
+                      }}
+                      style={[styles.challengeNextButton, styles.challengeNextButtonSuccess]}
+                      accessibilityLabel="Next challenge"
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.challengeNextButtonText}>Next →</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
 
                 {/* Progress bar */}
                 {challengeState.target &&
@@ -1588,42 +1761,21 @@ const Tuner = React.memo(function Tuner({
                     </View>
                   )}
 
-                {/* Success/Fail actions */}
-                {(challengeState.status === "success" ||
-                  challengeState.status === "failed") && (
+                {/* Try Again button - shown on failure */}
+                {challengeState.status === "failed" && (
                   <TouchableOpacity
-                    onPress={() => {
-                      if (challengeState.status === "success") {
-                        // Auto-generate next challenge
-                        const newChallenge = createRandomChallenge(
-                          DEFAULT_CHALLENGE_NOTES,
-                          challengeDifficulty,
-                        );
-                        setChallengeState((prev) =>
-                          startChallenge(resetAfterSuccess(prev), newChallenge),
-                        );
-                      } else {
-                        // Reset to idle
-                        setChallengeState(cancelChallenge(challengeState));
-                      }
-                    }}
+                    onPress={() =>
+                      setChallengeState(cancelChallenge(challengeState))
+                    }
                     style={[
                       styles.challengeNextButton,
-                      challengeState.status === "success"
-                        ? styles.challengeNextButtonSuccess
-                        : styles.challengeNextButtonRetry,
+                      styles.challengeNextButtonRetry,
                     ]}
-                    accessibilityLabel={
-                      challengeState.status === "success"
-                        ? "Next challenge"
-                        : "Try again"
-                    }
+                    accessibilityLabel="Try again"
                     accessibilityRole="button"
                   >
                     <Text style={styles.challengeNextButtonText}>
-                      {challengeState.status === "success"
-                        ? "Next →"
-                        : "Try Again"}
+                      Try Again
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -1643,35 +1795,6 @@ const Tuner = React.memo(function Tuner({
             )}
           </View>
         )}
-
-        {/* Settings Summary Button */}
-        <TouchableOpacity
-          style={styles.settingsSummaryButton}
-          onPress={() => setShowSettingsModal(true)}
-          accessibilityLabel="Open tuning settings"
-          accessibilityRole="button"
-        >
-          <View style={styles.settingsSummaryMetrics}>
-            {activeTemperament === "equal" ? (
-              <>
-                <Text style={styles.settingsSummaryMetric}>ET</Text>
-                <Text style={styles.settingsSummaryMetric}>A={concertA}Hz</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.settingsSummaryMetric}>JI</Text>
-                <Text style={styles.settingsSummaryMetric}>
-                  {KEY_DISPLAY_NAMES[selectedKeyIndex]}
-                </Text>
-                <Text style={styles.settingsSummaryMetric}>A={concertA}Hz</Text>
-                <Text style={styles.settingsSummaryMetric}>
-                  m7: {MINOR_7TH_LABELS[minor7System]}
-                </Text>
-              </>
-            )}
-          </View>
-          <Text style={styles.settingsSummaryIcon}>⚙️</Text>
-        </TouchableOpacity>
       </ScrollView>
 
       {/* Settings Modal */}
@@ -1892,7 +2015,8 @@ const styles = StyleSheet.create({
   },
   tunerScrollContent: {
     alignItems: "center",
-    padding: 12,
+    paddingHorizontal: 8,
+    paddingBottom: 8,
   },
   errorText: {
     color: "#FF6B6B",
@@ -1966,18 +2090,50 @@ const styles = StyleSheet.create({
   },
   noteContainer: {
     alignItems: "center",
-    marginTop: 8,
-    height: 144, // Fixed height: 44+24+18+16+14+28 = 144
     width: "100%",
   },
   noteNameRow: {
+    flexDirection: "row",
     height: 44, // Fixed height for note name or mic icon
     justifyContent: "center",
     alignItems: "center",
+    width: "100%",
+  },
+  noteRowButtonSpacer: {
+    width: 60,
+  },
+  noteRowSkipButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 6,
+    minHeight: 36,
+    minWidth: 60,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  noteRowSkipText: {
+    color: "#888",
+    fontSize: 14,
+  },
+  noteRowStopButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "rgba(255, 100, 100, 0.2)",
+    borderRadius: 6,
+    minHeight: 36,
+    minWidth: 60,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  noteRowStopText: {
+    color: "#FF6B6B",
+    fontSize: 14,
   },
   noteName: {
     fontSize: 36,
     fontWeight: "bold",
+    marginHorizontal: 16,
   },
   micIcon: {
     fontSize: 36,
@@ -1991,7 +2147,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    marginTop: 4,
+    marginBottom: 0,
     alignItems: "center",
     minHeight: 50,
     alignSelf: "stretch",
@@ -2014,7 +2170,7 @@ const styles = StyleSheet.create({
   },
   feedbackDots: {
     flexDirection: "row",
-    marginTop: 6,
+    marginTop: 0,
     gap: 6,
   },
   feedbackDot: {
@@ -2087,7 +2243,7 @@ const styles = StyleSheet.create({
   },
   // Fixed height container for lock/hold area
   lockHoldRow: {
-    height: 28,
+    height: 13,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -2174,7 +2330,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    marginTop: 12,
     borderWidth: 1,
     borderColor: "rgba(156, 39, 176, 0.3)",
   },
@@ -2197,6 +2352,47 @@ const styles = StyleSheet.create({
   settingsSummaryIcon: {
     fontSize: 16,
     marginLeft: 8,
+  },
+
+  // Panel Buttons (Stats/Challenge when collapsed)
+  panelToggle: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  panelToggleButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    minWidth: 100,
+  },
+  panelToggleText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "500",
+    textAlign: "center",
+  },
+  // Panel header buttons (reset + close)
+  panelHeaderButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  panelCloseButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  panelCloseText: {
+    color: "#888",
+    fontSize: 20,
+    fontWeight: "500",
   },
 
   // Settings Modal
@@ -2427,10 +2623,10 @@ const styles = StyleSheet.create({
   sessionStatsPanel: {
     backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
     width: "100%",
-    height: 130, // Fixed height to prevent layout jumps
+    minHeight: 137,
   },
   sessionStatsPlaceholder: {
     flex: 1,
@@ -2454,14 +2650,16 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   sessionStatsReset: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 4,
+    borderRadius: 6,
+    minHeight: 36,
+    justifyContent: "center",
   },
   sessionStatsResetText: {
     color: "#888",
-    fontSize: 11,
+    fontSize: 13,
   },
   sessionScoresRow: {
     flexDirection: "row",
@@ -2497,9 +2695,13 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.3)",
     borderRadius: 12,
     padding: 12,
-    marginTop: 12,
     width: "100%",
-    minHeight: 140,
+  },
+  challengePanelHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
   },
   challengeStartContent: {
     alignItems: "center",
@@ -2509,7 +2711,6 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
-    marginBottom: 8,
   },
   challengeDifficultyRow: {
     flexDirection: "row",
@@ -2562,26 +2763,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
   },
+  challengeButtonRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginBottom: 8,
+    gap: 8,
+  },
   challengeSkipButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 4,
+    borderRadius: 6,
+    minHeight: 44,
+    justifyContent: "center",
   },
   challengeSkipText: {
     color: "#888",
-    fontSize: 12,
+    fontSize: 14,
   },
   challengeStopButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     backgroundColor: "rgba(255, 100, 100, 0.2)",
-    borderRadius: 4,
-    marginLeft: 6,
+    borderRadius: 6,
+    minHeight: 44,
+    justifyContent: "center",
   },
   challengeStopText: {
     color: "#FF6B6B",
-    fontSize: 12,
+    fontSize: 14,
   },
   challengeTargetDisplay: {
     backgroundColor: "rgba(255, 255, 255, 0.1)",
@@ -2593,6 +2803,34 @@ const styles = StyleSheet.create({
   challengeTargetNote: {
     color: "#FFEB3B",
     fontSize: 32,
+    fontWeight: "700",
+  },
+  challengeInstructionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+    flexWrap: "wrap",
+  },
+  challengeInstructionText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  challengeSuccessText: {
+    color: "#4CAF50",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  challengeInlineNote: {
+    backgroundColor: "rgba(255, 235, 59, 0.2)",
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  challengeInlineNoteText: {
+    color: "#FFEB3B",
+    fontSize: 14,
     fontWeight: "700",
   },
   challengeStatusRow: {
@@ -2615,10 +2853,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   challengeNextButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderRadius: 6,
-    marginBottom: 8,
+    minHeight: 44,
+    justifyContent: "center",
   },
   challengeNextButtonSuccess: {
     backgroundColor: "#4CAF50",
