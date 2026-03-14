@@ -255,7 +255,7 @@ const Tuner = React.memo(function Tuner({
 }: TunerProps): React.JSX.Element {
   // Responsive sizing - scales to fit screen
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  
+
   // Horizontal: gauge scaling
   const GAUGE_BASE_WIDTH = 360; // SVG width
   const GAUGE_BASE_HEIGHT = 180;
@@ -272,7 +272,10 @@ const Tuner = React.memo(function Tuner({
   const MAX_HEIGHT = 700;
   const MIN_GAP = 2;
   const MAX_GAP = 20;
-  const heightRatio = Math.min(1, Math.max(0, (screenHeight - MIN_HEIGHT) / (MAX_HEIGHT - MIN_HEIGHT)));
+  const heightRatio = Math.min(
+    1,
+    Math.max(0, (screenHeight - MIN_HEIGHT) / (MAX_HEIGHT - MIN_HEIGHT)),
+  );
   const verticalGap = Math.round(MIN_GAP + heightRatio * (MAX_GAP - MIN_GAP));
 
   const [currentNote, setCurrentNote] = useState<string | null>(null);
@@ -287,9 +290,9 @@ const Tuner = React.memo(function Tuner({
   // Feedback display mode: 0=Deviation, 1=Guidance, 2=Stability, 3=Tendency
   const [feedbackMode, setFeedbackMode] = useState(0);
   // Active panel: "stats", "challenge", or null (just buttons)
-  const [activePanel, setActivePanel] = useState<
-    "stats" | "challenge" | null
-  >(null);
+  const [activePanel, setActivePanel] = useState<"stats" | "challenge" | null>(
+    null,
+  );
   const silenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Refs for callback to read current values (avoids stale closure in requestAnimationFrame loop)
@@ -720,7 +723,10 @@ const Tuner = React.memo(function Tuner({
     <View style={styles.container}>
       <ScrollView
         style={styles.tunerScrollView}
-        contentContainerStyle={[styles.tunerScrollContent, { paddingTop: verticalGap + 4 }]}
+        contentContainerStyle={[
+          styles.tunerScrollContent,
+          { paddingTop: verticalGap + 4 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Error Message */}
@@ -728,7 +734,10 @@ const Tuner = React.memo(function Tuner({
 
         {/* Settings Summary Button - positioned above tuner display */}
         <TouchableOpacity
-          style={[styles.settingsSummaryButton, { marginBottom: verticalGap + 2 }]}
+          style={[
+            styles.settingsSummaryButton,
+            { marginBottom: verticalGap + 2 },
+          ]}
           onPress={() => setShowSettingsModal(true)}
           accessibilityLabel="Open tuning settings"
           accessibilityRole="button"
@@ -1097,7 +1106,9 @@ const Tuner = React.memo(function Tuner({
               </View>
 
               {/* Note Display below gauge - fixed height container */}
-              <View style={[styles.noteContainer, { marginTop: -8 + verticalGap }]}>
+              <View
+                style={[styles.noteContainer, { marginTop: -8 + verticalGap }]}
+              >
                 {/* Note name row - always rendered with fixed height */}
                 <View style={styles.noteNameRow}>
                   {/* Skip button - shown during active challenge */}
@@ -1123,9 +1134,9 @@ const Tuner = React.memo(function Tuner({
                     </TouchableOpacity>
                   )}
                   {/* Spacer when no skip button */}
-                  {!(activePanel === "challenge" && challengeState.isActive) && (
-                    <View style={styles.noteRowButtonSpacer} />
-                  )}
+                  {!(
+                    activePanel === "challenge" && challengeState.isActive
+                  ) && <View style={styles.noteRowButtonSpacer} />}
                   {currentNote ? (
                     <Text style={[styles.noteName, { color: tuneColor }]}>
                       {currentNote}
@@ -1147,132 +1158,139 @@ const Tuner = React.memo(function Tuner({
                     </TouchableOpacity>
                   )}
                   {/* Spacer when no stop button */}
-                  {!(activePanel === "challenge" && challengeState.isActive) && (
-                    <View style={styles.noteRowButtonSpacer} />
-                  )}
+                  {!(
+                    activePanel === "challenge" && challengeState.isActive
+                  ) && <View style={styles.noteRowButtonSpacer} />}
                 </View>
                 {/* Tappable feedback area - cycles through modes (hidden during challenge) */}
                 {activePanel !== "challenge" && (
-                <TouchableOpacity
-                  style={[styles.feedbackArea, { marginTop: verticalGap }]}
-                  onPress={() => setFeedbackMode((prev) => (prev + 1) % 4)}
-                  activeOpacity={0.7}
-                  accessibilityLabel="Tap to cycle feedback display"
-                  accessibilityRole="button"
-                >
-                  <View style={styles.feedbackContent}>
-                    {feedbackMode === 0 &&
-                      currentNote &&
-                      // Mode 0: Deviation (60¢ SHARP / PERFECT)
-                      (TUNER_FLAGS.stateLanguage ? (
-                        <Text style={[styles.stateText, { color: tuneColor }]}>
-                          {stateText}
-                        </Text>
-                      ) : (
-                        <Text style={styles.centsDisplay}>
-                          {cents > 0 ? "+" : ""}
-                          {cents} cents
-                        </Text>
-                      ))}
-                    {feedbackMode === 1 &&
-                      currentNote &&
-                      !isDetectingPhase(tunerState) &&
-                      // Mode 1: Guidance (Lower pitch a lot)
-                      (directionalGuidance.text ? (
-                        <Text
-                          style={[
-                            styles.guidanceText,
-                            {
-                              color:
-                                directionalGuidance.direction === "lower"
-                                  ? "#FF9800"
-                                  : "#2196F3",
-                            },
-                          ]}
-                        >
-                          {directionalGuidance.text}
-                        </Text>
-                      ) : (
-                        <Text
-                          style={[styles.guidanceText, { color: "#4CAF50" }]}
-                        >
-                          On target
-                        </Text>
-                      ))}
-                    {feedbackMode === 2 &&
-                      currentNote &&
-                      !isDetectingPhase(tunerState) && (
-                        // Mode 2: Stability (STABLE / DRIFTING / UNSTABLE)
-                        <View style={styles.stabilityContent}>
-                          <View
-                            style={[
-                              styles.stabilityDot,
-                              { backgroundColor: stabilityColor },
-                            ]}
-                          />
+                  <TouchableOpacity
+                    style={[styles.feedbackArea, { marginTop: verticalGap }]}
+                    onPress={() => setFeedbackMode((prev) => (prev + 1) % 4)}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Tap to cycle feedback display"
+                    accessibilityRole="button"
+                  >
+                    <View style={styles.feedbackContent}>
+                      {feedbackMode === 0 &&
+                        currentNote &&
+                        // Mode 0: Deviation (60¢ SHARP / PERFECT)
+                        (TUNER_FLAGS.stateLanguage ? (
+                          <Text
+                            style={[styles.stateText, { color: tuneColor }]}
+                          >
+                            {stateText}
+                          </Text>
+                        ) : (
+                          <Text style={styles.centsDisplay}>
+                            {cents > 0 ? "+" : ""}
+                            {cents} cents
+                          </Text>
+                        ))}
+                      {feedbackMode === 1 &&
+                        currentNote &&
+                        !isDetectingPhase(tunerState) &&
+                        // Mode 1: Guidance (Lower pitch a lot)
+                        (directionalGuidance.text ? (
                           <Text
                             style={[
-                              styles.stabilityLabel,
-                              { color: stabilityColor },
+                              styles.guidanceText,
+                              {
+                                color:
+                                  directionalGuidance.direction === "lower"
+                                    ? "#FF9800"
+                                    : "#2196F3",
+                              },
                             ]}
                           >
-                            {tunerState.stability.isStable
-                              ? "STABLE"
-                              : tunerState.stability.isModerate
-                                ? "DRIFTING"
-                                : "UNSTABLE"}
+                            {directionalGuidance.text}
                           </Text>
-                        </View>
-                      )}
-                    {feedbackMode === 3 &&
-                      currentNote &&
-                      !isDetectingPhase(tunerState) &&
-                      // Mode 3: Tendency (Strong sharp tendency)
-                      (directionBias.biasText ? (
-                        <Text
-                          style={[
-                            styles.biasIndicator,
+                        ) : (
+                          <Text
+                            style={[styles.guidanceText, { color: "#4CAF50" }]}
+                          >
+                            On target
+                          </Text>
+                        ))}
+                      {feedbackMode === 2 &&
+                        currentNote &&
+                        !isDetectingPhase(tunerState) && (
+                          // Mode 2: Stability (STABLE / DRIFTING / UNSTABLE)
+                          <View style={styles.stabilityContent}>
+                            <View
+                              style={[
+                                styles.stabilityDot,
+                                { backgroundColor: stabilityColor },
+                              ]}
+                            />
+                            <Text
+                              style={[
+                                styles.stabilityLabel,
+                                { color: stabilityColor },
+                              ]}
+                            >
+                              {tunerState.stability.isStable
+                                ? "STABLE"
+                                : tunerState.stability.isModerate
+                                  ? "DRIFTING"
+                                  : "UNSTABLE"}
+                            </Text>
+                          </View>
+                        )}
+                      {feedbackMode === 3 &&
+                        currentNote &&
+                        !isDetectingPhase(tunerState) &&
+                        // Mode 3: Tendency (Strong sharp tendency)
+                        (directionBias.biasText ? (
+                          <Text
+                            style={[
+                              styles.biasIndicator,
+                              {
+                                color:
+                                  directionBias.direction === "sharp"
+                                    ? "#FF9800"
+                                    : "#2196F3",
+                              },
+                            ]}
+                          >
+                            {directionBias.biasText}
+                          </Text>
+                        ) : (
+                          <Text
+                            style={[styles.biasIndicator, { color: "#888" }]}
+                          >
+                            No tendency yet
+                          </Text>
+                        ))}
+                      {!currentNote && (
+                        <Text style={styles.feedbackPlaceholder}>
+                          <Text style={styles.feedbackModeName}>
                             {
-                              color:
-                                directionBias.direction === "sharp"
-                                  ? "#FF9800"
-                                  : "#2196F3",
-                            },
+                              [
+                                "Deviation",
+                                "Guidance",
+                                "Stability",
+                                "Tendency",
+                              ][feedbackMode]
+                            }
+                          </Text>
+                          {" — Waiting for pitch..."}
+                        </Text>
+                      )}
+                    </View>
+                    {/* Dot indicators */}
+                    <View style={styles.feedbackDots}>
+                      {[0, 1, 2, 3].map((i) => (
+                        <View
+                          key={i}
+                          style={[
+                            styles.feedbackDot,
+                            feedbackMode === i && styles.feedbackDotActive,
                           ]}
-                        >
-                          {directionBias.biasText}
-                        </Text>
-                      ) : (
-                        <Text style={[styles.biasIndicator, { color: "#888" }]}>
-                          No tendency yet
-                        </Text>
+                        />
                       ))}
-                    {!currentNote && (
-                      <Text style={styles.feedbackPlaceholder}>
-                        <Text style={styles.feedbackModeName}>
-                          {
-                            ["Deviation", "Guidance", "Stability", "Tendency"][
-                              feedbackMode
-                            ]
-                          }
-                        </Text>
-                        {" — Waiting for pitch..."}
-                      </Text>
-                    )}
-                  </View>
-                  {/* Dot indicators */}
-                  <View style={styles.feedbackDots}>
-                    {[0, 1, 2, 3].map((i) => (
-                      <View
-                        key={i}
-                        style={[
-                          styles.feedbackDot,
-                          feedbackMode === i && styles.feedbackDotActive,
-                        ]}
-                      />
-                    ))}
-                  </View>
-                </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
                 )}
                 {/* Fixed-height row for Lock/Hold Indicator (Phase 1) */}
                 <View style={styles.lockHoldRow}>
@@ -1351,124 +1369,126 @@ const Tuner = React.memo(function Tuner({
               </View>
               {/* Tappable feedback area - cycles through modes (hidden during challenge) */}
               {activePanel !== "challenge" && (
-              <TouchableOpacity
-                style={[styles.feedbackArea, { marginTop: verticalGap }]}
-                onPress={() => setFeedbackMode((prev) => (prev + 1) % 4)}
-                activeOpacity={0.7}
-                accessibilityLabel="Tap to cycle feedback display"
-                accessibilityRole="button"
-              >
-                <View style={styles.feedbackContent}>
-                  {feedbackMode === 0 &&
-                    currentNote &&
-                    // Mode 0: Deviation
-                    (TUNER_FLAGS.stateLanguage ? (
-                      <Text style={[styles.textCents, { color: tuneColor }]}>
-                        {stateText}
-                      </Text>
-                    ) : (
-                      <Text style={[styles.textCents, { color: tuneColor }]}>
-                        {cents > 0 ? "+" : ""}
-                        {cents} cents
-                      </Text>
-                    ))}
-                  {feedbackMode === 1 &&
-                    currentNote &&
-                    !isDetectingPhase(tunerState) &&
-                    // Mode 1: Guidance
-                    (directionalGuidance.text ? (
-                      <Text
-                        style={[
-                          styles.guidanceText,
-                          {
-                            color:
-                              directionalGuidance.direction === "lower"
-                                ? "#FF9800"
-                                : "#2196F3",
-                          },
-                        ]}
-                      >
-                        {directionalGuidance.text}
-                      </Text>
-                    ) : (
-                      <Text style={[styles.guidanceText, { color: "#4CAF50" }]}>
-                        On target
-                      </Text>
-                    ))}
-                  {feedbackMode === 2 &&
-                    currentNote &&
-                    !isDetectingPhase(tunerState) && (
-                      // Mode 2: Stability
-                      <View style={styles.stabilityContent}>
-                        <View
-                          style={[
-                            styles.stabilityDot,
-                            { backgroundColor: stabilityColor },
-                          ]}
-                        />
+                <TouchableOpacity
+                  style={[styles.feedbackArea, { marginTop: verticalGap }]}
+                  onPress={() => setFeedbackMode((prev) => (prev + 1) % 4)}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Tap to cycle feedback display"
+                  accessibilityRole="button"
+                >
+                  <View style={styles.feedbackContent}>
+                    {feedbackMode === 0 &&
+                      currentNote &&
+                      // Mode 0: Deviation
+                      (TUNER_FLAGS.stateLanguage ? (
+                        <Text style={[styles.textCents, { color: tuneColor }]}>
+                          {stateText}
+                        </Text>
+                      ) : (
+                        <Text style={[styles.textCents, { color: tuneColor }]}>
+                          {cents > 0 ? "+" : ""}
+                          {cents} cents
+                        </Text>
+                      ))}
+                    {feedbackMode === 1 &&
+                      currentNote &&
+                      !isDetectingPhase(tunerState) &&
+                      // Mode 1: Guidance
+                      (directionalGuidance.text ? (
                         <Text
                           style={[
-                            styles.stabilityLabel,
-                            { color: stabilityColor },
+                            styles.guidanceText,
+                            {
+                              color:
+                                directionalGuidance.direction === "lower"
+                                  ? "#FF9800"
+                                  : "#2196F3",
+                            },
                           ]}
                         >
-                          {tunerState.stability.isStable
-                            ? "STABLE"
-                            : tunerState.stability.isModerate
-                              ? "DRIFTING"
-                              : "UNSTABLE"}
+                          {directionalGuidance.text}
                         </Text>
-                      </View>
-                    )}
-                  {feedbackMode === 3 &&
-                    currentNote &&
-                    !isDetectingPhase(tunerState) &&
-                    // Mode 3: Tendency
-                    (directionBias.biasText ? (
-                      <Text
-                        style={[
-                          styles.biasIndicator,
+                      ) : (
+                        <Text
+                          style={[styles.guidanceText, { color: "#4CAF50" }]}
+                        >
+                          On target
+                        </Text>
+                      ))}
+                    {feedbackMode === 2 &&
+                      currentNote &&
+                      !isDetectingPhase(tunerState) && (
+                        // Mode 2: Stability
+                        <View style={styles.stabilityContent}>
+                          <View
+                            style={[
+                              styles.stabilityDot,
+                              { backgroundColor: stabilityColor },
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              styles.stabilityLabel,
+                              { color: stabilityColor },
+                            ]}
+                          >
+                            {tunerState.stability.isStable
+                              ? "STABLE"
+                              : tunerState.stability.isModerate
+                                ? "DRIFTING"
+                                : "UNSTABLE"}
+                          </Text>
+                        </View>
+                      )}
+                    {feedbackMode === 3 &&
+                      currentNote &&
+                      !isDetectingPhase(tunerState) &&
+                      // Mode 3: Tendency
+                      (directionBias.biasText ? (
+                        <Text
+                          style={[
+                            styles.biasIndicator,
+                            {
+                              color:
+                                directionBias.direction === "sharp"
+                                  ? "#FF9800"
+                                  : "#2196F3",
+                            },
+                          ]}
+                        >
+                          {directionBias.biasText}
+                        </Text>
+                      ) : (
+                        <Text style={[styles.biasIndicator, { color: "#888" }]}>
+                          No tendency yet
+                        </Text>
+                      ))}
+                    {!currentNote && (
+                      <Text style={styles.feedbackPlaceholder}>
+                        <Text style={styles.feedbackModeName}>
                           {
-                            color:
-                              directionBias.direction === "sharp"
-                                ? "#FF9800"
-                                : "#2196F3",
-                          },
+                            ["Deviation", "Guidance", "Stability", "Tendency"][
+                              feedbackMode
+                            ]
+                          }
+                        </Text>
+                        {" — Waiting for pitch..."}
+                      </Text>
+                    )}
+                  </View>
+                  {/* Dot indicators */}
+                  <View style={styles.feedbackDots}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.feedbackDot,
+                          feedbackMode === i && styles.feedbackDotActive,
                         ]}
-                      >
-                        {directionBias.biasText}
-                      </Text>
-                    ) : (
-                      <Text style={[styles.biasIndicator, { color: "#888" }]}>
-                        No tendency yet
-                      </Text>
+                      />
                     ))}
-                  {!currentNote && (
-                    <Text style={styles.feedbackPlaceholder}>
-                      <Text style={styles.feedbackModeName}>
-                        {
-                          ["Deviation", "Guidance", "Stability", "Tendency"][
-                            feedbackMode
-                          ]
-                        }
-                      </Text>
-                      {" — Waiting for pitch..."}
-                    </Text>
-                  )}
-                </View>
-                {/* Dot indicators */}
-                <View style={styles.feedbackDots}>
-                  {[0, 1, 2, 3].map((i) => (
-                    <View
-                      key={i}
-                      style={[
-                        styles.feedbackDot,
-                        feedbackMode === i && styles.feedbackDotActive,
-                      ]}
-                    />
-                  ))}
-                </View>
-              </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
               )}
             </View>
           )}
@@ -1507,7 +1527,9 @@ const Tuner = React.memo(function Tuner({
 
         {/* Session Stats Panel - shown when activePanel === "stats" */}
         {TUNER_FLAGS.sessionStats && activePanel === "stats" && (
-          <View style={[styles.sessionStatsPanel, { marginTop: verticalGap - 5 }]}>
+          <View
+            style={[styles.sessionStatsPanel, { marginTop: verticalGap - 5 }]}
+          >
             <View style={styles.sessionStatsHeader}>
               <Text style={styles.sessionStatsTitle}>📊 Session Stats</Text>
               <View style={styles.panelHeaderButtons}>
@@ -1669,7 +1691,8 @@ const Tuner = React.memo(function Tuner({
                         </Text>
                       </View>
                       <Text style={styles.challengeInstructionText}>
-                        {" "}±{challengeState.target.tolerance}¢ for{" "}
+                        {" "}
+                        ±{challengeState.target.tolerance}¢ for{" "}
                         {(challengeState.target.durationMs / 1000).toFixed(1)}s
                       </Text>
                     </View>
@@ -1734,7 +1757,10 @@ const Tuner = React.memo(function Tuner({
                           startChallenge(resetAfterSuccess(prev), newChallenge),
                         );
                       }}
-                      style={[styles.challengeNextButton, styles.challengeNextButtonSuccess]}
+                      style={[
+                        styles.challengeNextButton,
+                        styles.challengeNextButtonSuccess,
+                      ]}
                       accessibilityLabel="Next challenge"
                       accessibilityRole="button"
                     >
