@@ -702,348 +702,561 @@ const Tuner = React.memo(function Tuner({
 
   return (
     <View style={styles.container}>
-      <ScrollView 
+      <ScrollView
         style={styles.tunerScrollView}
         contentContainerStyle={styles.tunerScrollContent}
         showsVerticalScrollIndicator={false}
       >
-      {/* Error Message */}
-      {error && <Text style={styles.errorText}>{error}</Text>}
+        {/* Error Message */}
+        {error && <Text style={styles.errorText}>{error}</Text>}
 
-      {/* Tuner Display */}
-      <View style={styles.tunerDisplay}>
-        {mode === "needle" ? (
-          // Needle Mode - Semicircular gauge (responsive scaling)
-          <View style={styles.needleContainer}>
-            {/* Scaling container for responsive gauge */}
-            <View style={{
-              width: GAUGE_BASE_WIDTH * gaugeScale,
-              height: GAUGE_BASE_HEIGHT * gaugeScale,
-              overflow: "visible",
-            }}>
-              {/* Gauge arc and needle - scaled from top-left */}
-              <View style={[styles.gaugeArc, {
-                transform: [{ scale: gaugeScale }],
-                transformOrigin: "top left",
-              }]}>
-                {/* Smooth angular gradient using 180 SVG arc segments */}
-                <Svg width={360} height={180} style={styles.svgContainer}>
-                {/* Arc segments - 180 segments spanning 180° to 360° (left to right through top) */}
-                {/* Center at (180, 160), fills entire semicircle from center to radius 120 */}
-                {Array.from({ length: 180 }, (_, i) => {
-                  const cx = 180;
-                  const cy = 160;
-                  const outerR = 120;
-                  const segmentAngle = 180 / 180; // 1° per segment
-                  // Start at 180° (left), go through 270° (top), end at 360° (right)
-                  const startAngle = 180 + i * segmentAngle;
-                  const endAngle = 180 + (i + 1) * segmentAngle;
-                  const startRad = (startAngle * Math.PI) / 180;
-                  const endRad = (endAngle * Math.PI) / 180;
-
-                  // Interpolate color based on position (0 to 1 across the arc)
-                  const t = i / 179; // 0 at left edge, 1 at right edge
-                  // Color stops: red(0) -> orange(0.2) -> yellow(0.35) -> green(0.5) -> yellow(0.65) -> orange(0.8) -> red(1)
-                  const getColor = (pos: number): string => {
-                    const stops = [
-                      { p: 0, r: 244, g: 67, b: 54 }, // red
-                      { p: 0.2, r: 255, g: 152, b: 0 }, // orange
-                      { p: 0.35, r: 255, g: 193, b: 7 }, // yellow
-                      { p: 0.5, r: 76, g: 175, b: 80 }, // green
-                      { p: 0.65, r: 255, g: 193, b: 7 }, // yellow
-                      { p: 0.8, r: 255, g: 152, b: 0 }, // orange
-                      { p: 1, r: 244, g: 67, b: 54 }, // red
-                    ];
-                    let lower = stops[0],
-                      upper = stops[stops.length - 1];
-                    for (let j = 0; j < stops.length - 1; j++) {
-                      if (pos >= stops[j].p && pos <= stops[j + 1].p) {
-                        lower = stops[j];
-                        upper = stops[j + 1];
-                        break;
-                      }
-                    }
-                    const range = upper.p - lower.p;
-                    const localT = range > 0 ? (pos - lower.p) / range : 0;
-                    const r = Math.round(
-                      lower.r + (upper.r - lower.r) * localT,
-                    );
-                    const g = Math.round(
-                      lower.g + (upper.g - lower.g) * localT,
-                    );
-                    const b = Math.round(
-                      lower.b + (upper.b - lower.b) * localT,
-                    );
-                    return `rgb(${r},${g},${b})`;
-                  };
-
-                  const color = getColor(t);
-
-                  // Pie slice: from center to outer arc
-                  const x1 = cx + outerR * Math.cos(startRad);
-                  const y1 = cy + outerR * Math.sin(startRad);
-                  const x2 = cx + outerR * Math.cos(endRad);
-                  const y2 = cy + outerR * Math.sin(endRad);
-
-                  // Path: center -> outer start -> arc -> outer end -> back to center
-                  const d = `M ${cx} ${cy} L ${x1} ${y1} A ${outerR} ${outerR} 0 0 1 ${x2} ${y2} Z`;
-
-                  return <Path key={i} d={d} fill={color} opacity={0.7} />;
-                })}
-                {/* Arc outline */}
-                <Path
-                  d="M 60 160 A 120 120 0 0 1 300 160"
-                  stroke="#FFFFFF"
-                  strokeWidth={2}
-                  fill="none"
-                />
-                {/* Bottom line to complete the semicircle enclosure */}
-                <Line
-                  x1={60}
-                  y1={160}
-                  x2={300}
-                  y2={160}
-                  stroke="#FFFFFF"
-                  strokeWidth={2}
-                />
-                {/* Tick marks at 0, ±10, ±20, ±30, ±40, ±50 cents */}
-                {[-50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50].map(
-                  (centsValue) => {
-                    const cx = 180;
-                    const cy = 160;
-                    const innerR = 120; // Starts at the arc (radius 120)
-                    const outerR = 134; // Extends outward
-                    // Map cents to angle: 0 cents = 270° (top), ±50 cents = 180°/360°
-                    const angle = 270 + (centsValue / 50) * 90;
-                    const rad = (angle * Math.PI) / 180;
-                    const x1 = cx + innerR * Math.cos(rad);
-                    const y1 = cy + innerR * Math.sin(rad);
-                    const x2 = cx + outerR * Math.cos(rad);
-                    const y2 = cy + outerR * Math.sin(rad);
-                    // Make the 0 tick slightly longer
-                    const tickOuterR = centsValue === 0 ? 138 : outerR;
-                    const x2Final = cx + tickOuterR * Math.cos(rad);
-                    const y2Final = cy + tickOuterR * Math.sin(rad);
-                    // Label position outside the tick
-                    const labelR = centsValue === 0 ? 152 : 148;
-                    const labelX = cx + labelR * Math.cos(rad);
-                    const labelY = cy + labelR * Math.sin(rad);
-                    const labelText =
-                      centsValue === 0
-                        ? "0"
-                        : centsValue > 0
-                          ? `+${centsValue}`
-                          : `${centsValue}`;
-                    return (
-                      <React.Fragment key={centsValue}>
-                        <Line
-                          x1={x1}
-                          y1={y1}
-                          x2={x2Final}
-                          y2={y2Final}
-                          stroke={centsValue === 0 ? "#4CAF50" : "#FFFFFF"}
-                          strokeWidth={centsValue === 0 ? 4 : 1.5}
-                        />
-                        <SvgText
-                          x={labelX}
-                          y={labelY}
-                          fill={centsValue === 0 ? "#4CAF50" : "#FFFFFF"}
-                          fontSize={centsValue === 0 ? 16 : 12}
-                          fontWeight={centsValue === 0 ? "bold" : "normal"}
-                          textAnchor="middle"
-                          alignmentBaseline="middle"
-                        >
-                          {labelText}
-                        </SvgText>
-                      </React.Fragment>
-                    );
-                  },
-                )}
-                {/* Small tick marks at ±5, ±15, ±25, ±35, ±45 cents (half size) */}
-                {[-45, -35, -25, -15, -5, 5, 15, 25, 35, 45].map(
-                  (centsValue) => {
-                    const cx = 180;
-                    const cy = 160;
-                    const innerR = 120;
-                    const outerR = 129; // 9px length
-                    const angle = 270 + (centsValue / 50) * 90;
-                    const rad = (angle * Math.PI) / 180;
-                    const x1 = cx + innerR * Math.cos(rad);
-                    const y1 = cy + innerR * Math.sin(rad);
-                    const x2 = cx + outerR * Math.cos(rad);
-                    const y2 = cy + outerR * Math.sin(rad);
-                    return (
-                      <Line
-                        key={`small-${centsValue}`}
-                        x1={x1}
-                        y1={y1}
-                        x2={x2}
-                        y2={y2}
-                        stroke="#FFFFFF"
-                        strokeWidth={1.2}
-                      />
-                    );
-                  },
-                )}
-                {/* Tiny tick marks for every degree except 0, ±5, ±10, ±15, etc. */}
-                {Array.from({ length: 101 }, (_, i) => i - 50)
-                  .filter((v) => v % 5 !== 0) // Exclude multiples of 5 (already have ticks)
-                  .map((centsValue) => {
-                    const cx = 180;
-                    const cy = 160;
-                    const innerR = 120;
-                    const outerR = 123; // 3px length
-                    const angle = 270 + (centsValue / 50) * 90;
-                    const rad = (angle * Math.PI) / 180;
-                    const x1 = cx + innerR * Math.cos(rad);
-                    const y1 = cy + innerR * Math.sin(rad);
-                    const x2 = cx + outerR * Math.cos(rad);
-                    const y2 = cy + outerR * Math.sin(rad);
-                    return (
-                      <Line
-                        key={`tiny-${centsValue}`}
-                        x1={x1}
-                        y1={y1}
-                        x2={x2}
-                        y2={y2}
-                        stroke="#FFFFFF"
-                        strokeWidth={1}
-                      />
-                    );
-                  })}
-                {/* Drift Trail - faint ghost trail showing recent pitch movement (Phase 1C) */}
-                {TUNER_FLAGS.driftTrail &&
-                  currentNote &&
-                  driftTrailRef.current.map((sample, index) => {
-                    const cx = 180;
-                    const cy = 160;
-                    const trailR = 105; // Slightly inside the gauge arc
-                    // Clamp cents to -50/+50 range for angle calculation
-                    const clampedCents = Math.max(
-                      -50,
-                      Math.min(50, sample.cents),
-                    );
-                    const angle = 270 + (clampedCents / 50) * 90;
-                    const rad = (angle * Math.PI) / 180;
-                    const x = cx + trailR * Math.cos(rad);
-                    const y = cy + trailR * Math.sin(rad);
-                    // Opacity fades from newest (last) to oldest (first)
-                    const ageRatio =
-                      index / Math.max(1, driftTrailRef.current.length - 1);
-                    const opacity = 0.1 + 0.35 * (1 - ageRatio); // 0.45 newest → 0.1 oldest
-                    return (
-                      <Circle
-                        key={`trail-${index}-${sample.timestamp}`}
-                        cx={x}
-                        cy={y}
-                        r={3}
-                        fill={`rgba(100, 200, 255, ${opacity})`}
-                      />
-                    );
-                  })}
-                {/* Center Target Circle - visual aiming reference */}
-                {/* Position at top of arc (0 cents = 270° = (180, 40)) */}
-                <Circle
-                  cx={180}
-                  cy={40}
-                  r={8}
-                  fill={
-                    showLock
-                      ? "#4CAF50"
-                      : centered
-                        ? "rgba(76, 175, 80, 0.4)"
-                        : "rgba(100, 100, 100, 0.3)"
-                  }
-                  stroke={
-                    showLock
-                      ? "#4CAF50"
-                      : centered
-                        ? "rgba(76, 175, 80, 0.6)"
-                        : "rgba(150, 150, 150, 0.4)"
-                  }
-                  strokeWidth={showLock ? 2 : 1}
-                />
-                {/* Outer glow ring when locked */}
-                {showLock && (
-                  <Circle
-                    cx={180}
-                    cy={40}
-                    r={12}
-                    fill="none"
-                    stroke="rgba(76, 175, 80, 0.3)"
-                    strokeWidth={3}
-                  />
-                )}
-              </Svg>
-
-              {/* Needle - rotates around bottom center with spring physics */}
-              <View style={styles.needlePivotBase}>
-                <Animated.View
+        {/* Tuner Display */}
+        <View style={styles.tunerDisplay}>
+          {mode === "needle" ? (
+            // Needle Mode - Semicircular gauge (responsive scaling)
+            <View style={styles.needleContainer}>
+              {/* Scaling container for responsive gauge */}
+              <View
+                style={{
+                  width: GAUGE_BASE_WIDTH * gaugeScale,
+                  height: GAUGE_BASE_HEIGHT * gaugeScale,
+                  overflow: "visible",
+                }}
+              >
+                {/* Gauge arc and needle - scaled from top-left */}
+                <View
                   style={[
-                    styles.needleRotator,
+                    styles.gaugeArc,
                     {
-                      transform: [
-                        {
-                          rotate: needleRotationAnim.interpolate({
-                            inputRange: [-90, 90],
-                            outputRange: ["-90deg", "90deg"],
-                          }),
-                        },
-                      ],
+                      transform: [{ scale: gaugeScale }],
+                      transformOrigin: "top left",
                     },
                   ]}
                 >
-                  <View
-                    style={[styles.needle, { backgroundColor: "#FFFFFF" }]}
-                  />
-                </Animated.View>
-                {Math.abs(cents) <= 5 && currentNote ? (
-                  <View style={styles.smileyContainer}>
-                    <Svg width={24} height={24}>
-                      {/* Face background */}
-                      <Circle cx={12} cy={12} r={11} fill="#FFD700" />
+                  {/* Smooth angular gradient using 180 SVG arc segments */}
+                  <Svg width={360} height={180} style={styles.svgContainer}>
+                    {/* Arc segments - 180 segments spanning 180° to 360° (left to right through top) */}
+                    {/* Center at (180, 160), fills entire semicircle from center to radius 120 */}
+                    {Array.from({ length: 180 }, (_, i) => {
+                      const cx = 180;
+                      const cy = 160;
+                      const outerR = 120;
+                      const segmentAngle = 180 / 180; // 1° per segment
+                      // Start at 180° (left), go through 270° (top), end at 360° (right)
+                      const startAngle = 180 + i * segmentAngle;
+                      const endAngle = 180 + (i + 1) * segmentAngle;
+                      const startRad = (startAngle * Math.PI) / 180;
+                      const endRad = (endAngle * Math.PI) / 180;
+
+                      // Interpolate color based on position (0 to 1 across the arc)
+                      const t = i / 179; // 0 at left edge, 1 at right edge
+                      // Color stops: red(0) -> orange(0.2) -> yellow(0.35) -> green(0.5) -> yellow(0.65) -> orange(0.8) -> red(1)
+                      const getColor = (pos: number): string => {
+                        const stops = [
+                          { p: 0, r: 244, g: 67, b: 54 }, // red
+                          { p: 0.2, r: 255, g: 152, b: 0 }, // orange
+                          { p: 0.35, r: 255, g: 193, b: 7 }, // yellow
+                          { p: 0.5, r: 76, g: 175, b: 80 }, // green
+                          { p: 0.65, r: 255, g: 193, b: 7 }, // yellow
+                          { p: 0.8, r: 255, g: 152, b: 0 }, // orange
+                          { p: 1, r: 244, g: 67, b: 54 }, // red
+                        ];
+                        let lower = stops[0],
+                          upper = stops[stops.length - 1];
+                        for (let j = 0; j < stops.length - 1; j++) {
+                          if (pos >= stops[j].p && pos <= stops[j + 1].p) {
+                            lower = stops[j];
+                            upper = stops[j + 1];
+                            break;
+                          }
+                        }
+                        const range = upper.p - lower.p;
+                        const localT = range > 0 ? (pos - lower.p) / range : 0;
+                        const r = Math.round(
+                          lower.r + (upper.r - lower.r) * localT,
+                        );
+                        const g = Math.round(
+                          lower.g + (upper.g - lower.g) * localT,
+                        );
+                        const b = Math.round(
+                          lower.b + (upper.b - lower.b) * localT,
+                        );
+                        return `rgb(${r},${g},${b})`;
+                      };
+
+                      const color = getColor(t);
+
+                      // Pie slice: from center to outer arc
+                      const x1 = cx + outerR * Math.cos(startRad);
+                      const y1 = cy + outerR * Math.sin(startRad);
+                      const x2 = cx + outerR * Math.cos(endRad);
+                      const y2 = cy + outerR * Math.sin(endRad);
+
+                      // Path: center -> outer start -> arc -> outer end -> back to center
+                      const d = `M ${cx} ${cy} L ${x1} ${y1} A ${outerR} ${outerR} 0 0 1 ${x2} ${y2} Z`;
+
+                      return <Path key={i} d={d} fill={color} opacity={0.7} />;
+                    })}
+                    {/* Arc outline */}
+                    <Path
+                      d="M 60 160 A 120 120 0 0 1 300 160"
+                      stroke="#FFFFFF"
+                      strokeWidth={2}
+                      fill="none"
+                    />
+                    {/* Bottom line to complete the semicircle enclosure */}
+                    <Line
+                      x1={60}
+                      y1={160}
+                      x2={300}
+                      y2={160}
+                      stroke="#FFFFFF"
+                      strokeWidth={2}
+                    />
+                    {/* Tick marks at 0, ±10, ±20, ±30, ±40, ±50 cents */}
+                    {[-50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50].map(
+                      (centsValue) => {
+                        const cx = 180;
+                        const cy = 160;
+                        const innerR = 120; // Starts at the arc (radius 120)
+                        const outerR = 134; // Extends outward
+                        // Map cents to angle: 0 cents = 270° (top), ±50 cents = 180°/360°
+                        const angle = 270 + (centsValue / 50) * 90;
+                        const rad = (angle * Math.PI) / 180;
+                        const x1 = cx + innerR * Math.cos(rad);
+                        const y1 = cy + innerR * Math.sin(rad);
+                        const x2 = cx + outerR * Math.cos(rad);
+                        const y2 = cy + outerR * Math.sin(rad);
+                        // Make the 0 tick slightly longer
+                        const tickOuterR = centsValue === 0 ? 138 : outerR;
+                        const x2Final = cx + tickOuterR * Math.cos(rad);
+                        const y2Final = cy + tickOuterR * Math.sin(rad);
+                        // Label position outside the tick
+                        const labelR = centsValue === 0 ? 152 : 148;
+                        const labelX = cx + labelR * Math.cos(rad);
+                        const labelY = cy + labelR * Math.sin(rad);
+                        const labelText =
+                          centsValue === 0
+                            ? "0"
+                            : centsValue > 0
+                              ? `+${centsValue}`
+                              : `${centsValue}`;
+                        return (
+                          <React.Fragment key={centsValue}>
+                            <Line
+                              x1={x1}
+                              y1={y1}
+                              x2={x2Final}
+                              y2={y2Final}
+                              stroke={centsValue === 0 ? "#4CAF50" : "#FFFFFF"}
+                              strokeWidth={centsValue === 0 ? 4 : 1.5}
+                            />
+                            <SvgText
+                              x={labelX}
+                              y={labelY}
+                              fill={centsValue === 0 ? "#4CAF50" : "#FFFFFF"}
+                              fontSize={centsValue === 0 ? 16 : 12}
+                              fontWeight={centsValue === 0 ? "bold" : "normal"}
+                              textAnchor="middle"
+                              alignmentBaseline="middle"
+                            >
+                              {labelText}
+                            </SvgText>
+                          </React.Fragment>
+                        );
+                      },
+                    )}
+                    {/* Small tick marks at ±5, ±15, ±25, ±35, ±45 cents (half size) */}
+                    {[-45, -35, -25, -15, -5, 5, 15, 25, 35, 45].map(
+                      (centsValue) => {
+                        const cx = 180;
+                        const cy = 160;
+                        const innerR = 120;
+                        const outerR = 129; // 9px length
+                        const angle = 270 + (centsValue / 50) * 90;
+                        const rad = (angle * Math.PI) / 180;
+                        const x1 = cx + innerR * Math.cos(rad);
+                        const y1 = cy + innerR * Math.sin(rad);
+                        const x2 = cx + outerR * Math.cos(rad);
+                        const y2 = cy + outerR * Math.sin(rad);
+                        return (
+                          <Line
+                            key={`small-${centsValue}`}
+                            x1={x1}
+                            y1={y1}
+                            x2={x2}
+                            y2={y2}
+                            stroke="#FFFFFF"
+                            strokeWidth={1.2}
+                          />
+                        );
+                      },
+                    )}
+                    {/* Tiny tick marks for every degree except 0, ±5, ±10, ±15, etc. */}
+                    {Array.from({ length: 101 }, (_, i) => i - 50)
+                      .filter((v) => v % 5 !== 0) // Exclude multiples of 5 (already have ticks)
+                      .map((centsValue) => {
+                        const cx = 180;
+                        const cy = 160;
+                        const innerR = 120;
+                        const outerR = 123; // 3px length
+                        const angle = 270 + (centsValue / 50) * 90;
+                        const rad = (angle * Math.PI) / 180;
+                        const x1 = cx + innerR * Math.cos(rad);
+                        const y1 = cy + innerR * Math.sin(rad);
+                        const x2 = cx + outerR * Math.cos(rad);
+                        const y2 = cy + outerR * Math.sin(rad);
+                        return (
+                          <Line
+                            key={`tiny-${centsValue}`}
+                            x1={x1}
+                            y1={y1}
+                            x2={x2}
+                            y2={y2}
+                            stroke="#FFFFFF"
+                            strokeWidth={1}
+                          />
+                        );
+                      })}
+                    {/* Drift Trail - faint ghost trail showing recent pitch movement (Phase 1C) */}
+                    {TUNER_FLAGS.driftTrail &&
+                      currentNote &&
+                      driftTrailRef.current.map((sample, index) => {
+                        const cx = 180;
+                        const cy = 160;
+                        const trailR = 105; // Slightly inside the gauge arc
+                        // Clamp cents to -50/+50 range for angle calculation
+                        const clampedCents = Math.max(
+                          -50,
+                          Math.min(50, sample.cents),
+                        );
+                        const angle = 270 + (clampedCents / 50) * 90;
+                        const rad = (angle * Math.PI) / 180;
+                        const x = cx + trailR * Math.cos(rad);
+                        const y = cy + trailR * Math.sin(rad);
+                        // Opacity fades from newest (last) to oldest (first)
+                        const ageRatio =
+                          index / Math.max(1, driftTrailRef.current.length - 1);
+                        const opacity = 0.1 + 0.35 * (1 - ageRatio); // 0.45 newest → 0.1 oldest
+                        return (
+                          <Circle
+                            key={`trail-${index}-${sample.timestamp}`}
+                            cx={x}
+                            cy={y}
+                            r={3}
+                            fill={`rgba(100, 200, 255, ${opacity})`}
+                          />
+                        );
+                      })}
+                    {/* Center Target Circle - visual aiming reference */}
+                    {/* Position at top of arc (0 cents = 270° = (180, 40)) */}
+                    <Circle
+                      cx={180}
+                      cy={40}
+                      r={8}
+                      fill={
+                        showLock
+                          ? "#4CAF50"
+                          : centered
+                            ? "rgba(76, 175, 80, 0.4)"
+                            : "rgba(100, 100, 100, 0.3)"
+                      }
+                      stroke={
+                        showLock
+                          ? "#4CAF50"
+                          : centered
+                            ? "rgba(76, 175, 80, 0.6)"
+                            : "rgba(150, 150, 150, 0.4)"
+                      }
+                      strokeWidth={showLock ? 2 : 1}
+                    />
+                    {/* Outer glow ring when locked */}
+                    {showLock && (
                       <Circle
-                        cx={12}
-                        cy={12}
-                        r={11}
-                        stroke="#DAA520"
-                        strokeWidth={1}
+                        cx={180}
+                        cy={40}
+                        r={12}
                         fill="none"
+                        stroke="rgba(76, 175, 80, 0.3)"
+                        strokeWidth={3}
                       />
-                      {/* Star eyes */}
-                      <SvgText x={6} y={11} fontSize={8} textAnchor="middle">
-                        ⭐
-                      </SvgText>
-                      <SvgText x={18} y={11} fontSize={8} textAnchor="middle">
-                        ⭐
-                      </SvgText>
-                      {/* Smile */}
-                      <Path
-                        d="M 6 14 Q 12 20 18 14"
-                        stroke="#333"
-                        strokeWidth={2}
-                        fill="none"
-                        strokeLinecap="round"
+                    )}
+                  </Svg>
+
+                  {/* Needle - rotates around bottom center with spring physics */}
+                  <View style={styles.needlePivotBase}>
+                    <Animated.View
+                      style={[
+                        styles.needleRotator,
+                        {
+                          transform: [
+                            {
+                              rotate: needleRotationAnim.interpolate({
+                                inputRange: [-90, 90],
+                                outputRange: ["-90deg", "90deg"],
+                              }),
+                            },
+                          ],
+                        },
+                      ]}
+                    >
+                      <View
+                        style={[styles.needle, { backgroundColor: "#FFFFFF" }]}
                       />
-                    </Svg>
+                    </Animated.View>
+                    {Math.abs(cents) <= 5 && currentNote ? (
+                      <View style={styles.smileyContainer}>
+                        <Svg width={24} height={24}>
+                          {/* Face background */}
+                          <Circle cx={12} cy={12} r={11} fill="#FFD700" />
+                          <Circle
+                            cx={12}
+                            cy={12}
+                            r={11}
+                            stroke="#DAA520"
+                            strokeWidth={1}
+                            fill="none"
+                          />
+                          {/* Star eyes */}
+                          <SvgText
+                            x={6}
+                            y={11}
+                            fontSize={8}
+                            textAnchor="middle"
+                          >
+                            ⭐
+                          </SvgText>
+                          <SvgText
+                            x={18}
+                            y={11}
+                            fontSize={8}
+                            textAnchor="middle"
+                          >
+                            ⭐
+                          </SvgText>
+                          {/* Smile */}
+                          <Path
+                            d="M 6 14 Q 12 20 18 14"
+                            stroke="#333"
+                            strokeWidth={2}
+                            fill="none"
+                            strokeLinecap="round"
+                          />
+                        </Svg>
+                      </View>
+                    ) : (
+                      <View style={styles.pivotDot} />
+                    )}
                   </View>
-                ) : (
-                  <View style={styles.pivotDot} />
-                )}
+                </View>
+              </View>
+
+              {/* Note Display below gauge - fixed height container */}
+              <View style={styles.noteContainer}>
+                {/* Note name row - always rendered with fixed height */}
+                <View style={styles.noteNameRow}>
+                  {currentNote ? (
+                    <Text style={[styles.noteName, { color: tuneColor }]}>
+                      {currentNote}
+                    </Text>
+                  ) : (
+                    <Text style={styles.micIcon}>🎤</Text>
+                  )}
+                </View>
+                {/* Tappable feedback area - cycles through modes */}
+                <TouchableOpacity
+                  style={styles.feedbackArea}
+                  onPress={() => setFeedbackMode((prev) => (prev + 1) % 4)}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Tap to cycle feedback display"
+                  accessibilityRole="button"
+                >
+                  <View style={styles.feedbackContent}>
+                    {feedbackMode === 0 &&
+                      currentNote &&
+                      // Mode 0: Deviation (60¢ SHARP / PERFECT)
+                      (TUNER_FLAGS.stateLanguage ? (
+                        <Text style={[styles.stateText, { color: tuneColor }]}>
+                          {stateText}
+                        </Text>
+                      ) : (
+                        <Text style={styles.centsDisplay}>
+                          {cents > 0 ? "+" : ""}
+                          {cents} cents
+                        </Text>
+                      ))}
+                    {feedbackMode === 1 &&
+                      currentNote &&
+                      !isDetectingPhase(tunerState) &&
+                      // Mode 1: Guidance (Lower pitch a lot)
+                      (directionalGuidance.text ? (
+                        <Text
+                          style={[
+                            styles.guidanceText,
+                            {
+                              color:
+                                directionalGuidance.direction === "lower"
+                                  ? "#FF9800"
+                                  : "#2196F3",
+                            },
+                          ]}
+                        >
+                          {directionalGuidance.text}
+                        </Text>
+                      ) : (
+                        <Text
+                          style={[styles.guidanceText, { color: "#4CAF50" }]}
+                        >
+                          On target
+                        </Text>
+                      ))}
+                    {feedbackMode === 2 &&
+                      currentNote &&
+                      !isDetectingPhase(tunerState) && (
+                        // Mode 2: Stability (STABLE / DRIFTING / UNSTABLE)
+                        <View style={styles.stabilityContent}>
+                          <View
+                            style={[
+                              styles.stabilityDot,
+                              { backgroundColor: stabilityColor },
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              styles.stabilityLabel,
+                              { color: stabilityColor },
+                            ]}
+                          >
+                            {tunerState.stability.isStable
+                              ? "STABLE"
+                              : tunerState.stability.isModerate
+                                ? "DRIFTING"
+                                : "UNSTABLE"}
+                          </Text>
+                        </View>
+                      )}
+                    {feedbackMode === 3 &&
+                      currentNote &&
+                      !isDetectingPhase(tunerState) &&
+                      // Mode 3: Tendency (Strong sharp tendency)
+                      (directionBias.biasText ? (
+                        <Text
+                          style={[
+                            styles.biasIndicator,
+                            {
+                              color:
+                                directionBias.direction === "sharp"
+                                  ? "#FF9800"
+                                  : "#2196F3",
+                            },
+                          ]}
+                        >
+                          {directionBias.biasText}
+                        </Text>
+                      ) : (
+                        <Text style={[styles.biasIndicator, { color: "#888" }]}>
+                          No tendency yet
+                        </Text>
+                      ))}
+                    {!currentNote && (
+                      <Text style={styles.feedbackPlaceholder}>
+                        <Text style={styles.feedbackModeName}>
+                          {
+                            ["Deviation", "Guidance", "Stability", "Tendency"][
+                              feedbackMode
+                            ]
+                          }
+                        </Text>
+                        {" — Waiting for pitch..."}
+                      </Text>
+                    )}
+                  </View>
+                  {/* Dot indicators */}
+                  <View style={styles.feedbackDots}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.feedbackDot,
+                          feedbackMode === i && styles.feedbackDotActive,
+                        ]}
+                      />
+                    ))}
+                  </View>
+                </TouchableOpacity>
+                {/* Fixed-height row for Lock/Hold Indicator (Phase 1) */}
+                <View style={styles.lockHoldRow}>
+                  {currentNote && TUNER_FLAGS.holdIndicator && showLock && (
+                    <Animated.View
+                      style={[
+                        styles.lockIndicator,
+                        {
+                          backgroundColor: lockGlowAnim.interpolate({
+                            inputRange: [0, 0.5, 1],
+                            outputRange: [
+                              "rgba(0, 200, 0, 0.9)",
+                              "rgba(50, 220, 50, 0.95)",
+                              "rgba(100, 255, 100, 1)",
+                            ],
+                          }),
+                          borderColor: lockGlowAnim.interpolate({
+                            inputRange: [0, 0.5, 1],
+                            outputRange: [
+                              "rgba(0, 180, 0, 1)",
+                              "rgba(100, 255, 100, 1)",
+                              "rgba(200, 255, 200, 1)",
+                            ],
+                          }),
+                          borderWidth: 2,
+                          transform: [
+                            {
+                              scale: lockGlowAnim.interpolate({
+                                inputRange: [0, 0.5, 1],
+                                outputRange: [1, 1.05, 1.15],
+                              }),
+                            },
+                          ],
+                        },
+                      ]}
+                    >
+                      <Text style={styles.lockText}>✓ LOCKED</Text>
+                    </Animated.View>
+                  )}
+                  {currentNote &&
+                    TUNER_FLAGS.holdIndicator &&
+                    !showLock &&
+                    holdProgress > 0 && (
+                      <View style={styles.holdProgressContainer}>
+                        <View
+                          style={[
+                            styles.holdProgressBar,
+                            { width: `${holdProgress * 100}%` },
+                          ]}
+                        />
+                      </View>
+                    )}
+                </View>
               </View>
             </View>
-            </View>
-
-            {/* Note Display below gauge - fixed height container */}
-            <View style={styles.noteContainer}>
-              {/* Note name row - always rendered with fixed height */}
-              <View style={styles.noteNameRow}>
+          ) : (
+            // Text Mode - Single fixed-height container for both mic and note states
+            <View style={styles.textContainer}>
+              {/* Note name or mic icon */}
+              <View style={styles.textNoteRow}>
                 {currentNote ? (
-                  <Text style={[styles.noteName, { color: tuneColor }]}>
+                  <Text style={[styles.textNote, { color: tuneColor }]}>
                     {currentNote}
                   </Text>
                 ) : (
-                  <Text style={styles.micIcon}>🎤</Text>
+                  <Text style={styles.textMicIcon}>🎤</Text>
+                )}
+              </View>
+              {/* Frequency row */}
+              <View style={styles.textFreqRow}>
+                {currentNote && (
+                  <Text style={styles.textFreq}>
+                    {frequency ? `${frequency.toFixed(1)} Hz` : ""}
+                  </Text>
                 )}
               </View>
               {/* Tappable feedback area - cycles through modes */}
@@ -1057,13 +1270,13 @@ const Tuner = React.memo(function Tuner({
                 <View style={styles.feedbackContent}>
                   {feedbackMode === 0 &&
                     currentNote &&
-                    // Mode 0: Deviation (60¢ SHARP / PERFECT)
+                    // Mode 0: Deviation
                     (TUNER_FLAGS.stateLanguage ? (
-                      <Text style={[styles.stateText, { color: tuneColor }]}>
+                      <Text style={[styles.textCents, { color: tuneColor }]}>
                         {stateText}
                       </Text>
                     ) : (
-                      <Text style={styles.centsDisplay}>
+                      <Text style={[styles.textCents, { color: tuneColor }]}>
                         {cents > 0 ? "+" : ""}
                         {cents} cents
                       </Text>
@@ -1071,7 +1284,7 @@ const Tuner = React.memo(function Tuner({
                   {feedbackMode === 1 &&
                     currentNote &&
                     !isDetectingPhase(tunerState) &&
-                    // Mode 1: Guidance (Lower pitch a lot)
+                    // Mode 1: Guidance
                     (directionalGuidance.text ? (
                       <Text
                         style={[
@@ -1094,7 +1307,7 @@ const Tuner = React.memo(function Tuner({
                   {feedbackMode === 2 &&
                     currentNote &&
                     !isDetectingPhase(tunerState) && (
-                      // Mode 2: Stability (STABLE / DRIFTING / UNSTABLE)
+                      // Mode 2: Stability
                       <View style={styles.stabilityContent}>
                         <View
                           style={[
@@ -1119,7 +1332,7 @@ const Tuner = React.memo(function Tuner({
                   {feedbackMode === 3 &&
                     currentNote &&
                     !isDetectingPhase(tunerState) &&
-                    // Mode 3: Tendency (Strong sharp tendency)
+                    // Mode 3: Tendency
                     (directionBias.biasText ? (
                       <Text
                         style={[
@@ -1165,489 +1378,300 @@ const Tuner = React.memo(function Tuner({
                   ))}
                 </View>
               </TouchableOpacity>
-              {/* Fixed-height row for Lock/Hold Indicator (Phase 1) */}
-              <View style={styles.lockHoldRow}>
-                {currentNote && TUNER_FLAGS.holdIndicator && showLock && (
-                  <Animated.View
-                    style={[
-                      styles.lockIndicator,
-                      {
-                        backgroundColor: lockGlowAnim.interpolate({
-                          inputRange: [0, 0.5, 1],
-                          outputRange: [
-                            "rgba(0, 200, 0, 0.9)",
-                            "rgba(50, 220, 50, 0.95)",
-                            "rgba(100, 255, 100, 1)",
-                          ],
-                        }),
-                        borderColor: lockGlowAnim.interpolate({
-                          inputRange: [0, 0.5, 1],
-                          outputRange: [
-                            "rgba(0, 180, 0, 1)",
-                            "rgba(100, 255, 100, 1)",
-                            "rgba(200, 255, 200, 1)",
-                          ],
-                        }),
-                        borderWidth: 2,
-                        transform: [
-                          {
-                            scale: lockGlowAnim.interpolate({
-                              inputRange: [0, 0.5, 1],
-                              outputRange: [1, 1.05, 1.15],
-                            }),
-                          },
-                        ],
-                      },
-                    ]}
-                  >
-                    <Text style={styles.lockText}>✓ LOCKED</Text>
-                  </Animated.View>
-                )}
-                {currentNote &&
-                  TUNER_FLAGS.holdIndicator &&
-                  !showLock &&
-                  holdProgress > 0 && (
-                    <View style={styles.holdProgressContainer}>
-                      <View
-                        style={[
-                          styles.holdProgressBar,
-                          { width: `${holdProgress * 100}%` },
-                        ]}
-                      />
-                    </View>
-                  )}
-              </View>
-            </View>
-          </View>
-        ) : (
-          // Text Mode - Single fixed-height container for both mic and note states
-          <View style={styles.textContainer}>
-            {/* Note name or mic icon */}
-            <View style={styles.textNoteRow}>
-              {currentNote ? (
-                <Text style={[styles.textNote, { color: tuneColor }]}>
-                  {currentNote}
-                </Text>
-              ) : (
-                <Text style={styles.textMicIcon}>🎤</Text>
-              )}
-            </View>
-            {/* Frequency row */}
-            <View style={styles.textFreqRow}>
-              {currentNote && (
-                <Text style={styles.textFreq}>
-                  {frequency ? `${frequency.toFixed(1)} Hz` : ""}
-                </Text>
-              )}
-            </View>
-            {/* Tappable feedback area - cycles through modes */}
-            <TouchableOpacity
-              style={styles.feedbackArea}
-              onPress={() => setFeedbackMode((prev) => (prev + 1) % 4)}
-              activeOpacity={0.7}
-              accessibilityLabel="Tap to cycle feedback display"
-              accessibilityRole="button"
-            >
-              <View style={styles.feedbackContent}>
-                {feedbackMode === 0 &&
-                  currentNote &&
-                  // Mode 0: Deviation
-                  (TUNER_FLAGS.stateLanguage ? (
-                    <Text style={[styles.textCents, { color: tuneColor }]}>
-                      {stateText}
-                    </Text>
-                  ) : (
-                    <Text style={[styles.textCents, { color: tuneColor }]}>
-                      {cents > 0 ? "+" : ""}
-                      {cents} cents
-                    </Text>
-                  ))}
-                {feedbackMode === 1 &&
-                  currentNote &&
-                  !isDetectingPhase(tunerState) &&
-                  // Mode 1: Guidance
-                  (directionalGuidance.text ? (
-                    <Text
-                      style={[
-                        styles.guidanceText,
-                        {
-                          color:
-                            directionalGuidance.direction === "lower"
-                              ? "#FF9800"
-                              : "#2196F3",
-                        },
-                      ]}
-                    >
-                      {directionalGuidance.text}
-                    </Text>
-                  ) : (
-                    <Text style={[styles.guidanceText, { color: "#4CAF50" }]}>
-                      On target
-                    </Text>
-                  ))}
-                {feedbackMode === 2 &&
-                  currentNote &&
-                  !isDetectingPhase(tunerState) && (
-                    // Mode 2: Stability
-                    <View style={styles.stabilityContent}>
-                      <View
-                        style={[
-                          styles.stabilityDot,
-                          { backgroundColor: stabilityColor },
-                        ]}
-                      />
-                      <Text
-                        style={[
-                          styles.stabilityLabel,
-                          { color: stabilityColor },
-                        ]}
-                      >
-                        {tunerState.stability.isStable
-                          ? "STABLE"
-                          : tunerState.stability.isModerate
-                            ? "DRIFTING"
-                            : "UNSTABLE"}
-                      </Text>
-                    </View>
-                  )}
-                {feedbackMode === 3 &&
-                  currentNote &&
-                  !isDetectingPhase(tunerState) &&
-                  // Mode 3: Tendency
-                  (directionBias.biasText ? (
-                    <Text
-                      style={[
-                        styles.biasIndicator,
-                        {
-                          color:
-                            directionBias.direction === "sharp"
-                              ? "#FF9800"
-                              : "#2196F3",
-                        },
-                      ]}
-                    >
-                      {directionBias.biasText}
-                    </Text>
-                  ) : (
-                    <Text style={[styles.biasIndicator, { color: "#888" }]}>
-                      No tendency yet
-                    </Text>
-                  ))}
-                {!currentNote && (
-                  <Text style={styles.feedbackPlaceholder}>
-                    <Text style={styles.feedbackModeName}>
-                      {
-                        ["Deviation", "Guidance", "Stability", "Tendency"][
-                          feedbackMode
-                        ]
-                      }
-                    </Text>
-                    {" — Waiting for pitch..."}
-                  </Text>
-                )}
-              </View>
-              {/* Dot indicators */}
-              <View style={styles.feedbackDots}>
-                {[0, 1, 2, 3].map((i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.feedbackDot,
-                      feedbackMode === i && styles.feedbackDotActive,
-                    ]}
-                  />
-                ))}
-              </View>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-
-      {/* Session Stats Panel (Phase 2A) - Always rendered with fixed height */}
-      {TUNER_FLAGS.sessionStats && (
-        <View style={styles.sessionStatsPanel}>
-          {sessionStats.hasEnoughData ? (
-            <>
-              <View style={styles.sessionStatsHeader}>
-                <Text style={styles.sessionStatsTitle}>Session Stats</Text>
-                <TouchableOpacity
-                  onPress={() => setSessionStats(resetSessionStats())}
-                  style={styles.sessionStatsReset}
-                  accessibilityLabel="Reset session stats"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.sessionStatsResetText}>Reset</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.sessionScoresRow}>
-                <View style={styles.sessionScoreItem}>
-                  <Text style={styles.sessionScoreValue}>
-                    {calculateSessionScores(sessionStats).accuracy}%
-                  </Text>
-                  <Text style={styles.sessionScoreLabel}>Accuracy</Text>
-                </View>
-                <View style={styles.sessionScoreItem}>
-                  <Text style={styles.sessionScoreValue}>
-                    {calculateSessionScores(sessionStats).stability}%
-                  </Text>
-                  <Text style={styles.sessionScoreLabel}>Stability</Text>
-                </View>
-                <View style={styles.sessionScoreItem}>
-                  <Text style={styles.sessionScoreValue}>
-                    {calculateSessionScores(sessionStats).control}%
-                  </Text>
-                  <Text style={styles.sessionScoreLabel}>Control</Text>
-                </View>
-              </View>
-              {/* Fixed-height row for attack summary to prevent layout jumps */}
-              <View style={styles.attackSummaryRow}>
-                {TUNER_FLAGS.attackSummary &&
-                  calculateAttackSummary(sessionStats).summaryText && (
-                    <Text
-                      style={[
-                        styles.attackSummaryText,
-                        {
-                          color:
-                            calculateAttackSummary(sessionStats)
-                              .attackDirection === "sharp"
-                              ? "#FF9800"
-                              : "#2196F3",
-                        },
-                      ]}
-                    >
-                      {calculateAttackSummary(sessionStats).summaryText}
-                    </Text>
-                  )}
-              </View>
-            </>
-          ) : (
-            <View style={styles.sessionStatsPlaceholder}>
-              <Text style={styles.sessionStatsPlaceholderText}>
-                Play for a few seconds to see stats...
-              </Text>
             </View>
           )}
         </View>
-      )}
 
-      {/* Target Tone Challenge Panel (Phase 2A) */}
-      {TUNER_FLAGS.targetToneChallenge && (
-        <View style={styles.challengePanel}>
-          {challengeState.status === "idle" ? (
-            // Challenge start UI
-            <View style={styles.challengeStartContent}>
-              <Text style={styles.challengePanelTitle}>
-                Target Tone Challenge
-              </Text>
-              <View style={styles.challengeDifficultyRow}>
-                {(
-                  Object.keys(CHALLENGE_DIFFICULTIES) as ChallengeDifficulty[]
-                ).map((difficulty) => (
+        {/* Session Stats Panel (Phase 2A) - Always rendered with fixed height */}
+        {TUNER_FLAGS.sessionStats && (
+          <View style={styles.sessionStatsPanel}>
+            {sessionStats.hasEnoughData ? (
+              <>
+                <View style={styles.sessionStatsHeader}>
+                  <Text style={styles.sessionStatsTitle}>Session Stats</Text>
                   <TouchableOpacity
-                    key={difficulty}
-                    onPress={() => {
-                      if (difficulty !== challengeDifficulty) {
-                        setChallengeDifficulty(difficulty);
-                        setChallengeState(createInitialChallengeState());
-                      }
-                    }}
-                    style={[
-                      styles.challengeDifficultyButton,
-                      challengeDifficulty === difficulty &&
-                        styles.challengeDifficultyButtonActive,
-                    ]}
-                    accessibilityLabel={`${difficulty} difficulty${challengeDifficulty === difficulty ? ", selected" : ""}`}
+                    onPress={() => setSessionStats(resetSessionStats())}
+                    style={styles.sessionStatsReset}
+                    accessibilityLabel="Reset session stats"
                     accessibilityRole="button"
                   >
-                    <Text
-                      style={[
-                        styles.challengeDifficultyText,
-                        challengeDifficulty === difficulty &&
-                          styles.challengeDifficultyTextActive,
-                      ]}
-                    >
-                      {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
-                    </Text>
+                    <Text style={styles.sessionStatsResetText}>Reset</Text>
                   </TouchableOpacity>
-                ))}
+                </View>
+                <View style={styles.sessionScoresRow}>
+                  <View style={styles.sessionScoreItem}>
+                    <Text style={styles.sessionScoreValue}>
+                      {calculateSessionScores(sessionStats).accuracy}%
+                    </Text>
+                    <Text style={styles.sessionScoreLabel}>Accuracy</Text>
+                  </View>
+                  <View style={styles.sessionScoreItem}>
+                    <Text style={styles.sessionScoreValue}>
+                      {calculateSessionScores(sessionStats).stability}%
+                    </Text>
+                    <Text style={styles.sessionScoreLabel}>Stability</Text>
+                  </View>
+                  <View style={styles.sessionScoreItem}>
+                    <Text style={styles.sessionScoreValue}>
+                      {calculateSessionScores(sessionStats).control}%
+                    </Text>
+                    <Text style={styles.sessionScoreLabel}>Control</Text>
+                  </View>
+                </View>
+                {/* Fixed-height row for attack summary to prevent layout jumps */}
+                <View style={styles.attackSummaryRow}>
+                  {TUNER_FLAGS.attackSummary &&
+                    calculateAttackSummary(sessionStats).summaryText && (
+                      <Text
+                        style={[
+                          styles.attackSummaryText,
+                          {
+                            color:
+                              calculateAttackSummary(sessionStats)
+                                .attackDirection === "sharp"
+                                ? "#FF9800"
+                                : "#2196F3",
+                          },
+                        ]}
+                      >
+                        {calculateAttackSummary(sessionStats).summaryText}
+                      </Text>
+                    )}
+                </View>
+              </>
+            ) : (
+              <View style={styles.sessionStatsPlaceholder}>
+                <Text style={styles.sessionStatsPlaceholderText}>
+                  Play for a few seconds to see stats...
+                </Text>
               </View>
-              <TouchableOpacity
-                onPress={() => {
-                  const newChallenge = createRandomChallenge(
-                    DEFAULT_CHALLENGE_NOTES,
-                    challengeDifficulty,
-                  );
-                  setChallengeState(
-                    startChallenge(challengeState, newChallenge),
-                  );
-                }}
-                style={styles.challengeStartButton}
-                accessibilityLabel="Start challenge"
-                accessibilityRole="button"
-              >
-                <Text style={styles.challengeStartButtonText}>
-                  Start Challenge
+            )}
+          </View>
+        )}
+
+        {/* Target Tone Challenge Panel (Phase 2A) */}
+        {TUNER_FLAGS.targetToneChallenge && (
+          <View style={styles.challengePanel}>
+            {challengeState.status === "idle" ? (
+              // Challenge start UI
+              <View style={styles.challengeStartContent}>
+                <Text style={styles.challengePanelTitle}>
+                  Target Tone Challenge
                 </Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            // Active challenge UI
-            <View style={styles.challengeActiveContent}>
-              <View style={styles.challengeHeader}>
-                <Text style={styles.challengeTargetLabel}>
-                  {challengeState.target
-                    ? getChallengeInstructionText(challengeState.target)
-                    : "Loading..."}
-                </Text>
+                <View style={styles.challengeDifficultyRow}>
+                  {(
+                    Object.keys(CHALLENGE_DIFFICULTIES) as ChallengeDifficulty[]
+                  ).map((difficulty) => (
+                    <TouchableOpacity
+                      key={difficulty}
+                      onPress={() => {
+                        if (difficulty !== challengeDifficulty) {
+                          setChallengeDifficulty(difficulty);
+                          setChallengeState(createInitialChallengeState());
+                        }
+                      }}
+                      style={[
+                        styles.challengeDifficultyButton,
+                        challengeDifficulty === difficulty &&
+                          styles.challengeDifficultyButtonActive,
+                      ]}
+                      accessibilityLabel={`${difficulty} difficulty${challengeDifficulty === difficulty ? ", selected" : ""}`}
+                      accessibilityRole="button"
+                    >
+                      <Text
+                        style={[
+                          styles.challengeDifficultyText,
+                          challengeDifficulty === difficulty &&
+                            styles.challengeDifficultyTextActive,
+                        ]}
+                      >
+                        {difficulty.charAt(0).toUpperCase() +
+                          difficulty.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
                 <TouchableOpacity
                   onPress={() => {
-                    // Skip generates a new random note
                     const newChallenge = createRandomChallenge(
                       DEFAULT_CHALLENGE_NOTES,
                       challengeDifficulty,
                     );
                     setChallengeState(
-                      startChallenge(
-                        cancelChallenge(challengeState),
-                        newChallenge,
-                      ),
+                      startChallenge(challengeState, newChallenge),
                     );
                   }}
-                  style={styles.challengeSkipButton}
-                  accessibilityLabel="Skip to next note"
+                  style={styles.challengeStartButton}
+                  accessibilityLabel="Start challenge"
                   accessibilityRole="button"
                 >
-                  <Text style={styles.challengeSkipText}>Skip</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() =>
-                    setChallengeState(cancelChallenge(challengeState))
-                  }
-                  style={styles.challengeStopButton}
-                  accessibilityLabel="Stop challenge"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.challengeStopText}>Stop</Text>
-                </TouchableOpacity>
-              </View>
-
-              {challengeState.target && (
-                <View style={styles.challengeTargetDisplay}>
-                  <Text style={styles.challengeTargetNote}>
-                    {challengeState.target.note}
+                  <Text style={styles.challengeStartButtonText}>
+                    Start Challenge
                   </Text>
-                </View>
-              )}
-
-              <View style={styles.challengeStatusRow}>
-                <Text
-                  style={[
-                    styles.challengeStatusText,
-                    { color: getChallengeProgressColor(challengeState) },
-                  ]}
-                >
-                  {getChallengeStatusText(challengeState)}
-                </Text>
+                </TouchableOpacity>
               </View>
-
-              {/* Progress bar */}
-              {challengeState.target &&
-                (challengeState.status === "waiting" ||
-                  challengeState.status === "holding") && (
-                  <View style={styles.challengeProgressBar}>
-                    <View
-                      style={[
-                        styles.challengeProgressFill,
-                        {
-                          width: `${Math.min(100, challengeState.progress * 100)}%`,
-                          backgroundColor:
-                            getChallengeProgressColor(challengeState),
-                        },
-                      ]}
-                    />
-                  </View>
-                )}
-
-              {/* Success/Fail actions */}
-              {(challengeState.status === "success" ||
-                challengeState.status === "failed") && (
-                <TouchableOpacity
-                  onPress={() => {
-                    if (challengeState.status === "success") {
-                      // Auto-generate next challenge
+            ) : (
+              // Active challenge UI
+              <View style={styles.challengeActiveContent}>
+                <View style={styles.challengeHeader}>
+                  <Text style={styles.challengeTargetLabel}>
+                    {challengeState.target
+                      ? getChallengeInstructionText(challengeState.target)
+                      : "Loading..."}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      // Skip generates a new random note
                       const newChallenge = createRandomChallenge(
                         DEFAULT_CHALLENGE_NOTES,
                         challengeDifficulty,
                       );
-                      setChallengeState((prev) =>
-                        startChallenge(resetAfterSuccess(prev), newChallenge),
+                      setChallengeState(
+                        startChallenge(
+                          cancelChallenge(challengeState),
+                          newChallenge,
+                        ),
                       );
-                    } else {
-                      // Reset to idle
-                      setChallengeState(cancelChallenge(challengeState));
+                    }}
+                    style={styles.challengeSkipButton}
+                    accessibilityLabel="Skip to next note"
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.challengeSkipText}>Skip</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() =>
+                      setChallengeState(cancelChallenge(challengeState))
                     }
-                  }}
-                  style={[
-                    styles.challengeNextButton,
-                    challengeState.status === "success"
-                      ? styles.challengeNextButtonSuccess
-                      : styles.challengeNextButtonRetry,
-                  ]}
-                  accessibilityLabel={
-                    challengeState.status === "success"
-                      ? "Next challenge"
-                      : "Try again"
-                  }
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.challengeNextButtonText}>
-                    {challengeState.status === "success"
-                      ? "Next →"
-                      : "Try Again"}
+                    style={styles.challengeStopButton}
+                    accessibilityLabel="Stop challenge"
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.challengeStopText}>Stop</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {challengeState.target && (
+                  <View style={styles.challengeTargetDisplay}>
+                    <Text style={styles.challengeTargetNote}>
+                      {challengeState.target.note}
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.challengeStatusRow}>
+                  <Text
+                    style={[
+                      styles.challengeStatusText,
+                      { color: getChallengeProgressColor(challengeState) },
+                    ]}
+                  >
+                    {getChallengeStatusText(challengeState)}
                   </Text>
-                </TouchableOpacity>
-              )}
+                </View>
 
-              {/* Score display */}
-              <View style={styles.challengeScoreRow}>
-                <Text style={styles.challengeScoreLabel}>Completed:</Text>
-                <Text style={styles.challengeScoreValue}>
-                  {challengeState.completedCount}
-                </Text>
-                <Text style={styles.challengeStreakLabel}>Attempts:</Text>
-                <Text style={styles.challengeStreakValue}>
-                  {challengeState.attemptCount}
-                </Text>
+                {/* Progress bar */}
+                {challengeState.target &&
+                  (challengeState.status === "waiting" ||
+                    challengeState.status === "holding") && (
+                    <View style={styles.challengeProgressBar}>
+                      <View
+                        style={[
+                          styles.challengeProgressFill,
+                          {
+                            width: `${Math.min(100, challengeState.progress * 100)}%`,
+                            backgroundColor:
+                              getChallengeProgressColor(challengeState),
+                          },
+                        ]}
+                      />
+                    </View>
+                  )}
+
+                {/* Success/Fail actions */}
+                {(challengeState.status === "success" ||
+                  challengeState.status === "failed") && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (challengeState.status === "success") {
+                        // Auto-generate next challenge
+                        const newChallenge = createRandomChallenge(
+                          DEFAULT_CHALLENGE_NOTES,
+                          challengeDifficulty,
+                        );
+                        setChallengeState((prev) =>
+                          startChallenge(resetAfterSuccess(prev), newChallenge),
+                        );
+                      } else {
+                        // Reset to idle
+                        setChallengeState(cancelChallenge(challengeState));
+                      }
+                    }}
+                    style={[
+                      styles.challengeNextButton,
+                      challengeState.status === "success"
+                        ? styles.challengeNextButtonSuccess
+                        : styles.challengeNextButtonRetry,
+                    ]}
+                    accessibilityLabel={
+                      challengeState.status === "success"
+                        ? "Next challenge"
+                        : "Try again"
+                    }
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.challengeNextButtonText}>
+                      {challengeState.status === "success"
+                        ? "Next →"
+                        : "Try Again"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Score display */}
+                <View style={styles.challengeScoreRow}>
+                  <Text style={styles.challengeScoreLabel}>Completed:</Text>
+                  <Text style={styles.challengeScoreValue}>
+                    {challengeState.completedCount}
+                  </Text>
+                  <Text style={styles.challengeStreakLabel}>Attempts:</Text>
+                  <Text style={styles.challengeStreakValue}>
+                    {challengeState.attemptCount}
+                  </Text>
+                </View>
               </View>
-            </View>
-          )}
-        </View>
-      )}
+            )}
+          </View>
+        )}
 
-      {/* Settings Summary Button */}
-      <TouchableOpacity
-        style={styles.settingsSummaryButton}
-        onPress={() => setShowSettingsModal(true)}
-        accessibilityLabel="Open tuning settings"
-        accessibilityRole="button"
-      >
-        <View style={styles.settingsSummaryMetrics}>
-          {activeTemperament === "equal" ? (
-            <>
-              <Text style={styles.settingsSummaryMetric}>ET</Text>
-              <Text style={styles.settingsSummaryMetric}>A={concertA}Hz</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.settingsSummaryMetric}>JI</Text>
-              <Text style={styles.settingsSummaryMetric}>{KEY_DISPLAY_NAMES[selectedKeyIndex]}</Text>
-              <Text style={styles.settingsSummaryMetric}>A={concertA}Hz</Text>
-              <Text style={styles.settingsSummaryMetric}>m7: {MINOR_7TH_LABELS[minor7System]}</Text>
-            </>
-          )}
-        </View>
-        <Text style={styles.settingsSummaryIcon}>⚙️</Text>
-      </TouchableOpacity>
+        {/* Settings Summary Button */}
+        <TouchableOpacity
+          style={styles.settingsSummaryButton}
+          onPress={() => setShowSettingsModal(true)}
+          accessibilityLabel="Open tuning settings"
+          accessibilityRole="button"
+        >
+          <View style={styles.settingsSummaryMetrics}>
+            {activeTemperament === "equal" ? (
+              <>
+                <Text style={styles.settingsSummaryMetric}>ET</Text>
+                <Text style={styles.settingsSummaryMetric}>A={concertA}Hz</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.settingsSummaryMetric}>JI</Text>
+                <Text style={styles.settingsSummaryMetric}>
+                  {KEY_DISPLAY_NAMES[selectedKeyIndex]}
+                </Text>
+                <Text style={styles.settingsSummaryMetric}>A={concertA}Hz</Text>
+                <Text style={styles.settingsSummaryMetric}>
+                  m7: {MINOR_7TH_LABELS[minor7System]}
+                </Text>
+              </>
+            )}
+          </View>
+          <Text style={styles.settingsSummaryIcon}>⚙️</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Settings Modal */}
