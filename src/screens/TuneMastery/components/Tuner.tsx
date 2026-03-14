@@ -27,6 +27,7 @@ import {
   Animated,
   Modal,
   ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import Svg, { Path, Line, Text as SvgText, Circle } from "react-native-svg";
 import { usePitchDetection } from "../../../hooks/usePitchDetection";
@@ -252,6 +253,16 @@ const Tuner = React.memo(function Tuner({
   selectedKeyIndex: initialKeyIndex = 0,
   concertA: initialConcertA = 440,
 }: TunerProps): React.JSX.Element {
+  // Responsive gauge sizing - scales to fit screen width
+  const { width: screenWidth } = useWindowDimensions();
+  const GAUGE_BASE_WIDTH = 360; // SVG width
+  const GAUGE_BASE_HEIGHT = 180;
+  // Visual width including -50/+50 labels that extend beyond SVG (~15px each side)
+  const GAUGE_VISUAL_WIDTH = 390;
+  // Account for tuner container padding (12px each side)
+  const maxGaugeWidth = screenWidth - 48;
+  const gaugeScale = Math.min(1, maxGaugeWidth / GAUGE_VISUAL_WIDTH);
+
   const [currentNote, setCurrentNote] = useState<string | null>(null);
   const [cents, setCents] = useState(0);
   const [frequency, setFrequency] = useState<number | null>(null);
@@ -691,18 +702,32 @@ const Tuner = React.memo(function Tuner({
 
   return (
     <View style={styles.container}>
+      <ScrollView 
+        style={styles.tunerScrollView}
+        contentContainerStyle={styles.tunerScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
       {/* Error Message */}
       {error && <Text style={styles.errorText}>{error}</Text>}
 
       {/* Tuner Display */}
       <View style={styles.tunerDisplay}>
         {mode === "needle" ? (
-          // Needle Mode - Semicircular gauge
+          // Needle Mode - Semicircular gauge (responsive scaling)
           <View style={styles.needleContainer}>
-            {/* Gauge arc and needle */}
-            <View style={styles.gaugeArc}>
-              {/* Smooth angular gradient using 180 SVG arc segments */}
-              <Svg width={360} height={180} style={styles.svgContainer}>
+            {/* Scaling container for responsive gauge */}
+            <View style={{
+              width: GAUGE_BASE_WIDTH * gaugeScale,
+              height: GAUGE_BASE_HEIGHT * gaugeScale,
+              overflow: "visible",
+            }}>
+              {/* Gauge arc and needle - scaled from top-left */}
+              <View style={[styles.gaugeArc, {
+                transform: [{ scale: gaugeScale }],
+                transformOrigin: "top left",
+              }]}>
+                {/* Smooth angular gradient using 180 SVG arc segments */}
+                <Svg width={360} height={180} style={styles.svgContainer}>
                 {/* Arc segments - 180 segments spanning 180° to 360° (left to right through top) */}
                 {/* Center at (180, 160), fills entire semicircle from center to radius 120 */}
                 {Array.from({ length: 180 }, (_, i) => {
@@ -1006,6 +1031,7 @@ const Tuner = React.memo(function Tuner({
                   <View style={styles.pivotDot} />
                 )}
               </View>
+            </View>
             </View>
 
             {/* Note Display below gauge - fixed height container */}
@@ -1605,13 +1631,24 @@ const Tuner = React.memo(function Tuner({
         accessibilityLabel="Open tuning settings"
         accessibilityRole="button"
       >
-        <Text style={styles.settingsSummaryText}>
-          {activeTemperament === "equal"
-            ? `ET  •  A=${concertA}Hz`
-            : `JI  •  ${KEY_DISPLAY_NAMES[selectedKeyIndex]}  •  A=${concertA}Hz  •  m7: ${MINOR_7TH_LABELS[minor7System]}`}
-        </Text>
+        <View style={styles.settingsSummaryMetrics}>
+          {activeTemperament === "equal" ? (
+            <>
+              <Text style={styles.settingsSummaryMetric}>ET</Text>
+              <Text style={styles.settingsSummaryMetric}>A={concertA}Hz</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.settingsSummaryMetric}>JI</Text>
+              <Text style={styles.settingsSummaryMetric}>{KEY_DISPLAY_NAMES[selectedKeyIndex]}</Text>
+              <Text style={styles.settingsSummaryMetric}>A={concertA}Hz</Text>
+              <Text style={styles.settingsSummaryMetric}>m7: {MINOR_7TH_LABELS[minor7System]}</Text>
+            </>
+          )}
+        </View>
         <Text style={styles.settingsSummaryIcon}>⚙️</Text>
       </TouchableOpacity>
+      </ScrollView>
 
       {/* Settings Modal */}
       <Modal
@@ -1822,10 +1859,16 @@ const Tuner = React.memo(function Tuner({
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: "center",
-    padding: 12,
+    flex: 1,
     backgroundColor: "#1a1a2e",
     borderRadius: 12,
+  },
+  tunerScrollView: {
+    flex: 1,
+  },
+  tunerScrollContent: {
+    alignItems: "center",
+    padding: 12,
   },
   errorText: {
     color: "#FF6B6B",
@@ -2111,10 +2154,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(156, 39, 176, 0.3)",
   },
-  settingsSummaryText: {
+  settingsSummaryMetrics: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    flex: 1,
+    gap: 4,
+  },
+  settingsSummaryMetric: {
     color: "#E1BEE7",
     fontSize: 13,
     fontWeight: "500",
+    backgroundColor: "rgba(156, 39, 176, 0.2)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   settingsSummaryIcon: {
     fontSize: 16,
@@ -2350,8 +2404,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderRadius: 12,
     padding: 12,
-    marginHorizontal: 16,
     marginBottom: 12,
+    width: "100%",
     height: 130, // Fixed height to prevent layout jumps
   },
   sessionStatsPlaceholder: {
@@ -2420,10 +2474,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     marginTop: 12,
+    width: "100%",
     minHeight: 140,
   },
   challengeStartContent: {
     alignItems: "center",
+    width: "100%",
   },
   challengePanelTitle: {
     color: "#FFFFFF",
@@ -2433,14 +2489,16 @@ const styles = StyleSheet.create({
   },
   challengeDifficultyRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
     marginBottom: 12,
+    gap: 6,
   },
   challengeDifficultyButton: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 6,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderRadius: 6,
-    marginHorizontal: 3,
   },
   challengeDifficultyButtonActive: {
     backgroundColor: "#4CAF50",
@@ -2455,7 +2513,7 @@ const styles = StyleSheet.create({
   },
   challengeStartButton: {
     backgroundColor: "#2196F3",
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
   },
@@ -2466,6 +2524,7 @@ const styles = StyleSheet.create({
   },
   challengeActiveContent: {
     alignItems: "center",
+    width: "100%",
   },
   challengeHeader: {
     flexDirection: "row",
@@ -2480,7 +2539,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   challengeSkipButton: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderRadius: 4,
@@ -2490,11 +2549,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   challengeStopButton: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     backgroundColor: "rgba(255, 100, 100, 0.2)",
     borderRadius: 4,
-    marginLeft: 8,
+    marginLeft: 6,
   },
   challengeStopText: {
     color: "#FF6B6B",

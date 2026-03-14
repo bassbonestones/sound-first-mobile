@@ -449,28 +449,30 @@ export default function PracticePanel({
         </View>
       </View>
 
+      {/* Tuner Panel - rendered outside ScrollView to fill remaining space */}
+      {tunerExpanded && (
+        <View style={styles.tunerPanelFixed}>
+          <Tuner
+            mode={settings?.tunerMode || "needle"}
+            temperament={tunePitchSystem}
+            selectedKeyIndex={tuneKeyIndex}
+            concertA={tuneSettings?.aHertz || 440}
+          />
+        </View>
+      )}
+
+      {/* ScrollView for other content */}
+      {!tunerExpanded && (
       <ScrollView
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
       >
         {/* Focus Card - hidden when any tool is expanded */}
-        {!(tunerExpanded || metronomeExpanded || droneExpanded) && (
+        {!(metronomeExpanded || droneExpanded) && (
           <View style={styles.focusCard}>
             <Text style={styles.focusCardCategory}>{focusCard.category}</Text>
             <Text style={styles.focusCardName}>{focusCard.name}</Text>
             <Text style={styles.focusCardCue}>{focusCard.attention_cue}</Text>
-          </View>
-        )}
-
-        {/* Expanded Tool Panels */}
-        {tunerExpanded && (
-          <View style={styles.toolPanel}>
-            <Tuner
-              mode={settings?.tunerMode || "needle"}
-              temperament={tunePitchSystem}
-              selectedKeyIndex={tuneKeyIndex}
-              concertA={tuneSettings?.aHertz || 440}
-            />
           </View>
         )}
 
@@ -591,6 +593,7 @@ export default function PracticePanel({
           </View>
         )}
       </ScrollView>
+      )}
 
       {/* Submit Button - Hidden when tools are expanded */}
       {!tunerExpanded && !metronomeExpanded && !droneExpanded && (
@@ -806,6 +809,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#FFD700",
+  },
+  tunerPanelFixed: {
+    flex: 1,
+    backgroundColor: "#2a2a3e",
+    borderRadius: 12,
+    margin: 16,
+    borderWidth: 1,
+    borderColor: "#FFD700",
+    overflow: "hidden",
   },
   toolPanelMetronome: {
     backgroundColor: "#1a1410",
