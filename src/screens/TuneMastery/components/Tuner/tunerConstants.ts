@@ -180,6 +180,9 @@ export const CHALLENGE_DEFAULT_DURATION_MS = 4000;
 /** Minimum hold duration before progress starts counting (ms) */
 export const CHALLENGE_MIN_HOLD_MS = 100;
 
+/** Grace period to get back in tune before failing (ms) */
+export const CHALLENGE_GRACE_PERIOD_MS = 500;
+
 /** Challenge difficulty presets */
 export const CHALLENGE_DIFFICULTIES = {
   easy: { tolerance: 10, durationMs: 3000, label: "Easy" },

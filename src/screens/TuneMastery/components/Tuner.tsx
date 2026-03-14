@@ -89,6 +89,7 @@ import {
 import {
   createInitialChallengeState,
   createRandomChallenge,
+  createChallengeTarget,
   startChallenge,
   updateChallengeState,
   cancelChallenge,
@@ -1292,48 +1293,52 @@ const Tuner = React.memo(function Tuner({
                     </View>
                   </TouchableOpacity>
                 )}
-                {/* Fixed-height row for Lock/Hold Indicator (Phase 1) */}
+                {/* Fixed-height row for Lock/Hold Indicator (Phase 1) - hidden during challenge */}
                 <View style={styles.lockHoldRow}>
-                  {currentNote && TUNER_FLAGS.holdIndicator && showLock && (
-                    <Animated.View
-                      style={[
-                        styles.lockIndicator,
-                        {
-                          backgroundColor: lockGlowAnim.interpolate({
-                            inputRange: [0, 0.5, 1],
-                            outputRange: [
-                              "rgba(0, 200, 0, 0.9)",
-                              "rgba(50, 220, 50, 0.95)",
-                              "rgba(100, 255, 100, 1)",
+                  {currentNote &&
+                    TUNER_FLAGS.holdIndicator &&
+                    showLock &&
+                    activePanel !== "challenge" && (
+                      <Animated.View
+                        style={[
+                          styles.lockIndicator,
+                          {
+                            backgroundColor: lockGlowAnim.interpolate({
+                              inputRange: [0, 0.5, 1],
+                              outputRange: [
+                                "rgba(0, 200, 0, 0.9)",
+                                "rgba(50, 220, 50, 0.95)",
+                                "rgba(100, 255, 100, 1)",
+                              ],
+                            }),
+                            borderColor: lockGlowAnim.interpolate({
+                              inputRange: [0, 0.5, 1],
+                              outputRange: [
+                                "rgba(0, 180, 0, 1)",
+                                "rgba(100, 255, 100, 1)",
+                                "rgba(200, 255, 200, 1)",
+                              ],
+                            }),
+                            borderWidth: 2,
+                            transform: [
+                              {
+                                scale: lockGlowAnim.interpolate({
+                                  inputRange: [0, 0.5, 1],
+                                  outputRange: [1, 1.05, 1.15],
+                                }),
+                              },
                             ],
-                          }),
-                          borderColor: lockGlowAnim.interpolate({
-                            inputRange: [0, 0.5, 1],
-                            outputRange: [
-                              "rgba(0, 180, 0, 1)",
-                              "rgba(100, 255, 100, 1)",
-                              "rgba(200, 255, 200, 1)",
-                            ],
-                          }),
-                          borderWidth: 2,
-                          transform: [
-                            {
-                              scale: lockGlowAnim.interpolate({
-                                inputRange: [0, 0.5, 1],
-                                outputRange: [1, 1.05, 1.15],
-                              }),
-                            },
-                          ],
-                        },
-                      ]}
-                    >
-                      <Text style={styles.lockText}>✓ LOCKED</Text>
-                    </Animated.View>
-                  )}
+                          },
+                        ]}
+                      >
+                        <Text style={styles.lockText}>✓ LOCKED</Text>
+                      </Animated.View>
+                    )}
                   {currentNote &&
                     TUNER_FLAGS.holdIndicator &&
                     !showLock &&
-                    holdProgress > 0 && (
+                    holdProgress > 0 &&
+                    activePanel !== "challenge" && (
                       <View style={styles.holdProgressContainer}>
                         <View
                           style={[
@@ -1681,6 +1686,10 @@ const Tuner = React.memo(function Tuner({
                   <View style={styles.challengeInstructionRow}>
                     <Text style={styles.challengeSuccessText}>🎉 Success!</Text>
                   </View>
+                ) : challengeState.status === "failed" ? (
+                  <View style={styles.challengeInstructionRow}>
+                    <Text style={styles.challengeFailedText}>❌ Failed!</Text>
+                  </View>
                 ) : (
                   challengeState.target && (
                     <View style={styles.challengeInstructionRow}>
@@ -1699,40 +1708,41 @@ const Tuner = React.memo(function Tuner({
                   )
                 )}
 
-                {/* Skip and Stop buttons - shown when NOT successful */}
-                {challengeState.status !== "success" && (
-                  <View style={styles.challengeButtonRow}>
-                    <TouchableOpacity
-                      onPress={() => {
-                        const newChallenge = createRandomChallenge(
-                          DEFAULT_CHALLENGE_NOTES,
-                          challengeDifficulty,
-                        );
-                        setChallengeState(
-                          startChallenge(
-                            cancelChallenge(challengeState),
-                            newChallenge,
-                          ),
-                        );
-                      }}
-                      style={styles.challengeSkipButton}
-                      accessibilityLabel="Skip to next note"
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.challengeSkipText}>Skip</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() =>
-                        setChallengeState(cancelChallenge(challengeState))
-                      }
-                      style={styles.challengeStopButton}
-                      accessibilityLabel="Stop challenge"
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.challengeStopText}>Stop</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
+                {/* Skip and Stop buttons - shown when NOT successful or failed */}
+                {challengeState.status !== "success" &&
+                  challengeState.status !== "failed" && (
+                    <View style={styles.challengeButtonRow}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const newChallenge = createRandomChallenge(
+                            DEFAULT_CHALLENGE_NOTES,
+                            challengeDifficulty,
+                          );
+                          setChallengeState(
+                            startChallenge(
+                              cancelChallenge(challengeState),
+                              newChallenge,
+                            ),
+                          );
+                        }}
+                        style={styles.challengeSkipButton}
+                        accessibilityLabel="Skip to next note"
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.challengeSkipText}>Skip</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() =>
+                          setChallengeState(cancelChallenge(challengeState))
+                        }
+                        style={styles.challengeStopButton}
+                        accessibilityLabel="Stop challenge"
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.challengeStopText}>Stop</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
 
                 {/* Stop and Next buttons - shown on success */}
                 {challengeState.status === "success" && (
@@ -1787,23 +1797,44 @@ const Tuner = React.memo(function Tuner({
                     </View>
                   )}
 
-                {/* Try Again button - shown on failure */}
+                {/* Stop and Retry buttons - shown on failure */}
                 {challengeState.status === "failed" && (
-                  <TouchableOpacity
-                    onPress={() =>
-                      setChallengeState(cancelChallenge(challengeState))
-                    }
-                    style={[
-                      styles.challengeNextButton,
-                      styles.challengeNextButtonRetry,
-                    ]}
-                    accessibilityLabel="Try again"
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.challengeNextButtonText}>
-                      Try Again
-                    </Text>
-                  </TouchableOpacity>
+                  <View style={styles.challengeButtonRow}>
+                    <TouchableOpacity
+                      onPress={() =>
+                        setChallengeState(cancelChallenge(challengeState))
+                      }
+                      style={styles.challengeStopButton}
+                      accessibilityLabel="Stop challenge"
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.challengeStopText}>Stop</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        // Retry same note
+                        if (challengeState.target) {
+                          setChallengeState((prev) =>
+                            startChallenge(
+                              cancelChallenge(prev),
+                              createChallengeTarget(
+                                prev.target!.note,
+                                challengeDifficulty,
+                              ),
+                            ),
+                          );
+                        }
+                      }}
+                      style={[
+                        styles.challengeNextButton,
+                        styles.challengeNextButtonRetry,
+                      ]}
+                      accessibilityLabel="Try again"
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.challengeNextButtonText}>Retry</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
 
                 {/* Score display */}
@@ -2845,6 +2876,11 @@ const styles = StyleSheet.create({
   },
   challengeSuccessText: {
     color: "#4CAF50",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  challengeFailedText: {
+    color: "#F44336",
     fontSize: 18,
     fontWeight: "600",
   },

@@ -9,6 +9,7 @@ import {
   CHALLENGE_DEFAULT_TOLERANCE,
   CHALLENGE_DEFAULT_DURATION_MS,
   CHALLENGE_MIN_HOLD_MS,
+  CHALLENGE_GRACE_PERIOD_MS,
   CHALLENGE_DIFFICULTIES,
   type ChallengeDifficulty,
 } from "./tunerConstants";
@@ -48,6 +49,10 @@ export interface ChallengeState {
   completedCount: number;
   /** Total attempts this session */
   attemptCount: number;
+  /** Timestamp when grace period started (went out of tolerance) */
+  graceStartTime: number | null;
+  /** Whether the one grace period has been used */
+  graceUsed: boolean;
 }
 
 // ===========================================
@@ -62,6 +67,8 @@ export function createInitialChallengeState(): ChallengeState {
     progress: 0,
     completedCount: 0,
     attemptCount: 0,
+    graceStartTime: null,
+    graceUsed: false,
   };
 }
 
@@ -198,6 +205,8 @@ export function startChallenge(
     holdStartTime: null,
     progress: 0,
     attemptCount: state.attemptCount + 1,
+    graceStartTime: null,
+    graceUsed: false,
   };
 }
 
@@ -211,15 +220,28 @@ export function updateChallengeState(
   cents: number,
   now: number = Date.now(),
 ): ChallengeState {
-  // No active challenge
-  if (state.status === "idle" || state.status === "success" || !state.target) {
+  // No active challenge or already finished
+  if (
+    state.status === "idle" ||
+    state.status === "success" ||
+    state.status === "failed" ||
+    !state.target
+  ) {
     return state;
   }
 
-  const matches = matchesChallenge(currentNote, cents, state.target);
+  // If no note detected, don't change state (silence is ok)
+  if (!currentNote) {
+    return state;
+  }
 
-  if (matches) {
-    // Start or continue hold
+  // Check if playing correct note within tolerance
+  const isCorrectNote = currentNote === state.target.note;
+  const withinTolerance =
+    isCorrectNote && isWithinTolerance(cents, state.target.tolerance);
+
+  if (withinTolerance) {
+    // In tolerance - start or continue hold
     const holdStartTime = state.holdStartTime ?? now;
     const progress = calculateChallengeProgress(
       holdStartTime,
@@ -235,22 +257,55 @@ export function updateChallengeState(
         holdStartTime,
         progress: 1,
         completedCount: state.completedCount + 1,
+        graceStartTime: null,
       };
     }
+
+    // If we were in grace period and recovered, mark grace as used
+    const graceUsed = state.graceUsed || state.graceStartTime !== null;
 
     return {
       ...state,
       status: "holding",
       holdStartTime,
       progress,
+      graceStartTime: null, // Clear grace period - we're back in tolerance
+      graceUsed,
     };
   } else {
-    // Not matching - reset hold progress but stay in waiting state
+    // Wrong note or out of tolerance - handle grace period
+    // (Grace period helps with brief overtone detection glitches)
+
+    // If grace period already used, fail immediately
+    if (state.graceUsed) {
+      return {
+        ...state,
+        status: "failed",
+        holdStartTime: null,
+        graceStartTime: null,
+      };
+    }
+
+    // Start grace period if not already started
+    const graceStartTime = state.graceStartTime ?? now;
+    const graceElapsed = now - graceStartTime;
+
+    // Check if grace period expired
+    if (graceElapsed > CHALLENGE_GRACE_PERIOD_MS) {
+      return {
+        ...state,
+        status: "failed",
+        holdStartTime: null,
+        graceStartTime: null,
+      };
+    }
+
+    // Still in grace period - keep progress frozen but don't fail yet
     return {
       ...state,
-      status: "waiting",
-      holdStartTime: null,
-      progress: 0,
+      status: "holding", // Stay in holding state visually
+      graceStartTime,
+      // Keep holdStartTime and progress frozen during grace
     };
   }
 }
@@ -265,6 +320,8 @@ export function cancelChallenge(state: ChallengeState): ChallengeState {
     target: null,
     holdStartTime: null,
     progress: 0,
+    graceStartTime: null,
+    graceUsed: false,
   };
 }
 
@@ -278,6 +335,8 @@ export function resetAfterSuccess(state: ChallengeState): ChallengeState {
     target: null,
     holdStartTime: null,
     progress: 0,
+    graceStartTime: null,
+    graceUsed: false,
   };
 }
 
@@ -303,12 +362,16 @@ export function getChallengeStatusText(state: ChallengeState): string {
     case "waiting":
       return state.target ? `Play ${state.target.note}...` : "";
     case "holding":
+      // Check if we're in grace period (out of tolerance warning)
+      if (state.graceStartTime !== null) {
+        return "⚠️ Get back in tune!";
+      }
       const percent = Math.round(state.progress * 100);
       return `Hold it! ${percent}%`;
     case "success":
       return "🎉 Success!";
     case "failed":
-      return "Try again!";
+      return "❌ Failed - drifted out of tune";
     default:
       return "";
   }
@@ -320,9 +383,15 @@ export function getChallengeStatusText(state: ChallengeState): string {
 export function getChallengeProgressColor(state: ChallengeState): string {
   switch (state.status) {
     case "holding":
+      // Show warning color if in grace period
+      if (state.graceStartTime !== null) {
+        return "#FFC107"; // Yellow - warning, get back in tune
+      }
       return "#4CAF50"; // Green - making progress
     case "success":
       return "#2196F3"; // Blue - complete
+    case "failed":
+      return "#F44336"; // Red - failed
     case "waiting":
       return "#888"; // Gray - waiting
     default:
