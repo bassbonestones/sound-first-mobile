@@ -56,16 +56,8 @@ export type {
   PitchDetectionOptions,
 } from "./exerciseConstants";
 
-// Types and PropTypes (for backward compatibility)
-export {
-  exercisePropTypes,
-  exerciseDefaultProps,
-  configShape,
-  masteryShape,
-  focusCardShape,
-  resultShape,
-  pitchResultShape,
-} from "./propTypes";
+// Types (TypeScript interfaces)
+export { exerciseDefaultProps, lessonExerciseDefaultProps } from "./propTypes";
 export type {
   ExerciseProps,
   ExerciseConfig,
@@ -73,6 +65,9 @@ export type {
   FocusCard,
   ExerciseResult,
   PitchResult,
+  LessonExerciseProps,
+  MiniSession,
+  SessionState,
 } from "./propTypes";
 
 // Lesson styles

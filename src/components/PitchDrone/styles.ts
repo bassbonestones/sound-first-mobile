@@ -552,14 +552,7 @@ export const styles = StyleSheet.create<PitchDroneStyles>({
   },
   noteLabelActive: {
     color: colors.textLight,
-    ...Platform.select({
-      web: { textShadow: "1px 1px 2px #000" } as TextStyle,
-      default: {
-        textShadowColor: "#000",
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 2,
-      } as TextStyle,
-    }),
+    textShadow: "1px 1px 2px #000",
   },
   noteLabelInactive: {
     color: colors.gold,
@@ -568,14 +561,7 @@ export const styles = StyleSheet.create<PitchDroneStyles>({
     color: colors.textLight,
     fontSize: 10,
     textAlign: "center",
-    ...Platform.select({
-      web: { textShadow: "1px 1px 2px #000" } as TextStyle,
-      default: {
-        textShadowColor: "#000",
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 2,
-      } as TextStyle,
-    }),
+    textShadow: "1px 1px 2px #000",
   },
 
   // Active drones summary

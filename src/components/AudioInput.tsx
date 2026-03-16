@@ -294,14 +294,20 @@ export default function AudioInput({
   // Check permission state on mount (web only)
   useEffect(() => {
     if (Platform.OS === "web" && !globalMicPermissionState.checkedOnce) {
-      checkMicPermission().then((state) => {
-        globalMicPermissionState.checkedOnce = true;
-        setPermissionChecked(true);
-        if (state === "granted") {
-          globalMicPermissionState.granted = true;
-          setPermissionGranted(true);
-        }
-      });
+      checkMicPermission()
+        .then((state) => {
+          globalMicPermissionState.checkedOnce = true;
+          setPermissionChecked(true);
+          if (state === "granted") {
+            globalMicPermissionState.granted = true;
+            setPermissionGranted(true);
+          }
+        })
+        .catch(() => {
+          // Permission check failed, treat as not granted
+          globalMicPermissionState.checkedOnce = true;
+          setPermissionChecked(true);
+        });
     }
   }, []);
 

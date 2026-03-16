@@ -1339,6 +1339,18 @@ export const compactStyles = StyleSheet.create<CompactStyles>({
     borderWidth: 1,
     borderColor: colors.gold,
   },
+  compactBeatDotActive: {
+    backgroundColor: colors.gold,
+  },
+  compactBeatDotInactive: {
+    backgroundColor: colors.surface,
+  },
+  audioUnavailableText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    marginTop: 12,
+    textAlign: "center",
+  },
 });
 
 export default styles;

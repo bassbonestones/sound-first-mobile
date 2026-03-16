@@ -41,11 +41,16 @@ export function useExerciseAudioContext(): UseExerciseAudioContextReturn {
       if (audioContextRef.current) {
         // On some platforms, we need to resume the context
         if (audioContextRef.current.state === "suspended") {
-          audioContextRef.current.resume().then(() => {
-            if (mountedRef.current) {
-              setIsAudioReady(true);
-            }
-          });
+          audioContextRef.current
+            .resume()
+            .then(() => {
+              if (mountedRef.current) {
+                setIsAudioReady(true);
+              }
+            })
+            .catch((err) => {
+              devError("Audio context resume error:", err);
+            });
         } else {
           setIsAudioReady(true);
         }

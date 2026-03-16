@@ -24,7 +24,7 @@ jest.mock("../../src/utils/devLogger", () => ({
 // Mock Alert
 jest.spyOn(Alert, "alert").mockImplementation(() => {});
 
-import EngineSettings from "../../src/screens/Admin/tabs/EngineSettings/index.js";
+import EngineSettings from "../../src/screens/Admin/tabs/EngineSettings";
 
 describe("EngineSettings", () => {
   const mockConfig = {

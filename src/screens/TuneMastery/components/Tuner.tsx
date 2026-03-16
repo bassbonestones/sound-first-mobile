@@ -28,9 +28,11 @@ import {
   Modal,
   ScrollView,
   useWindowDimensions,
+  Platform,
 } from "react-native";
 import Svg, { Path, Line, Text as SvgText, Circle } from "react-native-svg";
 import { usePitchDetection } from "../../../hooks/usePitchDetection";
+import { devLog } from "../../../utils/devLogger";
 import {
   frequencyToNote,
   getCentsDeviation,
@@ -231,7 +233,7 @@ function getJustIntonationFrequency(
   // Debug logging
   const keyName = KEY_DISPLAY_NAMES[keyIndex].split("/")[0];
   const m7Info = semitonesAboveTonic === 10 ? `, m7=${minor7System}` : "";
-  console.log(
+  devLog(
     `[JUST] note=${noteName}, key=${keyName}, noteIdx=${noteIndex}, keyIdx=${keyIndex}, semitones=${semitonesAboveTonic}, ratio=${justRatio.toFixed(4)}, tonicFreq=${tonicFreq.toFixed(2)}, equalTemp=${equalTempFreq?.toFixed(2)}, justFreq=${justFreq.toFixed(2)}${m7Info}`,
   );
 
@@ -712,7 +714,7 @@ const Tuner = React.memo(function Tuner({
         toValue: targetRotation,
         tension: NEEDLE_SPRING_TENSION,
         friction: NEEDLE_SPRING_FRICTION,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== "web",
       }).start();
     } else {
       // Instant rotation when spring is disabled
@@ -772,11 +774,13 @@ const Tuner = React.memo(function Tuner({
             <View style={styles.needleContainer}>
               {/* Scaling container for responsive gauge */}
               <View
-                style={{
-                  width: GAUGE_BASE_WIDTH * gaugeScale,
-                  height: GAUGE_BASE_HEIGHT * gaugeScale,
-                  overflow: "visible",
-                }}
+                style={[
+                  styles.gaugeScalingContainer,
+                  {
+                    width: GAUGE_BASE_WIDTH * gaugeScale,
+                    height: GAUGE_BASE_HEIGHT * gaugeScale,
+                  },
+                ]}
               >
                 {/* Gauge arc and needle - scaled from top-left */}
                 <View
@@ -2194,9 +2198,7 @@ const styles = StyleSheet.create({
   },
   micIcon: {
     fontSize: 36,
-    textShadowColor: "rgba(76, 175, 80, 1.0)",
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 20,
+    textShadow: "0px 0px 20px rgba(76, 175, 80, 1.0)",
   },
   // Tappable feedback area (tap to cycle modes)
   feedbackArea: {
@@ -2350,9 +2352,7 @@ const styles = StyleSheet.create({
   },
   textMicIcon: {
     fontSize: 48,
-    textShadowColor: "rgba(76, 175, 80, 1.0)",
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 20,
+    textShadow: "0px 0px 20px rgba(76, 175, 80, 1.0)",
   },
   textCentsRow: {
     height: 32, // Fixed height for cents/state text
@@ -2956,6 +2956,9 @@ const styles = StyleSheet.create({
     color: "#FF9800",
     fontSize: 16,
     fontWeight: "700",
+  },
+  gaugeScalingContainer: {
+    overflow: "visible",
   },
 });
 

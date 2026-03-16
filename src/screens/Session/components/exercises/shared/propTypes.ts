@@ -87,63 +87,53 @@ export interface PitchResult {
   clarity?: number;
 }
 
-// For backward compatibility with JS files that import from propTypes
-// These are runtime-usable PropTypes objects
-import PropTypes from "prop-types";
+/**
+ * Mini-session object for lesson exercises
+ */
+export interface MiniSession {
+  material?: {
+    id?: number;
+    title?: string;
+    tempo_bpm?: number;
+    key?: string;
+  };
+  focusCard?: FocusCard;
+  [key: string]: unknown;
+}
 
-export const configShape = PropTypes.shape({
-  tempo: PropTypes.number,
-  beats: PropTypes.number,
-  note: PropTypes.string,
-  targetNote: PropTypes.string,
-  noteSequence: PropTypes.arrayOf(PropTypes.string),
-  intervals: PropTypes.arrayOf(PropTypes.number),
-  difficulty: PropTypes.number,
-  rounds: PropTypes.number,
-  params: PropTypes.object,
-});
+/**
+ * Session state object for lesson exercises
+ */
+export interface SessionState {
+  material?: {
+    id?: number;
+    title?: string;
+    tempo_bpm?: number;
+    key?: string;
+  };
+  focusCard?: FocusCard;
+  [key: string]: unknown;
+}
 
-export const masteryShape = PropTypes.shape({
-  level: PropTypes.number,
-  score: PropTypes.number,
-  history: PropTypes.arrayOf(PropTypes.object),
-});
+/**
+ * Lesson exercise component props (theory/concept exercises)
+ */
+export interface LessonExerciseProps {
+  /** Mini-session object with material and focus card */
+  mini?: MiniSession;
+  /** Session state object */
+  sessionState?: SessionState;
+  /** Called when exercise completes */
+  onComplete: (result: ExerciseResult) => void;
+  /** Called when user cancels/skips */
+  onCancel?: () => void;
+}
 
-export const exercisePropTypes = {
-  config: configShape,
-  mastery: masteryShape,
-  onComplete: PropTypes.func.isRequired,
-  onProgress: PropTypes.func,
-  userFirstNote: PropTypes.string,
-};
-
-export const focusCardShape = PropTypes.shape({
-  title: PropTypes.string.isRequired,
-  description: PropTypes.string.isRequired,
-  keyPoint: PropTypes.string,
-  icon: PropTypes.string,
-});
-
-export const resultShape = PropTypes.shape({
-  success: PropTypes.bool.isRequired,
-  score: PropTypes.number,
-  accuracy: PropTypes.number,
-  details: PropTypes.object,
-});
-
-export const pitchResultShape = PropTypes.shape({
-  pitch: PropTypes.number,
-  noteName: PropTypes.string,
-  confidence: PropTypes.number,
-  clarity: PropTypes.number,
-});
-
-export default {
-  exercisePropTypes,
-  exerciseDefaultProps,
-  configShape,
-  masteryShape,
-  focusCardShape,
-  resultShape,
-  pitchResultShape,
+/**
+ * Default props for lesson exercise components
+ */
+export const lessonExerciseDefaultProps: Partial<LessonExerciseProps> = {
+  mini: {},
+  sessionState: {},
+  onCancel: () => {},
 };

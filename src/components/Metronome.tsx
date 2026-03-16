@@ -760,14 +760,7 @@ const Metronome: React.FC<MetronomeProps> = ({
       )}
 
       {Platform.OS !== "web" && !NativeAudioContext && (
-        <Text
-          style={{
-            color: colors.textMuted,
-            fontSize: 11,
-            marginTop: 12,
-            textAlign: "center",
-          }}
-        >
+        <Text style={styles.audioUnavailableText}>
           Audio playback unavailable - react-native-audio-api not loaded
         </Text>
       )}
@@ -850,25 +843,16 @@ export const CompactMetronome: React.FC<CompactMetronomeProps> = ({
   beatsPerMeasure = 4,
 }) => {
   return (
-    <View style={{ flexDirection: "row", alignItems: "center" }}>
-      <Text style={{ color: colors.gold, fontWeight: "bold", marginRight: 8 }}>
-        {bpm} BPM
-      </Text>
+    <View style={styles.compactContainer}>
+      <Text style={styles.compactBpmText}>{bpm} BPM</Text>
       {Array.from({ length: beatsPerMeasure }, (_, i) => (
         <View
           key={i}
           style={[
-            {
-              width: 12,
-              height: 12,
-              borderRadius: 6,
-              marginHorizontal: 2,
-              borderWidth: 1,
-              borderColor: colors.gold,
-            } as ViewStyle,
+            styles.compactBeatDot,
             isPlaying && currentBeat === i
-              ? { backgroundColor: colors.gold }
-              : { backgroundColor: colors.surface },
+              ? styles.compactBeatDotActive
+              : styles.compactBeatDotInactive,
           ]}
         />
       ))}
