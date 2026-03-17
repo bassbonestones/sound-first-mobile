@@ -782,7 +782,9 @@ describe("TuneCard", () => {
       // Select "sixteenth notes" (subdivision "quarters")
       fireEvent.press(getByText("sixteenth notes"));
 
-      expect(onUpdateSettings).toHaveBeenCalledWith({ subdivision: "quarters" });
+      expect(onUpdateSettings).toHaveBeenCalledWith({
+        subdivision: "quarters",
+      });
     });
 
     it("does not call onUpdateSettings when same subdivision selected", () => {

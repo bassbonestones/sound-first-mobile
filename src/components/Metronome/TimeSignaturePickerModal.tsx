@@ -78,10 +78,7 @@ const TimeSignaturePickerModal: React.FC<TimeSignaturePickerModalProps> = ({
       <SafeAreaView style={styles.modalContainer}>
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Time Signature</Text>
-          <TouchableOpacity
-            onPress={onClose}
-            style={styles.modalCloseButton}
-          >
+          <TouchableOpacity onPress={onClose} style={styles.modalCloseButton}>
             <Text style={styles.modalCloseButtonText}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -89,7 +86,9 @@ const TimeSignaturePickerModal: React.FC<TimeSignaturePickerModalProps> = ({
         <View style={styles.modalContent}>
           {/* Beats per measure */}
           <View style={styles.modalSection}>
-            <Text style={styles.modalSectionLabel}>Beats per measure (1-12)</Text>
+            <Text style={styles.modalSectionLabel}>
+              Beats per measure (1-12)
+            </Text>
             <View style={styles.stepperRowLarge}>
               <TouchableOpacity
                 onPress={() => onBeatsChange(Math.max(1, beatsPerMeasure - 1))}

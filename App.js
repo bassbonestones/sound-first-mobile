@@ -130,7 +130,14 @@ export default function App() {
   // Show loading while fonts load
   if (!fontsLoaded) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#1a1612" }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#1a1612",
+        }}
+      >
         <ActivityIndicator size="large" color="#d4a574" />
       </View>
     );

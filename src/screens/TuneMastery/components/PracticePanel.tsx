@@ -386,7 +386,9 @@ export default function PracticePanel({
             <TouchableOpacity
               style={[
                 styles.headerToolButton,
-                metronomeActive && !metronomeExpanded && styles.headerToolButtonMetronome,
+                metronomeActive &&
+                  !metronomeExpanded &&
+                  styles.headerToolButtonMetronome,
                 metronomeExpanded && styles.headerToolButtonMetronomeExpanded,
               ]}
               onPress={() => {
@@ -564,9 +566,7 @@ export default function PracticePanel({
             {/* Score Display */}
             <View style={styles.scoreDisplay}>
               <Text style={styles.scoreValue}>{rating}%</Text>
-              <Text style={styles.scorePrevious}>
-                (prev: {currentScore}%)
-              </Text>
+              <Text style={styles.scorePrevious}>(prev: {currentScore}%)</Text>
             </View>
 
             {/* Slider */}

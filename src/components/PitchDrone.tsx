@@ -100,9 +100,8 @@ export default function PitchDrone({
   pitchCenter: initialPitchCenter = 0,
   concertA: initialConcertA = 440,
 }: PitchDroneProps): React.ReactElement {
-  const [temperament, setTemperament] = useState<Temperament>(
-    initialTemperament,
-  );
+  const [temperament, setTemperament] =
+    useState<Temperament>(initialTemperament);
   const [pitchCenter, setPitchCenter] = useState(initialPitchCenter);
   const [concertA, setConcertA] = useState(String(initialConcertA));
   const [octave, setOctave] = useState(4);
@@ -249,21 +248,23 @@ export default function PitchDrone({
       } else {
         // Just Intonation: calculate interval from key center
         const interval = (semitone - pitchCenter + 12) % 12;
-        
+
         // Get tonic frequency in octave 4
         const tonicMidi = 60 + pitchCenter;
         const tonicOctave4Freq = a4 * Math.pow(2, (tonicMidi - 69) / 12);
-        
+
         // Adjust tonic to the same octave as the target note
         const tonicFreq = tonicOctave4Freq * Math.pow(2, noteOctave - 4);
-        
+
         // Use selected minor 7th ratio when interval is 10 (minor 7th)
         const targetRatio =
-          interval === 10 ? MINOR_7TH_RATIOS[minor7System] : JUST_RATIOS[interval];
-        
+          interval === 10
+            ? MINOR_7TH_RATIOS[minor7System]
+            : JUST_RATIOS[interval];
+
         // Apply just intonation ratio
         let jiFreq = tonicFreq * targetRatio;
-        
+
         // Octave correction: ensure JI frequency is in the correct octave
         // (same approach as Tuner's getJustIntonationFrequency)
         while (jiFreq > equalTempFreq * 1.4) jiFreq /= 2;
@@ -666,7 +667,9 @@ export default function PitchDrone({
       )}
 
       {/* Header */}
-      <Text style={[styles.headerTitle, { marginBottom: largeGap }]}>Pitch Drone</Text>
+      <Text style={[styles.headerTitle, { marginBottom: largeGap }]}>
+        Pitch Drone
+      </Text>
 
       {/* Tuning Settings Button (shared component) */}
       <TuningSettingsButton

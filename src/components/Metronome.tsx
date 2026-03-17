@@ -52,10 +52,10 @@ if (Platform.OS !== "web") {
  * SMuFL codepoints for Bravura font note symbols (stem up variants)
  */
 const NOTE_SYMBOLS: Record<number, string> = {
-  1: "\uE1D2",  // noteWhole
-  2: "\uE1D3",  // noteHalfUp
-  4: "\uE1D5",  // noteQuarterUp
-  8: "\uE1D7",  // note8thUp
+  1: "\uE1D2", // noteWhole
+  2: "\uE1D3", // noteHalfUp
+  4: "\uE1D5", // noteQuarterUp
+  8: "\uE1D7", // note8thUp
   16: "\uE1D9", // note16thUp
   32: "\uE1DB", // note32ndUp
 };
@@ -558,7 +558,9 @@ const Metronome: React.FC<MetronomeProps> = ({
           </View>
 
           {/* Beat Indicator */}
-          <View style={[styles.beatIndicatorRow, { marginBottom: verticalGap }]}>
+          <View
+            style={[styles.beatIndicatorRow, { marginBottom: verticalGap }]}
+          >
             {Array.from({ length: beatsPerMeasure }, (_, i) => {
               const isCurrentBeat = isPlaying && currentBeat === i;
               const isAccentBeat = i === 0 && accentFirst;
@@ -583,7 +585,9 @@ const Metronome: React.FC<MetronomeProps> = ({
           {showControls && (
             <>
               {/* BPM Controls */}
-              <View style={[styles.bpmControlsRow, { marginBottom: verticalGap }]}>
+              <View
+                style={[styles.bpmControlsRow, { marginBottom: verticalGap }]}
+              >
                 <TouchableOpacity
                   onPress={() => handleBpmChange(bpm - 5)}
                   style={styles.bpmButtonLarge}
@@ -645,7 +649,9 @@ const Metronome: React.FC<MetronomeProps> = ({
               </View>
 
               {/* Preset BPM buttons - two rows of 3 */}
-              <View style={[styles.presetsContainer, { marginTop: verticalGap }]}>
+              <View
+                style={[styles.presetsContainer, { marginTop: verticalGap }]}
+              >
                 <View style={styles.presetsRow}>
                   {[60, 80, 100].map((preset) => (
                     <TouchableOpacity

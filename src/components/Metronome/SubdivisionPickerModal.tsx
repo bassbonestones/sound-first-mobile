@@ -44,18 +44,13 @@ const SubdivisionPickerModal: React.FC<SubdivisionPickerModalProps> = ({
       <SafeAreaView style={styles.modalContainer}>
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Subdivision</Text>
-          <TouchableOpacity
-            onPress={onClose}
-            style={styles.modalCloseButton}
-          >
+          <TouchableOpacity onPress={onClose} style={styles.modalCloseButton}>
             <Text style={styles.modalCloseButtonText}>✕</Text>
           </TouchableOpacity>
         </View>
 
         {noteValue !== 4 && (
-          <Text style={styles.modalNote}>
-            Swing only available in /4 time
-          </Text>
+          <Text style={styles.modalNote}>Swing only available in /4 time</Text>
         )}
 
         <ScrollView style={styles.modalScrollView}>
