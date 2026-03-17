@@ -42,37 +42,38 @@ export function getSubdivisionLabel(
   subdivisionKey: string,
   noteValue: number,
 ): string {
-  // Map beat note value to actual rhythm names for subdivisions
+  // Map beat note value to compact subdivision names
+  // Using numeric note types (8ths, 16ths) and word quantities (two, three, four)
   const noteNames: Record<number, Record<string, string>> = {
     1: {
-      half: "half notes",
-      quarter: "quarter notes",
-      triplet: "half note triplets",
+      half: "halves",
+      quarter: "quarters",
+      tripletNote: "half",
     },
     2: {
-      half: "quarter notes",
-      quarter: "eighth notes",
-      triplet: "quarter note triplets",
+      half: "quarters",
+      quarter: "8ths",
+      tripletNote: "quarter",
     },
     4: {
-      half: "eighth notes",
-      quarter: "sixteenth notes",
-      triplet: "eighth note triplets",
+      half: "8ths",
+      quarter: "16ths",
+      tripletNote: "8th",
     },
     8: {
-      half: "sixteenth notes",
-      quarter: "thirty-second notes",
-      triplet: "sixteenth note triplets",
+      half: "16ths",
+      quarter: "32nds",
+      tripletNote: "16th",
     },
     16: {
-      half: "thirty-second notes",
-      quarter: "sixty-fourth notes",
-      triplet: "thirty-second note triplets",
+      half: "32nds",
+      quarter: "64ths",
+      tripletNote: "32nd",
     },
     32: {
-      half: "sixty-fourth notes",
-      quarter: "128th notes",
-      triplet: "sixty-fourth note triplets",
+      half: "64ths",
+      quarter: "128ths",
+      tripletNote: "64th",
     },
   };
 
@@ -80,17 +81,17 @@ export function getSubdivisionLabel(
 
   const labels: Record<string, string> = {
     none: "None",
-    halves: n.half,
-    triplet: n.triplet,
-    quarters: n.quarter,
+    halves: `two ${n.half}`,
+    triplet: `${n.tripletNote} triplets`,
+    quarters: `four ${n.quarter}`,
     // Compound patterns
-    halfTwoQuarters: `${n.half.replace(" notes", "")} + 2 ${n.quarter}`,
-    twoQuartersHalf: `2 ${n.quarter} + ${n.half.replace(" notes", "")}`,
-    dottedHalfQuarter: `dotted ${n.half.replace(" notes", "")} + ${n.quarter.replace(" notes", "")}`,
-    quarterHalfQuarter: `${n.quarter.replace(" notes", "")} + ${n.half.replace(" notes", "")} + ${n.quarter.replace(" notes", "")}`,
-    quarterDottedHalf: `${n.quarter.replace(" notes", "")} + dotted ${n.half.replace(" notes", "")}`,
+    halfTwoQuarters: `${n.half.replace(/s$/, "")} + two ${n.quarter}`,
+    twoQuartersHalf: `two ${n.quarter} + ${n.half.replace(/s$/, "")}`,
+    dottedHalfQuarter: `dotted ${n.half.replace(/s$/, "")} + ${n.quarter.replace(/s$/, "")}`,
+    quarterHalfQuarter: `${n.quarter.replace(/s$/, "")} + ${n.half.replace(/s$/, "")} + ${n.quarter.replace(/s$/, "")}`,
+    quarterDottedHalf: `${n.quarter.replace(/s$/, "")} + dotted ${n.half.replace(/s$/, "")}`,
     // Swing - only for /4
-    swing: "Swing",
+    swing: "swung 8ths",
   };
 
   return labels[subdivisionKey] || subdivisionKey;
@@ -115,6 +116,13 @@ export const SUBDIVISIONS: Record<string, SubdivisionPattern> = {
     pattern: [0, 0.5],
     accent: [1, 0.5],
     swingOnly: false,
+  },
+  swing: {
+    key: "swing",
+    description: "Triplet swing feel",
+    pattern: [0, 0.667],
+    accent: [1, 0.5],
+    swingOnly: true, // Only available for /4 time
   },
   triplet: {
     key: "triplet",
@@ -164,13 +172,6 @@ export const SUBDIVISIONS: Record<string, SubdivisionPattern> = {
     pattern: [0, 0.25],
     accent: [0.6, 1],
     swingOnly: false,
-  },
-  swing: {
-    key: "swing",
-    description: "Triplet swing feel",
-    pattern: [0, 0.667],
-    accent: [1, 0.5],
-    swingOnly: true, // Only available for /4 time
   },
 };
 

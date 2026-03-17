@@ -150,70 +150,70 @@ describe("getSubdivisionLabel", () => {
       expect(getSubdivisionLabel("none", 4)).toBe("None");
     });
 
-    it("returns eighth notes for halves", () => {
-      expect(getSubdivisionLabel("halves", 4)).toBe("eighth notes");
+    it("returns two 8ths for halves", () => {
+      expect(getSubdivisionLabel("halves", 4)).toBe("two 8ths");
     });
 
-    it("returns eighth note triplets for triplet", () => {
-      expect(getSubdivisionLabel("triplet", 4)).toBe("eighth note triplets");
+    it("returns 8th triplets for triplet", () => {
+      expect(getSubdivisionLabel("triplet", 4)).toBe("8th triplets");
     });
 
-    it("returns sixteenth notes for quarters", () => {
-      expect(getSubdivisionLabel("quarters", 4)).toBe("sixteenth notes");
+    it("returns four 16ths for quarters", () => {
+      expect(getSubdivisionLabel("quarters", 4)).toBe("four 16ths");
     });
 
-    it("returns Swing for swing", () => {
-      expect(getSubdivisionLabel("swing", 4)).toBe("Swing");
+    it("returns swung 8ths for swing", () => {
+      expect(getSubdivisionLabel("swing", 4)).toBe("swung 8ths");
     });
   });
 
   describe("with half note beat (2)", () => {
-    it("returns quarter notes for halves", () => {
-      expect(getSubdivisionLabel("halves", 2)).toBe("quarter notes");
+    it("returns two quarters for halves", () => {
+      expect(getSubdivisionLabel("halves", 2)).toBe("two quarters");
     });
 
-    it("returns eighth notes for quarters", () => {
-      expect(getSubdivisionLabel("quarters", 2)).toBe("eighth notes");
+    it("returns four 8ths for quarters", () => {
+      expect(getSubdivisionLabel("quarters", 2)).toBe("four 8ths");
     });
 
-    it("returns quarter note triplets for triplet", () => {
-      expect(getSubdivisionLabel("triplet", 2)).toBe("quarter note triplets");
+    it("returns quarter triplets for triplet", () => {
+      expect(getSubdivisionLabel("triplet", 2)).toBe("quarter triplets");
     });
   });
 
   describe("with eighth note beat (8)", () => {
-    it("returns sixteenth notes for halves", () => {
-      expect(getSubdivisionLabel("halves", 8)).toBe("sixteenth notes");
+    it("returns two 16ths for halves", () => {
+      expect(getSubdivisionLabel("halves", 8)).toBe("two 16ths");
     });
 
-    it("returns thirty-second notes for quarters", () => {
-      expect(getSubdivisionLabel("quarters", 8)).toBe("thirty-second notes");
+    it("returns four 32nds for quarters", () => {
+      expect(getSubdivisionLabel("quarters", 8)).toBe("four 32nds");
     });
 
-    it("returns sixteenth note triplets for triplet", () => {
-      expect(getSubdivisionLabel("triplet", 8)).toBe("sixteenth note triplets");
+    it("returns 16th triplets for triplet", () => {
+      expect(getSubdivisionLabel("triplet", 8)).toBe("16th triplets");
     });
   });
 
   describe("with whole note beat (1)", () => {
-    it("returns half notes for halves", () => {
-      expect(getSubdivisionLabel("halves", 1)).toBe("half notes");
+    it("returns two halves for halves", () => {
+      expect(getSubdivisionLabel("halves", 1)).toBe("two halves");
     });
 
-    it("returns quarter notes for quarters", () => {
-      expect(getSubdivisionLabel("quarters", 1)).toBe("quarter notes");
+    it("returns four quarters for quarters", () => {
+      expect(getSubdivisionLabel("quarters", 1)).toBe("four quarters");
     });
 
-    it("returns half note triplets for triplet", () => {
-      expect(getSubdivisionLabel("triplet", 1)).toBe("half note triplets");
+    it("returns half triplets for triplet", () => {
+      expect(getSubdivisionLabel("triplet", 1)).toBe("half triplets");
     });
   });
 
   describe("compound patterns", () => {
     it("generates label for halfTwoQuarters", () => {
       const label = getSubdivisionLabel("halfTwoQuarters", 4);
-      expect(label).toContain("eighth");
-      expect(label).toContain("sixteenth");
+      expect(label).toContain("8th");
+      expect(label).toContain("16th");
     });
 
     it("generates label for dottedHalfQuarter", () => {
@@ -230,7 +230,7 @@ describe("getSubdivisionLabel", () => {
     it("uses quarter note names for unknown note value", () => {
       const label = getSubdivisionLabel("halves", 3);
       // Should fall back to quarter note names
-      expect(label).toBe("eighth notes");
+      expect(label).toBe("two 8ths");
     });
   });
 });

@@ -102,9 +102,6 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         <View style={styles.content}>
           {/* App Logo/Title */}
           <View style={styles.header}>
-            <Text style={styles.logo}>
-              {getInstrumentEmoji(selectedInstrument?.instrument_name)}
-            </Text>
             <Text style={styles.title}>Sound First</Text>
             <Text style={styles.subtitle}>Ear-First Music Practice</Text>
           </View>

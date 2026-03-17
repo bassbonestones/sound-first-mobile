@@ -906,7 +906,7 @@ describe("Metronome", () => {
       );
       fireEvent.press(getByText("None"));
       // Select triplets option
-      fireEvent.press(getByText("eighth note triplets"));
+      fireEvent.press(getByText("8th triplets"));
       // Picker should close (auto-closes on selection)
       expect(queryByText(/^Subdivision$/)).toBeNull();
     });

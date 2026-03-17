@@ -775,12 +775,12 @@ describe("TuneCard", () => {
         />,
       );
 
-      // Default subdivision is 2 ("eighth notes" in 4/4 time)
+      // Default subdivision is 2 ("two 8ths" in 4/4 time)
       // Click to open the picker
-      fireEvent.press(getByText("eighth notes"));
+      fireEvent.press(getByText("two 8ths"));
 
-      // Select "sixteenth notes" (subdivision "quarters")
-      fireEvent.press(getByText("sixteenth notes"));
+      // Select "four 16ths" (subdivision "quarters")
+      fireEvent.press(getByText("four 16ths"));
 
       expect(onUpdateSettings).toHaveBeenCalledWith({
         subdivision: "quarters",
@@ -799,11 +799,11 @@ describe("TuneCard", () => {
         />,
       );
 
-      // Click to open the picker (current is "sixteenth notes")
-      fireEvent.press(getByText("sixteenth notes"));
+      // Click to open the picker (current is "four 16ths")
+      fireEvent.press(getByText("four 16ths"));
 
       // Select same subdivision (second occurrence is in the picker)
-      const sixteenthOptions = getAllByText("sixteenth notes");
+      const sixteenthOptions = getAllByText("four 16ths");
       fireEvent.press(sixteenthOptions[1]);
 
       expect(onUpdateSettings).not.toHaveBeenCalled();
