@@ -8,24 +8,38 @@ import {
   TouchableOpacity,
   StyleSheet,
   TextInput,
-  GestureResponderEvent,
+  useWindowDimensions,
 } from "react-native";
 import { ALL_KEYS } from "../../../hooks/useTuneMasteryData";
 import KeyBadge from "./KeyBadge";
+import { getSubdivisionLabel } from "../../../components/Metronome/constants";
+import TimeSignaturePickerModal from "../../../components/Metronome/TimeSignaturePickerModal";
+import SubdivisionPickerModal from "../../../components/Metronome/SubdivisionPickerModal";
 
-const TIME_SIGNATURES = [
-  "2/4",
-  "3/4",
-  "4/4",
-  "5/4",
-  "6/8",
-  "7/8",
-  "12/8",
-] as const;
-const SUBDIVISIONS = [1, 2, 3, 4] as const;
+// Width threshold for compact BPM controls (without +/-5, +/-1 buttons)
+const COMPACT_BPM_WIDTH = 360;
 
-export type TimeSignature = (typeof TIME_SIGNATURES)[number];
-export type Subdivision = (typeof SUBDIVISIONS)[number];
+// Width thresholds for key grid layout
+const KEY_GRID_12_MIN_WIDTH = 660;
+const KEY_GRID_6_MIN_WIDTH = 360;
+
+// Map old numeric subdivisions (1-4) to new keys for backward compatibility
+const SUBDIVISION_MAP: Record<number, string> = {
+  1: "none",
+  2: "halves",
+  3: "triplet",
+  4: "quarters",
+};
+
+const REVERSE_SUBDIVISION_MAP: Record<string, number> = {
+  none: 1,
+  halves: 2,
+  triplet: 3,
+  quarters: 4,
+};
+
+export type TimeSignature = string;
+export type Subdivision = number | string;
 
 export interface KeyScore {
   score: number;
@@ -38,7 +52,7 @@ export interface TuneData {
   keys: Record<string, KeyScore>;
   bpm?: number | null;
   timeSignature?: string;
-  subdivision?: number;
+  subdivision?: number | string;
   pitchSystem?: "equal" | "just";
   aHertz?: number | null;
 }
@@ -46,7 +60,7 @@ export interface TuneData {
 export interface TuneSettings {
   bpm?: number | null;
   timeSignature?: string;
-  subdivision?: number;
+  subdivision?: number | string;
   pitchSystem?: "equal" | "just";
   aHertz?: number | null;
 }
@@ -58,6 +72,7 @@ export interface TuneCardProps {
   isFirst: boolean;
   isLast: boolean;
   isArchive?: boolean;
+  anyTuneExpanded?: boolean;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   onArchive?: () => void;
@@ -75,6 +90,7 @@ const TuneCard = React.memo(function TuneCard({
   isFirst,
   isLast,
   isArchive = false,
+  anyTuneExpanded = false,
   onMoveUp,
   onMoveDown,
   onArchive,
@@ -84,6 +100,9 @@ const TuneCard = React.memo(function TuneCard({
   onUpdateSettings,
   masteryThreshold = 95,
 }: TuneCardProps): React.JSX.Element {
+  const { width: screenWidth } = useWindowDimensions();
+  const isCompactBpm = screenWidth < COMPACT_BPM_WIDTH;
+
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(tune.name);
   const [editBpm, setEditBpm] = useState(
@@ -94,6 +113,23 @@ const TuneCard = React.memo(function TuneCard({
       ? String(tune.aHertz)
       : "440",
   );
+  const [showTimeSigPicker, setShowTimeSigPicker] = useState(false);
+  const [showSubdivisionPicker, setShowSubdivisionPicker] = useState(false);
+
+  // Parse time signature
+  const parseTimeSignature = (ts: string = "4/4") => {
+    const [top, bottom] = ts.split("/").map(Number);
+    return { beatsPerMeasure: top || 4, noteValue: bottom || 4 };
+  };
+  const { beatsPerMeasure, noteValue } = parseTimeSignature(tune.timeSignature);
+
+  // Get subdivision key (handle both old numeric and new string format)
+  const getSubdivisionKey = (): string => {
+    const sub = tune.subdivision;
+    if (typeof sub === "string") return sub;
+    return SUBDIVISION_MAP[sub as number] || "none";
+  };
+  const subdivisionKey = getSubdivisionKey();
 
   // Tap tempo tracking
   const tapTimesRef = useRef<number[]>([]);
@@ -185,22 +221,32 @@ const TuneCard = React.memo(function TuneCard({
     [onUpdateSettings],
   );
 
-  const handleTimeSignatureChange = useCallback(
-    (timeSig: string) => {
-      if (timeSig !== tune.timeSignature) {
-        onUpdateSettings?.({ timeSignature: timeSig });
-      }
+  // Time signature handlers
+  const handleBeatsPerMeasureChange = useCallback(
+    (newBeats: number) => {
+      const timeSig = `${newBeats}/${noteValue}`;
+      onUpdateSettings?.({ timeSignature: timeSig });
     },
-    [tune.timeSignature, onUpdateSettings],
+    [noteValue, onUpdateSettings],
   );
 
-  const handleSubdivisionChange = useCallback(
-    (sub: number) => {
-      if (sub !== tune.subdivision) {
-        onUpdateSettings?.({ subdivision: sub });
-      }
+  const handleNoteValueChange = useCallback(
+    (newNoteValue: number) => {
+      const timeSig = `${beatsPerMeasure}/${newNoteValue}`;
+      onUpdateSettings?.({ timeSignature: timeSig });
     },
-    [tune.subdivision, onUpdateSettings],
+    [beatsPerMeasure, onUpdateSettings],
+  );
+
+  // Subdivision handler - stores string key directly
+  const handleSubdivisionChange = useCallback(
+    (subKey: string) => {
+      if (subKey !== subdivisionKey) {
+        onUpdateSettings?.({ subdivision: subKey });
+      }
+      setShowSubdivisionPicker(false);
+    },
+    [subdivisionKey, onUpdateSettings],
   );
 
   const handlePitchSystemChange = useCallback(
@@ -251,13 +297,16 @@ const TuneCard = React.memo(function TuneCard({
             </Text>
           )}
 
-          <View style={styles.progressBadge}>
-            <Text style={styles.progressText}>{masteredCount}/12</Text>
-          </View>
+          {/* Progress badge - hide when this card is expanded */}
+          {!isExpanded && (
+            <View style={styles.progressBadge}>
+              <Text style={styles.progressText}>{masteredCount}/12</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
-        {/* Reorder buttons (only for active tunes) - outside the expandable area */}
-        {!isArchive && (
+        {/* Reorder buttons (only for active tunes, hide when any tune is expanded) */}
+        {!isArchive && !anyTuneExpanded && (
           <View style={styles.reorderButtons}>
             <TouchableOpacity
               style={[
@@ -304,40 +353,112 @@ const TuneCard = React.memo(function TuneCard({
       {/* Expanded Content */}
       {isExpanded && (
         <View style={styles.expandedContent}>
-          {/* Key Grid */}
+          {/* Key Grid - responsive rows */}
           <View style={styles.keyGrid}>
-            {ALL_KEYS.map((key) => (
-              <KeyBadge
-                key={key}
-                keyName={key}
-                score={tune.keys[key]?.score || 0}
-                attempts={tune.keys[key]?.attempts || 0}
-                masteryThreshold={masteryThreshold}
-              />
-            ))}
+            {screenWidth >= KEY_GRID_12_MIN_WIDTH ? (
+              // 1 row of 12
+              <View style={styles.keyRow}>
+                {ALL_KEYS.map((key) => (
+                  <KeyBadge
+                    key={key}
+                    keyName={key}
+                    score={tune.keys[key]?.score || 0}
+                    attempts={tune.keys[key]?.attempts || 0}
+                    masteryThreshold={masteryThreshold}
+                  />
+                ))}
+              </View>
+            ) : screenWidth >= KEY_GRID_6_MIN_WIDTH ? (
+              // 2 rows of 6
+              <>
+                <View style={styles.keyRow}>
+                  {ALL_KEYS.slice(0, 6).map((key) => (
+                    <KeyBadge
+                      key={key}
+                      keyName={key}
+                      score={tune.keys[key]?.score || 0}
+                      attempts={tune.keys[key]?.attempts || 0}
+                      masteryThreshold={masteryThreshold}
+                    />
+                  ))}
+                </View>
+                <View style={styles.keyRow}>
+                  {ALL_KEYS.slice(6, 12).map((key) => (
+                    <KeyBadge
+                      key={key}
+                      keyName={key}
+                      score={tune.keys[key]?.score || 0}
+                      attempts={tune.keys[key]?.attempts || 0}
+                      masteryThreshold={masteryThreshold}
+                    />
+                  ))}
+                </View>
+              </>
+            ) : (
+              // 3 rows of 4
+              <>
+                <View style={styles.keyRow}>
+                  {ALL_KEYS.slice(0, 4).map((key) => (
+                    <KeyBadge
+                      key={key}
+                      keyName={key}
+                      score={tune.keys[key]?.score || 0}
+                      attempts={tune.keys[key]?.attempts || 0}
+                      masteryThreshold={masteryThreshold}
+                    />
+                  ))}
+                </View>
+                <View style={styles.keyRow}>
+                  {ALL_KEYS.slice(4, 8).map((key) => (
+                    <KeyBadge
+                      key={key}
+                      keyName={key}
+                      score={tune.keys[key]?.score || 0}
+                      attempts={tune.keys[key]?.attempts || 0}
+                      masteryThreshold={masteryThreshold}
+                    />
+                  ))}
+                </View>
+                <View style={styles.keyRow}>
+                  {ALL_KEYS.slice(8, 12).map((key) => (
+                    <KeyBadge
+                      key={key}
+                      keyName={key}
+                      score={tune.keys[key]?.score || 0}
+                      attempts={tune.keys[key]?.attempts || 0}
+                      masteryThreshold={masteryThreshold}
+                    />
+                  ))}
+                </View>
+              </>
+            )}
           </View>
 
           {/* Tempo Settings Row - only for active tunes */}
           {!isArchive && onUpdateSettings && (
             <View style={styles.tempoSection}>
-              {/* BPM */}
+              {/* BPM - responsive: hide +/-5, +/-1 on small screens */}
               <View style={styles.tempoItem}>
                 <Text style={styles.tempoLabel}>BPM</Text>
                 <View style={styles.adjustRow}>
-                  <TouchableOpacity
-                    style={styles.adjustButtonSmall}
-                    onPress={() => handleBpmChange((tune.bpm || 120) - 5)}
-                    accessibilityLabel="Decrease BPM by 5"
-                  >
-                    <Text style={styles.adjustButtonTextSmall}>−5</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.adjustButtonSmall}
-                    onPress={() => handleBpmChange((tune.bpm || 120) - 1)}
-                    accessibilityLabel="Decrease BPM by 1"
-                  >
-                    <Text style={styles.adjustButtonTextSmall}>−1</Text>
-                  </TouchableOpacity>
+                  {!isCompactBpm && (
+                    <TouchableOpacity
+                      style={styles.adjustButtonSmall}
+                      onPress={() => handleBpmChange((tune.bpm || 120) - 5)}
+                      accessibilityLabel="Decrease BPM by 5"
+                    >
+                      <Text style={styles.adjustButtonTextSmall}>−5</Text>
+                    </TouchableOpacity>
+                  )}
+                  {!isCompactBpm && (
+                    <TouchableOpacity
+                      style={styles.adjustButtonSmall}
+                      onPress={() => handleBpmChange((tune.bpm || 120) - 1)}
+                      accessibilityLabel="Decrease BPM by 1"
+                    >
+                      <Text style={styles.adjustButtonTextSmall}>−1</Text>
+                    </TouchableOpacity>
+                  )}
                   <TextInput
                     style={styles.bpmInput}
                     value={editBpm}
@@ -348,20 +469,24 @@ const TuneCard = React.memo(function TuneCard({
                     placeholderTextColor="#666"
                     maxLength={3}
                   />
-                  <TouchableOpacity
-                    style={styles.adjustButtonSmall}
-                    onPress={() => handleBpmChange((tune.bpm || 120) + 1)}
-                    accessibilityLabel="Increase BPM by 1"
-                  >
-                    <Text style={styles.adjustButtonTextSmall}>+1</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.adjustButtonSmall}
-                    onPress={() => handleBpmChange((tune.bpm || 120) + 5)}
-                    accessibilityLabel="Increase BPM by 5"
-                  >
-                    <Text style={styles.adjustButtonTextSmall}>+5</Text>
-                  </TouchableOpacity>
+                  {!isCompactBpm && (
+                    <TouchableOpacity
+                      style={styles.adjustButtonSmall}
+                      onPress={() => handleBpmChange((tune.bpm || 120) + 1)}
+                      accessibilityLabel="Increase BPM by 1"
+                    >
+                      <Text style={styles.adjustButtonTextSmall}>+1</Text>
+                    </TouchableOpacity>
+                  )}
+                  {!isCompactBpm && (
+                    <TouchableOpacity
+                      style={styles.adjustButtonSmall}
+                      onPress={() => handleBpmChange((tune.bpm || 120) + 5)}
+                      accessibilityLabel="Increase BPM by 5"
+                    >
+                      <Text style={styles.adjustButtonTextSmall}>+5</Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     style={styles.tapButton}
                     onPress={handleTapTempo}
@@ -373,59 +498,78 @@ const TuneCard = React.memo(function TuneCard({
                 </View>
               </View>
 
-              {/* Time Signature */}
+              {/* Time Signature - dropdown button */}
               <View style={styles.tempoItem}>
                 <Text style={styles.tempoLabel}>Time</Text>
-                <View style={styles.pickerRow}>
-                  {TIME_SIGNATURES.map((ts) => (
-                    <TouchableOpacity
-                      key={ts}
-                      style={[
-                        styles.pickerOption,
-                        tune.timeSignature === ts && styles.pickerOptionActive,
-                      ]}
-                      onPress={() => handleTimeSignatureChange(ts)}
-                    >
-                      <Text
-                        style={[
-                          styles.pickerOptionText,
-                          tune.timeSignature === ts &&
-                            styles.pickerOptionTextActive,
-                        ]}
-                      >
-                        {ts}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!showSubdivisionPicker) {
+                      setShowTimeSigPicker(!showTimeSigPicker);
+                    }
+                  }}
+                  disabled={showSubdivisionPicker}
+                  style={[
+                    styles.dropdownButton,
+                    showTimeSigPicker && styles.dropdownButtonActive,
+                    showSubdivisionPicker && { opacity: 0.5 },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.dropdownButtonText,
+                      showTimeSigPicker && styles.dropdownButtonTextActive,
+                    ]}
+                  >
+                    {beatsPerMeasure}/{noteValue}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
-              {/* Subdivision */}
+              {/* Time Signature Picker Modal */}
+              <TimeSignaturePickerModal
+                visible={showTimeSigPicker}
+                onClose={() => setShowTimeSigPicker(false)}
+                beatsPerMeasure={beatsPerMeasure}
+                noteValue={noteValue}
+                onBeatsChange={handleBeatsPerMeasureChange}
+                onNoteValueChange={handleNoteValueChange}
+              />
+
+              {/* Subdivision - dropdown button */}
               <View style={styles.tempoItem}>
                 <Text style={styles.tempoLabel}>Sub</Text>
-                <View style={styles.pickerRow}>
-                  {SUBDIVISIONS.map((sub) => (
-                    <TouchableOpacity
-                      key={sub}
-                      style={[
-                        styles.pickerOption,
-                        tune.subdivision === sub && styles.pickerOptionActive,
-                      ]}
-                      onPress={() => handleSubdivisionChange(sub)}
-                    >
-                      <Text
-                        style={[
-                          styles.pickerOptionText,
-                          tune.subdivision === sub &&
-                            styles.pickerOptionTextActive,
-                        ]}
-                      >
-                        {sub}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!showTimeSigPicker) {
+                      setShowSubdivisionPicker(!showSubdivisionPicker);
+                    }
+                  }}
+                  disabled={showTimeSigPicker}
+                  style={[
+                    styles.dropdownButton,
+                    showSubdivisionPicker && styles.dropdownButtonActive,
+                    showTimeSigPicker && { opacity: 0.5 },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.dropdownButtonText,
+                      showSubdivisionPicker && styles.dropdownButtonTextActive,
+                    ]}
+                  >
+                    {getSubdivisionLabel(subdivisionKey, noteValue)}
+                  </Text>
+                </TouchableOpacity>
               </View>
+
+              {/* Subdivision Picker Modal */}
+              <SubdivisionPickerModal
+                visible={showSubdivisionPicker}
+                onClose={() => setShowSubdivisionPicker(false)}
+                subdivision={subdivisionKey}
+                noteValue={noteValue}
+                onSubdivisionChange={handleSubdivisionChange}
+              />
 
               {/* Pitch System */}
               <View style={styles.tempoItem}>
@@ -620,11 +764,14 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   keyGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
     gap: 6,
     justifyContent: "center",
     marginBottom: 12,
+  },
+  keyRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
   },
   actionsRow: {
     flexDirection: "row",
@@ -742,6 +889,28 @@ const styles = StyleSheet.create({
     color: "#FFD700",
     fontSize: 12,
     fontWeight: "600",
+  },
+
+  // Dropdown button styles
+  dropdownButton: {
+    backgroundColor: "#3a3a4e",
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "#5a4a3a",
+  },
+  dropdownButtonActive: {
+    backgroundColor: "#FFD700",
+    borderColor: "#FFD700",
+  },
+  dropdownButtonText: {
+    color: "#FFD700",
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  dropdownButtonTextActive: {
+    color: "#1a1a2e",
   },
 });
 

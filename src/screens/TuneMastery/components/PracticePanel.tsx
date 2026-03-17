@@ -8,7 +8,7 @@
  * - Mute button with volume controls (long press)
  * - Rating slider with fine-tune buttons
  */
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -261,7 +261,7 @@ export default function PracticePanel({
 }: PracticePanelProps): React.JSX.Element {
   const [rating, setRating] = useState(currentScore || 50);
 
-  // Tool visibility states - auto-expand based on settings
+  // Tool visibility states - expanded means full screen view
   const [tunerExpanded, setTunerExpanded] = useState(false);
   const [metronomeExpanded, setMetronomeExpanded] = useState(false);
   const [droneExpanded, setDroneExpanded] = useState(false);
@@ -271,6 +271,31 @@ export default function PracticePanel({
     settings?.autoMetronome || false,
   );
   const [droneActive, setDroneActive] = useState(settings?.autoDrone || false);
+
+  // Track if audio is actually playing (updated by child component callbacks)
+  const [metronomeIsPlaying, setMetronomeIsPlaying] = useState(
+    settings?.autoMetronome || false,
+  );
+  const [droneIsPlaying, setDroneIsPlaying] = useState(
+    settings?.autoDrone || false,
+  );
+
+  // Track whether auto-start has already happened (prevents restart on remount)
+  const [metronomeAutoStarted, setMetronomeAutoStarted] = useState(false);
+  const [droneAutoStarted, setDroneAutoStarted] = useState(false);
+
+  // Set autoStarted flag when component first becomes active
+  useEffect(() => {
+    if (metronomeActive && !metronomeAutoStarted) {
+      setMetronomeAutoStarted(true);
+    }
+  }, [metronomeActive, metronomeAutoStarted]);
+
+  useEffect(() => {
+    if (droneActive && !droneAutoStarted) {
+      setDroneAutoStarted(true);
+    }
+  }, [droneActive, droneAutoStarted]);
 
   // Audio controls
   const [audioMuted, setAudioMuted] = useState(false);
@@ -335,7 +360,8 @@ export default function PracticePanel({
             <TouchableOpacity
               style={[
                 styles.headerToolButton,
-                tunerExpanded && styles.headerToolButtonActive,
+                !tunerExpanded && styles.headerToolButtonActive,
+                tunerExpanded && styles.headerToolButtonActiveExpanded,
               ]}
               onPress={() => {
                 const willExpand = !tunerExpanded;
@@ -343,7 +369,10 @@ export default function PracticePanel({
                 if (willExpand) {
                   setMetronomeExpanded(false);
                   setDroneExpanded(false);
-                  setAudioMuted(true);
+                  // Only mute if something is actually playing
+                  if (metronomeIsPlaying || droneIsPlaying) {
+                    setAudioMuted(true);
+                  }
                 }
               }}
               accessibilityLabel={
@@ -357,8 +386,8 @@ export default function PracticePanel({
             <TouchableOpacity
               style={[
                 styles.headerToolButton,
-                (metronomeExpanded || metronomeActive) &&
-                  styles.headerToolButtonMetronome,
+                metronomeActive && !metronomeExpanded && styles.headerToolButtonMetronome,
+                metronomeExpanded && styles.headerToolButtonMetronomeExpanded,
               ]}
               onPress={() => {
                 if (!metronomeActive) {
@@ -378,6 +407,7 @@ export default function PracticePanel({
               onLongPress={() => {
                 setMetronomeActive(false);
                 setMetronomeExpanded(false);
+                setMetronomeIsPlaying(false);
               }}
               accessibilityLabel={
                 metronomeExpanded ? "Collapse metronome" : "Expand metronome"
@@ -390,7 +420,8 @@ export default function PracticePanel({
             <TouchableOpacity
               style={[
                 styles.headerToolButton,
-                (droneExpanded || droneActive) && styles.headerToolButtonDrone,
+                droneActive && !droneExpanded && styles.headerToolButtonDrone,
+                droneExpanded && styles.headerToolButtonDroneExpanded,
               ]}
               onPress={() => {
                 if (!droneActive) {
@@ -410,6 +441,7 @@ export default function PracticePanel({
               onLongPress={() => {
                 setDroneActive(false);
                 setDroneExpanded(false);
+                setDroneIsPlaying(false);
               }}
               accessibilityLabel={
                 droneExpanded ? "Collapse drone" : "Expand drone"
@@ -461,139 +493,131 @@ export default function PracticePanel({
         </View>
       )}
 
-      {/* ScrollView for other content */}
-      {!tunerExpanded && (
+      {/* Metronome Panel - always rendered when active, styled as collapsed or expanded */}
+      {metronomeActive && (
+        <View
+          style={[
+            styles.toolPanelFixed,
+            styles.toolPanelMetronome,
+            !metronomeExpanded && styles.toolPanelCollapsed,
+          ]}
+          pointerEvents={metronomeExpanded ? "auto" : "none"}
+        >
+          <Metronome
+            initialBpm={metronomeBpm}
+            beatsPerMeasure={beatsPerMeasure}
+            initialNoteValue={noteValue}
+            initialSubdivision={metronomeSubdivision}
+            autoStart={settings?.autoMetronome && !metronomeAutoStarted}
+            showControls={true}
+            showTimeSignature={true}
+            showSubdivision={true}
+            muted={audioMuted}
+            volume={metronomeVolume}
+            hideInternalMute={true}
+            onPlayingChange={setMetronomeIsPlaying}
+          />
+        </View>
+      )}
+
+      {/* Drone Panel - always rendered when active, styled as collapsed or expanded */}
+      {droneActive && (
+        <View
+          style={[
+            styles.toolPanelFixed,
+            styles.toolPanelDrone,
+            !droneExpanded && styles.toolPanelCollapsed,
+          ]}
+          pointerEvents={droneExpanded ? "auto" : "none"}
+        >
+          <PitchDrone
+            initialNote={tuneKey}
+            autoStart={settings?.autoDrone && !droneAutoStarted}
+            muted={audioMuted}
+            volume={droneVolume}
+            hideInternalMute={true}
+            temperament={tunePitchSystem}
+            pitchCenter={tuneKeyIndex}
+            concertA={tuneSettings?.aHertz || 440}
+            onPlayingChange={setDroneIsPlaying}
+          />
+        </View>
+      )}
+
+      {/* ScrollView for other content - shown when no tool is expanded */}
+      {!tunerExpanded && !metronomeExpanded && !droneExpanded && (
         <ScrollView
           style={styles.content}
           contentContainerStyle={styles.contentContainer}
         >
-          {/* Focus Card - hidden when any tool is expanded */}
-          {!(metronomeExpanded || droneExpanded) && (
-            <View style={styles.focusCard}>
-              <Text style={styles.focusCardCategory}>{focusCard.category}</Text>
-              <Text style={styles.focusCardName}>{focusCard.name}</Text>
-              <Text style={styles.focusCardCue}>{focusCard.attention_cue}</Text>
+          {/* Focus Card */}
+          <View style={styles.focusCard}>
+            <Text style={styles.focusCardCategory}>{focusCard.category}</Text>
+            <Text style={styles.focusCardName}>{focusCard.name}</Text>
+            <Text style={styles.focusCardCue}>{focusCard.attention_cue}</Text>
+          </View>
+
+          {/* Rating Section */}
+          <View style={styles.ratingSection}>
+            <Text style={styles.ratingLabel}>How did it go?</Text>
+
+            {/* Score Display */}
+            <View style={styles.scoreDisplay}>
+              <Text style={styles.scoreValue}>{rating}%</Text>
+              <Text style={styles.scorePrevious}>
+                (prev: {currentScore}%)
+              </Text>
             </View>
-          )}
 
-          {metronomeActive && (
-            <View
-              style={[
-                styles.toolPanel,
-                styles.toolPanelMetronome,
-                !metronomeExpanded && styles.toolPanelCollapsed,
-              ]}
-              pointerEvents={metronomeExpanded ? "auto" : "none"}
-              accessibilityElementsHidden={!metronomeExpanded}
-              importantForAccessibility={
-                metronomeExpanded ? "auto" : "no-hide-descendants"
-              }
-            >
-              <Metronome
-                initialBpm={metronomeBpm}
-                beatsPerMeasure={beatsPerMeasure}
-                initialNoteValue={noteValue}
-                initialSubdivision={metronomeSubdivision}
-                autoStart={settings?.autoMetronome}
-                showControls={true}
-                showTimeSignature={true}
-                showSubdivision={true}
-                muted={audioMuted}
-                volume={metronomeVolume}
-                hideInternalMute={true}
-              />
+            {/* Slider */}
+            <Slider
+              style={styles.slider}
+              value={rating}
+              onValueChange={(value: number) => setRating(Math.round(value))}
+              minimumValue={0}
+              maximumValue={100}
+              step={1}
+              minimumTrackTintColor="#FFD700"
+              maximumTrackTintColor="#444"
+              thumbTintColor="#FFD700"
+            />
+
+            {/* Fine Tune Buttons */}
+            <View style={styles.fineTuneRow}>
+              <TouchableOpacity
+                style={styles.fineTuneButton}
+                onPress={() => handleFineTune(-5)}
+                accessibilityLabel="Decrease rating by 5"
+                accessibilityRole="button"
+              >
+                <Text style={styles.fineTuneButtonText}>-5</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.fineTuneButton}
+                onPress={() => handleFineTune(-1)}
+                accessibilityLabel="Decrease rating by 1"
+                accessibilityRole="button"
+              >
+                <Text style={styles.fineTuneButtonText}>-1</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.fineTuneButton}
+                onPress={() => handleFineTune(1)}
+                accessibilityLabel="Increase rating by 1"
+                accessibilityRole="button"
+              >
+                <Text style={styles.fineTuneButtonText}>+1</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.fineTuneButton}
+                onPress={() => handleFineTune(5)}
+                accessibilityLabel="Increase rating by 5"
+                accessibilityRole="button"
+              >
+                <Text style={styles.fineTuneButtonText}>+5</Text>
+              </TouchableOpacity>
             </View>
-          )}
-
-          {droneActive && (
-            <View
-              style={[
-                styles.toolPanel,
-                styles.toolPanelDrone,
-                !droneExpanded && styles.toolPanelCollapsed,
-              ]}
-              pointerEvents={droneExpanded ? "auto" : "none"}
-              accessibilityElementsHidden={!droneExpanded}
-              importantForAccessibility={
-                droneExpanded ? "auto" : "no-hide-descendants"
-              }
-            >
-              <PitchDrone
-                initialNote={tuneKey}
-                autoStart={settings?.autoDrone}
-                muted={audioMuted}
-                volume={droneVolume}
-                hideInternalMute={true}
-                temperament={tunePitchSystem}
-                pitchCenter={tuneKeyIndex}
-                concertA={tuneSettings?.aHertz || 440}
-              />
-            </View>
-          )}
-
-          {/* Rating Section - Hidden when tools are expanded */}
-          {!tunerExpanded && !metronomeExpanded && !droneExpanded && (
-            <View style={styles.ratingSection}>
-              <Text style={styles.ratingLabel}>How did it go?</Text>
-
-              {/* Score Display */}
-              <View style={styles.scoreDisplay}>
-                <Text style={styles.scoreValue}>{rating}%</Text>
-                <Text style={styles.scorePrevious}>
-                  (prev: {currentScore}%)
-                </Text>
-              </View>
-
-              {/* Slider */}
-              <Slider
-                style={styles.slider}
-                value={rating}
-                onValueChange={(value: number) => setRating(Math.round(value))}
-                minimumValue={0}
-                maximumValue={100}
-                step={1}
-                minimumTrackTintColor="#FFD700"
-                maximumTrackTintColor="#444"
-                thumbTintColor="#FFD700"
-              />
-
-              {/* Fine Tune Buttons */}
-              <View style={styles.fineTuneRow}>
-                <TouchableOpacity
-                  style={styles.fineTuneButton}
-                  onPress={() => handleFineTune(-5)}
-                  accessibilityLabel="Decrease rating by 5"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.fineTuneButtonText}>-5</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.fineTuneButton}
-                  onPress={() => handleFineTune(-1)}
-                  accessibilityLabel="Decrease rating by 1"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.fineTuneButtonText}>-1</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.fineTuneButton}
-                  onPress={() => handleFineTune(1)}
-                  accessibilityLabel="Increase rating by 1"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.fineTuneButtonText}>+1</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.fineTuneButton}
-                  onPress={() => handleFineTune(5)}
-                  accessibilityLabel="Increase rating by 5"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.fineTuneButtonText}>+5</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
+          </View>
         </ScrollView>
       )}
 
@@ -738,15 +762,30 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#4a4a5e",
   },
+  // Tuner button styles - lighter when closed, solid when expanded
   headerToolButtonActive: {
-    backgroundColor: "#4a4a6e",
+    backgroundColor: "rgba(255, 215, 0, 0.3)",
     borderColor: "#FFD700",
   },
+  headerToolButtonActiveExpanded: {
+    backgroundColor: "#FFD700",
+    borderColor: "#FFD700",
+  },
+  // Metronome button styles - lighter when closed, solid when expanded
   headerToolButtonMetronome: {
+    backgroundColor: "rgba(156, 39, 176, 0.3)",
+    borderColor: "#9C27B0",
+  },
+  headerToolButtonMetronomeExpanded: {
     backgroundColor: "#9C27B0",
     borderColor: "#9C27B0",
   },
+  // Drone button styles - lighter when closed, solid when expanded
   headerToolButtonDrone: {
+    backgroundColor: "rgba(0, 188, 212, 0.3)",
+    borderColor: "#00BCD4",
+  },
+  headerToolButtonDroneExpanded: {
     backgroundColor: "#00BCD4",
     borderColor: "#00BCD4",
   },
@@ -778,7 +817,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#3b2c1a",
     borderRadius: 16,
     padding: 16,
-    marginBottom: 20,
+    marginBottom: 16,
     borderWidth: 2,
     borderColor: "#FFD700",
   },
@@ -804,14 +843,6 @@ const styles = StyleSheet.create({
   },
 
   // Tool Panels
-  toolPanel: {
-    backgroundColor: "#2a2a3e",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#FFD700",
-  },
   tunerPanelFixed: {
     flex: 1,
     backgroundColor: "#2a2a3e",
@@ -821,68 +852,70 @@ const styles = StyleSheet.create({
     borderColor: "#FFD700",
     overflow: "hidden",
   },
+  toolPanelFixed: {
+    flex: 1,
+    borderRadius: 12,
+    margin: 16,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
   toolPanelMetronome: {
     backgroundColor: "#1a1410",
-    padding: 0,
     borderColor: "#9C27B0",
-    overflow: "hidden",
   },
   toolPanelDrone: {
     backgroundColor: "#1a1a2a",
-    padding: 0,
     borderColor: "#00BCD4",
-    overflow: "hidden",
   },
   toolPanelCollapsed: {
+    flex: 0,
     height: 0,
-    maxHeight: 0,
-    padding: 0,
     margin: 0,
+    borderWidth: 0,
     overflow: "hidden",
-    opacity: 0,
   },
 
   // Rating
   ratingSection: {
     backgroundColor: "#2a2a3e",
     borderRadius: 12,
-    padding: 16,
-    marginTop: 8,
+    padding: 12,
+    marginTop: 4,
   },
   ratingLabel: {
     color: "#888",
     fontSize: 14,
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 4,
   },
   scoreDisplay: {
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 4,
   },
   scoreValue: {
     color: "#FFD700",
-    fontSize: 48,
+    fontSize: 40,
     fontWeight: "bold",
   },
   scorePrevious: {
     color: "#666",
-    fontSize: 14,
+    fontSize: 13,
   },
   slider: {
     width: "100%",
-    height: 40,
+    height: 32,
   },
   fineTuneRow: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 12,
-    marginTop: 12,
+    gap: 10,
+    marginTop: 8,
   },
   fineTuneButton: {
     backgroundColor: "#3a3a4e",
     borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
   },
   fineTuneButtonText: {
     color: "#FFFFFF",

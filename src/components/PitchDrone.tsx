@@ -5,10 +5,8 @@ import {
   TouchableOpacity,
   Pressable,
   Platform,
-  TextInput,
   Modal,
-  ViewStyle,
-  TextStyle,
+  useWindowDimensions,
 } from "react-native";
 import Slider from "@react-native-community/slider";
 import { devLog, devWarn } from "../utils/devLogger";
@@ -26,6 +24,13 @@ import {
 
 // Import styles
 import { styles, colors } from "./PitchDrone/styles";
+
+// Import shared tuning settings component
+import TuningSettingsButton, {
+  type Minor7System,
+  type Temperament,
+  MINOR_7TH_RATIOS,
+} from "./TuningSettingsButton";
 
 // AudioContext types
 interface NativeAudioContextType {
@@ -95,7 +100,7 @@ export default function PitchDrone({
   pitchCenter: initialPitchCenter = 0,
   concertA: initialConcertA = 440,
 }: PitchDroneProps): React.ReactElement {
-  const [temperament, setTemperament] = useState<"equal" | "just">(
+  const [temperament, setTemperament] = useState<Temperament>(
     initialTemperament,
   );
   const [pitchCenter, setPitchCenter] = useState(initialPitchCenter);
@@ -107,6 +112,7 @@ export default function PitchDrone({
   const [activeDrones, setActiveDrones] = useState<ActiveDrones>({});
   const [octaveStacks, setOctaveStacks] = useState<OctaveStacks>({});
   const [showVolumeModal, setShowVolumeModal] = useState(false);
+  const [minor7System, setMinor7System] = useState<Minor7System>("pythagorean");
 
   const MAX_OCTAVES_PER_NOTE = 3;
 
@@ -235,21 +241,38 @@ export default function PitchDrone({
   const calculateFrequency = useCallback(
     (semitone: number, noteOctave: number): number => {
       const a4 = parseFloat(concertA) || 440;
+      const midiNote = noteOctave * 12 + semitone + 12;
+      const equalTempFreq = a4 * Math.pow(2, (midiNote - 69) / 12);
 
       if (temperament === "equal") {
-        const midiNote = noteOctave * 12 + semitone + 12;
-        return a4 * Math.pow(2, (midiNote - 69) / 12);
+        return equalTempFreq;
       } else {
+        // Just Intonation: calculate interval from key center
         const interval = (semitone - pitchCenter + 12) % 12;
-        const baseMidi = 60 + pitchCenter;
-        const baseFreq = a4 * Math.pow(2, (baseMidi - 69) / 12);
-        const targetRatio = JUST_RATIOS[interval];
-        const targetOctaveOffset = noteOctave - 4;
+        
+        // Get tonic frequency in octave 4
+        const tonicMidi = 60 + pitchCenter;
+        const tonicOctave4Freq = a4 * Math.pow(2, (tonicMidi - 69) / 12);
+        
+        // Adjust tonic to the same octave as the target note
+        const tonicFreq = tonicOctave4Freq * Math.pow(2, noteOctave - 4);
+        
+        // Use selected minor 7th ratio when interval is 10 (minor 7th)
+        const targetRatio =
+          interval === 10 ? MINOR_7TH_RATIOS[minor7System] : JUST_RATIOS[interval];
+        
+        // Apply just intonation ratio
+        let jiFreq = tonicFreq * targetRatio;
+        
+        // Octave correction: ensure JI frequency is in the correct octave
+        // (same approach as Tuner's getJustIntonationFrequency)
+        while (jiFreq > equalTempFreq * 1.4) jiFreq /= 2;
+        while (jiFreq < equalTempFreq * 0.7) jiFreq *= 2;
 
-        return baseFreq * targetRatio * Math.pow(2, targetOctaveOffset);
+        return jiFreq;
       }
     },
-    [concertA, temperament, pitchCenter],
+    [concertA, temperament, pitchCenter, minor7System],
   );
 
   // Start a drone
@@ -459,6 +482,13 @@ export default function PitchDrone({
 
       const semitone = noteNameToSemitone(initialNote);
       if (semitone !== null) {
+        const noteName = NOTES[semitone].name;
+        // Update octaveStacks for visual highlighting
+        setOctaveStacks((prev) => ({
+          ...prev,
+          [noteName]: [octave],
+        }));
+        // Start the audio
         startDrone(semitone, octave);
         devLog(`[Drone] Auto-started ${initialNote} in octave ${octave}`);
       }
@@ -601,8 +631,22 @@ export default function PitchDrone({
 
   const isAnyDronePlaying = Object.keys(activeDrones).length > 0;
 
+  // Responsive vertical spacing
+  const { height: screenHeight } = useWindowDimensions();
+  const MIN_HEIGHT = 568;
+  const MAX_HEIGHT = 700;
+  const heightRatio = Math.min(
+    1,
+    Math.max(0, (screenHeight - MIN_HEIGHT) / (MAX_HEIGHT - MIN_HEIGHT)),
+  );
+  // Gap ranges: minimum values from current styling, max = 20
+  const smallGap = Math.round(6 + heightRatio * (20 - 6)); // 6-20
+  const mediumGap = Math.round(8 + heightRatio * (20 - 8)); // 8-20
+  const largeGap = Math.round(12 + heightRatio * (20 - 12)); // 12-20
+  const topPadding = Math.round(4 + heightRatio * (20 - 4)); // 4-20
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: topPadding }]}>
       {/* Mute Button */}
       {isAnyDronePlaying && !hideInternalMute && (
         <Pressable
@@ -622,111 +666,23 @@ export default function PitchDrone({
       )}
 
       {/* Header */}
-      <Text style={styles.headerTitle}>Pitch Drone</Text>
+      <Text style={[styles.headerTitle, { marginBottom: largeGap }]}>Pitch Drone</Text>
 
-      {/* Temperament & Concert A Row */}
-      <View style={styles.headerRow}>
-        {/* Temperament Toggle */}
-        <View style={styles.temperamentToggle}>
-          <TouchableOpacity
-            onPress={() => setTemperament("equal")}
-            style={[
-              styles.temperamentButtonLeft,
-              temperament === "equal"
-                ? styles.temperamentButtonActive
-                : styles.temperamentButtonInactive,
-            ]}
-            accessibilityLabel={`Equal temperament${temperament === "equal" ? ", selected" : ""}`}
-            accessibilityRole="button"
-            accessibilityState={{ selected: temperament === "equal" }}
-          >
-            <Text
-              style={[
-                styles.temperamentButtonText,
-                temperament === "equal"
-                  ? styles.temperamentButtonTextActive
-                  : styles.temperamentButtonTextInactive,
-              ]}
-            >
-              Equal
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setTemperament("just")}
-            style={[
-              styles.temperamentButtonRight,
-              temperament === "just"
-                ? styles.temperamentButtonActive
-                : styles.temperamentButtonInactive,
-            ]}
-            accessibilityLabel={`Just intonation${temperament === "just" ? ", selected" : ""}`}
-            accessibilityRole="button"
-            accessibilityState={{ selected: temperament === "just" }}
-          >
-            <Text
-              style={[
-                styles.temperamentButtonText,
-                temperament === "just"
-                  ? styles.temperamentButtonTextActive
-                  : styles.temperamentButtonTextInactive,
-              ]}
-            >
-              Just
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Concert A Input */}
-        <View style={styles.concertARow}>
-          <Text style={styles.concertALabel}>A=</Text>
-          <TextInput
-            value={concertA}
-            onChangeText={setConcertA}
-            keyboardType="numeric"
-            style={styles.concertAInput}
-            placeholder="440"
-            placeholderTextColor="#666"
-          />
-          <Text style={styles.concertAUnit}>Hz</Text>
-        </View>
-      </View>
-
-      {/* Pitch Center (only for Just temperament) */}
-      {temperament === "just" && (
-        <View style={styles.pitchCenterContainer}>
-          <Text style={styles.justIntonationLabel}>
-            Root for Just Intonation:
-          </Text>
-          <View style={styles.pitchCenterGrid}>
-            {NOTES.map((note, idx) => (
-              <TouchableOpacity
-                key={note.name}
-                onPress={() => setPitchCenter(idx)}
-                style={[
-                  styles.pitchCenterButton,
-                  pitchCenter === idx
-                    ? styles.pitchCenterButtonActive
-                    : styles.pitchCenterButtonInactive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.pitchCenterText,
-                    pitchCenter === idx
-                      ? styles.pitchCenterTextActive
-                      : styles.pitchCenterTextInactive,
-                  ]}
-                >
-                  {note.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      )}
+      {/* Tuning Settings Button (shared component) */}
+      <TuningSettingsButton
+        temperament={temperament}
+        concertA={concertA}
+        keyIndex={pitchCenter}
+        minor7System={minor7System}
+        onTemperamentChange={setTemperament}
+        onConcertAChange={setConcertA}
+        onKeyIndexChange={setPitchCenter}
+        onMinor7SystemChange={setMinor7System}
+        style={[styles.settingsSummaryButton, { marginBottom: largeGap }]}
+      />
 
       {/* Octave Selector */}
-      <View style={styles.octaveRow}>
+      <View style={[styles.octaveRow, { marginBottom: largeGap }]}>
         <TouchableOpacity
           onPress={() => setOctave(Math.max(1, octave - 1))}
           style={[
@@ -775,7 +731,7 @@ export default function PitchDrone({
       </View>
 
       {/* Sustain & Vibrato Row */}
-      <View style={styles.toggleRow}>
+      <View style={[styles.toggleRow, { marginBottom: mediumGap }]}>
         {/* Sustain Button */}
         <TouchableOpacity
           onPress={handleSustainToggle}
@@ -860,7 +816,7 @@ export default function PitchDrone({
 
       {/* Active Drones Summary */}
       {isAnyDronePlaying && (
-        <View style={styles.activeDronesSummary}>
+        <View style={[styles.activeDronesSummary, { marginTop: smallGap }]}>
           <Text style={styles.activeDronesText}>
             Active:{" "}
             {Object.keys(activeDrones)
@@ -873,8 +829,8 @@ export default function PitchDrone({
       )}
 
       {/* Octave Color Legend */}
-      <View style={styles.legendContainer}>
-        <Text style={styles.legendLabel}>Octave colors:</Text>
+      <View style={[styles.legendContainer, { marginTop: smallGap }]}>
+        <Text style={styles.legendLabel}>Octaves:</Text>
         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((oct) => (
           <View key={oct} style={styles.legendItem}>
             <View

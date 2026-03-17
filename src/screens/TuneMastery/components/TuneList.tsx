@@ -70,6 +70,7 @@ const TuneList = React.memo(function TuneList({
           isFirst={index === 0}
           isLast={index === tunes.length - 1}
           isArchive={isArchive}
+          anyTuneExpanded={expandedId !== null}
           onMoveUp={onReorder ? () => onReorder(tune.id, -1) : undefined}
           onMoveDown={onReorder ? () => onReorder(tune.id, 1) : undefined}
           onArchive={onArchive ? () => onArchive(tune.id) : undefined}

@@ -5,10 +5,8 @@ import {
   TouchableOpacity,
   Pressable,
   Platform,
-  ScrollView,
   Modal,
-  ViewStyle,
-  TextStyle,
+  useWindowDimensions,
 } from "react-native";
 import Slider from "@react-native-community/slider";
 import { devLog, devWarn } from "../utils/devLogger";
@@ -21,6 +19,10 @@ import {
   getSubdivisionLabel,
   createClickSound,
 } from "./Metronome/constants";
+
+// Import picker modals
+import TimeSignaturePickerModal from "./Metronome/TimeSignaturePickerModal";
+import SubdivisionPickerModal from "./Metronome/SubdivisionPickerModal";
 
 // Import styles
 import { styles, colors } from "./Metronome/styles";
@@ -45,6 +47,49 @@ if (Platform.OS !== "web") {
     devWarn("react-native-audio-api not available:", e);
   }
 }
+
+/**
+ * SMuFL codepoints for Bravura font note symbols (stem up variants)
+ */
+const NOTE_SYMBOLS: Record<number, string> = {
+  1: "\uE1D2",  // noteWhole
+  2: "\uE1D3",  // noteHalfUp
+  4: "\uE1D5",  // noteQuarterUp
+  8: "\uE1D7",  // note8thUp
+  16: "\uE1D9", // note16thUp
+  32: "\uE1DB", // note32ndUp
+};
+
+/**
+ * NoteSymbol component - renders musical note symbols using Bravura font
+ * Vertical offset aligns noteheads (stems go up, so stemmed notes shift down)
+ */
+interface NoteSymbolProps {
+  value: number;
+  active: boolean;
+}
+
+const NoteSymbol: React.FC<NoteSymbolProps> = ({ value, active }) => {
+  const color = active ? colors.textDark : colors.gold;
+  const symbol = NOTE_SYMBOLS[value] || NOTE_SYMBOLS[4];
+
+  // Whole note doesn't have stem, needs to move back up to center
+  const topOffset = value === 1 ? -16 : 0;
+
+  return (
+    <Text
+      style={{
+        fontFamily: "Bravura",
+        fontSize: 28,
+        color,
+        textAlign: "center",
+        marginTop: topOffset,
+      }}
+    >
+      {symbol}
+    </Text>
+  );
+};
 
 /**
  * Metronome Component
@@ -119,6 +164,19 @@ const Metronome: React.FC<MetronomeProps> = ({
 
   // Volume modal state
   const [showVolumeModal, setShowVolumeModal] = useState(false);
+
+  // Responsive vertical spacing
+  const { height: screenHeight } = useWindowDimensions();
+  const MIN_HEIGHT = 568;
+  const MAX_HEIGHT = 700;
+  const MIN_GAP = 8; // minimum spacing (current tight values)
+  const MAX_GAP = 20; // maximum spacing
+  const heightRatio = Math.min(
+    1,
+    Math.max(0, (screenHeight - MIN_HEIGHT) / (MAX_HEIGHT - MIN_HEIGHT)),
+  );
+  const verticalGap = Math.round(MIN_GAP + heightRatio * (MAX_GAP - MIN_GAP));
+  const smallGap = Math.round(verticalGap * 0.6); // for tighter spacing (e.g., 5-12px)
 
   // Reset subdivision to "none" if swing is selected but noteValue changes from 4
   useEffect(() => {
@@ -386,7 +444,7 @@ const Metronome: React.FC<MetronomeProps> = ({
   const currentSubdivision = SUBDIVISIONS[subdivision];
 
   return (
-    <View style={styles.mainContainer}>
+    <View style={[styles.mainContainer, { padding: verticalGap }]}>
       {/* Mute Button - top right corner, only when playing */}
       {/* Tap to mute, long-press for volume controls */}
       {isPlaying && !hideInternalMute && (
@@ -406,15 +464,9 @@ const Metronome: React.FC<MetronomeProps> = ({
         </Pressable>
       )}
 
-      {/* BPM Display */}
-      <View style={styles.bpmContainer}>
-        <Text style={styles.bpmText}>{bpm}</Text>
-        <Text style={styles.bpmLabel}>BPM</Text>
-      </View>
-
-      {/* Time Signature & Subdivision Display */}
+      {/* Time Signature & Subdivision Buttons - always at top */}
       {showControls && (showTimeSignature || showSubdivision) && (
-        <View style={styles.selectorRow}>
+        <View style={[styles.selectorRow, { marginBottom: smallGap }]}>
           {/* Time Signature Selector */}
           {showTimeSignature && (
             <TouchableOpacity
@@ -477,285 +529,176 @@ const Metronome: React.FC<MetronomeProps> = ({
         </View>
       )}
 
-      {/* Time Signature Picker */}
-      {showTimeSigPicker && (
-        <View style={styles.timeSigPickerPanel}>
-          <Text style={[styles.pickerTitle, styles.pickerTitleGold]}>
-            Time Signature
-          </Text>
+      {/* Time Signature Picker Modal */}
+      <TimeSignaturePickerModal
+        visible={showTimeSigPicker}
+        onClose={() => setShowTimeSigPicker(false)}
+        beatsPerMeasure={beatsPerMeasure}
+        noteValue={noteValue}
+        onBeatsChange={setBeatsPerMeasure}
+        onNoteValueChange={setNoteValue}
+      />
 
-          {/* Beats per measure (top number) */}
-          <View style={styles.beatsPerMeasureSection}>
-            <Text style={styles.pickerLabel}>Beats per measure (1-12):</Text>
-            <View style={styles.stepperRow}>
-              <TouchableOpacity
-                onPress={() =>
-                  setBeatsPerMeasure(Math.max(1, beatsPerMeasure - 1))
-                }
-                style={styles.stepperButton}
-              >
-                <Text style={styles.stepperButtonText}>-</Text>
-              </TouchableOpacity>
-              <Text style={styles.stepperValue}>{beatsPerMeasure}</Text>
-              <TouchableOpacity
-                onPress={() =>
-                  setBeatsPerMeasure(Math.min(12, beatsPerMeasure + 1))
-                }
-                style={styles.stepperButton}
-              >
-                <Text style={styles.stepperButtonText}>+</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+      {/* Subdivision Picker Modal */}
+      <SubdivisionPickerModal
+        visible={showSubdivisionPicker}
+        onClose={() => setShowSubdivisionPicker(false)}
+        subdivision={subdivision}
+        noteValue={noteValue}
+        onSubdivisionChange={setSubdivision}
+      />
 
-          {/* Note value (bottom number) */}
-          <View>
-            <Text style={styles.pickerLabel}>Beat note value:</Text>
-            <View style={styles.noteValueGrid}>
-              {NOTE_VALUES.map((val: number) => (
-                <TouchableOpacity
-                  key={val}
-                  onPress={() => setNoteValue(val)}
-                  style={[
-                    styles.noteValueButton,
-                    noteValue === val
-                      ? styles.noteValueButtonActive
-                      : styles.noteValueButtonInactive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.noteValueText,
-                      noteValue === val
-                        ? styles.noteValueTextActive
-                        : styles.noteValueTextInactive,
-                    ]}
-                  >
-                    {val}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.noteValueLabel,
-                      noteValue === val
-                        ? styles.noteValueLabelActive
-                        : styles.noteValueLabelInactive,
-                    ]}
-                  >
-                    {NOTE_VALUE_NAMES[val]}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <TouchableOpacity
-            onPress={() => setShowTimeSigPicker(false)}
-            style={styles.timeSigDoneButton}
-          >
-            <Text style={styles.timeSigDoneButtonText}>Done</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Subdivision Picker */}
-      {showSubdivisionPicker && (
-        <View style={styles.subdivisionPickerPanel}>
-          <Text style={styles.subdivisionPickerTitle}>Subdivision Pattern</Text>
-          {noteValue !== 4 && (
-            <Text style={styles.pickerNote}>
-              Note: Swing patterns only available in /4 time
-            </Text>
-          )}
-          <ScrollView
-            style={styles.subdivisionScrollView}
-            showsVerticalScrollIndicator={true}
-          >
-            {Object.entries(SUBDIVISIONS)
-              .filter(
-                ([key, sub]) =>
-                  !(sub as { swingOnly?: boolean }).swingOnly ||
-                  noteValue === 4,
-              )
-              .map(([key, sub]) => (
-                <TouchableOpacity
-                  key={key}
-                  onPress={() => {
-                    setSubdivision(key);
-                    setShowSubdivisionPicker(false);
-                  }}
-                  style={[
-                    styles.subdivisionOption,
-                    subdivision === key
-                      ? styles.subdivisionOptionActive
-                      : styles.subdivisionOptionInactive,
-                  ]}
-                >
-                  <View style={styles.subdivisionOptionContent}>
-                    <Text
-                      style={[
-                        styles.subdivisionOptionTitle,
-                        subdivision === key
-                          ? styles.subdivisionOptionTitleActive
-                          : styles.subdivisionOptionTitleInactive,
-                      ]}
-                    >
-                      {getSubdivisionLabel(key, noteValue)}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.subdivisionOptionDesc,
-                        subdivision === key
-                          ? styles.subdivisionOptionDescActive
-                          : styles.subdivisionOptionDescInactive,
-                      ]}
-                    >
-                      {(sub as { description: string }).description}
-                    </Text>
-                  </View>
-                  {subdivision === key && (
-                    <Text style={styles.subdivisionCheckmark}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-          </ScrollView>
-
-          <TouchableOpacity
-            onPress={() => setShowSubdivisionPicker(false)}
-            style={styles.doneButtonPurple}
-          >
-            <Text style={styles.doneButtonTextLight}>Done</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Beat Indicator */}
-      <View style={styles.beatIndicatorRow}>
-        {Array.from({ length: beatsPerMeasure }, (_, i) => {
-          const isCurrentBeat = isPlaying && currentBeat === i;
-          const isAccentBeat = i === 0 && accentFirst;
-          return (
-            <View
-              key={i}
-              style={[
-                styles.beatDot,
-                isCurrentBeat
-                  ? isAccentBeat
-                    ? styles.beatDotActiveAccent
-                    : styles.beatDotActive
-                  : isAccentBeat
-                    ? styles.beatDotInactiveAccent
-                    : styles.beatDotInactive,
-              ]}
-            />
-          );
-        })}
-      </View>
-
-      {/* Subdivision indicator (small dots under current beat) */}
-      {subdivision !== "none" && isPlaying && (
-        <View style={styles.subIndicatorRow}>
-          {currentSubdivision.pattern.map((_: number, i: number) => (
-            <View
-              key={i}
-              style={[
-                styles.subIndicatorDot,
-                currentSubClick === i
-                  ? styles.subIndicatorDotActive
-                  : styles.subIndicatorDotInactive,
-              ]}
-            />
-          ))}
-        </View>
-      )}
-
-      {showControls && (
+      {/* Hide elements below when picker is open */}
+      {!showTimeSigPicker && !showSubdivisionPicker && (
         <>
-          {/* BPM Controls */}
-          <View style={styles.bpmControlsRow}>
-            <TouchableOpacity
-              onPress={() => handleBpmChange(bpm - 5)}
-              style={styles.bpmButtonLarge}
-            >
-              <Text style={styles.bpmButtonLargeText}>-</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => handleBpmChange(bpm - 1)}
-              style={styles.bpmButtonSmall}
-            >
-              <Text style={styles.bpmButtonSmallText}>-1</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => handleBpmChange(bpm + 1)}
-              style={styles.bpmButtonSmall}
-            >
-              <Text style={styles.bpmButtonSmallText}>+1</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => handleBpmChange(bpm + 5)}
-              style={styles.bpmButtonLarge}
-            >
-              <Text style={styles.bpmButtonLargeText}>+</Text>
-            </TouchableOpacity>
+          {/* BPM Display */}
+          <View style={[styles.bpmContainer, { marginBottom: verticalGap }]}>
+            <Text style={styles.bpmText}>{bpm}</Text>
+            <Text style={styles.bpmLabel}>BPM</Text>
           </View>
 
-          {/* Play/Stop & Tap Tempo */}
-          <View style={styles.playButtonsRow}>
-            <TouchableOpacity
-              onPress={togglePlay}
-              style={[
-                styles.playButtonStart,
-                isPlaying && styles.playButtonStop,
-              ]}
-              accessibilityLabel={
-                isPlaying ? "Stop metronome" : "Start metronome"
-              }
-              accessibilityRole="button"
-            >
-              <Text style={styles.playButtonText}>
-                {isPlaying ? "⏹ Stop" : "▶ Start"}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleTapTempo}
-              style={styles.tapButton}
-              accessibilityLabel="Tap tempo"
-              accessibilityHint="Tap repeatedly to set tempo from your taps"
-              accessibilityRole="button"
-            >
-              <Text style={styles.tapButtonText}>👆 Tap</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Preset BPM buttons */}
-          <View style={styles.presetsRow}>
-            {[60, 80, 100, 120, 140, 160].map((preset) => (
-              <TouchableOpacity
-                key={preset}
-                onPress={() => handleBpmChange(preset)}
-                style={[
-                  styles.presetButton,
-                  bpm === preset
-                    ? styles.presetButtonActive
-                    : styles.presetButtonInactive,
-                ]}
-              >
-                <Text
+          {/* Beat Indicator */}
+          <View style={[styles.beatIndicatorRow, { marginBottom: verticalGap }]}>
+            {Array.from({ length: beatsPerMeasure }, (_, i) => {
+              const isCurrentBeat = isPlaying && currentBeat === i;
+              const isAccentBeat = i === 0 && accentFirst;
+              return (
+                <View
+                  key={i}
                   style={[
-                    styles.presetButtonText,
-                    bpm === preset
-                      ? styles.presetButtonTextActive
-                      : styles.presetButtonTextInactive,
+                    styles.beatDot,
+                    isCurrentBeat
+                      ? isAccentBeat
+                        ? styles.beatDotActiveAccent
+                        : styles.beatDotActive
+                      : isAccentBeat
+                        ? styles.beatDotInactiveAccent
+                        : styles.beatDotInactive,
                   ]}
-                >
-                  {preset}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                />
+              );
+            })}
           </View>
+
+          {showControls && (
+            <>
+              {/* BPM Controls */}
+              <View style={[styles.bpmControlsRow, { marginBottom: verticalGap }]}>
+                <TouchableOpacity
+                  onPress={() => handleBpmChange(bpm - 5)}
+                  style={styles.bpmButtonLarge}
+                >
+                  <Text style={styles.bpmButtonLargeText}>-</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => handleBpmChange(bpm - 1)}
+                  style={styles.bpmButtonSmall}
+                >
+                  <Text style={styles.bpmButtonSmallText}>-1</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => handleBpmChange(bpm + 1)}
+                  style={styles.bpmButtonSmall}
+                >
+                  <Text style={styles.bpmButtonSmallText}>+1</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => handleBpmChange(bpm + 5)}
+                  style={styles.bpmButtonLarge}
+                >
+                  <Text style={styles.bpmButtonLargeText}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Play/Stop & Tap Tempo */}
+              <View style={[styles.playButtonsRow, { marginTop: smallGap }]}>
+                <TouchableOpacity
+                  onPress={togglePlay}
+                  style={[
+                    styles.playButtonStart,
+                    isPlaying && styles.playButtonStop,
+                  ]}
+                  accessibilityLabel={
+                    isPlaying ? "Stop metronome" : "Start metronome"
+                  }
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.playButtonText}>
+                    {isPlaying ? "⏹ Stop" : "▶ Start"}
+                  </Text>
+                </TouchableOpacity>
+
+                {!isPlaying && (
+                  <TouchableOpacity
+                    onPress={handleTapTempo}
+                    style={styles.tapButton}
+                    accessibilityLabel="Tap tempo"
+                    accessibilityHint="Tap repeatedly to set tempo from your taps"
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.tapButtonText}>Tap</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Preset BPM buttons - two rows of 3 */}
+              <View style={[styles.presetsContainer, { marginTop: verticalGap }]}>
+                <View style={styles.presetsRow}>
+                  {[60, 80, 100].map((preset) => (
+                    <TouchableOpacity
+                      key={preset}
+                      onPress={() => handleBpmChange(preset)}
+                      style={[
+                        styles.presetButton,
+                        bpm === preset
+                          ? styles.presetButtonActive
+                          : styles.presetButtonInactive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.presetButtonText,
+                          bpm === preset
+                            ? styles.presetButtonTextActive
+                            : styles.presetButtonTextInactive,
+                        ]}
+                      >
+                        {preset}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={styles.presetsRow}>
+                  {[120, 140, 160].map((preset) => (
+                    <TouchableOpacity
+                      key={preset}
+                      onPress={() => handleBpmChange(preset)}
+                      style={[
+                        styles.presetButton,
+                        bpm === preset
+                          ? styles.presetButtonActive
+                          : styles.presetButtonInactive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.presetButtonText,
+                          bpm === preset
+                            ? styles.presetButtonTextActive
+                            : styles.presetButtonTextInactive,
+                        ]}
+                      >
+                        {preset}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </>
+          )}
         </>
       )}
 

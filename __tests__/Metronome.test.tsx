@@ -866,8 +866,8 @@ describe("Metronome", () => {
       // Subdivision button should show "None" by default
       const subButton = getByText("None");
       fireEvent.press(subButton);
-      // Picker should now be visible with title "Subdivision Pattern"
-      expect(queryByText("Subdivision Pattern")).toBeTruthy();
+      // Picker should now be visible with title "Subdivision"
+      expect(queryByText("Subdivision")).toBeTruthy();
     });
 
     it("disabled when time signature picker is open", () => {
@@ -886,17 +886,18 @@ describe("Metronome", () => {
       const subButton = getByText("None");
       // Try to press - picker should not open
       fireEvent.press(subButton);
-      expect(queryByText("Subdivision Pattern")).toBeNull();
+      expect(queryByText(/^Subdivision$/)).toBeNull();
     });
 
-    it("closes subdivision picker when Done pressed", () => {
+    it("closes subdivision picker when close button pressed", () => {
       const { getByText, queryByText } = render(
         <Metronome showControls={true} showSubdivision={true} />,
       );
       fireEvent.press(getByText("None"));
-      expect(queryByText("Subdivision Pattern")).toBeTruthy();
-      fireEvent.press(getByText("Done"));
-      expect(queryByText("Subdivision Pattern")).toBeNull();
+      expect(queryByText(/^Subdivision$/)).toBeTruthy();
+      // Press the close button (✕)
+      fireEvent.press(getByText("✕"));
+      expect(queryByText(/^Subdivision$/)).toBeNull();
     });
 
     it("selects a subdivision option", () => {
@@ -906,8 +907,8 @@ describe("Metronome", () => {
       fireEvent.press(getByText("None"));
       // Select triplets option
       fireEvent.press(getByText("eighth note triplets"));
-      // Picker should close
-      expect(queryByText("Subdivision Pattern")).toBeNull();
+      // Picker should close (auto-closes on selection)
+      expect(queryByText(/^Subdivision$/)).toBeNull();
     });
   });
 });

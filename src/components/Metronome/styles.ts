@@ -79,6 +79,7 @@ interface MetronomeStyles {
 
   // Note value grid
   noteValueGrid: ViewStyle;
+  noteValueRow: ViewStyle;
   noteValueButton: ViewStyle;
   noteValueButtonActive: ViewStyle;
   noteValueButtonInactive: ViewStyle;
@@ -185,7 +186,8 @@ interface MetronomeStyles {
   tapButton: ViewStyle;
   tapButtonText: TextStyle;
 
-  // Presets row
+  // Presets
+  presetsContainer: ViewStyle;
   presetsRow: ViewStyle;
   presetButton: ViewStyle;
   presetButtonActive: ViewStyle;
@@ -224,7 +226,7 @@ export const styles = StyleSheet.create<MetronomeStyles>({
 
   // BPM Display
   bpmContainer: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   bpmText: {
     color: colors.gold,
@@ -243,8 +245,7 @@ export const styles = StyleSheet.create<MetronomeStyles>({
   selectorRow: {
     flexDirection: "row",
     justifyContent: "center",
-    marginBottom: 12,
-    flexWrap: "wrap",
+    marginBottom: 8,
   },
 
   // Time signature button
@@ -361,17 +362,24 @@ export const styles = StyleSheet.create<MetronomeStyles>({
 
   // Note value grid
   noteValueGrid: {
+    alignItems: "center",
+    width: "100%",
+  },
+  noteValueRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     justifyContent: "center",
+    marginTop: 4,
   },
   noteValueButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
+    paddingTop: 18,
     borderRadius: 8,
     margin: 4,
-    minWidth: 50,
+    width: 50,
+    height: 50,
     alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
   noteValueButtonActive: {
     backgroundColor: colors.gold,
@@ -468,7 +476,7 @@ export const styles = StyleSheet.create<MetronomeStyles>({
   beatIndicatorRow: {
     flexDirection: "row",
     justifyContent: "center",
-    marginBottom: 20,
+    marginBottom: 16,
     flexWrap: "wrap",
     maxWidth: 320,
   },
@@ -501,7 +509,7 @@ export const styles = StyleSheet.create<MetronomeStyles>({
   subdivisionIndicatorRow: {
     flexDirection: "row",
     justifyContent: "center",
-    marginBottom: 12,
+    marginBottom: 8,
     marginTop: -10,
   },
   subdivisionDot: {
@@ -641,7 +649,7 @@ export const styles = StyleSheet.create<MetronomeStyles>({
   // Main component container
   mainContainer: {
     alignItems: "center",
-    padding: 16,
+    padding: 12,
     position: "relative",
     width: "100%",
   },
@@ -733,6 +741,7 @@ export const styles = StyleSheet.create<MetronomeStyles>({
   playButtonsRow: {
     flexDirection: "row",
     justifyContent: "center",
+    alignItems: "center",
     marginTop: 8,
   },
   playButtonStart: {
@@ -741,6 +750,8 @@ export const styles = StyleSheet.create<MetronomeStyles>({
     paddingHorizontal: 32,
     borderRadius: 24,
     marginRight: 12,
+    justifyContent: "center",
+    alignItems: "center",
   },
   playButtonStop: {
     backgroundColor: "#c0392b",
@@ -748,35 +759,43 @@ export const styles = StyleSheet.create<MetronomeStyles>({
     paddingHorizontal: 32,
     borderRadius: 24,
     marginRight: 12,
+    justifyContent: "center",
+    alignItems: "center",
   },
   tapButton: {
     backgroundColor: colors.surface,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     borderWidth: 2,
     borderColor: colors.gold,
+    justifyContent: "center",
+    alignItems: "center",
   },
   tapButtonText: {
     color: colors.gold,
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: 14,
+    textAlign: "center",
   },
 
-  // Presets row
+  // Presets
+  presetsContainer: {
+    alignItems: "center",
+    width: "100%",
+  },
   presetsRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     justifyContent: "center",
-    marginTop: 16,
-    width: "100%",
+    marginTop: 8,
   },
   presetButton: {
     paddingVertical: 8,
-    paddingHorizontal: 14,
+    width: 50,
     borderRadius: 16,
-    margin: 4,
+    marginHorizontal: 4,
     backgroundColor: colors.surfaceDark,
+    alignItems: "center",
   },
   presetButtonActive: {
     backgroundColor: colors.gold,
@@ -915,6 +934,7 @@ interface CompactStyles {
   playButtonText: TextStyle;
   tapButton: ViewStyle;
   tapButtonText: TextStyle;
+  presetsContainer: ViewStyle;
   presetsRow: ViewStyle;
   presetButton: ViewStyle;
   presetButtonActive: ViewStyle;
@@ -976,7 +996,7 @@ export const compactStyles = StyleSheet.create<CompactStyles>({
   // Main component container
   mainContainer: {
     alignItems: "center",
-    padding: 16,
+    padding: 12,
     position: "relative",
   },
 
@@ -1124,6 +1144,7 @@ export const compactStyles = StyleSheet.create<CompactStyles>({
   // Play buttons row
   playButtonsRow: {
     flexDirection: "row",
+    alignItems: "center",
     marginTop: 8,
   },
   playButton: {
@@ -1131,6 +1152,8 @@ export const compactStyles = StyleSheet.create<CompactStyles>({
     paddingHorizontal: 32,
     borderRadius: 24,
     marginRight: 12,
+    justifyContent: "center",
+    alignItems: "center",
   },
   playButtonStart: {
     backgroundColor: "#27ae60",
@@ -1141,34 +1164,45 @@ export const compactStyles = StyleSheet.create<CompactStyles>({
   playButtonText: {
     color: colors.textLight,
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: 18,
+    textAlign: "center",
+    includeFontPadding: false,
+    textAlignVertical: "center",
   },
   tapButton: {
     backgroundColor: colors.surface,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     borderWidth: 2,
     borderColor: colors.gold,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: -4,
   },
   tapButtonText: {
     color: colors.gold,
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: 14,
+    textAlign: "center",
   },
 
-  // Presets row
+  // Presets
+  presetsContainer: {
+    alignItems: "center",
+    width: "100%",
+  },
   presetsRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     justifyContent: "center",
-    marginTop: 16,
+    marginTop: 8,
   },
   presetButton: {
     paddingVertical: 8,
-    paddingHorizontal: 14,
+    width: 50,
     borderRadius: 16,
-    margin: 4,
+    marginHorizontal: 4,
+    alignItems: "center",
   },
   presetButtonActive: {
     backgroundColor: colors.gold,
@@ -1280,7 +1314,7 @@ export const compactStyles = StyleSheet.create<CompactStyles>({
   beatIndicatorRow: {
     flexDirection: "row",
     justifyContent: "center",
-    marginBottom: 20,
+    marginBottom: 16,
     flexWrap: "wrap",
     maxWidth: 320,
   },

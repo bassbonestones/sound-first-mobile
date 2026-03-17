@@ -105,20 +105,14 @@ import {
 } from "./Tuner/tunerChallenge";
 import { CHALLENGE_DIFFICULTIES } from "./Tuner/tunerConstants";
 
-// Minor 7th system options
-export type Minor7System = "classical" | "pythagorean" | "harmonic";
-
-const MINOR_7TH_RATIOS: Record<Minor7System, number> = {
-  classical: 9 / 5, // ~1018 cents, +18 vs ET - Classical harmony
-  pythagorean: 16 / 9, // ~996 cents, +4 vs ET - Modal/melodic
-  harmonic: 7 / 4, // ~969 cents, -31 vs ET - Dominant 7 chords (natural harmonic series)
-};
-
-const MINOR_7TH_LABELS: Record<Minor7System, string> = {
-  classical: "9:5",
-  pythagorean: "16:9",
-  harmonic: "7:4",
-};
+// Import shared tuning settings component and types
+import TuningSettingsButton, {
+  type Minor7System,
+  type Temperament,
+  MINOR_7TH_RATIOS,
+  MINOR_7TH_LABELS,
+  KEY_DISPLAY_NAMES,
+} from "../../../components/TuningSettingsButton";
 
 // Just intonation ratios for chromatic scale degrees relative to tonic
 // Index corresponds to semitones above tonic
@@ -136,22 +130,6 @@ const JUST_RATIOS: number[] = [
   5 / 3, // 9: Major 6th
   9 / 5, // 10: Minor 7th (default - will be overridden)
   15 / 8, // 11: Major 7th
-];
-
-// Key display names with enharmonics
-const KEY_DISPLAY_NAMES: string[] = [
-  "C",
-  "C#/Db",
-  "D",
-  "D#/Eb",
-  "E",
-  "F",
-  "F#/Gb",
-  "G",
-  "G#/Ab",
-  "A",
-  "A#/Bb",
-  "B",
 ];
 
 /**
@@ -241,7 +219,9 @@ function getJustIntonationFrequency(
 }
 
 export type TunerMode = "needle" | "text";
-export type Temperament = "equal" | "just";
+
+// Re-export types from shared component for convenience
+export type { Minor7System, Temperament };
 
 export interface TunerProps {
   mode?: TunerMode;
@@ -289,7 +269,6 @@ const Tuner = React.memo(function Tuner({
   const [selectedKeyIndex, setSelectedKeyIndex] = useState(initialKeyIndex); // 0 = C
   const [concertA, setConcertA] = useState(String(initialConcertA));
   const [minor7System, setMinor7System] = useState<Minor7System>("pythagorean");
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
   // Feedback display mode: 0=Deviation, 1=Guidance, 2=Stability, 3=Tendency
   const [feedbackMode, setFeedbackMode] = useState(0);
   // Active panel: "stats", "challenge", or null (just buttons)
@@ -735,37 +714,18 @@ const Tuner = React.memo(function Tuner({
         {/* Error Message */}
         {error && <Text style={styles.errorText}>{error}</Text>}
 
-        {/* Settings Summary Button - positioned above tuner display */}
-        <TouchableOpacity
-          style={[
-            styles.settingsSummaryButton,
-            { marginBottom: verticalGap + 2 },
-          ]}
-          onPress={() => setShowSettingsModal(true)}
-          accessibilityLabel="Open tuning settings"
-          accessibilityRole="button"
-        >
-          <View style={styles.settingsSummaryMetrics}>
-            {activeTemperament === "equal" ? (
-              <>
-                <Text style={styles.settingsSummaryMetric}>ET</Text>
-                <Text style={styles.settingsSummaryMetric}>A={concertA}Hz</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.settingsSummaryMetric}>JI</Text>
-                <Text style={styles.settingsSummaryMetric}>
-                  {KEY_DISPLAY_NAMES[selectedKeyIndex]}
-                </Text>
-                <Text style={styles.settingsSummaryMetric}>A={concertA}Hz</Text>
-                <Text style={styles.settingsSummaryMetric}>
-                  m7: {MINOR_7TH_LABELS[minor7System]}
-                </Text>
-              </>
-            )}
-          </View>
-          <Text style={styles.settingsSummaryIcon}>⚙️</Text>
-        </TouchableOpacity>
+        {/* Tuning Settings Button (shared component) */}
+        <TuningSettingsButton
+          temperament={activeTemperament}
+          concertA={concertA}
+          keyIndex={selectedKeyIndex}
+          minor7System={minor7System}
+          onTemperamentChange={setActiveTemperament}
+          onConcertAChange={setConcertA}
+          onKeyIndexChange={setSelectedKeyIndex}
+          onMinor7SystemChange={setMinor7System}
+          style={{ marginBottom: verticalGap + 2 }}
+        />
 
         {/* Tuner Display */}
         <View style={styles.tunerDisplay}>
@@ -1857,210 +1817,6 @@ const Tuner = React.memo(function Tuner({
           </View>
         )}
       </ScrollView>
-
-      {/* Settings Modal */}
-      <Modal
-        visible={showSettingsModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowSettingsModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Tuning Settings</Text>
-              <TouchableOpacity
-                onPress={() => setShowSettingsModal(false)}
-                style={styles.modalCloseButton}
-                accessibilityLabel="Close settings"
-              >
-                <Text style={styles.modalCloseText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView contentContainerStyle={styles.modalBody}>
-              {/* Temperament */}
-              <View style={styles.modalSection}>
-                <Text style={styles.modalSectionTitle}>Temperament</Text>
-                <View style={styles.temperamentToggle}>
-                  <TouchableOpacity
-                    onPress={() => setActiveTemperament("equal")}
-                    style={[
-                      styles.temperamentButtonLeft,
-                      activeTemperament === "equal"
-                        ? styles.temperamentButtonActive
-                        : styles.temperamentButtonInactive,
-                    ]}
-                    accessibilityLabel={`Standard equal temperament${activeTemperament === "equal" ? ", selected" : ""}`}
-                    accessibilityRole="button"
-                  >
-                    <Text
-                      style={[
-                        styles.temperamentButtonText,
-                        activeTemperament === "equal"
-                          ? styles.temperamentButtonTextActive
-                          : styles.temperamentButtonTextInactive,
-                      ]}
-                    >
-                      Standard (ET)
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setActiveTemperament("just")}
-                    style={[
-                      styles.temperamentButtonRight,
-                      activeTemperament === "just"
-                        ? styles.temperamentButtonActive
-                        : styles.temperamentButtonInactive,
-                    ]}
-                    accessibilityLabel={`Resonance just intonation${activeTemperament === "just" ? ", selected" : ""}`}
-                    accessibilityRole="button"
-                  >
-                    <Text
-                      style={[
-                        styles.temperamentButtonText,
-                        activeTemperament === "just"
-                          ? styles.temperamentButtonTextActive
-                          : styles.temperamentButtonTextInactive,
-                      ]}
-                    >
-                      Resonance (JI)
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Concert A */}
-              <View style={styles.modalSection}>
-                <Text style={styles.modalSectionTitle}>Concert Pitch</Text>
-                <View style={styles.concertARow}>
-                  <Text style={styles.concertALabel}>A =</Text>
-                  <TextInput
-                    value={concertA}
-                    onChangeText={setConcertA}
-                    keyboardType="numeric"
-                    style={styles.concertAInput}
-                    placeholder="440"
-                    placeholderTextColor="#666"
-                    accessibilityLabel="Concert A frequency"
-                  />
-                  <Text style={styles.concertAUnit}>Hz</Text>
-                </View>
-              </View>
-
-              {/* Key Selector (JI only) */}
-              {activeTemperament === "just" && (
-                <View style={styles.modalSection}>
-                  <Text style={styles.modalSectionTitle}>Key Center</Text>
-                  <View style={styles.keyGrid}>
-                    {[0, 1, 2].map((row) => (
-                      <View key={row} style={styles.keyRow}>
-                        {KEY_DISPLAY_NAMES.slice(row * 4, row * 4 + 4).map(
-                          (keyName, colIndex) => {
-                            const index = row * 4 + colIndex;
-                            return (
-                              <TouchableOpacity
-                                key={keyName}
-                                style={[
-                                  styles.keyOption,
-                                  selectedKeyIndex === index &&
-                                    styles.keyOptionActive,
-                                ]}
-                                onPress={() => setSelectedKeyIndex(index)}
-                                accessibilityLabel={`Key of ${keyName}`}
-                                accessibilityRole="button"
-                              >
-                                <Text
-                                  style={[
-                                    styles.keyOptionText,
-                                    selectedKeyIndex === index &&
-                                      styles.keyOptionTextActive,
-                                  ]}
-                                >
-                                  {keyName}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          },
-                        )}
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              {/* Minor 7th (JI only) */}
-              {activeTemperament === "just" && (
-                <View style={styles.modalSection}>
-                  <Text style={styles.modalSectionTitle}>Minor 7th Ratio</Text>
-                  <View style={styles.m7SystemToggle}>
-                    <TouchableOpacity
-                      onPress={() => setMinor7System("classical")}
-                      style={[
-                        styles.m7ButtonLeft,
-                        minor7System === "classical"
-                          ? styles.m7ButtonActive
-                          : styles.m7ButtonInactive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.m7ButtonText,
-                          minor7System === "classical"
-                            ? styles.m7ButtonTextActive
-                            : styles.m7ButtonTextInactive,
-                        ]}
-                      >
-                        9:5
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => setMinor7System("pythagorean")}
-                      style={[
-                        styles.m7ButtonMiddle,
-                        minor7System === "pythagorean"
-                          ? styles.m7ButtonActive
-                          : styles.m7ButtonInactive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.m7ButtonText,
-                          minor7System === "pythagorean"
-                            ? styles.m7ButtonTextActive
-                            : styles.m7ButtonTextInactive,
-                        ]}
-                      >
-                        16:9
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => setMinor7System("harmonic")}
-                      style={[
-                        styles.m7ButtonRight,
-                        minor7System === "harmonic"
-                          ? styles.m7ButtonActive
-                          : styles.m7ButtonInactive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.m7ButtonText,
-                          minor7System === "harmonic"
-                            ? styles.m7ButtonTextActive
-                            : styles.m7ButtonTextInactive,
-                        ]}
-                      >
-                        7:4
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 });

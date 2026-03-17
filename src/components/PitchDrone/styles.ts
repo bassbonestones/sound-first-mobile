@@ -173,13 +173,18 @@ interface PitchDroneStyles {
   volumeLabelPurple: TextStyle;
   volumeLabelCyan: TextStyle;
   slider: ViewStyle;
+
+  // Settings summary button (additional styling for PitchDrone)
+  settingsSummaryButton: ViewStyle;
 }
 
 export const styles = StyleSheet.create<PitchDroneStyles>({
   // Container
   container: {
     alignItems: "center",
-    padding: 16,
+    paddingHorizontal: 8,
+    paddingTop: 4,
+    paddingBottom: 8,
   },
 
   // Header
@@ -377,7 +382,7 @@ export const styles = StyleSheet.create<PitchDroneStyles>({
   toggleRow: {
     flexDirection: "row",
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 8,
   } as ViewStyle,
   toggleButton: {
     paddingVertical: 10,
@@ -421,7 +426,7 @@ export const styles = StyleSheet.create<PitchDroneStyles>({
   },
   noteButton: {
     width: 72,
-    height: 56,
+    height: 38,
     margin: 4,
     borderRadius: 8,
     backgroundColor: colors.surfaceDark,
@@ -566,7 +571,7 @@ export const styles = StyleSheet.create<PitchDroneStyles>({
 
   // Active drones summary
   activeDronesSummary: {
-    marginTop: 12,
+    marginTop: 6,
   },
   activeDronesText: {
     color: colors.goldDark,
@@ -579,7 +584,7 @@ export const styles = StyleSheet.create<PitchDroneStyles>({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    marginTop: 12,
+    marginTop: 6,
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: "#333",
@@ -700,6 +705,11 @@ export const styles = StyleSheet.create<PitchDroneStyles>({
   slider: {
     width: "100%",
     height: 40,
+  },
+
+  // Settings Summary Button (matching Tuner layout)
+  settingsSummaryButton: {
+    marginBottom: 12,
   },
 });
 

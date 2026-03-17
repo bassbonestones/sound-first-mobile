@@ -21,6 +21,17 @@ export { default as VolumeBar } from "./VolumeBar";
 export { default as NotationDisplay } from "./NotationDisplay";
 export { default as StaffNotePicker } from "./StaffNotePicker";
 export { default as EDMVisualizer } from "./EDMVisualizer";
+export { default as TuningSettingsButton } from "./TuningSettingsButton";
+export type {
+  Temperament,
+  Minor7System,
+  TuningSettingsButtonProps,
+} from "./TuningSettingsButton";
+export {
+  MINOR_7TH_RATIOS,
+  MINOR_7TH_LABELS,
+  KEY_DISPLAY_NAMES,
+} from "./TuningSettingsButton";
 
 // UI components
 export { default as DevNavMenu } from "./DevNavMenu";

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, ActivityIndicator, Text, Platform, LogBox } from "react-native";
+import { useFonts } from "expo-font";
 
 // Suppress warnings from dependencies we can't fix
 LogBox.ignoreLogs(["props.pointerEvents is deprecated"]);
@@ -104,6 +105,11 @@ const Stack = createNativeStackNavigator();
 export default function App() {
   const [initialRoute, setInitialRoute] = useState("Home");
 
+  // Load Bravura music notation font
+  const [fontsLoaded] = useFonts({
+    Bravura: require("./assets/fonts/Bravura.otf"),
+  });
+
   useEffect(() => {
     // ============= APP STARTUP TIMING =============
     const appMountTime = Date.now();
@@ -120,6 +126,15 @@ export default function App() {
       breakdown: `Expo=${expoStartupMs}ms`,
     });
   }, []);
+
+  // Show loading while fonts load
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#1a1612" }}>
+        <ActivityIndicator size="large" color="#d4a574" />
+      </View>
+    );
+  }
 
   return (
     <ErrorBoundary>

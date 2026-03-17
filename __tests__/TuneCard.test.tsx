@@ -728,7 +728,7 @@ describe("TuneCard", () => {
   describe("Time Signature Settings", () => {
     it("calls onUpdateSettings when time signature is changed", () => {
       const onUpdateSettings = jest.fn();
-      const { getByText } = render(
+      const { getByText, getAllByText } = render(
         <TuneCard
           {...defaultProps}
           isExpanded={true}
@@ -736,13 +736,17 @@ describe("TuneCard", () => {
         />,
       );
 
-      // Default is 4/4, tap 3/4
-      fireEvent.press(getByText("3/4"));
+      // Click the time signature dropdown button to open picker (default is 4/4)
+      fireEvent.press(getByText("4/4"));
+
+      // Find the "−" button in the stepper to decrease beats from 4 to 3
+      const minusButtons = getAllByText("−");
+      fireEvent.press(minusButtons[0]); // First minus is for beats per measure
 
       expect(onUpdateSettings).toHaveBeenCalledWith({ timeSignature: "3/4" });
     });
 
-    it("does not call onUpdateSettings when same time signature selected", () => {
+    it("does not call onUpdateSettings when picker is opened and closed", () => {
       const onUpdateSettings = jest.fn();
       const { getByText } = render(
         <TuneCard
@@ -752,8 +756,9 @@ describe("TuneCard", () => {
         />,
       );
 
-      // Tap current time signature (4/4)
+      // Open and close the time signature picker without changing
       fireEvent.press(getByText("4/4"));
+      fireEvent.press(getByText("✕")); // Close button
 
       expect(onUpdateSettings).not.toHaveBeenCalled();
     });
@@ -770,16 +775,20 @@ describe("TuneCard", () => {
         />,
       );
 
-      // Default is 2, tap 4
-      fireEvent.press(getByText("4"));
+      // Default subdivision is 2 ("eighth notes" in 4/4 time)
+      // Click to open the picker
+      fireEvent.press(getByText("eighth notes"));
 
-      expect(onUpdateSettings).toHaveBeenCalledWith({ subdivision: 4 });
+      // Select "sixteenth notes" (subdivision "quarters")
+      fireEvent.press(getByText("sixteenth notes"));
+
+      expect(onUpdateSettings).toHaveBeenCalledWith({ subdivision: "quarters" });
     });
 
     it("does not call onUpdateSettings when same subdivision selected", () => {
       const onUpdateSettings = jest.fn();
-      const tuneWithSub = { ...mockTune, subdivision: 4 };
-      const { getByText } = render(
+      const tuneWithSub = { ...mockTune, subdivision: "quarters" };
+      const { getByText, getAllByText } = render(
         <TuneCard
           {...defaultProps}
           tune={tuneWithSub}
@@ -788,8 +797,12 @@ describe("TuneCard", () => {
         />,
       );
 
-      // Tap current subdivision (4)
-      fireEvent.press(getByText("4"));
+      // Click to open the picker (current is "sixteenth notes")
+      fireEvent.press(getByText("sixteenth notes"));
+
+      // Select same subdivision (second occurrence is in the picker)
+      const sixteenthOptions = getAllByText("sixteenth notes");
+      fireEvent.press(sixteenthOptions[1]);
 
       expect(onUpdateSettings).not.toHaveBeenCalled();
     });
