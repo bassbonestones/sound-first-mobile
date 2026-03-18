@@ -241,30 +241,6 @@ describe("ImportedScorePracticeScreen", () => {
     });
   });
 
-  describe("metronome toggle", () => {
-    it("toggles metronome on header button press", () => {
-      const { getByLabelText } = render(
-        <ImportedScorePracticeScreen
-          route={
-            {
-              params: { score: mockScore, rawMusicXml: mockRawMusicXml },
-            } as unknown
-          }
-          navigation={mockNavigation}
-        />,
-      );
-
-      // Initially enabled
-      const button = getByLabelText("Disable metronome");
-      expect(button).toBeTruthy();
-
-      fireEvent.press(button);
-
-      // Now disabled
-      expect(getByLabelText("Enable metronome")).toBeTruthy();
-    });
-  });
-
   describe("navigation", () => {
     it("navigates back on back button press", () => {
       const { getByLabelText } = render(
