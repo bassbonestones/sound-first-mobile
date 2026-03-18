@@ -315,14 +315,11 @@ function ScorePreviewInner(
       hideCursor: () => injectScript("window.hideCursor();"),
       resetCursor: () => injectScript("window.resetCursor();"),
       cursorNext: () => injectScript("window.cursorNext();"),
-      advanceCursorByBeat: () =>
-        injectScript("window.advanceCursorByBeat();"),
+      advanceCursorByBeat: () => injectScript("window.advanceCursorByBeat();"),
       cursorToMeasure: (measureNumber: number) =>
         injectScript(`window.cursorToMeasure(${measureNumber});`),
       startPlayback: (tempo: number, startMeasure?: number) =>
-        injectScript(
-          `window.startPlayback(${tempo}, ${startMeasure ?? 1});`,
-        ),
+        injectScript(`window.startPlayback(${tempo}, ${startMeasure ?? 1});`),
       pausePlayback: () => injectScript("window.pausePlayback();"),
       resumePlayback: () => injectScript("window.resumePlayback();"),
       stopPlayback: () => injectScript("window.stopPlayback();"),

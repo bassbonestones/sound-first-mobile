@@ -417,9 +417,7 @@ export function ImportedScorePracticeScreen({
           <Feather
             name="crosshair"
             size={20}
-            color={
-              cursorEnabled ? colors.primary : colors.textSecondary
-            }
+            color={cursorEnabled ? colors.primary : colors.textSecondary}
           />
         </TouchableOpacity>
       </View>

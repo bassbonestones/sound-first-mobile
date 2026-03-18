@@ -238,7 +238,7 @@ export function useImportedScorePractice(
         // Cursor starts at position 0 (beat 1), so we don't advance on the first tick.
         // The interval fires after beatDurationMs, which is when beat 2 starts.
         let beatCounter = 1;
-        
+
         timerRef.current = setInterval(() => {
           beatCounter += 1;
           if (beatCounter > beatsPerMeasure) {
@@ -248,7 +248,7 @@ export function useImportedScorePractice(
 
           // Play click for each beat
           playClick(isFirstBeat);
-          
+
           // Advance cursor to the new beat position
           onBeatTick?.();
 
@@ -328,7 +328,7 @@ export function useImportedScorePractice(
 
       // Play click for each beat
       playClick(isFirstBeat);
-      
+
       // Notify cursor to advance
       onBeatTick?.();
 
