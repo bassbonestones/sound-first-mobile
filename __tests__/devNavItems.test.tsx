@@ -16,8 +16,8 @@ describe("DEV_NAV_ITEMS", () => {
       expect(DEV_NAV_ITEMS.length).toBeGreaterThan(0);
     });
 
-    it("has exactly 9 items", () => {
-      expect(DEV_NAV_ITEMS.length).toBe(9);
+    it("has exactly 11 items", () => {
+      expect(DEV_NAV_ITEMS.length).toBe(11);
     });
 
     it("is not empty", () => {
@@ -68,6 +68,20 @@ describe("DEV_NAV_ITEMS", () => {
       );
       expect(tuneMastery).toBeDefined();
       expect(tuneMastery?.label).toBe("Tune Mastery");
+    });
+
+    it("contains ImportMusic screen", () => {
+      const importMusic = DEV_NAV_ITEMS.find(
+        (item) => item.screen === "ImportMusic",
+      );
+      expect(importMusic).toBeDefined();
+      expect(importMusic?.label).toBe("Import Music");
+    });
+
+    it("contains MyScores screen", () => {
+      const myScores = DEV_NAV_ITEMS.find((item) => item.screen === "MyScores");
+      expect(myScores).toBeDefined();
+      expect(myScores?.label).toBe("My Scores");
     });
 
     it("contains History screen", () => {

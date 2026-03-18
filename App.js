@@ -99,6 +99,13 @@ import AdminScreen from "./src/screens/Admin";
 import FirstNoteScreen from "./src/screens/FirstNote";
 import ExerciseTestScreen from "./src/screens/ExerciseTestScreen";
 import TuneMasteryScreen from "./src/screens/TuneMastery";
+import {
+  ImportMusicScreen,
+  ScoreCorrectionScreen,
+  ScoreViewerScreen,
+  MyScoresScreen,
+  ImportedScorePracticeScreen,
+} from "./src/features/importMusic";
 
 const Stack = createNativeStackNavigator();
 
@@ -212,6 +219,31 @@ export default function App() {
               name="TuneMastery"
               component={TuneMasteryScreen}
               options={{ title: "Tune Mastery", headerShown: false }}
+            />
+            <Stack.Screen
+              name="ImportMusic"
+              component={ImportMusicScreen}
+              options={{ title: "Import Music", headerShown: false }}
+            />
+            <Stack.Screen
+              name="ScoreCorrection"
+              component={ScoreCorrectionScreen}
+              options={{ title: "Review Score", headerShown: false }}
+            />
+            <Stack.Screen
+              name="ScoreViewer"
+              component={ScoreViewerScreen}
+              options={{ title: "Score", headerShown: false }}
+            />
+            <Stack.Screen
+              name="MyScores"
+              component={MyScoresScreen}
+              options={{ title: "My Scores", headerShown: false }}
+            />
+            <Stack.Screen
+              name="ImportedScorePractice"
+              component={ImportedScorePracticeScreen}
+              options={{ title: "Practice", headerShown: false }}
             />
           </Stack.Navigator>
         </NavigationContainer>

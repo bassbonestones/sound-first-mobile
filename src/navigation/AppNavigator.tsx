@@ -22,6 +22,7 @@ import AdminScreen from "../screens/Admin";
 import FirstNoteScreen from "../screens/FirstNote";
 import ExerciseTestScreen from "../screens/ExerciseTestScreen";
 import TuneMasteryScreen from "../screens/TuneMastery";
+import { ImportMusicScreen } from "../features/importMusic";
 
 const Stack = createNativeStackNavigator();
 
@@ -72,6 +73,10 @@ export const screenConfig = {
   Admin: {
     component: AdminScreen,
     options: { title: "Admin Console", headerShown: false },
+  },
+  ImportMusic: {
+    component: ImportMusicScreen,
+    options: { title: "Import Music" },
   },
 };
 
@@ -152,6 +157,11 @@ export function AppNavigator({ initialRoute, initialParams }: AppNavigatorProps)
           name="TuneMastery"
           component={TuneMasteryScreen}
           options={{ title: "Tune Mastery", headerShown: false }}
+        />
+        <Stack.Screen
+          name="ImportMusic"
+          component={ImportMusicScreen}
+          options={{ title: "Import Music" }}
         />
       </Stack.Navigator>
     </NavigationContainer>

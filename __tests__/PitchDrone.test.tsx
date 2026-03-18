@@ -72,14 +72,14 @@ describe("PitchDrone", () => {
 
     it("renders with Equal temperament selected by default", () => {
       const { getByText } = render(<PitchDrone />);
-      // Equal button should be present
-      expect(getByText("Equal")).toBeTruthy();
-      expect(getByText("Just")).toBeTruthy();
+      // Settings summary shows "ET" for equal temperament
+      expect(getByText("ET")).toBeTruthy();
     });
 
     it("renders Concert A input with default 440 Hz", () => {
-      const { getByDisplayValue } = render(<PitchDrone />);
-      expect(getByDisplayValue("440")).toBeTruthy();
+      const { getByText } = render(<PitchDrone />);
+      // Settings summary shows A=440Hz
+      expect(getByText("A=440Hz")).toBeTruthy();
     });
 
     it("renders octave selector with default octave 4", () => {
@@ -132,71 +132,102 @@ describe("PitchDrone", () => {
 
   describe("Temperament toggle", () => {
     it("switches to Just temperament when pressed", () => {
-      const { getByText } = render(<PitchDrone />);
+      const { getByLabelText, getByText } = render(<PitchDrone />);
 
-      const justButton = getByText("Just");
-      fireEvent.press(justButton);
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
 
-      // After pressing Just, pitch center selector should appear
-      // (Visual state change - Just mode enables pitch center selection)
+      // Press Just (Resonance) button
+      fireEvent.press(getByLabelText("Resonance just intonation"));
+
+      // Close modal
+      fireEvent.press(getByText("Done"));
+
+      // Summary should now show JI
+      expect(getByText("JI")).toBeTruthy();
     });
 
     it("switches back to Equal temperament when pressed", () => {
-      const { getByText } = render(<PitchDrone />);
+      const { getByLabelText, getByText } = render(<PitchDrone />);
 
-      // First switch to Just
-      fireEvent.press(getByText("Just"));
+      // Open settings and switch to Just
+      fireEvent.press(getByLabelText("Open tuning settings"));
+      fireEvent.press(getByLabelText("Resonance just intonation"));
 
       // Then switch back to Equal
-      fireEvent.press(getByText("Equal"));
+      fireEvent.press(getByLabelText("Standard equal temperament"));
+
+      // Close modal
+      fireEvent.press(getByText("Done"));
+
+      // Summary should show ET
+      expect(getByText("ET")).toBeTruthy();
     });
 
     it("shows pitch center selector in Just mode", () => {
-      const { getByText, queryByText } = render(<PitchDrone />);
+      const { getByLabelText, getByText } = render(<PitchDrone />);
 
-      // Switch to Just temperament
-      fireEvent.press(getByText("Just"));
+      // Open settings and switch to Just
+      fireEvent.press(getByLabelText("Open tuning settings"));
+      fireEvent.press(getByLabelText("Resonance just intonation"));
 
-      // Should show "Root for Just Intonation:" label
-      expect(getByText(/Root for Just Intonation/)).toBeTruthy();
+      // Should show "Key Center" section in modal
+      expect(getByText("Key Center")).toBeTruthy();
     });
 
     it("hides pitch center selector in Equal mode", () => {
-      const { getByText, queryByText } = render(<PitchDrone />);
+      const { getByLabelText, queryByText } = render(<PitchDrone />);
 
-      // Start in Equal mode - should not show pitch center selector
-      expect(queryByText(/Root for Just Intonation/)).toBeNull();
+      // Open settings modal (Equal by default)
+      fireEvent.press(getByLabelText("Open tuning settings"));
+
+      // Should not show "Key Center" section
+      expect(queryByText("Key Center")).toBeNull();
     });
 
     it("allows selecting pitch center in Just mode", () => {
-      const { getByText, getAllByText } = render(<PitchDrone />);
+      const { getByLabelText, getByText } = render(<PitchDrone />);
 
-      // Switch to Just
-      fireEvent.press(getByText("Just"));
+      // Open settings and switch to Just
+      fireEvent.press(getByLabelText("Open tuning settings"));
+      fireEvent.press(getByLabelText("Resonance just intonation"));
 
-      // Find the pitch center buttons (there's a D button for pitch center)
-      const dButtons = getAllByText("D");
-      // Press the pitch center D button
-      if (dButtons.length > 0) {
-        fireEvent.press(dButtons[0]);
-      }
+      // Select key of D
+      fireEvent.press(getByLabelText("Key of D"));
+
+      // Close modal
+      fireEvent.press(getByText("Done"));
+
+      // Summary should show JI mode (which includes the key)
+      expect(getByText("JI")).toBeTruthy();
     });
   });
 
   describe("Concert A input", () => {
     it("allows changing Concert A frequency", () => {
-      const { getByDisplayValue } = render(<PitchDrone />);
+      const { getByLabelText, getByDisplayValue, getByText } = render(
+        <PitchDrone />,
+      );
+
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
 
       const input = getByDisplayValue("440");
       fireEvent.changeText(input, "442");
 
       expect(getByDisplayValue("442")).toBeTruthy();
+
+      // Close modal and verify summary
+      fireEvent.press(getByText("Done"));
+      expect(getByText("A=442Hz")).toBeTruthy();
     });
 
     it("accepts empty input gracefully", () => {
-      const { getByDisplayValue, getByPlaceholderText } = render(
-        <PitchDrone />,
-      );
+      const { getByLabelText, getByDisplayValue, getByPlaceholderText } =
+        render(<PitchDrone />);
+
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
 
       const input = getByDisplayValue("440");
       fireEvent.changeText(input, "");
@@ -206,30 +237,57 @@ describe("PitchDrone", () => {
     });
 
     it("accepts standard baroque pitch 415 Hz", () => {
-      const { getByDisplayValue } = render(<PitchDrone />);
+      const { getByLabelText, getByDisplayValue, getByText } = render(
+        <PitchDrone />,
+      );
+
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
 
       const input = getByDisplayValue("440");
       fireEvent.changeText(input, "415");
 
       expect(getByDisplayValue("415")).toBeTruthy();
+
+      // Close modal and verify summary
+      fireEvent.press(getByText("Done"));
+      expect(getByText("A=415Hz")).toBeTruthy();
     });
 
     it("accepts high orchestra pitch 444 Hz", () => {
-      const { getByDisplayValue } = render(<PitchDrone />);
+      const { getByLabelText, getByDisplayValue, getByText } = render(
+        <PitchDrone />,
+      );
+
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
 
       const input = getByDisplayValue("440");
       fireEvent.changeText(input, "444");
 
       expect(getByDisplayValue("444")).toBeTruthy();
+
+      // Close modal and verify summary
+      fireEvent.press(getByText("Done"));
+      expect(getByText("A=444Hz")).toBeTruthy();
     });
 
     it("accepts scientific pitch 432 Hz", () => {
-      const { getByDisplayValue } = render(<PitchDrone />);
+      const { getByLabelText, getByDisplayValue, getByText } = render(
+        <PitchDrone />,
+      );
+
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
 
       const input = getByDisplayValue("440");
       fireEvent.changeText(input, "432");
 
       expect(getByDisplayValue("432")).toBeTruthy();
+
+      // Close modal and verify summary
+      fireEvent.press(getByText("Done"));
+      expect(getByText("A=432Hz")).toBeTruthy();
     });
   });
 
@@ -645,34 +703,42 @@ describe("PitchDrone", () => {
 
   describe("Just intonation", () => {
     it("shows pitch center selector in Just mode", () => {
-      const { getByText, queryByText } = render(<PitchDrone />);
+      const { getByLabelText, getByText } = render(<PitchDrone />);
 
-      // Switch to Just temperament
-      fireEvent.press(getByText("Just"));
+      // Open settings and switch to Just temperament
+      fireEvent.press(getByLabelText("Open tuning settings"));
+      fireEvent.press(getByLabelText("Resonance just intonation"));
 
-      // Pitch center selector should be available
-      // (Component shows note buttons as pitch center options in Just mode)
+      // Pitch center selector should be available in the modal
+      expect(getByText("Key Center")).toBeTruthy();
     });
 
     it("renders pitch center grid in Just mode", () => {
-      const { getByText, getAllByText } = render(<PitchDrone />);
+      const { getByLabelText, getAllByLabelText } = render(<PitchDrone />);
 
-      fireEvent.press(getByText("Just"));
+      // Open settings and switch to Just
+      fireEvent.press(getByLabelText("Open tuning settings"));
+      fireEvent.press(getByLabelText("Resonance just intonation"));
 
-      // Should have pitch center buttons for all 12 notes
-      // Multiple D buttons exist: one for pitch center, one for note grid
-      const dButtons = getAllByText("D");
-      expect(dButtons.length).toBeGreaterThan(0);
+      // Should have key buttons for all 12 notes
+      expect(getByLabelText("Key of C")).toBeTruthy();
+      expect(getByLabelText("Key of D")).toBeTruthy();
+      expect(getByLabelText("Key of G")).toBeTruthy();
     });
 
     it("can change pitch center", () => {
-      const { getByText, getAllByText } = render(<PitchDrone />);
+      const { getByLabelText, getByText } = render(<PitchDrone />);
 
-      fireEvent.press(getByText("Just"));
+      // Open settings and switch to Just
+      fireEvent.press(getByLabelText("Open tuning settings"));
+      fireEvent.press(getByLabelText("Resonance just intonation"));
 
-      // Find and press a pitch center button
-      const dButtons = getAllByText("D");
-      fireEvent.press(dButtons[0]);
+      // Select key of D
+      fireEvent.press(getByLabelText("Key of D"));
+
+      // Close and verify JI mode is active
+      fireEvent.press(getByText("Done"));
+      expect(getByText("JI")).toBeTruthy();
     });
   });
 
@@ -771,21 +837,35 @@ describe("PitchDrone", () => {
   describe("Accessibility", () => {
     it("has accessible temperament buttons", () => {
       const { getByLabelText } = render(<PitchDrone />);
-      expect(getByLabelText(/Equal temperament/)).toBeTruthy();
-      expect(getByLabelText(/Just intonation/)).toBeTruthy();
+
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
+
+      expect(getByLabelText(/Standard equal temperament/)).toBeTruthy();
+      expect(getByLabelText(/Resonance just intonation/)).toBeTruthy();
     });
 
     it("indicates selected temperament", () => {
       const { getByLabelText } = render(<PitchDrone />);
-      expect(getByLabelText(/Equal temperament, selected/)).toBeTruthy();
+
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
+
+      expect(
+        getByLabelText(/Standard equal temperament, selected/),
+      ).toBeTruthy();
     });
 
     it("updates accessibility state when temperament changes", () => {
-      const { getByText, getByLabelText } = render(<PitchDrone />);
+      const { getByLabelText } = render(<PitchDrone />);
 
-      fireEvent.press(getByText("Just"));
+      // Open settings and switch to Just
+      fireEvent.press(getByLabelText("Open tuning settings"));
+      fireEvent.press(getByLabelText("Resonance just intonation"));
 
-      expect(getByLabelText(/Just intonation, selected/)).toBeTruthy();
+      expect(
+        getByLabelText(/Resonance just intonation, selected/),
+      ).toBeTruthy();
     });
 
     it("has accessible mute button when visible", () => {
@@ -825,33 +905,45 @@ describe("PitchDrone", () => {
     });
 
     it("handles rapid temperament changes", () => {
-      const { getByText } = render(<PitchDrone />);
+      const { getByLabelText, getByText } = render(<PitchDrone />);
+
+      // Open settings modal
+      fireEvent.press(getByLabelText("Open tuning settings"));
 
       for (let i = 0; i < 5; i++) {
-        fireEvent.press(getByText("Just"));
-        fireEvent.press(getByText("Equal"));
+        fireEvent.press(getByLabelText("Resonance just intonation"));
+        fireEvent.press(getByLabelText("Standard equal temperament"));
       }
+
+      // Close modal
+      fireEvent.press(getByText("Done"));
     });
 
     it("handles Concert A changes while drone is playing", () => {
-      const { getByText, getByDisplayValue } = render(<PitchDrone />);
+      const { getByText, getByLabelText, getByDisplayValue } = render(
+        <PitchDrone />,
+      );
 
       fireEvent.press(getByText(/Sustain/));
       fireEvent.press(getByText("B♯/C"));
 
-      // Change Concert A while playing
+      // Open settings and change Concert A while playing
+      fireEvent.press(getByLabelText("Open tuning settings"));
       const input = getByDisplayValue("440");
       fireEvent.changeText(input, "442");
+      fireEvent.press(getByText("Done"));
     });
 
     it("handles temperament change while drone is playing", () => {
-      const { getByText } = render(<PitchDrone />);
+      const { getByText, getByLabelText } = render(<PitchDrone />);
 
       fireEvent.press(getByText(/Sustain/));
       fireEvent.press(getByText("B♯/C"));
 
-      // Switch temperament while playing
-      fireEvent.press(getByText("Just"));
+      // Open settings and switch temperament while playing
+      fireEvent.press(getByLabelText("Open tuning settings"));
+      fireEvent.press(getByLabelText("Resonance just intonation"));
+      fireEvent.press(getByText("Done"));
     });
 
     it("handles vibrato toggle while drone is playing", () => {

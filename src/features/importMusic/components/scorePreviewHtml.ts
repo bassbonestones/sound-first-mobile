@@ -1,0 +1,801 @@
+/**
+ * Score Preview HTML Generator
+ *
+ * Generates HTML that loads OpenSheetMusicDisplay (OSMD) from CDN
+ * and renders MusicXML content.
+ *
+ * OSMD is a JavaScript library that renders MusicXML as SVG,
+ * providing high-quality music notation rendering.
+ *
+ * @see https://opensheetmusicdisplay.org/
+ */
+
+import type { HighlightedMeasure } from "./scorePreviewTypes";
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export interface OsmdHtmlOptions {
+  /** Initial zoom level (default: 1.0) */
+  initialZoom?: number;
+  /** Measures to highlight */
+  highlightMeasures?: HighlightedMeasure[];
+  /** Background color (default: white) */
+  backgroundColor?: string;
+  /** Draw title (default: true) */
+  drawTitle?: boolean;
+  /** Draw composer (default: true) */
+  drawComposer?: boolean;
+  /** Draw part names (default: true) */
+  drawPartNames?: boolean;
+  /** Enable cursor for practice mode (default: false) */
+  enableCursor?: boolean;
+}
+
+// ============================================================================
+// HTML Generator
+// ============================================================================
+
+/**
+ * Generate HTML that loads OSMD and renders MusicXML.
+ *
+ * The HTML includes:
+ * - OSMD library loaded from CDN
+ * - Container for SVG rendering
+ * - JavaScript API for React Native communication
+ */
+export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
+  const {
+    initialZoom = 1.0,
+    highlightMeasures = [],
+    backgroundColor = "#ffffff",
+    drawTitle = false,
+    drawComposer = false,
+    drawPartNames = true,
+    enableCursor = false,
+  } = options;
+
+  // Serialize highlight measures for use in JavaScript
+  const highlightJson = JSON.stringify(highlightMeasures);
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Score Preview</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: ${backgroundColor};
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    #container {
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    #osmd-container {
+      min-width: 100%;
+      padding: 16px;
+      transform-origin: top left;
+    }
+    
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-size: 16px;
+      color: #666;
+    }
+    
+    .error {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      padding: 20px;
+      text-align: center;
+      color: #d32f2f;
+    }
+    
+    .error-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+    
+    /* Highlight uncertain measures */
+    .highlight-measure {
+      fill: rgba(255, 193, 7, 0.3);
+      stroke: rgba(255, 152, 0, 0.8);
+      stroke-width: 2;
+    }
+    
+    .highlight-measure-low {
+      fill: rgba(244, 67, 54, 0.2);
+      stroke: rgba(244, 67, 54, 0.8);
+    }
+    
+    /* Cursor styles for practice mode */
+    .cursor {
+      fill: rgba(76, 175, 80, 0.3) !important;
+      stroke: rgba(56, 142, 60, 0.9) !important;
+      stroke-width: 2px !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div id="osmd-container">
+      <div class="loading" id="loading">Loading music renderer...</div>
+    </div>
+  </div>
+
+  <!-- Load OSMD from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.6/build/opensheetmusicdisplay.min.js"></script>
+
+  <script>
+    // Global state
+    let osmd = null;
+    let currentZoom = ${initialZoom};
+    const highlightMeasures = ${highlightJson};
+    let pendingMusicXml = null; // Store XML if received before OSMD loads
+
+    // Send message to React Native (WebView) or parent window (iframe on web)
+    function sendMessage(type, payload) {
+      const message = JSON.stringify({ type, payload });
+      if (window.ReactNativeWebView) {
+        // React Native WebView
+        window.ReactNativeWebView.postMessage(message);
+      } else if (window.parent !== window) {
+        // Web iframe - post to parent
+        window.parent.postMessage(message, '*');
+      }
+    }
+
+    // Listen for messages from parent (web iframe)
+    window.addEventListener('message', function(event) {
+      try {
+        const data = event.data;
+        if (data && data.type === 'execute' && data.script) {
+          eval(data.script);
+        }
+      } catch (e) {
+        console.error('Message handling error:', e);
+      }
+    });
+
+    // Initialize OSMD
+    function initOsmd() {
+      try {
+        const container = document.getElementById('osmd-container');
+        const loadingEl = document.getElementById('loading');
+        
+        if (!container) {
+          console.error('OSMD container not found');
+          showError('Score container not found. Please try again.');
+          return false;
+        }
+        
+        if (typeof opensheetmusicdisplay === 'undefined') {
+          console.error('OSMD library not loaded');
+          showError('Music renderer not loaded. Check your internet connection.');
+          return false;
+        }
+        
+        osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(container, {
+          autoResize: false,
+          drawTitle: ${drawTitle},
+          drawComposer: ${drawComposer},
+          drawPartNames: ${drawPartNames},
+          drawCredits: false,
+          drawingParameters: "compact",
+          backend: "svg",
+          // Enable auto-beaming when MusicXML doesn't have beam elements
+          autoBeam: true,
+          // Performance optimizations
+          renderSingleHorizontalStaffline: false,
+        });
+
+        if (loadingEl) {
+          loadingEl.style.display = 'none';
+        }
+        return true;
+      } catch (error) {
+        console.error('OSMD init error:', error);
+        showError('Failed to initialize music renderer: ' + error.message);
+        return false;
+      }
+    }
+
+    // Render MusicXML content
+    window.renderMusicXML = async function(xmlContent) {
+      // Check if OSMD library is loaded
+      if (typeof opensheetmusicdisplay === 'undefined') {
+        // Store for later when OSMD loads
+        pendingMusicXml = xmlContent;
+        return;
+      }
+      
+      if (!osmd) {
+        if (!initOsmd()) {
+          return;
+        }
+      }
+
+      const loadingEl = document.getElementById('loading');
+      
+      try {
+        if (loadingEl) {
+          loadingEl.textContent = 'Rendering...';
+          loadingEl.style.display = 'flex';
+        }
+
+        await osmd.load(xmlContent);
+        osmd.render();
+
+        if (loadingEl) {
+          loadingEl.style.display = 'none';
+        }
+        
+        // Apply initial zoom
+        setZoom(currentZoom);
+        
+        // Apply measure highlights
+        applyHighlights();
+
+        // Add click handlers to measures
+        addMeasureClickHandlers();
+        
+        // Pre-build cursor timeline for playback
+        buildCursorTimeline();
+
+        sendMessage('rendered');
+      } catch (error) {
+        console.error('Render error:', error);
+        showError('Failed to render score: ' + error.message);
+        sendMessage('error', error.message);
+      }
+    };
+
+    // Set zoom level
+    window.setZoom = function(zoom) {
+      currentZoom = zoom;
+      const container = document.getElementById('osmd-container');
+      if (container) {
+        container.style.transform = 'scale(' + zoom + ')';
+      }
+      sendMessage('zoomChange', zoom);
+    };
+
+    // ========================================================================
+    // Cursor playback system
+    // ========================================================================
+    
+    // Build timeline of cursor positions with their timestamps (in quarter notes)
+    let cursorTimeline = []; // [{timestamp: number, index: number}]
+    let playbackState = 'stopped'; // 'stopped' | 'playing' | 'paused'
+    let playbackTempo = 120;
+    let playbackStartTime = 0;
+    let playbackPausedAt = 0;
+    let currentCursorIndex = 0;
+    let animationFrameId = null;
+    let beatIntervalId = null;
+    let scoreBpm = 120; // Will be read from score
+    let beatDurationMs = 500; // Will be calculated
+    let beatsPerMeasure = 4;
+    let beatUnit = 4; // 4 = quarter, 8 = eighth
+    let currentBeat = 0; // Current beat in playback
+    let totalBeats = 0; // Total beats in piece
+    let currentPlaybackTimestamp = 0; // Current position for metronome-synced cursor (in whole notes)
+    
+    // Build the timeline after rendering - but now we also extract time sig and tempo
+    function buildCursorTimeline() {
+      if (!osmd || !osmd.cursor) return;
+      
+      cursorTimeline = [];
+      osmd.cursor.reset();
+      
+      // Get time signature from the score
+      try {
+        if (osmd.sheet && osmd.sheet.SourceMeasures && osmd.sheet.SourceMeasures.length > 0) {
+          const firstMeasure = osmd.sheet.SourceMeasures[0];
+          if (firstMeasure.ActiveTimeSignature) {
+            beatsPerMeasure = firstMeasure.ActiveTimeSignature.Numerator;
+            beatUnit = firstMeasure.ActiveTimeSignature.Denominator;
+            console.log('Time signature from score:', beatsPerMeasure + '/' + beatUnit);
+          }
+        }
+      } catch (e) {
+        console.log('Could not read time signature, using default 4/4');
+      }
+      
+      // Get tempo from the score
+      try {
+        if (osmd.sheet && osmd.sheet.DefaultStartTempoInBpm) {
+          scoreBpm = osmd.sheet.DefaultStartTempoInBpm;
+          console.log('Tempo from OSMD DefaultStartTempoInBpm:', scoreBpm);
+        }
+        // Also try to get from tempo expressions
+        if (osmd.sheet && osmd.sheet.TimestampSortedTempoExpressionsList) {
+          const tempoList = osmd.sheet.TimestampSortedTempoExpressionsList;
+          if (tempoList.length > 0 && tempoList[0].TempoInBpm) {
+            scoreBpm = tempoList[0].TempoInBpm;
+            console.log('Tempo from expressions:', scoreBpm);
+          }
+        }
+      } catch (e) {
+        console.log('Could not read tempo from score, using default:', scoreBpm);
+      }
+      
+      // Calculate beat duration in milliseconds
+      // MusicXML tempo is in quarter notes per minute (e.g., quarter=80)
+      // But we need to tick per time signature beat unit:
+      // - In 4/4, beat unit = 4 (quarter), so tick = quarter = 60000/80 = 750ms
+      // - In 7/8, beat unit = 8 (eighth), so tick = eighth = 60000/(80*2) = 375ms
+      // Formula: beatDurationMs = 60000 / (scoreBpm * (4 / beatUnit))
+      const beatsPerQuarter = 4 / beatUnit; // 4/4=1, 4/8=0.5, 4/2=2
+      beatDurationMs = 60000 / (scoreBpm * beatsPerQuarter);
+      
+      console.log('Beat calculation:', {
+        scoreBpm: scoreBpm,
+        timeSignature: beatsPerMeasure + '/' + beatUnit,
+        beatsPerQuarter: beatsPerQuarter,
+        beatDurationMs: beatDurationMs.toFixed(0) + 'ms per ' + (beatUnit === 8 ? 'eighth' : 'quarter')
+      });
+      
+      // Build timeline with beat info
+      let index = 0;
+      while (!osmd.cursor.iterator.EndReached) {
+        const timestamp = osmd.cursor.iterator.currentTimeStamp.RealValue;
+        const measureIndex = osmd.cursor.iterator.CurrentMeasureIndex;
+        cursorTimeline.push({ timestamp, index, measureIndex });
+        osmd.cursor.next();
+        index++;
+      }
+      
+      // Reset cursor to beginning
+      osmd.cursor.reset();
+      osmd.cursor.hide();
+      
+      console.log('Cursor timeline built:', {
+        positions: cursorTimeline.length,
+        measures: cursorTimeline.length > 0 ? cursorTimeline[cursorTimeline.length - 1].measureIndex + 1 : 0,
+        beatDurationMs: beatDurationMs.toFixed(0)
+      });
+      
+      // Notify React Native
+      sendMessage('timelineBuilt', { 
+        positions: cursorTimeline.length,
+        scoreBpm: scoreBpm,
+        timeSignature: beatsPerMeasure + '/' + beatUnit,
+        beatDurationMs: beatDurationMs
+      });
+    }
+    
+    // Move cursor to specific index
+    function moveCursorToIndex(targetIndex) {
+      if (!osmd || !osmd.cursor) return;
+      if (targetIndex === currentCursorIndex) return;
+      
+      // Reset if we need to go backwards
+      if (targetIndex < currentCursorIndex) {
+        osmd.cursor.reset();
+        currentCursorIndex = 0;
+      }
+      
+      // Advance to target
+      while (currentCursorIndex < targetIndex && !osmd.cursor.iterator.EndReached) {
+        osmd.cursor.next();
+        currentCursorIndex++;
+      }
+    }
+    
+    // Calculate which cursor index corresponds to a given beat number
+    function getCursorIndexForBeat(beatNumber) {
+      if (cursorTimeline.length === 0) return 0;
+      
+      // Convert beat number to timestamp
+      // In OSMD, timestamps are in "whole note" units (1.0 = whole note)
+      // The beat value depends on the time signature:
+      // - In 4/4: beatUnit=4 → each beat = 1/4 = 0.25 whole notes
+      // - In 7/8: beatUnit=8 → each beat = 1/8 = 0.125 whole notes
+      const beatValueInWholeNotes = 1 / beatUnit;
+      const targetTimestamp = beatNumber * beatValueInWholeNotes;
+      
+      // Find the cursor position at or just before this beat
+      let index = 0;
+      for (let i = 0; i < cursorTimeline.length; i++) {
+        if (cursorTimeline[i].timestamp <= targetTimestamp + 0.001) { // small epsilon
+          index = i;
+        } else {
+          break;
+        }
+      }
+      return index;
+    }
+    
+    // Beat tick handler - called once per beat
+    function onBeatTick() {
+      if (playbackState !== 'playing') return;
+      
+      // Find cursor position for current beat
+      const targetIndex = getCursorIndexForBeat(currentBeat);
+      
+      if (targetIndex !== currentCursorIndex) {
+        moveCursorToIndex(targetIndex);
+        
+        const measureIndex = osmd.cursor.iterator.CurrentMeasureIndex;
+        const beatInMeasure = (currentBeat % beatsPerMeasure) + 1;
+        
+        sendMessage('cursorMoved', { 
+          measureNumber: measureIndex + 1,
+          beat: beatInMeasure,
+          totalBeat: currentBeat,
+          cursorIndex: currentCursorIndex
+        });
+      }
+      
+      // Advance to next beat
+      currentBeat++;
+      
+      // Check if we've reached the end
+      if (currentBeat >= totalBeats) {
+        stopPlayback();
+        sendMessage('playbackEnded');
+      }
+    }
+    
+    // Start playback using beat-based timing
+    window.startPlayback = function(tempo, startMeasure, playbackRate) {
+      if (!osmd || !osmd.cursor) return;
+      if (cursorTimeline.length === 0) {
+        buildCursorTimeline();
+      }
+      
+      // Calculate total beats in the piece (based on time signature beat unit)
+      if (cursorTimeline.length > 0) {
+        const lastTimestamp = cursorTimeline[cursorTimeline.length - 1].timestamp;
+        const beatValueInWholeNotes = 1 / beatUnit;
+        totalBeats = Math.ceil(lastTimestamp / beatValueInWholeNotes) + 1;
+      }
+      
+      // Apply playback rate to beat duration
+      const rateMultiplier = playbackRate || 1.0;
+      window.currentPlaybackRate = rateMultiplier; // Store for resume
+      const adjustedBeatDuration = beatDurationMs / rateMultiplier;
+      
+      playbackTempo = tempo || 120;
+      playbackState = 'playing';
+      playbackStartTime = performance.now();
+      
+      // Reset cursor
+      osmd.cursor.reset();
+      currentCursorIndex = 0;
+      currentBeat = 0;
+      
+      // Handle start measure - find first cursor position in that measure
+      if (startMeasure && startMeasure > 1) {
+        for (let i = 0; i < cursorTimeline.length; i++) {
+          if (cursorTimeline[i].measureIndex >= startMeasure - 1) {
+            // Calculate which beat this is based on time signature beat unit
+            const beatValueInWholeNotes = 1 / beatUnit;
+            currentBeat = Math.floor(cursorTimeline[i].timestamp / beatValueInWholeNotes);
+            moveCursorToIndex(i);
+            break;
+          }
+        }
+      }
+      
+      osmd.cursor.show();
+      
+      console.log('Starting beat-based playback:', {
+        scoreBpm: scoreBpm,
+        timeSignature: beatsPerMeasure + '/' + beatUnit,
+        beatDurationMs: adjustedBeatDuration.toFixed(0),
+        totalBeats: totalBeats,
+        startBeat: currentBeat,
+        rateMultiplier: rateMultiplier
+      });
+      
+      sendMessage('playbackStarted', { 
+        scoreBpm: scoreBpm,
+        timeSignature: beatsPerMeasure + '/' + beatUnit,
+        beatDurationMs: adjustedBeatDuration,
+        startMeasure: startMeasure || 1 
+      });
+      
+      // Fire first beat immediately
+      onBeatTick();
+      
+      // Start beat interval
+      beatIntervalId = setInterval(onBeatTick, adjustedBeatDuration);
+    };
+    
+    // Pause playback
+    window.pausePlayback = function() {
+      if (playbackState !== 'playing') return;
+      
+      playbackState = 'paused';
+      
+      if (beatIntervalId) {
+        clearInterval(beatIntervalId);
+        beatIntervalId = null;
+      }
+      
+      sendMessage('playbackPaused');
+    };
+    
+    // Resume playback
+    window.resumePlayback = function() {
+      if (playbackState !== 'paused') return;
+      
+      playbackState = 'playing';
+      
+      // Get current playback rate
+      const rateMultiplier = window.currentPlaybackRate || 1.0;
+      const adjustedBeatDuration = beatDurationMs / rateMultiplier;
+      
+      // Restart interval from current beat
+      beatIntervalId = setInterval(onBeatTick, adjustedBeatDuration);
+      
+      sendMessage('playbackResumed');
+    };
+    
+    // Stop playback
+    window.stopPlayback = function() {
+      playbackState = 'stopped';
+      
+      if (beatIntervalId) {
+        clearInterval(beatIntervalId);
+        beatIntervalId = null;
+      }
+      
+      if (osmd && osmd.cursor) {
+        osmd.cursor.reset();
+        osmd.cursor.hide();
+      }
+      currentCursorIndex = 0;
+      currentBeat = 0;
+      
+      sendMessage('playbackStopped');
+    };
+    
+    // Legacy cursor control functions (kept for compatibility)
+    window.showCursor = function() {
+      if (!osmd || !osmd.cursor) return;
+      osmd.cursor.show();
+      sendMessage('cursorShown');
+    };
+
+    window.hideCursor = function() {
+      if (!osmd || !osmd.cursor) return;
+      osmd.cursor.hide();
+      sendMessage('cursorHidden');
+    };
+
+    window.resetCursor = function() {
+      if (!osmd || !osmd.cursor) return;
+      osmd.cursor.reset();
+      currentCursorIndex = 0;
+      currentPlaybackTimestamp = 0;
+      // Don't show cursor here - let caller decide visibility
+      osmd.cursor.hide();
+      sendMessage('cursorReset');
+    };
+
+    window.cursorNext = function() {
+      if (!osmd || !osmd.cursor) return;
+      if (!osmd.cursor.iterator.EndReached) {
+        osmd.cursor.next();
+        currentCursorIndex++;
+        sendMessage('cursorMoved', { 
+          measureNumber: osmd.cursor.iterator.CurrentMeasureIndex + 1,
+          endReached: osmd.cursor.iterator.EndReached
+        });
+      } else {
+        sendMessage('cursorEnd');
+      }
+    };
+    
+    // Advance cursor by one beat (based on time signature beat unit)
+    // This is the correct method for metronome-synced cursor movement
+    window.advanceCursorByBeat = function() {
+      if (!osmd || !osmd.cursor) return;
+      if (cursorTimeline.length === 0) {
+        buildCursorTimeline();
+      }
+      
+      // Advance by one beat based on time signature
+      // In 4/4: beatUnit=4, so 1/4 = 0.25 whole notes
+      // In 7/8: beatUnit=8, so 1/8 = 0.125 whole notes
+      const beatValueInWholeNotes = 1 / beatUnit;
+      currentPlaybackTimestamp += beatValueInWholeNotes;
+      
+      // Find cursor position for this timestamp
+      let targetIndex = 0;
+      for (let i = 0; i < cursorTimeline.length; i++) {
+        if (cursorTimeline[i].timestamp <= currentPlaybackTimestamp + 0.001) {
+          targetIndex = i;
+        } else {
+          break;
+        }
+      }
+      
+      // Check if we've reached the end
+      if (cursorTimeline.length > 0) {
+        const lastTimestamp = cursorTimeline[cursorTimeline.length - 1].timestamp;
+        const beatValueInWholeNotes = 1 / beatUnit;
+        if (currentPlaybackTimestamp > lastTimestamp + beatValueInWholeNotes) {
+          sendMessage('cursorEnd');
+          return;
+        }
+      }
+      
+      // Move cursor if needed
+      if (targetIndex !== currentCursorIndex) {
+        moveCursorToIndex(targetIndex);
+        sendMessage('cursorMoved', { 
+          measureNumber: osmd.cursor.iterator.CurrentMeasureIndex + 1,
+          timestamp: currentPlaybackTimestamp.toFixed(3),
+          cursorIndex: currentCursorIndex
+        });
+      }
+    };
+    
+    // Reset playback timestamp (called by resetCursor)
+    window.resetPlaybackTimestamp = function() {
+      currentPlaybackTimestamp = 0;
+    };
+
+    window.cursorToMeasure = function(measureNumber) {
+      if (!osmd || !osmd.cursor) return;
+      osmd.cursor.reset();
+      currentCursorIndex = 0;
+      // Move to the specified measure
+      while (!osmd.cursor.iterator.EndReached && 
+             osmd.cursor.iterator.CurrentMeasureIndex < measureNumber - 1) {
+        osmd.cursor.next();
+        currentCursorIndex++;
+      }
+      osmd.cursor.show();
+      sendMessage('cursorMoved', { measureNumber });
+    };
+
+    // Apply highlight overlays to uncertain measures
+    function applyHighlights() {
+      if (!osmd || !highlightMeasures.length) return;
+
+      const svgContainer = document.querySelector('#osmd-container svg');
+      if (!svgContainer) return;
+
+      // Get all measure elements
+      const measureBoundingBoxes = osmd.GraphicSheet.MeasureList;
+      
+      highlightMeasures.forEach(function(highlight) {
+        try {
+          // OSMD indexes are 0-based, measure numbers are 1-based
+          const measureIndex = highlight.measureNumber - 1;
+          const partIndex = highlight.partIndex || 0;
+          
+          if (measureIndex >= 0 && measureIndex < measureBoundingBoxes.length) {
+            const measureList = measureBoundingBoxes[measureIndex];
+            if (measureList && measureList[partIndex]) {
+              const staffEntry = measureList[partIndex];
+              const bbox = staffEntry.PositionAndShape;
+              
+              if (bbox) {
+                // Create highlight rectangle
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                const units = osmd.GraphicSheet.units;
+                
+                rect.setAttribute('x', bbox.AbsolutePosition.x * units);
+                rect.setAttribute('y', bbox.AbsolutePosition.y * units);
+                rect.setAttribute('width', bbox.Size.width * units);
+                rect.setAttribute('height', bbox.Size.height * units);
+                rect.setAttribute('class', 
+                  highlight.confidence && highlight.confidence < 0.5 
+                    ? 'highlight-measure highlight-measure-low' 
+                    : 'highlight-measure'
+                );
+                rect.setAttribute('data-measure', highlight.measureNumber);
+                rect.setAttribute('data-part', partIndex);
+                
+                svgContainer.appendChild(rect);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to highlight measure', highlight.measureNumber, e);
+        }
+      });
+    }
+
+    // Add click handlers to measures
+    function addMeasureClickHandlers() {
+      if (!osmd) return;
+
+      const svgContainer = document.querySelector('#osmd-container svg');
+      if (!svgContainer) return;
+
+      // Add touch handler
+      svgContainer.addEventListener('click', function(event) {
+        const rect = event.target.closest('.highlight-measure');
+        if (rect) {
+          const measureNumber = parseInt(rect.getAttribute('data-measure'), 10);
+          const partIndex = parseInt(rect.getAttribute('data-part'), 10);
+          sendMessage('measureTap', { measureNumber, partIndex });
+        }
+      });
+    }
+
+    // Show error message
+    function showError(message) {
+      const container = document.getElementById('osmd-container');
+      if (container) {
+        container.innerHTML = \`
+          <div class="error">
+            <div class="error-icon">⚠️</div>
+            <div>\${message}</div>
+          </div>
+        \`;
+      }
+      sendMessage('error', message);
+    }
+
+    // Wait for OSMD library to load
+    function waitForOsmd(callback, maxAttempts) {
+      maxAttempts = maxAttempts || 50; // 5 seconds max
+      let attempts = 0;
+      
+      function check() {
+        if (typeof opensheetmusicdisplay !== 'undefined') {
+          callback();
+        } else if (attempts < maxAttempts) {
+          attempts++;
+          setTimeout(check, 100);
+        } else {
+          showError('Music renderer failed to load. Check your internet connection.');
+        }
+      }
+      
+      check();
+    }
+
+    // Initialize when DOM and OSMD are ready
+    function startup() {
+      waitForOsmd(function() {
+        sendMessage('ready');
+        // If we received MusicXML before OSMD was ready, render it now
+        if (pendingMusicXml) {
+          window.renderMusicXML(pendingMusicXml);
+          pendingMusicXml = null;
+        }
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', startup);
+    } else {
+      startup();
+    }
+  </script>
+</body>
+</html>
+`.trim();
+}

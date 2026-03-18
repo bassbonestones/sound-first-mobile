@@ -14,3 +14,6 @@ export * from "./material";
 export * from "./session";
 export * from "./tuning";
 export * from "./user";
+
+// Import pipeline types
+export * from "./import";

@@ -1,0 +1,379 @@
+/**
+ * MusicXML Parser Tests
+ */
+
+import {
+  parseMusicXml,
+  extractMusicXmlMetadataQuick,
+} from "../src/features/importMusic/services/musicXmlParser";
+
+describe("MusicXML Parser", () => {
+  // ============================================================================
+  // Sample MusicXML Content
+  // ============================================================================
+
+  const MINIMAL_MUSICXML = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1">
+      <part-name>Music</part-name>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>1</divisions>
+        <key>
+          <fifths>0</fifths>
+        </key>
+        <time>
+          <beats>4</beats>
+          <beat-type>4</beat-type>
+        </time>
+        <clef>
+          <sign>G</sign>
+          <line>2</line>
+        </clef>
+      </attributes>
+      <note>
+        <pitch>
+          <step>C</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
+        <type>whole</type>
+      </note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+  const MUSICXML_WITH_METADATA = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <work>
+    <work-title>Test Work Title</work-title>
+  </work>
+  <movement-title>Test Movement</movement-title>
+  <identification>
+    <creator type="composer">Johann Sebastian Bach</creator>
+    <creator type="arranger">Test Arranger</creator>
+    <rights>Copyright 2024</rights>
+  </identification>
+  <part-list>
+    <score-part id="P1">
+      <part-name>Violin</part-name>
+      <part-abbreviation>Vln.</part-abbreviation>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>2</divisions>
+        <key>
+          <fifths>2</fifths>
+          <mode>major</mode>
+        </key>
+        <time>
+          <beats>3</beats>
+          <beat-type>4</beat-type>
+        </time>
+      </attributes>
+      <direction>
+        <direction-type>
+          <metronome>
+            <beat-unit>quarter</beat-unit>
+            <per-minute>120</per-minute>
+          </metronome>
+        </direction-type>
+      </direction>
+      <note>
+        <pitch>
+          <step>D</step>
+          <octave>5</octave>
+        </pitch>
+        <duration>2</duration>
+        <type>quarter</type>
+      </note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+  // ============================================================================
+  // parseMusicXml Tests
+  // ============================================================================
+
+  describe("parseMusicXml", () => {
+    const sourceInfo = {
+      sourceType: "musicxml" as const,
+      originalFileName: "test.musicxml",
+      remoteAssetId: null,
+    };
+
+    it("parses minimal valid MusicXML", async () => {
+      const result = await parseMusicXml(MINIMAL_MUSICXML, sourceInfo);
+
+      expect(result.success).toBe(true);
+      expect(result.score).not.toBeNull();
+      expect(result.error).toBeNull();
+    });
+
+    it("extracts parts correctly", async () => {
+      const result = await parseMusicXml(MINIMAL_MUSICXML, sourceInfo);
+
+      expect(result.score?.parts).toHaveLength(1);
+      expect(result.score?.parts[0].id).toBe("P1");
+      expect(result.score?.parts[0].name).toBe("Music");
+    });
+
+    it("extracts measures correctly", async () => {
+      const result = await parseMusicXml(MINIMAL_MUSICXML, sourceInfo);
+
+      expect(result.score?.measureCount).toBe(1);
+      expect(result.score?.parts[0].measures).toHaveLength(1);
+      expect(result.score?.parts[0].measures[0].number).toBe(1);
+    });
+
+    it("extracts time signature", async () => {
+      const result = await parseMusicXml(MINIMAL_MUSICXML, sourceInfo);
+
+      expect(result.score?.metadata.timeSignature).not.toBeNull();
+      expect(result.score?.metadata.timeSignature?.beats).toBe(4);
+      expect(result.score?.metadata.timeSignature?.beatType).toBe(4);
+      expect(result.score?.metadata.timeSignature?.displayName).toBe("4/4");
+    });
+
+    it("extracts key signature", async () => {
+      const result = await parseMusicXml(MINIMAL_MUSICXML, sourceInfo);
+
+      expect(result.score?.metadata.keySignature).not.toBeNull();
+      expect(result.score?.metadata.keySignature?.fifths).toBe(0);
+      expect(result.score?.metadata.keySignature?.displayName).toContain("C");
+    });
+
+    it("extracts notes", async () => {
+      const result = await parseMusicXml(MINIMAL_MUSICXML, sourceInfo);
+      const events = result.score?.parts[0].measures[0].events;
+
+      expect(events).toHaveLength(1);
+      expect(events?.[0].type).toBe("note");
+      expect(events?.[0].pitch?.step).toBe("C");
+      expect(events?.[0].pitch?.octave).toBe(4);
+    });
+
+    it("fails for invalid content", async () => {
+      const result = await parseMusicXml("not valid xml", sourceInfo);
+
+      expect(result.success).toBe(false);
+      expect(result.score).toBeNull();
+      expect(result.error).not.toBeNull();
+    });
+
+    it("fails for empty content", async () => {
+      const result = await parseMusicXml("", sourceInfo);
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("musicxml_invalid");
+    });
+
+    it("fails for non-MusicXML XML", async () => {
+      const result = await parseMusicXml(
+        "<html><body></body></html>",
+        sourceInfo,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("musicxml_invalid");
+    });
+  });
+
+  // ============================================================================
+  // Metadata Extraction Tests
+  // ============================================================================
+
+  describe("parseMusicXml metadata extraction", () => {
+    const sourceInfo = {
+      sourceType: "musicxml" as const,
+      originalFileName: "test.musicxml",
+      remoteAssetId: null,
+    };
+
+    it("extracts title from movement-title", async () => {
+      const result = await parseMusicXml(MUSICXML_WITH_METADATA, sourceInfo);
+
+      expect(result.score?.metadata.title).toBe("Test Movement");
+      expect(result.score?.metadata.movementTitle).toBe("Test Movement");
+    });
+
+    it("extracts work title", async () => {
+      const result = await parseMusicXml(MUSICXML_WITH_METADATA, sourceInfo);
+
+      expect(result.score?.metadata.workTitle).toBe("Test Work Title");
+    });
+
+    it("extracts composer", async () => {
+      const result = await parseMusicXml(MUSICXML_WITH_METADATA, sourceInfo);
+
+      expect(result.score?.metadata.composer).toBe("Johann Sebastian Bach");
+    });
+
+    it("extracts arranger", async () => {
+      const result = await parseMusicXml(MUSICXML_WITH_METADATA, sourceInfo);
+
+      expect(result.score?.metadata.arranger).toBe("Test Arranger");
+    });
+
+    it("extracts copyright", async () => {
+      const result = await parseMusicXml(MUSICXML_WITH_METADATA, sourceInfo);
+
+      expect(result.score?.metadata.copyright).toBe("Copyright 2024");
+    });
+
+    it("extracts key signature with mode", async () => {
+      const result = await parseMusicXml(MUSICXML_WITH_METADATA, sourceInfo);
+
+      expect(result.score?.metadata.keySignature?.fifths).toBe(2);
+      expect(result.score?.metadata.keySignature?.mode).toBe("major");
+      expect(result.score?.metadata.keySignature?.displayName).toContain("D");
+    });
+
+    it("extracts tempo from metronome", async () => {
+      const result = await parseMusicXml(MUSICXML_WITH_METADATA, sourceInfo);
+
+      expect(result.score?.metadata.tempo).not.toBeNull();
+      expect(result.score?.metadata.tempo?.bpm).toBe(120);
+      expect(result.score?.metadata.tempo?.beatUnit).toBe("quarter");
+    });
+
+    it("extracts part name and abbreviation", async () => {
+      const result = await parseMusicXml(MUSICXML_WITH_METADATA, sourceInfo);
+
+      expect(result.score?.parts[0].name).toBe("Violin");
+      expect(result.score?.parts[0].abbreviation).toBe("Vln.");
+    });
+  });
+
+  // ============================================================================
+  // Quick Metadata Extraction Tests
+  // ============================================================================
+
+  describe("extractMusicXmlMetadataQuick", () => {
+    it("extracts basic metadata quickly", () => {
+      const metadata = extractMusicXmlMetadataQuick(MUSICXML_WITH_METADATA);
+
+      expect(metadata.title).toBe("Test Movement");
+      expect(metadata.composer).toBe("Johann Sebastian Bach");
+    });
+
+    it("returns empty for invalid content", () => {
+      const metadata = extractMusicXmlMetadataQuick("not musicxml");
+
+      expect(metadata.title).toBeUndefined();
+      expect(metadata.composer).toBeUndefined();
+    });
+  });
+
+  // ============================================================================
+  // Edge Cases
+  // ============================================================================
+
+  describe("edge cases", () => {
+    const sourceInfo = {
+      sourceType: "musicxml" as const,
+      originalFileName: "test.musicxml",
+      remoteAssetId: null,
+    };
+
+    it("handles rests", async () => {
+      const xmlWithRest = `<?xml version="1.0"?>
+<score-partwise version="3.1">
+  <part-list><score-part id="P1"><part-name>Music</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <type>whole</type>
+      </note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+      const result = await parseMusicXml(xmlWithRest, sourceInfo);
+      const events = result.score?.parts[0].measures[0].events;
+
+      expect(events?.[0].type).toBe("rest");
+      expect(events?.[0].pitch).toBeNull();
+    });
+
+    it("handles notes with alterations (sharps/flats)", async () => {
+      const xmlWithAlter = `<?xml version="1.0"?>
+<score-partwise version="3.1">
+  <part-list><score-part id="P1"><part-name>Music</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <note>
+        <pitch>
+          <step>F</step>
+          <alter>1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
+        <type>whole</type>
+      </note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+      const result = await parseMusicXml(xmlWithAlter, sourceInfo);
+      const events = result.score?.parts[0].measures[0].events;
+
+      expect(events?.[0].pitch?.step).toBe("F");
+      expect(events?.[0].pitch?.alter).toBe(1);
+      expect(events?.[0].pitch?.displayName).toBe("F#4");
+    });
+
+    it("handles tied notes", async () => {
+      const xmlWithTie = `<?xml version="1.0"?>
+<score-partwise version="3.1">
+  <part-list><score-part id="P1"><part-name>Music</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>4</duration>
+        <type>whole</type>
+        <tie type="start"/>
+      </note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+      const result = await parseMusicXml(xmlWithTie, sourceInfo);
+      const events = result.score?.parts[0].measures[0].events;
+
+      expect(events?.[0].tiedToNext).toBe(true);
+    });
+
+    it("handles dotted notes", async () => {
+      const xmlWithDot = `<?xml version="1.0"?>
+<score-partwise version="3.1">
+  <part-list><score-part id="P1"><part-name>Music</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>6</duration>
+        <type>half</type>
+        <dot/>
+      </note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+      const result = await parseMusicXml(xmlWithDot, sourceInfo);
+      const events = result.score?.parts[0].measures[0].events;
+
+      expect(events?.[0].dots).toBe(1);
+    });
+  });
+});

@@ -393,7 +393,7 @@ describe("Tuner", () => {
       // Should show key grid with 12 keys (check accessible labels)
       await waitFor(() => {
         expect(queryByLabelText("Key of C")).toBeTruthy();
-        expect(queryByLabelText("Key of F#/Gb")).toBeTruthy();
+        expect(queryByLabelText("Key of F♯/G♭")).toBeTruthy();
       });
     });
 
@@ -835,8 +835,8 @@ describe("Tuner", () => {
       fireEvent.press(getByLabelText("Key of C"));
       fireEvent.press(getByLabelText("Key of G"));
       fireEvent.press(getByLabelText("Key of D"));
-      fireEvent.press(getByLabelText("Key of F#/Gb"));
-      fireEvent.press(getByLabelText("Key of A#/Bb"));
+      fireEvent.press(getByLabelText("Key of F♯/G♭"));
+      fireEvent.press(getByLabelText("Key of A♯/B♭"));
     });
   });
 
