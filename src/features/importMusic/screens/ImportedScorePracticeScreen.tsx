@@ -251,12 +251,13 @@ export function ImportedScorePracticeScreen({
   const [cursorEnabled, setCursorEnabled] = useState(false);
   const scorePreviewRef = useRef<ScorePreviewRef>(null);
 
-  // Beat tick callback - advances cursor by one beat (per time signature) on each metronome tick
+  // Beat tick callback - always advances cursor position (even when hidden)
+  // This ensures cursor is at correct position if enabled mid-practice
   const handleBeatTick = useCallback(() => {
-    if (cursorEnabled && scorePreviewRef.current) {
+    if (scorePreviewRef.current) {
       scorePreviewRef.current.advanceCursorByBeat();
     }
-  }, [cursorEnabled]);
+  }, []);
 
   // Practice hook - passes beat tick callback for cursor syncing
   const {
@@ -297,21 +298,28 @@ export function ImportedScorePracticeScreen({
     setRenderError(error);
   }, []);
 
-  // Control cursor visibility based on practice state
+  // Always reset cursor position on countdown/idle - regardless of cursor visibility
+  // This ensures timestamp tracking stays in sync even when cursor is hidden
   useEffect(() => {
-    if (!cursorEnabled || !scorePreviewRef.current) return;
+    if (!scorePreviewRef.current) return;
 
-    if (practiceState === "playing") {
-      // Show cursor when playing starts
-      scorePreviewRef.current.showCursor();
-    } else if (practiceState === "countdown") {
-      // Reset cursor position during countdown (stays hidden)
-      scorePreviewRef.current.resetCursor();
-    } else if (practiceState === "idle") {
-      // Hide and reset when stopped
+    if (practiceState === "countdown" || practiceState === "idle") {
       scorePreviewRef.current.resetCursor();
     }
-    // paused state - keep cursor visible but don't move
+  }, [practiceState]);
+
+  // Control cursor visibility based on cursor enabled state and practice state
+  useEffect(() => {
+    if (!scorePreviewRef.current) return;
+
+    if (cursorEnabled && practiceState === "playing") {
+      // Show cursor when enabled and playing
+      scorePreviewRef.current.showCursor();
+    } else if (!cursorEnabled) {
+      // Hide cursor when disabled
+      scorePreviewRef.current.hideCursor();
+    }
+    // paused state with cursorEnabled - keep cursor visible
   }, [cursorEnabled, practiceState]);
 
   // Handle back button

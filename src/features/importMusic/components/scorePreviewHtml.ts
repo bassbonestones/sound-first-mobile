@@ -52,7 +52,7 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
     backgroundColor = "#ffffff",
     drawTitle = false,
     drawComposer = false,
-    drawPartNames = true,
+    drawPartNames = false,
     enableCursor = false,
   } = options;
 
@@ -621,13 +621,12 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
         buildCursorTimeline();
       }
       
-      // Advance by one beat based on time signature
-      // In 4/4: beatUnit=4, so 1/4 = 0.25 whole notes
-      // In 7/8: beatUnit=8, so 1/8 = 0.125 whole notes
       const beatValueInWholeNotes = 1 / beatUnit;
+      
+      // Advance timestamp first - we're moving TO the next beat
       currentPlaybackTimestamp += beatValueInWholeNotes;
       
-      // Find cursor position for this timestamp
+      // Find cursor position for updated timestamp
       let targetIndex = 0;
       for (let i = 0; i < cursorTimeline.length; i++) {
         if (cursorTimeline[i].timestamp <= currentPlaybackTimestamp + 0.001) {
@@ -640,7 +639,6 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
       // Check if we've reached the end
       if (cursorTimeline.length > 0) {
         const lastTimestamp = cursorTimeline[cursorTimeline.length - 1].timestamp;
-        const beatValueInWholeNotes = 1 / beatUnit;
         if (currentPlaybackTimestamp > lastTimestamp + beatValueInWholeNotes) {
           sendMessage('cursorEnd');
           return;
