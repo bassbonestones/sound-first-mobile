@@ -91,13 +91,12 @@ function TempoControl({
       >
         <Feather
           name="minus"
-          size={20}
+          size={16}
           color={disabled ? colors.textSecondary : colors.textPrimary}
         />
       </TouchableOpacity>
       <View style={styles.tempoDisplay}>
         <Text style={styles.tempoValue}>{tempo}</Text>
-        <Text style={styles.tempoLabel}>BPM</Text>
       </View>
       <TouchableOpacity
         onPress={increaseTempo}
@@ -108,7 +107,7 @@ function TempoControl({
       >
         <Feather
           name="plus"
-          size={20}
+          size={16}
           color={disabled ? colors.textSecondary : colors.textPrimary}
         />
       </TouchableOpacity>
@@ -132,7 +131,6 @@ function PlaybackControls({
   onPause,
   onResume,
   onStop,
-  onRestart,
   disabled,
 }: PlaybackControlsProps): React.ReactElement {
   const isPlaying =
@@ -141,17 +139,17 @@ function PlaybackControls({
 
   return (
     <View style={styles.playbackControls}>
-      {/* Stop/Reset button */}
+      {/* Stop button */}
       <TouchableOpacity
-        onPress={practiceState === "idle" ? onRestart : onStop}
+        onPress={onStop}
         style={[styles.playbackButton, styles.secondaryPlaybackButton]}
         accessibilityRole="button"
-        accessibilityLabel={practiceState === "idle" ? "Restart" : "Stop"}
+        accessibilityLabel="Stop"
         disabled={disabled || practiceState === "idle"}
       >
         <Feather
           name="square"
-          size={24}
+          size={18}
           color={
             practiceState === "idle" ? colors.textSecondary : colors.textPrimary
           }
@@ -172,7 +170,7 @@ function PlaybackControls({
       >
         <Feather
           name={isPlaying ? "pause" : "play"}
-          size={32}
+          size={24}
           color={colors.background}
         />
       </TouchableOpacity>
@@ -201,38 +199,28 @@ function ProgressDisplay({
   if (practiceState === "countdown" && countdownRemaining > 0) {
     return (
       <View style={styles.progressDisplay}>
-        <View style={styles.countdownContainer}>
-          <Text style={styles.countdownNumber}>{countdownRemaining}</Text>
-          <Text style={styles.countdownLabel}>Get Ready</Text>
-        </View>
+        <Text style={styles.countdownNumber}>{countdownRemaining}</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.progressDisplay}>
-      <View style={styles.progressItem}>
-        <Text style={styles.progressLabel}>Measure</Text>
-        <Text style={styles.progressValue}>
-          {currentMeasure} / {totalMeasures}
-        </Text>
-      </View>
-      <View style={styles.progressDivider} />
-      <View style={styles.progressItem}>
-        <Text style={styles.progressLabel}>Beat</Text>
-        <View style={styles.beatIndicators}>
-          {Array.from({ length: beatsPerMeasure }).map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.beatDot,
-                i + 1 === currentBeat &&
-                  practiceState === "playing" &&
-                  styles.activeBeat,
-              ]}
-            />
-          ))}
-        </View>
+      <Text style={styles.progressText}>
+        {currentMeasure}/{totalMeasures}
+      </Text>
+      <View style={styles.beatIndicators}>
+        {Array.from({ length: beatsPerMeasure }).map((_, i) => (
+          <View
+            key={i}
+            style={[
+              styles.beatDot,
+              i + 1 === currentBeat &&
+                practiceState === "playing" &&
+                styles.activeBeat,
+            ]}
+          />
+        ))}
       </View>
     </View>
   );
@@ -255,20 +243,12 @@ export function ImportedScorePracticeScreen({
   const insets = useSafeAreaInsets();
 
   // Calculate score preview height:
-  // Total height - safe area insets - header (~60) - progress bar (~80) - tempo control (~80) - playback controls (~100)
-  const headerHeight = 60;
-  const progressHeight = 80;
-  const tempoControlHeight = 80;
-  const playbackControlsHeight = 100;
+  // Total height - safe area insets - header (~44) - control bar (~56)
+  const headerHeight = 44;
+  const controlBarHeight = 56;
   const scorePreviewHeight = Math.max(
     200,
-    windowHeight -
-      insets.top -
-      insets.bottom -
-      headerHeight -
-      progressHeight -
-      tempoControlHeight -
-      playbackControlsHeight,
+    windowHeight - insets.top - insets.bottom - headerHeight - controlBarHeight,
   );
 
   // Track render state
@@ -383,7 +363,7 @@ export function ImportedScorePracticeScreen({
     if (!scorePreviewRef.current) return;
 
     if (practiceState === "playing") {
-      // Start smooth scrolling
+      // Start smooth scrolling - it chases the cursor position
       scorePreviewRef.current.startSyncedScroll();
     } else if (practiceState === "paused") {
       // Pause scrolling
@@ -506,33 +486,36 @@ export function ImportedScorePracticeScreen({
         )}
       </View>
 
-      {/* Progress Display */}
-      <ProgressDisplay
-        currentMeasure={progress.currentMeasure}
-        currentBeat={progress.currentBeat}
-        totalMeasures={totalMeasures}
-        beatsPerMeasure={config.beatsPerMeasure}
-        countdownRemaining={progress.countdownRemaining}
-        practiceState={practiceState}
-      />
+      {/* Unified Control Bar */}
+      <View style={styles.controlBar}>
+        {/* Tempo Control */}
+        <TempoControl
+          tempo={config.tempo}
+          onTempoChange={setTempo}
+          disabled={practiceState === "playing" || practiceState === "countdown"}
+        />
 
-      {/* Tempo Control */}
-      <TempoControl
-        tempo={config.tempo}
-        onTempoChange={setTempo}
-        disabled={practiceState === "playing" || practiceState === "countdown"}
-      />
+        {/* Progress Display */}
+        <ProgressDisplay
+          currentMeasure={progress.currentMeasure}
+          currentBeat={progress.currentBeat}
+          totalMeasures={totalMeasures}
+          beatsPerMeasure={config.beatsPerMeasure}
+          countdownRemaining={progress.countdownRemaining}
+          practiceState={practiceState}
+        />
 
-      {/* Playback Controls */}
-      <PlaybackControls
-        practiceState={practiceState}
-        onStart={start}
-        onPause={pause}
-        onResume={resume}
-        onStop={stop}
-        onRestart={restart}
-        disabled={!isRendered}
-      />
+        {/* Playback Controls */}
+        <PlaybackControls
+          practiceState={practiceState}
+          onStart={start}
+          onPause={pause}
+          onResume={resume}
+          onStop={stop}
+          onRestart={restart}
+          disabled={!isRendered}
+        />
+      </View>
     </SafeAreaView>
   );
 }
@@ -562,14 +545,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "600",
     color: colors.textPrimary,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: colors.textSecondary,
-    marginTop: 2,
+    marginTop: 1,
   },
   headerButton: {
     padding: spacing.xs,
@@ -583,120 +566,96 @@ const styles = StyleSheet.create({
     width: 32,
   },
   previewContainer: {
+    flex: 1,
     // Explicit height is passed to ScorePreview for iOS WebView compatibility
   },
-  progressDisplay: {
+  // Unified control bar at bottom
+  controlBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: spacing.md,
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+    height: 56,
   },
-  progressItem: {
+  // Compact progress display
+  progressDisplay: {
+    flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
   },
-  progressLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    textTransform: "uppercase",
-    marginBottom: 4,
-  },
-  progressValue: {
-    fontSize: 18,
+  progressText: {
+    fontSize: 14,
     fontWeight: "600",
     color: colors.textPrimary,
   },
-  progressDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: colors.border,
-  },
   beatIndicators: {
     flexDirection: "row",
-    gap: 6,
+    gap: 4,
   },
   beatDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: colors.border,
   },
   activeBeat: {
     backgroundColor: colors.primary,
-    transform: [{ scale: 1.2 }],
-  },
-  countdownContainer: {
-    alignItems: "center",
+    transform: [{ scale: 1.3 }],
   },
   countdownNumber: {
-    fontSize: 48,
+    fontSize: 24,
     fontWeight: "700",
     color: colors.primary,
   },
-  countdownLabel: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 4,
-  },
+  // Compact tempo control
   tempoControl: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.background,
+    gap: spacing.xs,
   },
   tempoButton: {
-    padding: spacing.sm,
-    borderRadius: 24,
-    backgroundColor: colors.surface,
+    padding: 6,
+    borderRadius: 16,
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
   },
   tempoDisplay: {
     alignItems: "center",
-    minWidth: 80,
-    paddingHorizontal: spacing.md,
+    minWidth: 50,
   },
   tempoValue: {
-    fontSize: 24,
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: "600",
     color: colors.textPrimary,
-  },
-  tempoLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
   },
   disabledButton: {
     opacity: 0.5,
   },
+  // Compact playback controls
   playbackControls: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: spacing.md,
-    paddingBottom: spacing.lg,
-    gap: spacing.lg,
-    backgroundColor: colors.background,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    gap: spacing.sm,
   },
   playbackButton: {
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 32,
+    borderRadius: 24,
   },
   primaryPlaybackButton: {
-    width: 64,
-    height: 64,
+    width: 44,
+    height: 44,
     backgroundColor: colors.primary,
   },
   secondaryPlaybackButton: {
-    width: 48,
-    height: 48,
-    backgroundColor: colors.surface,
+    width: 36,
+    height: 36,
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
   },

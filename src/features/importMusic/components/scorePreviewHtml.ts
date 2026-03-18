@@ -177,12 +177,10 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
     const autoScrollEnabled = ${autoScrollToCursor};
     const cursorTargetPercent = 0.20; // Keep cursor at 20% from left edge
     
-    // Smooth scroll state
+    // Smooth scroll state - CURSOR-CHASING approach
+    // Simply follows wherever the cursor element actually is
     let scrollAnimationId = null;
-    let scrollTargetX = 0;
     let isScrolling = false;
-    let isEndScrolling = false; // True when continuing to scroll after look-ahead runs out
-    const END_SCROLL_SPEED = 2.5; // Fixed pixels per frame for end scrolling
 
     // Send message to React Native (WebView) or parent window (iframe on web)
     function sendMessage(type, payload) {
@@ -195,6 +193,18 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
         window.parent.postMessage(message, '*');
       }
     }
+    
+    // Intercept console.log to send to React Native for debugging
+    const originalConsoleLog = console.log;
+    const originalConsoleError = console.error;
+    console.log = function(...args) {
+      originalConsoleLog.apply(console, args);
+      sendMessage('consoleLog', { level: 'log', message: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') });
+    };
+    console.error = function(...args) {
+      originalConsoleError.apply(console, args);
+      sendMessage('consoleLog', { level: 'error', message: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') });
+    };
 
     // Listen for messages from parent (web iframe)
     window.addEventListener('message', function(event) {
@@ -401,10 +411,18 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
       osmd.cursor.reset();
       osmd.cursor.hide();
       
+      // Calculate total beats in the piece
+      if (cursorTimeline.length > 0) {
+        const lastTimestamp = cursorTimeline[cursorTimeline.length - 1].timestamp;
+        const beatValueInWholeNotes = 1 / beatUnit;
+        totalBeats = Math.ceil(lastTimestamp / beatValueInWholeNotes) + 1;
+      }
+      
       console.log('Cursor timeline built:', {
         positions: cursorTimeline.length,
         measures: cursorTimeline.length > 0 ? cursorTimeline[cursorTimeline.length - 1].measureIndex + 1 : 0,
-        beatDurationMs: beatDurationMs.toFixed(0)
+        beatDurationMs: beatDurationMs.toFixed(0),
+        totalBeats: totalBeats
       });
       
       // Notify React Native
@@ -432,121 +450,37 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
         osmd.cursor.next();
         currentCursorIndex++;
       }
-      
-      // Always update scroll target when cursor moves
-      if (autoScrollEnabled && isScrolling) {
-        updateScrollTarget();
-      }
     }
     
-    // Update scroll target to keep cursor at target position
-    function updateScrollTarget() {
-      if (!osmd || !osmd.cursor || !osmd.cursor.cursorElement) return;
-      
-      const container = document.getElementById('container');
-      if (!container) return;
-      
-      const cursorEl = osmd.cursor.cursorElement;
-      const cursorRect = cursorEl.getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
-      
-      // Calculate where cursor is in document coordinates
-      const cursorScreenX = cursorRect.left - containerRect.left;
-      const cursorDocX = cursorScreenX + container.scrollLeft;
-      
-      const maxScroll = container.scrollWidth - containerRect.width;
-      const contentWidth = container.scrollWidth;
-      
-      // Calculate where the look-ahead would put us
-      const lookAheadPixels = 150;
-      const cursorWithLookAhead = cursorDocX + lookAheadPixels;
-      
-      // Detect when look-ahead can no longer help (cursor + look-ahead goes past content)
-      // This triggers end-scrolling mode BEFORE we reach the last note
-      const lookAheadExceedsContent = cursorWithLookAhead >= contentWidth - 50;
-      const isAtLastNote = currentCursorIndex >= cursorTimeline.length - 1;
-      
-      if ((lookAheadExceedsContent || isAtLastNote) && maxScroll > container.scrollLeft) {
-        // Look-ahead has run out of content - switch to constant-speed end-scrolling
-        isEndScrolling = true;
-        scrollTargetX = maxScroll;
-      } else {
-        // Normal scrolling with look-ahead
-        isEndScrolling = false;
-        
-        // Target scroll puts cursor at target percent from left
-        const targetOffset = containerRect.width * cursorTargetPercent;
-        const newTarget = Math.max(0, cursorWithLookAhead - targetOffset);
-        
-        scrollTargetX = Math.min(maxScroll, newTarget);
-      }
-      
-      // Start animation if not running
-      if (!scrollAnimationId) {
-        scrollAnimationId = requestAnimationFrame(smoothScrollFrame);
-      }
-    }
-    
-    // Smooth scroll animation frame
+    // Animation frame loop - now just keeps isScrolling state active
+    // Actual scrolling happens directly in advanceCursorByBeat for zero latency
     function smoothScrollFrame() {
-      // When end-scrolling, keep going even if isScrolling is false
-      // (allows scroll to complete after practice ends)
-      if (!isScrolling && !isEndScrolling) {
+      if (!isScrolling) {
         scrollAnimationId = null;
         return;
       }
-      
-      const container = document.getElementById('container');
-      if (!container) {
-        scrollAnimationId = null;
-        return;
-      }
-      
-      const current = container.scrollLeft;
-      const maxScroll = container.scrollWidth - container.clientWidth;
-      const diff = scrollTargetX - current;
-      
-      let step;
-      if (isEndScrolling) {
-        // At end of piece: use fixed constant speed
-        step = Math.min(END_SCROLL_SPEED, Math.abs(diff));
-        if (diff < 0) step = -step;
-      } else {
-        // Normal scrolling: use proportional speed
-        // Minimum 25% per frame, up to 50% for large gaps
-        const speed = Math.min(0.5, Math.max(0.25, Math.abs(diff) / 500));
-        step = diff * speed;
-      }
-      
-      // If we're close enough, snap and stop animation
-      if (Math.abs(diff) < 1) {
-        container.scrollLeft = scrollTargetX;
-        // If we're end-scrolling and reached the end, we're done
-        if (isEndScrolling) {
-          isEndScrolling = false;
-        }
-        scrollAnimationId = null;
-        return;
-      }
-      
-      container.scrollLeft = current + step;
+      // Just keep the loop alive - actual scroll happens in advanceCursorByBeat
       scrollAnimationId = requestAnimationFrame(smoothScrollFrame);
     }
     
-    // Start smooth scrolling (does NOT reset position - just enables scrolling)
+    // Start smooth scrolling (sets state, actual scroll in advanceCursorByBeat)
     function startSmoothScroll() {
+      // Cancel any existing animation
+      if (scrollAnimationId) {
+        cancelAnimationFrame(scrollAnimationId);
+        scrollAnimationId = null;
+      }
+      
       isScrolling = true;
-      isEndScrolling = false;
-      // Don't reset scrollTargetX or container.scrollLeft here
-      // The scroll position is managed by updateScrollTarget() which tracks the cursor
+      
+      // Start animation loop (just keeps state alive)
+      scrollAnimationId = requestAnimationFrame(smoothScrollFrame);
     }
     
-    // Stop smooth scrolling - but let end-scrolling complete
+    // Stop smooth scrolling
     function stopSmoothScroll() {
       isScrolling = false;
-      // If we're end-scrolling, let it continue to completion
-      // The animation will stop itself when it reaches the target
-      if (!isEndScrolling && scrollAnimationId) {
+      if (scrollAnimationId) {
         cancelAnimationFrame(scrollAnimationId);
         scrollAnimationId = null;
       }
@@ -564,11 +498,12 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
     // Resume smooth scrolling
     function resumeSmoothScroll() {
       isScrolling = true;
-      // Immediately update target based on current cursor position
-      updateScrollTarget();
+      if (!scrollAnimationId) {
+        scrollAnimationId = requestAnimationFrame(smoothScrollFrame);
+      }
     }
     
-    // Scroll the container to keep the cursor visible (manual/legacy)
+    // Scroll the container to keep the cursor visible (instant jump)
     function scrollToCursor() {
       if (!osmd || !osmd.cursor || !osmd.cursor.cursorElement) return;
       
@@ -599,13 +534,12 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
     
     // Reset scroll position to beginning
     function resetScroll() {
-      // Stop any ongoing end-scroll animation
-      isEndScrolling = false;
+      // Stop any ongoing scroll animation
       if (scrollAnimationId) {
         cancelAnimationFrame(scrollAnimationId);
         scrollAnimationId = null;
       }
-      scrollTargetX = 0;
+      isScrolling = false;
       
       const container = document.getElementById('container');
       if (container) {
@@ -682,12 +616,18 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
         totalBeats = Math.ceil(lastTimestamp / beatValueInWholeNotes) + 1;
       }
       
-      // Apply playback rate to beat duration
-      const rateMultiplier = playbackRate || 1.0;
-      window.currentPlaybackRate = rateMultiplier; // Store for resume
-      const adjustedBeatDuration = beatDurationMs / rateMultiplier;
+      // Calculate beat duration from the USER'S selected tempo, not the score's tempo
+      // The tempo parameter is the BPM the user wants to practice at
+      const userTempo = tempo || scoreBpm || 120;
+      const beatsPerQuarter = 4 / beatUnit; // Adjust for time signature (4/4=1, 7/8=0.5)
+      const userBeatDurationMs = 60000 / (userTempo * beatsPerQuarter);
       
-      playbackTempo = tempo || 120;
+      // Apply playback rate (usually 1.0)
+      const rateMultiplier = playbackRate || 1.0;
+      window.currentPlaybackRate = rateMultiplier;
+      const adjustedBeatDuration = userBeatDurationMs / rateMultiplier;
+      
+      playbackTempo = userTempo;
       playbackState = 'playing';
       playbackStartTime = performance.now();
       
@@ -733,8 +673,9 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
       // Start beat interval
       beatIntervalId = setInterval(onBeatTick, adjustedBeatDuration);
       
-      // Start smooth scrolling
-      startSmoothScroll();
+      // Start smooth scrolling - total duration = beats * beat duration
+      const totalScrollDuration = totalBeats * adjustedBeatDuration;
+      startSmoothScroll(totalScrollDuration);
     };
     
     // Pause playback
@@ -760,9 +701,11 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
       
       playbackState = 'playing';
       
-      // Get current playback rate
+      // Calculate beat duration from playbackTempo (user's selected tempo)
+      const beatsPerQuarter = 4 / beatUnit;
+      const userBeatDurationMs = 60000 / (playbackTempo * beatsPerQuarter);
       const rateMultiplier = window.currentPlaybackRate || 1.0;
-      const adjustedBeatDuration = beatDurationMs / rateMultiplier;
+      const adjustedBeatDuration = userBeatDurationMs / rateMultiplier;
       
       // Restart interval from current beat
       beatIntervalId = setInterval(onBeatTick, adjustedBeatDuration);
@@ -817,7 +760,11 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
     
     // Scroll control functions (called from React Native)
     window.startSyncedScroll = function() {
-      console.log('startSyncedScroll called');
+      // Ensure timeline is built (needed for cursor movement)
+      if (cursorTimeline.length === 0 || totalBeats === 0) {
+        buildCursorTimeline();
+      }
+      
       startSmoothScroll();
     };
     
@@ -867,6 +814,7 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
     
     // Advance cursor by one beat (based on time signature beat unit)
     // This is the correct method for metronome-synced cursor movement
+    // Note: Scroll is autonomous (time-based) and doesn't need beat updates
     window.advanceCursorByBeat = function() {
       if (!osmd || !osmd.cursor) return;
       if (cursorTimeline.length === 0) {
@@ -900,6 +848,12 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
       // Move cursor if needed
       if (targetIndex !== currentCursorIndex) {
         moveCursorToIndex(targetIndex);
+        
+        // Scroll immediately after cursor moves (no animation loop lag)
+        if (isScrolling && autoScrollEnabled) {
+          scrollToCursorDirect();
+        }
+        
         sendMessage('cursorMoved', { 
           measureNumber: osmd.cursor.iterator.CurrentMeasureIndex + 1,
           timestamp: currentPlaybackTimestamp.toFixed(3),
@@ -907,6 +861,30 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
         });
       }
     };
+    
+    // Direct scroll to cursor - called synchronously when cursor moves
+    function scrollToCursorDirect() {
+      const container = document.getElementById('container');
+      if (!container || !osmd || !osmd.cursor || !osmd.cursor.cursorElement) return;
+      
+      try {
+        const cursorEl = osmd.cursor.cursorElement;
+        const cursorRect = cursorEl.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        
+        // Cursor X relative to the scroll content
+        const cursorX = cursorRect.left - containerRect.left + container.scrollLeft;
+        
+        // Target scroll = cursor position - lead space (keep cursor at 20% from left)
+        const leadSpace = containerRect.width * cursorTargetPercent;
+        const targetScrollX = Math.max(0, cursorX - leadSpace);
+        
+        // Set directly, no animation
+        container.scrollLeft = targetScrollX;
+      } catch (e) {
+        // Ignore errors
+      }
+    }
     
     // Reset playback timestamp (called by resetCursor)
     window.resetPlaybackTimestamp = function() {

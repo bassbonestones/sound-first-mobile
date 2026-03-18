@@ -170,7 +170,6 @@ describe("ImportedScorePracticeScreen", () => {
       );
 
       expect(getByText("120")).toBeTruthy(); // Initial tempo from metadata
-      expect(getByText("BPM")).toBeTruthy();
       expect(getByLabelText("Decrease tempo")).toBeTruthy();
       expect(getByLabelText("Increase tempo")).toBeTruthy();
     });
@@ -202,8 +201,8 @@ describe("ImportedScorePracticeScreen", () => {
         />,
       );
 
-      expect(getByText("Measure")).toBeTruthy();
-      expect(getByText("Beat")).toBeTruthy();
+      // Progress shows as "measure/total" format in compact layout
+      expect(getByText("1/8")).toBeTruthy();
     });
   });
 

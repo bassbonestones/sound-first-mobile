@@ -239,6 +239,19 @@ function ScorePreviewInner(
         case "zoomChange":
           setCurrentZoom(message.payload as number);
           break;
+
+        case "consoleLog": {
+          const { level, message: logMessage } = message.payload as {
+            level: string;
+            message: string;
+          };
+          if (level === "error") {
+            console.error("[WebView]", logMessage);
+          } else {
+            console.log("[WebView]", logMessage);
+          }
+          break;
+        }
       }
     },
     [onMeasureTap, onError, onRenderComplete],
@@ -348,7 +361,8 @@ function ScorePreviewInner(
       pausePlayback: () => injectScript("window.pausePlayback();"),
       resumePlayback: () => injectScript("window.resumePlayback();"),
       stopPlayback: () => injectScript("window.stopPlayback();"),
-      startSyncedScroll: () => injectScript("window.startSyncedScroll();"),
+      startSyncedScroll: () =>
+        injectScript(`window.startSyncedScroll();`),
       pauseSyncedScroll: () => injectScript("window.pauseSyncedScroll();"),
       stopSyncedScroll: () => injectScript("window.stopSyncedScroll();"),
     }),
