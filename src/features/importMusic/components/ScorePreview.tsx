@@ -134,6 +134,12 @@ export interface ScorePreviewRef {
   resumePlayback: () => void;
   /** Stop playback and reset cursor */
   stopPlayback: () => void;
+  /** Start smooth scrolling that follows cursor position */
+  startSyncedScroll: () => void;
+  /** Pause scrolling */
+  pauseSyncedScroll: () => void;
+  /** Stop scrolling */
+  stopSyncedScroll: () => void;
 }
 
 type RenderState = "loading" | "rendering" | "ready" | "error";
@@ -342,6 +348,9 @@ function ScorePreviewInner(
       pausePlayback: () => injectScript("window.pausePlayback();"),
       resumePlayback: () => injectScript("window.resumePlayback();"),
       stopPlayback: () => injectScript("window.stopPlayback();"),
+      startSyncedScroll: () => injectScript("window.startSyncedScroll();"),
+      pauseSyncedScroll: () => injectScript("window.pauseSyncedScroll();"),
+      stopSyncedScroll: () => injectScript("window.stopSyncedScroll();"),
     }),
     [injectScript],
   );

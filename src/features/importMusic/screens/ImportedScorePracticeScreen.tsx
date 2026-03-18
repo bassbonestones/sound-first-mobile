@@ -322,7 +322,6 @@ export function ImportedScorePracticeScreen({
     config,
     progress,
     setTempo,
-    toggleMetronome,
     start,
     pause,
     resume,
@@ -355,12 +354,12 @@ export function ImportedScorePracticeScreen({
     setRenderError(error);
   }, []);
 
-  // Always reset cursor position on countdown/idle - regardless of cursor visibility
-  // This ensures timestamp tracking stays in sync even when cursor is hidden
+  // Reset cursor position on countdown (starting/restarting practice)
+  // Don't reset on idle - let the score stay at the end position when practice finishes
   useEffect(() => {
     if (!scorePreviewRef.current) return;
 
-    if (practiceState === "countdown" || practiceState === "idle") {
+    if (practiceState === "countdown") {
       scorePreviewRef.current.resetCursor();
     }
   }, [practiceState]);
@@ -378,6 +377,22 @@ export function ImportedScorePracticeScreen({
     }
     // paused state with cursorEnabled - keep cursor visible
   }, [cursorEnabled, practiceState]);
+
+  // Control smooth scrolling based on practice state
+  useEffect(() => {
+    if (!scorePreviewRef.current) return;
+
+    if (practiceState === "playing") {
+      // Start smooth scrolling
+      scorePreviewRef.current.startSyncedScroll();
+    } else if (practiceState === "paused") {
+      // Pause scrolling
+      scorePreviewRef.current.pauseSyncedScroll();
+    } else {
+      // idle or countdown - stop scrolling
+      scorePreviewRef.current.stopSyncedScroll();
+    }
+  }, [practiceState]);
 
   // Handle back button
   const handleBack = useCallback(() => {
@@ -445,27 +460,6 @@ export function ImportedScorePracticeScreen({
             </Text>
           )}
         </View>
-        <TouchableOpacity
-          onPress={toggleMetronome}
-          style={[
-            styles.headerButton,
-            config.metronomeEnabled && styles.activeHeaderButton,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={
-            config.metronomeEnabled ? "Disable metronome" : "Enable metronome"
-          }
-          // @ts-expect-error - title works on web for tooltip
-          title="Metronome"
-        >
-          <Feather
-            name="activity"
-            size={20}
-            color={
-              config.metronomeEnabled ? colors.primary : colors.textSecondary
-            }
-          />
-        </TouchableOpacity>
         <TouchableOpacity
           onPress={toggleCursor}
           style={[

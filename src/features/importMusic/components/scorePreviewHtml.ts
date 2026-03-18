@@ -175,7 +175,14 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
     
     // Auto-scroll configuration
     const autoScrollEnabled = ${autoScrollToCursor};
-    const scrollLeadPercent = 0.25; // Keep cursor 25% from left edge
+    const cursorTargetPercent = 0.20; // Keep cursor at 20% from left edge
+    
+    // Smooth scroll state
+    let scrollAnimationId = null;
+    let scrollTargetX = 0;
+    let isScrolling = false;
+    let isEndScrolling = false; // True when continuing to scroll after look-ahead runs out
+    const END_SCROLL_SPEED = 2.5; // Fixed pixels per frame for end scrolling
 
     // Send message to React Native (WebView) or parent window (iframe on web)
     function sendMessage(type, payload) {
@@ -426,13 +433,142 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
         currentCursorIndex++;
       }
       
-      // Auto-scroll to keep cursor visible
-      if (autoScrollEnabled) {
-        scrollToCursor();
+      // Always update scroll target when cursor moves
+      if (autoScrollEnabled && isScrolling) {
+        updateScrollTarget();
       }
     }
     
-    // Scroll the container to keep the cursor visible
+    // Update scroll target to keep cursor at target position
+    function updateScrollTarget() {
+      if (!osmd || !osmd.cursor || !osmd.cursor.cursorElement) return;
+      
+      const container = document.getElementById('container');
+      if (!container) return;
+      
+      const cursorEl = osmd.cursor.cursorElement;
+      const cursorRect = cursorEl.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      
+      // Calculate where cursor is in document coordinates
+      const cursorScreenX = cursorRect.left - containerRect.left;
+      const cursorDocX = cursorScreenX + container.scrollLeft;
+      
+      const maxScroll = container.scrollWidth - containerRect.width;
+      const contentWidth = container.scrollWidth;
+      
+      // Calculate where the look-ahead would put us
+      const lookAheadPixels = 150;
+      const cursorWithLookAhead = cursorDocX + lookAheadPixels;
+      
+      // Detect when look-ahead can no longer help (cursor + look-ahead goes past content)
+      // This triggers end-scrolling mode BEFORE we reach the last note
+      const lookAheadExceedsContent = cursorWithLookAhead >= contentWidth - 50;
+      const isAtLastNote = currentCursorIndex >= cursorTimeline.length - 1;
+      
+      if ((lookAheadExceedsContent || isAtLastNote) && maxScroll > container.scrollLeft) {
+        // Look-ahead has run out of content - switch to constant-speed end-scrolling
+        isEndScrolling = true;
+        scrollTargetX = maxScroll;
+      } else {
+        // Normal scrolling with look-ahead
+        isEndScrolling = false;
+        
+        // Target scroll puts cursor at target percent from left
+        const targetOffset = containerRect.width * cursorTargetPercent;
+        const newTarget = Math.max(0, cursorWithLookAhead - targetOffset);
+        
+        scrollTargetX = Math.min(maxScroll, newTarget);
+      }
+      
+      // Start animation if not running
+      if (!scrollAnimationId) {
+        scrollAnimationId = requestAnimationFrame(smoothScrollFrame);
+      }
+    }
+    
+    // Smooth scroll animation frame
+    function smoothScrollFrame() {
+      // When end-scrolling, keep going even if isScrolling is false
+      // (allows scroll to complete after practice ends)
+      if (!isScrolling && !isEndScrolling) {
+        scrollAnimationId = null;
+        return;
+      }
+      
+      const container = document.getElementById('container');
+      if (!container) {
+        scrollAnimationId = null;
+        return;
+      }
+      
+      const current = container.scrollLeft;
+      const maxScroll = container.scrollWidth - container.clientWidth;
+      const diff = scrollTargetX - current;
+      
+      let step;
+      if (isEndScrolling) {
+        // At end of piece: use fixed constant speed
+        step = Math.min(END_SCROLL_SPEED, Math.abs(diff));
+        if (diff < 0) step = -step;
+      } else {
+        // Normal scrolling: use proportional speed
+        // Minimum 25% per frame, up to 50% for large gaps
+        const speed = Math.min(0.5, Math.max(0.25, Math.abs(diff) / 500));
+        step = diff * speed;
+      }
+      
+      // If we're close enough, snap and stop animation
+      if (Math.abs(diff) < 1) {
+        container.scrollLeft = scrollTargetX;
+        // If we're end-scrolling and reached the end, we're done
+        if (isEndScrolling) {
+          isEndScrolling = false;
+        }
+        scrollAnimationId = null;
+        return;
+      }
+      
+      container.scrollLeft = current + step;
+      scrollAnimationId = requestAnimationFrame(smoothScrollFrame);
+    }
+    
+    // Start smooth scrolling (does NOT reset position - just enables scrolling)
+    function startSmoothScroll() {
+      isScrolling = true;
+      isEndScrolling = false;
+      // Don't reset scrollTargetX or container.scrollLeft here
+      // The scroll position is managed by updateScrollTarget() which tracks the cursor
+    }
+    
+    // Stop smooth scrolling - but let end-scrolling complete
+    function stopSmoothScroll() {
+      isScrolling = false;
+      // If we're end-scrolling, let it continue to completion
+      // The animation will stop itself when it reaches the target
+      if (!isEndScrolling && scrollAnimationId) {
+        cancelAnimationFrame(scrollAnimationId);
+        scrollAnimationId = null;
+      }
+    }
+    
+    // Pause smooth scrolling (keep position)
+    function pauseSmoothScroll() {
+      isScrolling = false;
+      if (scrollAnimationId) {
+        cancelAnimationFrame(scrollAnimationId);
+        scrollAnimationId = null;
+      }
+    }
+    
+    // Resume smooth scrolling
+    function resumeSmoothScroll() {
+      isScrolling = true;
+      // Immediately update target based on current cursor position
+      updateScrollTarget();
+    }
+    
+    // Scroll the container to keep the cursor visible (manual/legacy)
     function scrollToCursor() {
       if (!osmd || !osmd.cursor || !osmd.cursor.cursorElement) return;
       
@@ -446,24 +582,16 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
         const containerRect = container.getBoundingClientRect();
         
         // Calculate where cursor is relative to the scrollable container
-        // Account for current scroll position and zoom
         const cursorX = cursorRect.left - containerRect.left + container.scrollLeft;
         
         // Calculate target scroll position
-        // We want the cursor to be scrollLeadPercent from the left edge
-        const leadSpace = containerRect.width * scrollLeadPercent;
+        const leadSpace = containerRect.width * cursorTargetPercent;
         const targetScrollX = Math.max(0, cursorX - leadSpace);
         
-        // Only scroll if cursor would be outside visible area or too far right
-        const visibleLeft = container.scrollLeft + leadSpace;
-        const visibleRight = container.scrollLeft + containerRect.width * 0.9;
-        
-        if (cursorX < visibleLeft || cursorX > visibleRight) {
-          container.scrollTo({
-            left: targetScrollX,
-            behavior: 'smooth'
-          });
-        }
+        container.scrollTo({
+          left: targetScrollX,
+          behavior: 'smooth'
+        });
       } catch (e) {
         console.log('Scroll to cursor error:', e);
       }
@@ -471,6 +599,14 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
     
     // Reset scroll position to beginning
     function resetScroll() {
+      // Stop any ongoing end-scroll animation
+      isEndScrolling = false;
+      if (scrollAnimationId) {
+        cancelAnimationFrame(scrollAnimationId);
+        scrollAnimationId = null;
+      }
+      scrollTargetX = 0;
+      
       const container = document.getElementById('container');
       if (container) {
         container.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
@@ -596,6 +732,9 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
       
       // Start beat interval
       beatIntervalId = setInterval(onBeatTick, adjustedBeatDuration);
+      
+      // Start smooth scrolling
+      startSmoothScroll();
     };
     
     // Pause playback
@@ -608,6 +747,9 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
         clearInterval(beatIntervalId);
         beatIntervalId = null;
       }
+      
+      // Pause scrolling
+      pauseSmoothScroll();
       
       sendMessage('playbackPaused');
     };
@@ -625,6 +767,9 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
       // Restart interval from current beat
       beatIntervalId = setInterval(onBeatTick, adjustedBeatDuration);
       
+      // Resume scrolling
+      resumeSmoothScroll();
+      
       sendMessage('playbackResumed');
     };
     
@@ -637,6 +782,9 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
         beatIntervalId = null;
       }
       
+      // Stop scrolling
+      stopSmoothScroll();
+      
       if (osmd && osmd.cursor) {
         osmd.cursor.reset();
         osmd.cursor.hide();
@@ -647,17 +795,42 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
       sendMessage('playbackStopped');
     };
     
-    // Legacy cursor control functions (kept for compatibility)
+    // Cursor visibility control - use opacity instead of hide() to keep scrolling working
     window.showCursor = function() {
       if (!osmd || !osmd.cursor) return;
       osmd.cursor.show();
+      if (osmd.cursor.cursorElement) {
+        osmd.cursor.cursorElement.style.opacity = '1';
+      }
       sendMessage('cursorShown');
     };
 
     window.hideCursor = function() {
       if (!osmd || !osmd.cursor) return;
-      osmd.cursor.hide();
+      // Don't actually hide - just make transparent so scrolling still works
+      osmd.cursor.show(); // Ensure cursor element exists
+      if (osmd.cursor.cursorElement) {
+        osmd.cursor.cursorElement.style.opacity = '0';
+      }
       sendMessage('cursorHidden');
+    };
+    
+    // Scroll control functions (called from React Native)
+    window.startSyncedScroll = function() {
+      console.log('startSyncedScroll called');
+      startSmoothScroll();
+    };
+    
+    window.pauseSyncedScroll = function() {
+      pauseSmoothScroll();
+    };
+    
+    window.stopSyncedScroll = function() {
+      stopSmoothScroll();
+    };
+    
+    window.resumeSyncedScroll = function() {
+      resumeSmoothScroll();
     };
 
     window.resetCursor = function() {
