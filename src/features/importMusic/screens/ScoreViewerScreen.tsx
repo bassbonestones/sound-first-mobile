@@ -15,12 +15,16 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 
@@ -65,6 +69,25 @@ export function ScoreViewerScreen({
   // Extract params
   const params = (route?.params ?? {}) as Partial<ScoreViewerParams>;
   const { scoreId } = params;
+
+  // Get window dimensions for explicit WebView sizing (iOS needs this)
+  const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  // Calculate score preview height:
+  // Total height - safe area insets - header (~60) - info bar (~50) - action buttons (~80)
+  const headerHeight = 60;
+  const infoBarHeight = 50;
+  const actionButtonsHeight = 80;
+  const scorePreviewHeight = Math.max(
+    200,
+    windowHeight -
+      insets.top -
+      insets.bottom -
+      headerHeight -
+      infoBarHeight -
+      actionButtonsHeight,
+  );
 
   // State for score data (from params or loaded from storage)
   const [score, setScore] = useState<ImportedScore | null>(
@@ -309,8 +332,10 @@ export function ScoreViewerScreen({
         ) : (
           <ScorePreview
             musicXml={rawMusicXml}
-            height={undefined} // Full height
+            height={scorePreviewHeight}
             showZoomControls={true}
+            fixedWidth={1200}
+            horizontalStaffline={true}
             onRenderComplete={handleRenderComplete}
             onError={handleRenderError}
             testID="score-viewer-preview"

@@ -14,11 +14,11 @@ import {
   View,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   Text,
   TouchableOpacity,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 
@@ -34,6 +34,54 @@ import {
 } from "../components";
 
 import { devLog } from "../../../utils/devLogger";
+
+// ============================================================================
+// Sample MusicXML for Development Testing
+// ============================================================================
+
+const SAMPLE_MUSICXML = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN"
+    "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="3.1">
+  <work>
+    <work-title>Sample Scale</work-title>
+  </work>
+  <identification>
+    <creator type="composer">Sound First Demo</creator>
+  </identification>
+  <part-list>
+    <score-part id="P1">
+      <part-name>Piano</part-name>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>1</divisions>
+        <key><fifths>0</fifths></key>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef>
+      </attributes>
+      <direction placement="above">
+        <direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>80</per-minute></metronome></direction-type>
+        <sound tempo="80"/>
+      </direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+    </measure>
+    <measure number="2">
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+      <note><pitch><step>A</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+      <note><pitch><step>B</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+      <note><pitch><step>C</step><octave>5</octave></pitch><duration>1</duration><type>quarter</type></note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+// Check if we're in development mode
+const __DEV__ = process.env.NODE_ENV !== "production";
 
 // ============================================================================
 // Types
@@ -151,6 +199,37 @@ export function ImportMusicScreen({
     navigation?.navigate("MyScores");
   }, [navigation]);
 
+  // Development only: Load sample MusicXML for testing
+  const handleLoadSample = useCallback(() => {
+    if (!__DEV__) return;
+
+    devLog("Loading sample MusicXML for development testing");
+
+    // Create a mock score from the sample
+    const sampleScore = {
+      id: `sample-${Date.now()}`,
+      metadata: {
+        title: "Sample Scale",
+        composer: "Sound First Demo",
+        partCount: 1,
+        measureCount: 2,
+        keySignature: "C major",
+        timeSignature: "4/4",
+        tempo: 80,
+        sourceType: "musicxml" as const,
+        importedAt: new Date().toISOString(),
+        confidence: 1,
+      },
+      parts: [],
+    };
+
+    // Navigate to ScoreViewer first (then user can tap Practice)
+    navigation?.navigate("ScoreViewer", {
+      score: sampleScore,
+      rawMusicXml: SAMPLE_MUSICXML,
+    });
+  }, [navigation]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
@@ -177,11 +256,35 @@ export function ImportMusicScreen({
       >
         {/* Idle State - Show import actions */}
         {screenState === "idle" && (
-          <ImportActionList
-            actions={importActions}
-            disabled={false}
-            testID="import-music-actions"
-          />
+          <>
+            <ImportActionList
+              actions={importActions}
+              disabled={false}
+              testID="import-music-actions"
+            />
+
+            {/* Development Only: Load Sample for Testing */}
+            {__DEV__ && (
+              <View style={styles.devSection}>
+                <Text style={styles.devSectionTitle}>Development Testing</Text>
+                <TouchableOpacity
+                  style={styles.sampleButton}
+                  onPress={handleLoadSample}
+                  accessibilityRole="button"
+                  accessibilityLabel="Load sample MusicXML"
+                  testID="import-music-load-sample"
+                >
+                  <Feather name="play-circle" size={20} color={colors.white} />
+                  <Text style={styles.sampleButtonText}>
+                    Load Sample (C Scale)
+                  </Text>
+                </TouchableOpacity>
+                <Text style={styles.devHint}>
+                  Skips file picker - goes directly to practice
+                </Text>
+              </View>
+            )}
+          </>
         )}
 
         {/* Importing State - Show progress */}
@@ -271,6 +374,44 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     paddingVertical: spacing.xl,
+  },
+  devSection: {
+    marginTop: spacing.xl,
+    marginHorizontal: spacing.lg,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: "dashed",
+  },
+  devSectionTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    textTransform: "uppercase",
+    marginBottom: spacing.sm,
+  },
+  sampleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 8,
+  },
+  sampleButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.white,
+  },
+  devHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginTop: spacing.sm,
   },
 });
 

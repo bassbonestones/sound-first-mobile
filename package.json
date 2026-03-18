@@ -28,6 +28,7 @@
     "expo-document-picker": "~55.0.9",
     "expo-image-picker": "~55.0.13",
     "expo-linear-gradient": "~55.0.8",
+    "expo-screen-orientation": "~55.0.9",
     "expo-secure-store": "~55.0.8",
     "expo-splash-screen": "~55.0.10",
     "expo-status-bar": "~55.0.4",

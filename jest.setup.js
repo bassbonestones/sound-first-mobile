@@ -51,6 +51,33 @@ jest.mock("expo-constants", () => ({
   },
 }));
 
+jest.mock("expo-screen-orientation", () => ({
+  OrientationLock: {
+    LANDSCAPE: "LANDSCAPE",
+    PORTRAIT: "PORTRAIT",
+    DEFAULT: "DEFAULT",
+  },
+  Orientation: {
+    PORTRAIT_UP: 1,
+    PORTRAIT_DOWN: 2,
+    LANDSCAPE_LEFT: 3,
+    LANDSCAPE_RIGHT: 4,
+  },
+  lockAsync: jest.fn().mockResolvedValue(undefined),
+  unlockAsync: jest.fn().mockResolvedValue(undefined),
+  getOrientationAsync: jest.fn().mockResolvedValue(1),
+}));
+
+jest.mock("react-native-safe-area-context", () => {
+  const { View } = require("react-native");
+  return {
+    SafeAreaView: ({ children, ...props }) =>
+      require("react").createElement(View, props, children),
+    SafeAreaProvider: ({ children }) => children,
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  };
+});
+
 // Mock React Navigation
 jest.mock("@react-navigation/native", () => {
   const actualNav = jest.requireActual("@react-navigation/native");

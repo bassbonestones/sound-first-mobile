@@ -98,6 +98,12 @@ export interface ScorePreviewProps {
   readonly enableCursor?: boolean;
   /** Called when cursor should advance (each beat) */
   readonly onCursorNext?: () => void;
+  /** Fixed render width in pixels for horizontal scrolling (0 = auto-fit) */
+  readonly fixedWidth?: number;
+  /** Auto-scroll to keep cursor visible during playback (default: false) */
+  readonly autoScrollToCursor?: boolean;
+  /** Render all measures in a single horizontal line for scrollable practice (default: false) */
+  readonly horizontalStaffline?: boolean;
   /** Container height (default: 400) */
   readonly height?: number;
   /** Test ID */
@@ -149,6 +155,9 @@ function ScorePreviewInner(
     showZoomControls = true,
     enableCursor = false,
     onCursorNext,
+    fixedWidth = 0,
+    autoScrollToCursor = false,
+    horizontalStaffline = false,
     height = 400,
     testID = "score-preview",
   }: ScorePreviewProps,
@@ -179,8 +188,18 @@ function ScorePreviewInner(
         initialZoom,
         highlightMeasures: highlightMeasures as HighlightedMeasure[],
         enableCursor,
+        fixedWidth,
+        autoScrollToCursor,
+        horizontalStaffline,
       }),
-    [initialZoom, highlightMeasures, enableCursor],
+    [
+      initialZoom,
+      highlightMeasures,
+      enableCursor,
+      fixedWidth,
+      autoScrollToCursor,
+      horizontalStaffline,
+    ],
   );
 
   // Process message from WebView/iframe
@@ -350,9 +369,14 @@ function ScorePreviewInner(
   const isReady = renderState === "ready";
 
   // Unified render - always keep iframe/WebView mounted to prevent re-triggering onLoad
+  // If height is undefined, use flex: 1 to fill parent container
+  const containerStyle = height
+    ? [styles.container, { height }]
+    : [styles.container, { flex: 1 }];
+
   return (
     <View
-      style={[styles.container, { height }]}
+      style={containerStyle}
       testID={testID}
       accessibilityLabel={
         isLoading

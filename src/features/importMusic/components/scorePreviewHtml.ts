@@ -31,6 +31,12 @@ export interface OsmdHtmlOptions {
   drawPartNames?: boolean;
   /** Enable cursor for practice mode (default: false) */
   enableCursor?: boolean;
+  /** Fixed width in pixels for scrollable rendering (0 = auto-fit to container) */
+  fixedWidth?: number;
+  /** Auto-scroll to keep cursor visible during playback (default: false) */
+  autoScrollToCursor?: boolean;
+  /** Render all measures in a single horizontal line (default: false) */
+  horizontalStaffline?: boolean;
 }
 
 // ============================================================================
@@ -54,10 +60,17 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
     drawComposer = false,
     drawPartNames = false,
     enableCursor = false,
+    fixedWidth = 0,
+    autoScrollToCursor = false,
+    horizontalStaffline = false,
   } = options;
 
   // Serialize highlight measures for use in JavaScript
   const highlightJson = JSON.stringify(highlightMeasures);
+
+  // Calculate container width style - fixed width enables horizontal scrolling
+  const containerWidthStyle =
+    fixedWidth > 0 ? `min-width: ${fixedWidth}px;` : "";
 
   return `
 <!DOCTYPE html>
@@ -85,10 +98,14 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
       width: 100%;
       height: 100%;
       overflow: auto;
+      overflow-x: auto;
+      overflow-y: auto;
       -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
     }
     
     #osmd-container {
+      ${containerWidthStyle}
       min-width: 100%;
       padding: 16px;
       transform-origin: top left;
@@ -155,6 +172,10 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
     let currentZoom = ${initialZoom};
     const highlightMeasures = ${highlightJson};
     let pendingMusicXml = null; // Store XML if received before OSMD loads
+    
+    // Auto-scroll configuration
+    const autoScrollEnabled = ${autoScrollToCursor};
+    const scrollLeadPercent = 0.25; // Keep cursor 25% from left edge
 
     // Send message to React Native (WebView) or parent window (iframe on web)
     function sendMessage(type, payload) {
@@ -208,8 +229,8 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
           backend: "svg",
           // Enable auto-beaming when MusicXML doesn't have beam elements
           autoBeam: true,
-          // Performance optimizations
-          renderSingleHorizontalStaffline: false,
+          // Render all in one line for scrollable practice view
+          renderSingleHorizontalStaffline: ${horizontalStaffline},
         });
 
         if (loadingEl) {
@@ -404,6 +425,56 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
         osmd.cursor.next();
         currentCursorIndex++;
       }
+      
+      // Auto-scroll to keep cursor visible
+      if (autoScrollEnabled) {
+        scrollToCursor();
+      }
+    }
+    
+    // Scroll the container to keep the cursor visible
+    function scrollToCursor() {
+      if (!osmd || !osmd.cursor || !osmd.cursor.cursorElement) return;
+      
+      const container = document.getElementById('container');
+      if (!container) return;
+      
+      try {
+        // Get cursor element bounding rect
+        const cursorEl = osmd.cursor.cursorElement;
+        const cursorRect = cursorEl.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        
+        // Calculate where cursor is relative to the scrollable container
+        // Account for current scroll position and zoom
+        const cursorX = cursorRect.left - containerRect.left + container.scrollLeft;
+        
+        // Calculate target scroll position
+        // We want the cursor to be scrollLeadPercent from the left edge
+        const leadSpace = containerRect.width * scrollLeadPercent;
+        const targetScrollX = Math.max(0, cursorX - leadSpace);
+        
+        // Only scroll if cursor would be outside visible area or too far right
+        const visibleLeft = container.scrollLeft + leadSpace;
+        const visibleRight = container.scrollLeft + containerRect.width * 0.9;
+        
+        if (cursorX < visibleLeft || cursorX > visibleRight) {
+          container.scrollTo({
+            left: targetScrollX,
+            behavior: 'smooth'
+          });
+        }
+      } catch (e) {
+        console.log('Scroll to cursor error:', e);
+      }
+    }
+    
+    // Reset scroll position to beginning
+    function resetScroll() {
+      const container = document.getElementById('container');
+      if (container) {
+        container.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
+      }
     }
     
     // Calculate which cursor index corresponds to a given beat number
@@ -596,6 +667,10 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
       currentPlaybackTimestamp = 0;
       // Don't show cursor here - let caller decide visibility
       osmd.cursor.hide();
+      // Reset scroll position to beginning
+      if (autoScrollEnabled) {
+        resetScroll();
+      }
       sendMessage('cursorReset');
     };
 
@@ -604,6 +679,10 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
       if (!osmd.cursor.iterator.EndReached) {
         osmd.cursor.next();
         currentCursorIndex++;
+        // Auto-scroll to keep cursor visible
+        if (autoScrollEnabled) {
+          scrollToCursor();
+        }
         sendMessage('cursorMoved', { 
           measureNumber: osmd.cursor.iterator.CurrentMeasureIndex + 1,
           endReached: osmd.cursor.iterator.EndReached

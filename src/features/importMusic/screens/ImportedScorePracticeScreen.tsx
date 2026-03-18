@@ -14,12 +14,19 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   TouchableOpacity,
+  Platform,
+  useWindowDimensions,
 } from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useFocusEffect } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
+import * as ScreenOrientation from "expo-screen-orientation";
 
 import { colors, spacing } from "../../../constants";
 import { ScorePreview, type ScorePreviewRef } from "../components";
@@ -243,9 +250,59 @@ export function ImportedScorePracticeScreen({
   const { score, rawMusicXml } = (route?.params ??
     {}) as Partial<ImportedScorePracticeParams>;
 
+  // Get window dimensions for explicit WebView sizing (iOS needs this)
+  const { width, height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  // Calculate score preview height:
+  // Total height - safe area insets - header (~60) - progress bar (~80) - tempo control (~80) - playback controls (~100)
+  const headerHeight = 60;
+  const progressHeight = 80;
+  const tempoControlHeight = 80;
+  const playbackControlsHeight = 100;
+  const scorePreviewHeight = Math.max(
+    200,
+    windowHeight -
+      insets.top -
+      insets.bottom -
+      headerHeight -
+      progressHeight -
+      tempoControlHeight -
+      playbackControlsHeight,
+  );
+
   // Track render state
   const [isRendered, setIsRendered] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
+
+  // Lock to landscape orientation when screen is focused (mobile only)
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === "web") return;
+
+      // Lock to landscape when focused
+      ScreenOrientation.lockAsync(
+        ScreenOrientation.OrientationLock.LANDSCAPE,
+      ).catch((error) => {
+        console.warn("Failed to lock orientation:", error);
+      });
+
+      return () => {
+        // Lock back to portrait when leaving the screen
+        // (unlockAsync just allows rotation, doesn't change orientation)
+        ScreenOrientation.lockAsync(
+          ScreenOrientation.OrientationLock.PORTRAIT_UP,
+        )
+          .then(() => {
+            // Then unlock to allow normal rotation again
+            ScreenOrientation.unlockAsync();
+          })
+          .catch(() => {
+            // Ignore errors on cleanup
+          });
+      };
+    }, []),
+  );
 
   // Cursor following state
   const [cursorEnabled, setCursorEnabled] = useState(false);
@@ -442,9 +499,12 @@ export function ImportedScorePracticeScreen({
           <ScorePreview
             ref={scorePreviewRef}
             musicXml={rawMusicXml}
-            height={undefined}
+            height={scorePreviewHeight}
             showZoomControls={false}
             enableCursor={cursorEnabled}
+            fixedWidth={1200}
+            autoScrollToCursor={true}
+            horizontalStaffline={true}
             onRenderComplete={handleRenderComplete}
             onError={handleRenderError}
             testID="practice-score-preview"
@@ -529,7 +589,7 @@ const styles = StyleSheet.create({
     width: 32,
   },
   previewContainer: {
-    flex: 1,
+    // Explicit height is passed to ScorePreview for iOS WebView compatibility
   },
   progressDisplay: {
     flexDirection: "row",
