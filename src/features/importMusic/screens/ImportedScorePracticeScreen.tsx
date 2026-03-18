@@ -492,7 +492,9 @@ export function ImportedScorePracticeScreen({
         <TempoControl
           tempo={config.tempo}
           onTempoChange={setTempo}
-          disabled={practiceState === "playing" || practiceState === "countdown"}
+          disabled={
+            practiceState === "playing" || practiceState === "countdown"
+          }
         />
 
         {/* Progress Display */}

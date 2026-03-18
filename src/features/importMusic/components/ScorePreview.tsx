@@ -361,8 +361,7 @@ function ScorePreviewInner(
       pausePlayback: () => injectScript("window.pausePlayback();"),
       resumePlayback: () => injectScript("window.resumePlayback();"),
       stopPlayback: () => injectScript("window.stopPlayback();"),
-      startSyncedScroll: () =>
-        injectScript(`window.startSyncedScroll();`),
+      startSyncedScroll: () => injectScript(`window.startSyncedScroll();`),
       pauseSyncedScroll: () => injectScript("window.pauseSyncedScroll();"),
       stopSyncedScroll: () => injectScript("window.stopSyncedScroll();"),
     }),
