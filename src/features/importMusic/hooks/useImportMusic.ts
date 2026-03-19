@@ -9,7 +9,7 @@
  * - Reset state for new imports
  */
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 
 import type {
   LocalImportAsset,
@@ -143,8 +143,30 @@ function createInitialState(): ImportMusicState {
 export function useImportMusic(): UseImportMusicReturn {
   const [state, setState] = useState<ImportMusicState>(createInitialState);
 
-  // Cancellation token ref
+  // Cancellation token ref (legacy, kept for compatibility)
   const cancellationRef = useRef<{ cancelled: boolean }>({ cancelled: false });
+
+  // AbortController for proper fetch cancellation
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Import lock to prevent concurrent imports (race condition fix)
+  const importLockRef = useRef<boolean>(false);
+
+  // ============================================================================
+  // Cleanup on Unmount
+  // ============================================================================
+
+  useEffect(() => {
+    // Cleanup function - abort any pending imports when component unmounts
+    return () => {
+      if (abortControllerRef.current) {
+        devLog("[useImportMusic] Cleanup: Aborting pending import");
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      cancellationRef.current.cancelled = true;
+    };
+  }, []);
 
   // ============================================================================
   // State Update Helpers
@@ -174,7 +196,23 @@ export function useImportMusic(): UseImportMusicReturn {
 
   const runImport = useCallback(
     async (asset: LocalImportAsset) => {
-      // Reset cancellation token
+      // Prevent concurrent imports (race condition protection)
+      if (importLockRef.current) {
+        devLog("[useImportMusic] Import already in progress, ignoring request");
+        return;
+      }
+      importLockRef.current = true;
+
+      // Abort any previous import
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // Create new AbortController for this import
+      abortControllerRef.current = new AbortController();
+      const abortSignal = abortControllerRef.current.signal;
+
+      // Reset cancellation token (legacy)
       cancellationRef.current = { cancelled: false };
 
       // Set importing state
@@ -200,6 +238,7 @@ export function useImportMusic(): UseImportMusicReturn {
           {
             onStatusChange: setStatus,
             cancellationToken: cancellationRef.current,
+            abortSignal,
           },
         );
 
@@ -215,7 +254,7 @@ export function useImportMusic(): UseImportMusicReturn {
             error: null,
           });
         } else {
-          devError("[useImportMusic] Import failed:", result.error?.code);
+          devError("[useImportMusic] Import failed:", result.error?.code, result.error?.message, result.error);
           updateState({
             result,
             error: result.error,
@@ -233,6 +272,9 @@ export function useImportMusic(): UseImportMusicReturn {
           recoveryHint: null,
         };
         setError(error);
+      } finally {
+        // Always release the import lock
+        importLockRef.current = false;
       }
     },
     [updateState, setStatus, setError],
@@ -328,12 +370,42 @@ export function useImportMusic(): UseImportMusicReturn {
 
   const cancelImport = useCallback(() => {
     devLog("[useImportMusic] cancelImport");
+    // Set legacy cancellation flag
     cancellationRef.current.cancelled = true;
+    // Abort any in-flight fetch requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    // Release import lock
+    importLockRef.current = false;
+    // Update state to reflect cancellation
+    setState((prev) => ({
+      ...prev,
+      isImporting: false,
+      error: {
+        code: "canceled_by_user",
+        message: "Import cancelled",
+        userMessage: "Import was cancelled.",
+        severity: "recoverable",
+        recoverable: true,
+        recoveryHint: null,
+      },
+    }));
   }, []);
 
   const resetImportState = useCallback(() => {
     devLog("[useImportMusic] resetImportState");
+    // Set legacy cancellation flag
     cancellationRef.current.cancelled = true;
+    // Abort any in-flight fetch requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    // Release import lock
+    importLockRef.current = false;
+    // Reset to initial state
     setState(createInitialState());
   }, []);
 

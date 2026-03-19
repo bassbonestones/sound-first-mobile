@@ -8,6 +8,7 @@
 // Use the legacy API for expo-file-system (SDK 55+ uses class-based API)
 import * as FileSystem from "expo-file-system/legacy";
 import { FileSystemUploadType } from "expo-file-system/legacy";
+import { Platform } from "react-native";
 
 // Upload type constants for reference (matching FileSystemUploadType enum)
 // UPLOAD_TYPE_BINARY = 0 (not currently used)
@@ -27,6 +28,7 @@ import type {
 import { IMPORT_TIMEOUTS } from "../../../constants/import";
 import { mapNativeError } from "../utils/errors";
 import { devLog } from "../../../utils/devLogger";
+import { getApiConfig, getUploadConfig } from "../config";
 
 // ============================================================================
 // Configuration
@@ -35,11 +37,11 @@ import { devLog } from "../../../utils/devLogger";
 /**
  * Upload service configuration
  *
- * In production, these values would come from environment config
+ * Uses shared import config for URLs, allows local overrides for timeout etc.
  */
 interface UploadConfig {
-  /** Base URL for the upload API */
-  readonly baseUrl: string;
+  /** Base URL for the upload API (defaults to import config) */
+  readonly baseUrl?: string;
   /** Whether to use signed URLs for upload */
   readonly useSignedUrls: boolean;
   /** Upload timeout in ms */
@@ -47,15 +49,17 @@ interface UploadConfig {
 }
 
 /**
- * Default upload configuration
- *
- * TODO: Replace with actual backend URL from environment
+ * Get default upload configuration from shared config
  */
-const DEFAULT_CONFIG: UploadConfig = {
-  baseUrl: "https://api.soundfirst.app", // Placeholder
-  useSignedUrls: true,
-  timeout: IMPORT_TIMEOUTS.UPLOAD,
-};
+function getDefaultConfig(): UploadConfig {
+  const apiConfig = getApiConfig();
+  const uploadConfig = getUploadConfig();
+  return {
+    baseUrl: apiConfig.importsUrl,
+    useSignedUrls: uploadConfig.method === "signed_url",
+    timeout: uploadConfig.timeout,
+  };
+}
 
 // ============================================================================
 // Upload Functions
@@ -76,7 +80,8 @@ export async function uploadImportAsset(
   asset: LocalImportAsset,
   config: Partial<UploadConfig> = {},
 ): Promise<RemoteUploadResult> {
-  const finalConfig = { ...DEFAULT_CONFIG, ...config };
+  const defaultConfig = getDefaultConfig();
+  const finalConfig = { ...defaultConfig, ...config };
 
   try {
     if (finalConfig.useSignedUrls) {
@@ -166,29 +171,66 @@ async function uploadViaSignedUrl(
 
 /**
  * Upload directly to the backend API
+ *
+ * Note: Direct upload flow:
+ * 1. First request a signed URL to get an asset_id
+ * 2. Then upload to /upload/direct/{asset_id}
  */
 async function uploadDirect(
   asset: LocalImportAsset,
   config: UploadConfig,
 ): Promise<RemoteUploadResult> {
-  const uploadUrl = `${config.baseUrl}/api/v1/import/upload`;
+  // First get a signed URL to obtain an asset_id
+  // The backend generates the asset_id on this call
+  const signedUrlResponse = await requestSignedUrl(
+    {
+      fileName: asset.fileName,
+      mimeType: asset.mimeType ?? "application/octet-stream",
+      sourceType: asset.sourceType,
+      fileSize: asset.fileSize ?? 0,
+    },
+    config,
+  );
+
+  if (!signedUrlResponse.success || !signedUrlResponse.assetId) {
+    return {
+      success: false,
+      remoteAssetId: null,
+      remoteUrl: null,
+      uploadedAt: null,
+      error: createImportError(
+        "upload_failed",
+        signedUrlResponse.error ?? "Failed to prepare upload",
+        "Could not start upload. Please try again.",
+        { severity: "recoverable", recoverable: true },
+      ),
+    };
+  }
+
+  const uploadUrl = `${config.baseUrl}/upload/direct/${signedUrlResponse.assetId}`;
+
+  // On web, use fetch with FormData for blob URLs
+  if (Platform.OS === "web") {
+    return await uploadDirectWeb(asset, uploadUrl);
+  }
 
   const response = await FileSystem.uploadAsync(uploadUrl, asset.uri, {
     httpMethod: "POST",
     uploadType: FileSystemUploadType.MULTIPART,
     fieldName: "file",
     parameters: {
-      fileName: asset.fileName,
-      sourceType: asset.sourceType,
-      mimeType: asset.mimeType ?? "application/octet-stream",
+      source_type: asset.sourceType,
     },
   });
 
   if (response.status >= 200 && response.status < 300) {
-    const responseData: UploadResponse = JSON.parse(response.body);
+    const responseData = JSON.parse(response.body);
+    devLog("[Upload] Native upload response:", responseData);
+    // Backend sends snake_case, map to our interface
+    const assetId = responseData.asset_id ?? responseData.assetId;
     return {
       success: true,
-      remoteAssetId: responseData.assetId,
+      remoteAssetId: assetId,
       remoteUrl: responseData.url ?? null,
       uploadedAt: Date.now(),
       error: null,
@@ -209,46 +251,135 @@ async function uploadDirect(
   }
 }
 
+/**
+ * Web-specific upload using fetch and FormData
+ * Handles blob URLs that FileSystem.uploadAsync can't process
+ */
+async function uploadDirectWeb(
+  asset: LocalImportAsset,
+  uploadUrl: string,
+): Promise<RemoteUploadResult> {
+  try {
+    devLog("[Upload] Using web upload path for:", asset.uri);
+
+    // Fetch the blob from the blob URL
+    const blobResponse = await fetch(asset.uri);
+    const blob = await blobResponse.blob();
+
+    // Create FormData with the file
+    const formData = new FormData();
+    formData.append("file", blob, asset.fileName);
+    formData.append("source_type", asset.sourceType);
+
+    // Upload using fetch
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (response.ok) {
+      const responseData = await response.json();
+      devLog("[Upload] Web upload response:", responseData);
+      // Backend sends snake_case, map to our interface
+      const assetId = responseData.asset_id ?? responseData.assetId;
+      return {
+        success: true,
+        remoteAssetId: assetId,
+        remoteUrl: responseData.url ?? null,
+        uploadedAt: Date.now(),
+        error: null,
+      };
+    } else {
+      const errorText = await response.text();
+      return {
+        success: false,
+        remoteAssetId: null,
+        remoteUrl: null,
+        uploadedAt: null,
+        error: createImportError(
+          "upload_failed",
+          `Upload failed with status ${response.status}: ${errorText}`,
+          "Failed to upload your file. Please try again.",
+          { severity: "recoverable", recoverable: true },
+        ),
+      };
+    }
+  } catch (error) {
+    devLog("[Upload] Web upload error:", error);
+    return {
+      success: false,
+      remoteAssetId: null,
+      remoteUrl: null,
+      uploadedAt: null,
+      error: mapNativeError(error),
+    };
+  }
+}
+
 // ============================================================================
 // Signed URL Workflow
 // ============================================================================
 
 /**
  * Request a signed URL from the backend
- *
- * TODO: Implement actual API call
  */
 async function requestSignedUrl(
   request: SignedUrlRequest,
-  _config: UploadConfig,
+  config: UploadConfig,
 ): Promise<SignedUrlResponse> {
-  // Placeholder: In production, this would make an actual API call
-  // For now, return a mock response indicating the feature needs backend integration
+  const url = `${config.baseUrl}/upload/signed-url`;
 
-  devLog("[Upload] Would request signed URL:", request);
+  devLog("[Upload] Requesting signed URL:", url);
 
-  // Simulated response for development
-  // In production, replace with actual fetch call
-  /*
-  const response = await fetch(`${config.baseUrl}/api/v1/import/signed-url`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      // Add auth headers here
-    },
-    body: JSON.stringify(request),
-  });
-  return response.json();
-  */
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        // TODO: Add auth headers from context
+      },
+      body: JSON.stringify({
+        file_name: request.fileName,
+        mime_type: request.mimeType,
+        source_type: request.sourceType,
+        file_size: request.fileSize,
+      }),
+    });
 
-  return {
-    success: false,
-    uploadUrl: null,
-    assetId: "",
-    publicUrl: null,
-    expiresAt: null,
-    error: "Upload service not yet integrated with backend",
-  };
+    if (!response.ok) {
+      const errorText = await response.text();
+      devLog("[Upload] Signed URL request failed:", response.status, errorText);
+      return {
+        success: false,
+        uploadUrl: null,
+        assetId: "",
+        publicUrl: null,
+        expiresAt: null,
+        error: `Failed to get upload URL: ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+    return {
+      success: data.success ?? true,
+      uploadUrl: data.upload_url ?? null,
+      assetId: data.asset_id ?? "",
+      publicUrl: data.public_url ?? null,
+      expiresAt: data.expires_at ?? null,
+      error: data.error ?? null,
+    };
+  } catch (error) {
+    devLog("[Upload] Signed URL request error:", error);
+    return {
+      success: false,
+      uploadUrl: null,
+      assetId: "",
+      publicUrl: null,
+      expiresAt: null,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
 }
 
 /**

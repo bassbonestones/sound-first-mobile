@@ -106,10 +106,167 @@ export function reportError(
     context ? `(${context})` : "",
   );
 
-  // In production, this would send to external service:
-  // if (!__DEV__) {
-  //   sendToExternalService(report);
+  // In production, send to external error tracking service
+  if (!__DEV__) {
+    sendToErrorService(report);
+  }
+}
+
+// ============================================================================
+// Production Error Service
+// ============================================================================
+
+/**
+ * Configuration for external error service (Sentry, Bugsnag, etc.)
+ */
+interface ErrorServiceConfig {
+  enabled: boolean;
+  dsn?: string;
+  environment: string;
+  sampleRate: number;
+}
+
+let errorServiceConfig: ErrorServiceConfig = {
+  enabled: false,
+  environment: "development",
+  sampleRate: 1.0,
+};
+
+/**
+ * Initialize the error reporting service
+ *
+ * Call this early in app startup with your Sentry DSN or equivalent.
+ *
+ * @example
+ * ```tsx
+ * // In App.tsx
+ * import { initErrorService } from './utils/errorReporter';
+ *
+ * initErrorService({
+ *   enabled: !__DEV__,
+ *   dsn: process.env.SENTRY_DSN,
+ *   environment: process.env.NODE_ENV,
+ * });
+ * ```
+ */
+export function initErrorService(config: Partial<ErrorServiceConfig>): void {
+  errorServiceConfig = { ...errorServiceConfig, ...config };
+
+  if (errorServiceConfig.enabled && errorServiceConfig.dsn) {
+    // In a real implementation, initialize Sentry here:
+    // Sentry.init({
+    //   dsn: errorServiceConfig.dsn,
+    //   environment: errorServiceConfig.environment,
+    //   sampleRate: errorServiceConfig.sampleRate,
+    // });
+    devError(
+      "[ErrorReporter] Error service initialized for",
+      errorServiceConfig.environment,
+    );
+  }
+}
+
+/**
+ * Send error to external service
+ */
+function sendToErrorService(report: ErrorReport): void {
+  if (!errorServiceConfig.enabled) return;
+
+  // Sample rate check
+  if (Math.random() > errorServiceConfig.sampleRate) return;
+
+  // In a real implementation, use Sentry.captureException:
+  // Sentry.captureException(report.error || new Error(report.message), {
+  //   tags: {
+  //     category: report.category,
+  //     recoverable: String(report.recoverable),
+  //   },
+  //   extra: {
+  //     context: report.context,
+  //     timestamp: report.timestamp,
+  //   },
+  // });
+
+  // For now, we'll queue errors for batch sending
+  queueErrorForBatch(report);
+}
+
+// Batch error sending
+const errorBatch: ErrorReport[] = [];
+const BATCH_SIZE = 10;
+const BATCH_INTERVAL_MS = 60000; // 1 minute
+let batchTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+function queueErrorForBatch(report: ErrorReport): void {
+  errorBatch.push(report);
+
+  if (errorBatch.length >= BATCH_SIZE) {
+    sendErrorBatch();
+  } else if (!batchTimeoutId) {
+    batchTimeoutId = setTimeout(sendErrorBatch, BATCH_INTERVAL_MS);
+  }
+}
+
+async function sendErrorBatch(): Promise<void> {
+  if (batchTimeoutId) {
+    clearTimeout(batchTimeoutId);
+    batchTimeoutId = null;
+  }
+
+  if (errorBatch.length === 0) return;
+
+  const batch = [...errorBatch];
+  errorBatch.length = 0;
+
+  // In production, send to error service endpoint
+  // try {
+  //   await fetch('https://errors.soundfirst.app/batch', {
+  //     method: 'POST',
+  //     headers: { 'Content-Type': 'application/json' },
+  //     body: JSON.stringify({ errors: batch }),
+  //   });
+  // } catch (e) {
+  //   // Re-queue on failure
+  //   errorBatch.unshift(...batch);
   // }
+}
+
+/**
+ * Capture an exception with additional context
+ *
+ * Use this for caught exceptions that you want to report.
+ */
+export function captureException(
+  error: Error,
+  context?: {
+    tags?: Record<string, string>;
+    extra?: Record<string, unknown>;
+    user?: { id: string; email?: string };
+  },
+): void {
+  reportError(error, context?.tags?.feature || "captureException", true);
+
+  // In production with Sentry:
+  // Sentry.withScope((scope) => {
+  //   if (context?.tags) scope.setTags(context.tags);
+  //   if (context?.extra) scope.setExtras(context.extra);
+  //   if (context?.user) scope.setUser(context.user);
+  //   Sentry.captureException(error);
+  // });
+}
+
+/**
+ * Capture a message (non-error event)
+ */
+export function captureMessage(
+  message: string,
+  level: "info" | "warning" | "error" = "info",
+  context?: Record<string, unknown>,
+): void {
+  devError(`[ErrorReporter] ${level}:`, message, context || "");
+
+  // In production with Sentry:
+  // Sentry.captureMessage(message, { level, extra: context });
 }
 
 /**
@@ -192,4 +349,7 @@ export default {
   clearErrorStore,
   getErrorStats,
   createErrorHandler,
+  initErrorService,
+  captureException,
+  captureMessage,
 };

@@ -30,6 +30,7 @@ import type {
   OmrResultPayload,
 } from "./backendContracts";
 import { devLog } from "../../../utils/devLogger";
+import { getApiConfig } from "../config";
 
 // ============================================================================
 // Helper Functions
@@ -65,11 +66,14 @@ interface OmrServiceConfig {
   readonly maxWaitTime: number;
 }
 
-const DEFAULT_CONFIG: OmrServiceConfig = {
-  baseUrl: "https://api.soundfirst.app", // Placeholder
-  pollInterval: IMPORT_TIMEOUTS.OMR_POLL_INTERVAL,
-  maxWaitTime: IMPORT_TIMEOUTS.OMR_MAX_WAIT,
-};
+function getDefaultConfig(): OmrServiceConfig {
+  const apiConfig = getApiConfig();
+  return {
+    baseUrl: apiConfig.importsUrl,
+    pollInterval: IMPORT_TIMEOUTS.OMR_POLL_INTERVAL,
+    maxWaitTime: IMPORT_TIMEOUTS.OMR_MAX_WAIT,
+  };
+}
 
 // ============================================================================
 // OMR Job Submission
@@ -86,7 +90,7 @@ export async function submitOmrJob(
   request: OmrJobRequest,
   config: Partial<OmrServiceConfig> = {},
 ): Promise<OmrJobSubmitResponse> {
-  const finalConfig = { ...DEFAULT_CONFIG, ...config };
+  const finalConfig = { ...getDefaultConfig(), ...config };
 
   try {
     const apiRequest: OmrSubmitRequest = {
@@ -140,34 +144,47 @@ export async function submitOmrJob(
 
 /**
  * Submit OMR job to backend
- *
- * TODO: Implement actual API call
  */
 async function submitOmrJobToBackend(
   request: OmrSubmitRequest,
-  _config: OmrServiceConfig,
+  config: OmrServiceConfig,
 ): Promise<OmrSubmitResponse> {
-  // Placeholder implementation
-  devLog("[OMR] Would submit job:", request);
+  devLog("[OMR] Submitting job:", request);
 
-  // In production, replace with actual fetch call
-  /*
-  const response = await fetch(`${config.baseUrl}/api/v1/omr/submit`, {
-    method: 'POST',
+  const url = `${config.baseUrl}/omr/submit`;
+  
+  // Convert to snake_case for backend
+  const backendRequest = {
+    asset_id: request.assetId,
+    source_type: request.sourceType,
+    options: request.options,
+  };
+
+  const response = await fetch(url, {
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
-      // Add auth headers
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify(request),
+    body: JSON.stringify(backendRequest),
   });
-  return response.json();
-  */
+
+  const data = await response.json();
+  devLog("[OMR] Submit response:", data);
+
+  if (!response.ok) {
+    return {
+      success: false,
+      jobId: null,
+      estimatedDurationMs: null,
+      error: data.error ?? data.detail ?? `HTTP ${response.status}`,
+    };
+  }
 
   return {
-    success: false,
-    jobId: null,
-    estimatedDurationMs: null,
-    error: "OMR service not yet integrated with backend",
+    success: data.success,
+    jobId: data.job_id ?? null,
+    estimatedDurationMs: data.estimated_duration_ms ?? null,
+    error: data.error ?? null,
   };
 }
 
@@ -186,7 +203,7 @@ export async function getOmrJobStatus(
   jobId: string,
   config: Partial<OmrServiceConfig> = {},
 ): Promise<OmrJobStatusResponse> {
-  const finalConfig = { ...DEFAULT_CONFIG, ...config };
+  const finalConfig = { ...getDefaultConfig(), ...config };
 
   try {
     const response = await fetchJobStatus(jobId, finalConfig);
@@ -230,32 +247,51 @@ export async function getOmrJobStatus(
 /**
  * Fetch job status from backend
  *
- * TODO: Implement actual API call
+/**
+ * Fetch job status from backend
  */
 async function fetchJobStatus(
   jobId: string,
-  _config: OmrServiceConfig,
+  config: OmrServiceConfig,
 ): Promise<OmrStatusResponse> {
-  // Placeholder implementation
-  devLog("[OMR] Would fetch status for job:", jobId);
+  devLog("[OMR] Fetching status for job:", jobId);
 
-  // In production, replace with actual fetch call
-  /*
-  const response = await fetch(`${config.baseUrl}/api/v1/omr/status/${jobId}`, {
-    method: 'GET',
+  const url = `${config.baseUrl}/omr/status/${jobId}`;
+  
+  const response = await fetch(url, {
+    method: "GET",
     headers: {
-      // Add auth headers
+      "Content-Type": "application/json",
     },
   });
-  return response.json();
-  */
 
+  const data = await response.json();
+  devLog("[OMR] Status response:", data);
+
+  if (!response.ok) {
+    return {
+      jobId,
+      status: "failed",
+      progress: null,
+      result: null,
+      error: data.error ?? data.detail ?? `HTTP ${response.status}`,
+    };
+  }
+
+  // Map snake_case to camelCase
   return {
-    jobId,
-    status: "failed",
-    progress: null,
-    result: null,
-    error: "OMR service not yet integrated with backend",
+    jobId: data.job_id ?? jobId,
+    status: data.status,
+    progress: data.progress ?? null,
+    result: data.result ? {
+      confidence: data.result.confidence,
+      musicXml: data.result.music_xml ?? null,
+      measureConfidence: data.result.measure_confidence ?? [],
+      uncertainMeasures: data.result.uncertain_measures ?? [],
+      previewUrl: data.result.preview_url ?? null,
+      metadata: data.result.metadata ?? null,
+    } : null,
+    error: data.error ?? null,
   };
 }
 
@@ -283,7 +319,7 @@ export async function pollOmrJobUntilComplete(
   cancellationToken?: { cancelled: boolean },
   config: Partial<OmrServiceConfig> = {},
 ): Promise<OmrJobStatusResponse> {
-  const finalConfig = { ...DEFAULT_CONFIG, ...config };
+  const finalConfig = { ...getDefaultConfig(), ...config };
   const startTime = Date.now();
 
   while (true) {

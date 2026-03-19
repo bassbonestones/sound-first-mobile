@@ -3,13 +3,14 @@
  *
  * Practice screen for imported scores. Provides tempo control,
  * metronome, and beat tracking for practicing with notation.
+ * Includes real-time pitch detection and feedback.
  *
  * Navigation params:
  * - score: The imported score to practice
  * - rawMusicXml: MusicXML content for rendering
  */
 
-import React, { useCallback, useState, useRef, useEffect } from "react";
+import React, { useCallback, useState, useRef, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -18,6 +19,7 @@ import {
   TouchableOpacity,
   Platform,
   useWindowDimensions,
+  Alert,
 } from "react-native";
 import {
   SafeAreaView,
@@ -29,8 +31,11 @@ import { Feather } from "@expo/vector-icons";
 import * as ScreenOrientation from "expo-screen-orientation";
 
 import { colors, spacing } from "../../../constants";
-import { ScorePreview, type ScorePreviewRef } from "../components";
+import { ScorePreview, PitchFeedback, type ScorePreviewRef } from "../components";
 import { useImportedScorePractice } from "../hooks/useImportedScorePractice";
+import { usePracticeNotes } from "../hooks/usePracticeNotes";
+import { usePracticePitchDetection } from "../hooks/usePracticePitchDetection";
+import { calculateStats } from "../types/practiceTypes";
 import type { ImportedScore } from "../../../types/import";
 import type { PracticeState } from "../hooks/useImportedScorePractice";
 
@@ -312,6 +317,89 @@ export function ImportedScorePracticeScreen({
     onBeatTick: handleBeatTick,
   });
 
+  // Pitch detection state
+  const [pitchDetectionEnabled, setPitchDetectionEnabled] = useState(false);
+  const practiceStartTimeRef = useRef<number | null>(null);
+
+  // Extract notes from score for pitch matching
+  const { getNoteAtPosition, totalNotes } = usePracticeNotes({
+    score: score ?? null,
+    partIndex: 0,
+  });
+
+  // Get current target note based on practice position
+  const currentTargetNote = useMemo(() => {
+    if (practiceState !== "playing") return null;
+    return getNoteAtPosition(progress.currentMeasure, progress.currentBeat);
+  }, [practiceState, progress.currentMeasure, progress.currentBeat, getNoteAtPosition]);
+
+  // Pitch detection hook
+  const {
+    pitchState,
+    isAvailable: pitchDetectionAvailable,
+    isListening,
+    permissionGranted: micPermissionGranted,
+    error: pitchError,
+    startListening,
+    stopListening,
+    performances,
+    clearPerformances,
+  } = usePracticePitchDetection({
+    enabled: pitchDetectionEnabled && practiceState === "playing",
+    targetNote: currentTargetNote,
+    currentMeasure: progress.currentMeasure,
+    currentBeat: progress.currentBeat,
+  });
+
+  // Toggle pitch detection
+  const togglePitchDetection = useCallback(async () => {
+    if (pitchDetectionEnabled) {
+      stopListening();
+      setPitchDetectionEnabled(false);
+    } else {
+      if (!pitchDetectionAvailable) {
+        Alert.alert(
+          "Not Available",
+          "Pitch detection is not available on this device.",
+        );
+        return;
+      }
+      setPitchDetectionEnabled(true);
+      await startListening();
+    }
+  }, [pitchDetectionEnabled, pitchDetectionAvailable, startListening, stopListening]);
+
+  // Start/stop pitch detection with practice state
+  useEffect(() => {
+    if (practiceState === "playing" && pitchDetectionEnabled) {
+      if (!practiceStartTimeRef.current) {
+        practiceStartTimeRef.current = Date.now();
+      }
+    } else if (practiceState === "idle") {
+      // Show results if we have performances
+      if (performances.length > 0 && practiceStartTimeRef.current) {
+        const practiceTimeSeconds = (Date.now() - practiceStartTimeRef.current) / 1000;
+        const stats = calculateStats(performances, practiceTimeSeconds, config.tempo);
+        
+        if (stats.totalNotes > 0) {
+          const message = 
+            `Accuracy: ${stats.accuracy.toFixed(1)}%\n` +
+            `Correct: ${stats.correctNotes}/${stats.totalNotes} notes\n` +
+            `Avg. deviation: ${stats.averageCentsDeviation.toFixed(1)}¢`;
+          
+          if (Platform.OS === "web") {
+            // Use window.alert on web since Alert.alert doesn't work
+            window.alert(`Practice Complete\n\n${message}`);
+          } else {
+            Alert.alert("Practice Complete", message, [{ text: "OK" }]);
+          }
+        }
+        clearPerformances();
+      }
+      practiceStartTimeRef.current = null;
+    }
+  }, [practiceState, pitchDetectionEnabled, performances, config.tempo, clearPerformances]);
+
   // Toggle cursor following
   const toggleCursor = useCallback(() => {
     setCursorEnabled((prev) => {
@@ -441,6 +529,25 @@ export function ImportedScorePracticeScreen({
           )}
         </View>
         <TouchableOpacity
+          onPress={togglePitchDetection}
+          style={[
+            styles.headerButton,
+            pitchDetectionEnabled && styles.activeHeaderButton,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={
+            pitchDetectionEnabled ? "Disable pitch detection" : "Enable pitch detection"
+          }
+          // @ts-expect-error - title works on web for tooltip
+          title="Pitch Detection"
+        >
+          <Feather
+            name={pitchDetectionEnabled ? "mic" : "mic-off"}
+            size={20}
+            color={pitchDetectionEnabled ? colors.primary : colors.textSecondary}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
           onPress={toggleCursor}
           style={[
             styles.headerButton,
@@ -461,6 +568,16 @@ export function ImportedScorePracticeScreen({
         </TouchableOpacity>
       </View>
 
+      {/* Pitch Feedback - shown when pitch detection is enabled */}
+      {pitchDetectionEnabled && (
+        <PitchFeedback
+          pitchState={pitchState}
+          isActive={isListening && practiceState === "playing"}
+          compact={true}
+          testID="pitch-feedback"
+        />
+      )}
+
       {/* Score Preview */}
       <View style={styles.previewContainer}>
         {renderError ? (
@@ -473,7 +590,7 @@ export function ImportedScorePracticeScreen({
           <ScorePreview
             ref={scorePreviewRef}
             musicXml={rawMusicXml}
-            height={scorePreviewHeight}
+            height={pitchDetectionEnabled ? scorePreviewHeight - 60 : scorePreviewHeight}
             showZoomControls={false}
             enableCursor={cursorEnabled}
             fixedWidth={1200}

@@ -37,3 +37,10 @@ export {
   type PracticeProgress,
   type UseImportedScorePracticeResult,
 } from "./useImportedScorePractice";
+
+export {
+  useRateLimit,
+  type RateLimitState,
+  type OmrQuotaState,
+  type UseRateLimitReturn,
+} from "./useRateLimit";

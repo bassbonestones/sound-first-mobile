@@ -105,3 +105,82 @@ export {
   type StorageError,
   type StorageErrorCode,
 } from "./scoreStorageService";
+
+// Background OMR task
+export {
+  defineBackgroundOmrTask,
+  startBackgroundOmrTask,
+  stopBackgroundOmrTask,
+  checkPendingBackgroundOmrTask,
+  isBackgroundTaskSupported,
+  type BackgroundOmrTaskState,
+  type BackgroundOmrTaskResult,
+  type BackgroundOmrTaskOptions,
+} from "./backgroundOmrTask";
+
+// Import checkpoints (resume support)
+export {
+  generateCheckpointId,
+  createCheckpoint,
+  updateCheckpoint,
+  completeCheckpoint,
+  removeCheckpoint,
+  getCheckpoint,
+  getActiveCheckpoints,
+  getCheckpointSummaries,
+  isCheckpointStale,
+  cleanupStaleCheckpoints,
+  clearAllCheckpoints,
+  analyzeCheckpointForResume,
+  getPendingImports,
+  type ImportCheckpoint,
+  type CheckpointStage,
+  type CheckpointSummary,
+  type ResumeContext,
+} from "./importCheckpoint";
+
+// Multi-page PDF processing
+export {
+  uploadPdfForProcessing,
+  submitPdfForOmr,
+  getPdfOmrStatus,
+  getPdfOmrResult,
+  processPdfForOmr,
+  estimatePdfPageCount,
+  validatePdfForImport,
+  type PdfPageInfo,
+  type PdfUploadResponse,
+  type PdfOmrStatus,
+  type PageOmrStatus,
+  type PdfOmrResult,
+  type PageOmrResult,
+  type UncertainMeasure,
+  type PdfProgressCallback,
+  type ProcessPdfOptions,
+} from "./pdfProcessingService";
+
+// Capability analysis
+export {
+  analyzeCapabilities,
+  analyzeCapabilitiesMock,
+  getMockAnalysisResult,
+  type AnalysisResult,
+  type AnalysisServiceResult,
+  type AnalysisServiceError,
+} from "./capabilityAnalysisService";
+
+// Import analytics
+export {
+  importAnalyticsService,
+  type ImportAnalyticsEvent,
+  type ImportEventType,
+  type FunnelMetrics,
+} from "./importAnalyticsService";
+
+// Offline queue
+export {
+  offlineQueueService,
+  type QueuedImport,
+  type ImportHandler,
+  type QueueStatus,
+} from "./offlineQueueService";

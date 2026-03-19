@@ -47,6 +47,24 @@ export {
   type MeasureEditModalProps,
 } from "./MeasureEditModal";
 
+// Capability Discovery
+export {
+  CapabilityDiscovery,
+  type CapabilityDiscoveryProps,
+} from "./CapabilityDiscovery";
+
+// Score Curriculum (Learning Path)
+export {
+  ScoreCurriculum,
+  type ScoreCurriculumProps,
+} from "./ScoreCurriculum";
+
+// Pitch Feedback
+export {
+  PitchFeedback,
+  type PitchFeedbackProps,
+} from "./PitchFeedback";
+
 // Re-export correction types from types/ for backward compatibility
 export {
   type CorrectionMeasure,

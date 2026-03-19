@@ -4,6 +4,8 @@
  * Full-screen view of an imported score with notation rendering.
  * Shows the music notation using ScorePreview component and provides
  * actions for practice, editing, and navigation.
+ * 
+ * Includes tabbed view for Score display and Capability Discovery.
  *
  * Navigation params:
  * - score: The imported score to display
@@ -29,13 +31,16 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../constants";
-import { ScorePreview } from "../components";
+import { ScorePreview, CapabilityDiscovery, ScoreCurriculum } from "../components";
 import { saveScore, getScore } from "../services/scoreStorageService";
 import type { ImportedScore, UncertainMeasure } from "../../../types/import";
+import type { LearningPathResponse, LearningPathCapability } from "../types/analysisTypes";
 
 // ============================================================================
 // Types
 // ============================================================================
+
+type ViewTab = "score" | "capabilities" | "curriculum";
 
 /**
  * Navigation params for ScoreViewerScreen
@@ -104,6 +109,15 @@ export function ScoreViewerScreen({
   const [isRendered, setIsRendered] = useState(false);
   const [isSaved, setIsSaved] = useState(!!scoreId); // Already saved if loading by ID
   const [isSaving, setIsSaving] = useState(false);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<ViewTab>("score");
+
+  // Capabilities discovered from the score (for passing to ScoreCurriculum)
+  const [discoveredCapabilities, setDiscoveredCapabilities] = useState<string[]>([]);
+
+  // TODO: Get actual user ID from auth context/state
+  const userId = 1;
 
   // Load score from storage when scoreId is provided
   useEffect(() => {
@@ -198,6 +212,83 @@ export function ScoreViewerScreen({
       uncertainMeasures,
     });
   }, [score, rawMusicXml, navigation]);
+
+  // Handle capability press - navigate to capability practice/details
+  const handleCapabilityPress = useCallback(
+    (capabilityName: string, _domain: string) => {
+      // Navigate to capability explorer or practice screen
+      // For now, show an alert with the capability info
+      Alert.alert(
+        "Capability",
+        `${capabilityName}\n\nThis capability is required for this score. Practice it to improve your mastery.`,
+        [
+          {
+            text: "Practice",
+            onPress: () => {
+              // TODO: Navigate to capability practice when that screen exists
+              // navigation?.navigate("CapabilityPractice", { capabilityName });
+            },
+          },
+          { text: "OK", style: "cancel" },
+        ],
+      );
+    },
+    [],
+  );
+
+  // Handle capabilities loaded from CapabilityDiscovery
+  const handleCapabilitiesLoaded = useCallback((capabilities: string[]) => {
+    setDiscoveredCapabilities(capabilities);
+  }, []);
+
+  // Handle curriculum capability press
+  const handleCurriculumCapabilityPress = useCallback(
+    (capability: LearningPathCapability) => {
+      Alert.alert(
+        capability.display_name || capability.name,
+        capability.is_mastered
+          ? "You've already mastered this capability!"
+          : capability.prerequisite_names.length > 0
+            ? `Prerequisites: ${capability.prerequisite_names.join(", ")}`
+            : "This capability is ready to learn!",
+        [{ text: "OK" }],
+      );
+    },
+    [],
+  );
+
+  // Handle start learning from curriculum
+  const handleStartLearning = useCallback(
+    (learningPath: LearningPathResponse) => {
+      const nextToLearn = learningPath.learning_path.find(
+        (cap) => !cap.is_mastered && cap.depth === 0,
+      );
+
+      if (nextToLearn) {
+        Alert.alert(
+          "Start Learning",
+          `Begin with: ${nextToLearn.display_name || nextToLearn.name}`,
+          [
+            {
+              text: "Start",
+              onPress: () => {
+                // TODO: Navigate to teaching module for this capability
+                // navigation?.navigate("TeachingModule", { capabilityName: nextToLearn.name });
+              },
+            },
+            { text: "Cancel", style: "cancel" },
+          ],
+        );
+      } else {
+        Alert.alert(
+          "Prerequisites Required",
+          "Complete the prerequisite capabilities first.",
+          [{ text: "OK" }],
+        );
+      }
+    },
+    [],
+  );
 
   // Handle back button
   const handleBack = useCallback(() => {
@@ -321,62 +412,151 @@ export function ScoreViewerScreen({
         </TouchableOpacity>
       </View>
 
-      {/* Score Preview */}
-      <View style={styles.previewContainer}>
-        {renderError ? (
-          <View style={styles.errorState}>
-            <Feather name="alert-circle" size={48} color={colors.error} />
-            <Text style={styles.errorTitle}>Unable to Display Score</Text>
-            <Text style={styles.errorMessage}>{renderError}</Text>
-          </View>
-        ) : (
-          <ScorePreview
-            musicXml={rawMusicXml}
-            height={scorePreviewHeight}
-            showZoomControls={true}
-            fixedWidth={1200}
-            horizontalStaffline={true}
-            onRenderComplete={handleRenderComplete}
-            onError={handleRenderError}
-            testID="score-viewer-preview"
+      {/* Tab Bar */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          onPress={() => setActiveTab("score")}
+          style={[styles.tab, activeTab === "score" && styles.activeTab]}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === "score" }}
+          accessibilityLabel="Score view"
+        >
+          <Feather
+            name="music"
+            size={18}
+            color={activeTab === "score" ? colors.primary : colors.textSecondary}
           />
-        )}
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "score" && styles.activeTabText,
+            ]}
+          >
+            Score
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveTab("capabilities")}
+          style={[styles.tab, activeTab === "capabilities" && styles.activeTab]}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === "capabilities" }}
+          accessibilityLabel="Capabilities view"
+        >
+          <Feather
+            name="list"
+            size={18}
+            color={activeTab === "capabilities" ? colors.primary : colors.textSecondary}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "capabilities" && styles.activeTabText,
+            ]}
+          >
+            Capabilities
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveTab("curriculum")}
+          style={[styles.tab, activeTab === "curriculum" && styles.activeTab]}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === "curriculum" }}
+          accessibilityLabel="Learning path view"
+        >
+          <Feather
+            name="trending-up"
+            size={18}
+            color={activeTab === "curriculum" ? colors.primary : colors.textSecondary}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "curriculum" && styles.activeTabText,
+            ]}
+          >
+            Learn
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Score Info Bar */}
-      <View style={styles.infoBar}>
-        <View style={styles.infoItem}>
-          <Text style={styles.infoLabel}>Parts</Text>
-          <Text style={styles.infoValue}>{score.parts.length}</Text>
-        </View>
-        <View style={styles.infoDivider} />
-        <View style={styles.infoItem}>
-          <Text style={styles.infoLabel}>Measures</Text>
-          <Text style={styles.infoValue}>{score.measureCount}</Text>
-        </View>
-        {score.metadata.timeSignature && (
-          <>
+      {/* Content Area - Score or Capabilities */}
+      {activeTab === "score" ? (
+        <>
+          {/* Score Preview */}
+          <View style={styles.previewContainer}>
+            {renderError ? (
+              <View style={styles.errorState}>
+                <Feather name="alert-circle" size={48} color={colors.error} />
+                <Text style={styles.errorTitle}>Unable to Display Score</Text>
+                <Text style={styles.errorMessage}>{renderError}</Text>
+              </View>
+            ) : (
+              <ScorePreview
+                musicXml={rawMusicXml}
+                height={scorePreviewHeight - 44} // Account for tab bar
+                showZoomControls={true}
+                fixedWidth={1200}
+                horizontalStaffline={true}
+                onRenderComplete={handleRenderComplete}
+                onError={handleRenderError}
+                testID="score-viewer-preview"
+              />
+            )}
+          </View>
+
+          {/* Score Info Bar */}
+          <View style={styles.infoBar}>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Parts</Text>
+              <Text style={styles.infoValue}>{score.parts.length}</Text>
+            </View>
             <View style={styles.infoDivider} />
             <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Time</Text>
-              <Text style={styles.infoValue}>
-                {score.metadata.timeSignature.displayName}
-              </Text>
+              <Text style={styles.infoLabel}>Measures</Text>
+              <Text style={styles.infoValue}>{score.measureCount}</Text>
             </View>
-          </>
-        )}
-        {score.metadata.keySignature && (
-          <>
-            <View style={styles.infoDivider} />
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Key</Text>
-              <Text style={styles.infoValue}>
-                {score.metadata.keySignature.displayName}
-              </Text>
-            </View>
-          </>
-        )}
-      </View>
+            {score.metadata.timeSignature && (
+              <>
+                <View style={styles.infoDivider} />
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Time</Text>
+                  <Text style={styles.infoValue}>
+                    {score.metadata.timeSignature.displayName}
+                  </Text>
+                </View>
+              </>
+            )}
+            {score.metadata.keySignature && (
+              <>
+                <View style={styles.infoDivider} />
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Key</Text>
+                  <Text style={styles.infoValue}>
+                    {score.metadata.keySignature.displayName}
+                  </Text>
+                </View>
+              </>
+            )}
+          </View>
+        </>
+      ) : activeTab === "capabilities" ? (
+        /* Capabilities Tab Content */
+        <CapabilityDiscovery
+          musicXml={rawMusicXml}
+          title={title}
+          onCapabilityPress={handleCapabilityPress}
+          onCapabilitiesLoaded={handleCapabilitiesLoaded}
+          testID="capability-discovery"
+        />
+      ) : (
+        /* Curriculum Tab Content */
+        <ScoreCurriculum
+          capabilityNames={discoveredCapabilities}
+          userId={userId}
+          onCapabilityPress={handleCurriculumCapabilityPress}
+          onStartLearning={handleStartLearning}
+        />
+      )}
 
       {/* Action Buttons */}
       <View style={styles.actionBar}>
@@ -457,6 +637,32 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 32,
+  },
+  tabBar: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.sm,
+    gap: spacing.xs,
+  },
+  activeTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: colors.primary,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: colors.textSecondary,
+  },
+  activeTabText: {
+    color: colors.primary,
+    fontWeight: "600",
   },
   previewContainer: {
     flex: 1,

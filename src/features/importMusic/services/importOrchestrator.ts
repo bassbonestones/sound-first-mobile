@@ -30,6 +30,7 @@ import {
 } from "../../../types/import";
 import { validateImportAsset } from "../utils/validation";
 import { summarizeErrors, mapNativeError } from "../utils/errors";
+import { devLog, devError } from "../../../utils/devLogger";
 import { readFileAsString } from "./fileAcquisition";
 import { parseMusicXml, type MusicXmlParseResult } from "./musicXmlParser";
 import { extractMxlContent } from "./mxlHandler";
@@ -58,6 +59,8 @@ export interface ImportOrchestratorOptions {
   readonly onStatusChange?: StatusListener;
   /** Cancellation token for aborting the import */
   readonly cancellationToken?: { cancelled: boolean };
+  /** AbortSignal for cancelling fetch operations */
+  readonly abortSignal?: AbortSignal;
 }
 
 /**
@@ -146,6 +149,7 @@ export async function runImportPipeline(
       return await runOmrPath(input.asset, state, updateStatus, options);
     }
   } catch (error) {
+    console.error("[importOrchestrator] Pipeline error:", error);
     const importError = mapNativeError(error);
     return createFailedResult(state, importError);
   }
@@ -189,9 +193,9 @@ async function runDirectParsePath(
   } else {
     // Handle plain MusicXML
     try {
-      console.log("[Orchestrator] Reading MusicXML from:", asset.uri);
+      devLog("[Orchestrator] Reading MusicXML from:", asset.uri);
       const content = await readFileAsString(asset.uri);
-      console.log(
+      devLog(
         "[Orchestrator] MusicXML content length:",
         content.length,
         "first 100 chars:",
@@ -203,13 +207,13 @@ async function runDirectParsePath(
         originalFileName: asset.fileName,
         remoteAssetId: null,
       });
-      console.log(
+      devLog(
         "[Orchestrator] Parse result:",
         parseResult.success,
         parseResult.error?.code,
       );
     } catch (error) {
-      console.error("[Orchestrator] Failed to read/parse MusicXML:", error);
+      devError("[Orchestrator] Failed to read/parse MusicXML:", error);
       parseResult = {
         success: false,
         score: null,
@@ -308,9 +312,12 @@ async function runOmrPath(
     sourceType: asset.sourceType,
   };
 
+  devLog("[Orchestrator] Submitting OMR job:", omrRequest);
   const submitResult = await submitOmrJob(omrRequest);
+  devLog("[Orchestrator] OMR submit result:", submitResult);
 
   if (!submitResult.success || !submitResult.jobId) {
+    devError("[Orchestrator] OMR submission failed:", submitResult.error);
     updateStatus("failed", "Recognition failed to start");
     return createFailedResult(state, submitResult.error);
   }
@@ -342,17 +349,55 @@ async function runOmrPath(
     return createFailedResult(state, omrResult.error);
   }
 
-  // Step 5: Normalize OMR result
+  // Step 5: Normalize OMR result - parse the MusicXML if available
   updateStatus("normalizing", "Processing results...", 90);
 
-  const score = normalizeOmrResult(omrResult.result, {
-    sourceType: asset.sourceType,
-    originalFileName: asset.fileName,
-    remoteAssetId: uploadResult.remoteAssetId,
-  });
+  const rawMusicXml = omrResult.result.musicXml ?? null;
+  let score: ImportedScore;
+  let parseResult: MusicXmlParseResult | null = null;
+
+  if (rawMusicXml) {
+    // OMR returned MusicXML - parse it like we do for direct imports
+    devLog("[Orchestrator] Parsing OMR MusicXML result");
+    parseResult = await parseMusicXml(rawMusicXml, {
+      sourceType: asset.sourceType,
+      originalFileName: asset.fileName,
+      remoteAssetId: uploadResult.remoteAssetId,
+    });
+
+    if (parseResult.success && parseResult.score) {
+      score = parseResult.score;
+      // Add OMR confidence to the parsed score
+      score.confidence = {
+        overall: omrResult.result.confidence,
+        measureConfidence: [],
+        needsReview: omrResult.result.confidence < 0.8 || omrResult.result.uncertainMeasures.length > 0,
+      };
+    } else {
+      devError("[Orchestrator] Failed to parse OMR MusicXML:", parseResult.error);
+      // Fall back to normalizeOmrResult placeholder
+      score = normalizeOmrResult(omrResult.result, {
+        sourceType: asset.sourceType,
+        originalFileName: asset.fileName,
+        remoteAssetId: uploadResult.remoteAssetId,
+      });
+    }
+  } else {
+    // No MusicXML from OMR - use placeholder normalization
+    score = normalizeOmrResult(omrResult.result, {
+      sourceType: asset.sourceType,
+      originalFileName: asset.fileName,
+      remoteAssetId: uploadResult.remoteAssetId,
+    });
+  }
 
   const preview = createPreviewFromScore(score);
   const validationIssues = validateScore(score);
+
+  // Add parser warnings if any
+  if (parseResult?.warnings) {
+    state.warnings.push(...parseResult.warnings);
+  }
 
   // Check for low confidence
   if (score.confidence && score.confidence.overall < 0.7) {
@@ -362,9 +407,6 @@ async function runOmrPath(
   }
 
   updateStatus("succeeded", "Import complete!", 100);
-
-  // OMR may produce MusicXML output for rendering
-  const rawMusicXml = omrResult.result.musicXml ?? null;
 
   return createSuccessResult(
     state,

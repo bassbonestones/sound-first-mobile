@@ -413,3 +413,102 @@ export function areImageDimensionsSufficient(
 
   return { sufficient: true, warning: null };
 }
+
+// ============================================================================
+// Memory-Safe File Loading
+// ============================================================================
+
+/**
+ * Default memory thresholds for file loading
+ */
+const DEFAULT_MAX_IN_MEMORY_SIZE = 20 * 1024 * 1024; // 20 MB
+const DEFAULT_WARNING_THRESHOLD = 10 * 1024 * 1024; // 10 MB
+
+/**
+ * Result of memory validation check
+ */
+export interface MemoryValidationResult {
+  readonly safe: boolean;
+  readonly warning: string | null;
+  readonly recommendation: "load" | "stream" | "reject";
+}
+
+/**
+ * Validate file size for in-memory loading
+ *
+ * Returns recommendation on how to handle the file:
+ * - "load": Safe to load into memory
+ * - "stream": Too large for memory, should stream
+ * - "reject": Too large to process
+ *
+ * @param fileSize - File size in bytes
+ * @param maxSize - Maximum safe size for in-memory loading
+ * @param warningThreshold - Size at which to warn but still allow
+ */
+export function validateFileSizeForMemory(
+  fileSize: number | null,
+  maxSize: number = DEFAULT_MAX_IN_MEMORY_SIZE,
+  warningThreshold: number = DEFAULT_WARNING_THRESHOLD,
+): MemoryValidationResult {
+  if (fileSize === null) {
+    // Can't check, assume safe
+    return {
+      safe: true,
+      warning: null,
+      recommendation: "load",
+    };
+  }
+
+  if (fileSize > maxSize) {
+    return {
+      safe: false,
+      warning: `File is too large to load safely (${formatFileSize(fileSize)}). Consider streaming.`,
+      recommendation: fileSize > maxSize * 2 ? "reject" : "stream",
+    };
+  }
+
+  if (fileSize > warningThreshold) {
+    return {
+      safe: true,
+      warning: `Large file (${formatFileSize(fileSize)}) may impact performance on older devices.`,
+      recommendation: "load",
+    };
+  }
+
+  return {
+    safe: true,
+    warning: null,
+    recommendation: "load",
+  };
+}
+
+// ============================================================================
+// Renamed Functions (clearer names, old names kept for compatibility)
+// ============================================================================
+
+/**
+ * Check if MIME type indicates MusicXML content
+ *
+ * @alias mightBeMusicXml (deprecated)
+ */
+export function hasValidMusicXmlMimeType(mimeType: string | null): boolean {
+  return mightBeMusicXml(mimeType);
+}
+
+/**
+ * Check if MIME type indicates compressed MXL content
+ *
+ * @alias mightBeMxl (deprecated)
+ */
+export function hasValidMxlMimeType(mimeType: string | null): boolean {
+  return mightBeMxl(mimeType);
+}
+
+/**
+ * Check if content contains a valid MusicXML root element
+ *
+ * @alias looksLikeMusicXml (deprecated)
+ */
+export function containsMusicXmlRootElement(content: string): boolean {
+  return looksLikeMusicXml(content);
+}

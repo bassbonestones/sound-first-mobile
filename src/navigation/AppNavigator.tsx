@@ -8,6 +8,8 @@ import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
+import type { RootStackParamList } from "./types";
+
 // Screen imports - these will be updated as screens are reorganized
 import HomeScreen from "../screens/HomeScreen";
 import StartPracticeScreen from "../screens/StartPracticeScreen";
@@ -22,9 +24,15 @@ import AdminScreen from "../screens/Admin";
 import FirstNoteScreen from "../screens/FirstNote";
 import ExerciseTestScreen from "../screens/ExerciseTestScreen";
 import TuneMasteryScreen from "../screens/TuneMastery";
-import { ImportMusicScreen } from "../features/importMusic";
+import {
+  ImportMusicScreen,
+  ScoreViewerScreen,
+  ScoreCorrectionScreen,
+  MyScoresScreen,
+  ImportedScorePracticeScreen,
+} from "../features/importMusic";
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 /**
  * Screen configuration
@@ -81,7 +89,7 @@ export const screenConfig = {
 };
 
 interface AppNavigatorProps {
-  initialRoute?: string;
+  initialRoute?: keyof RootStackParamList;
   initialParams?: Record<string, unknown>;
 }
 
@@ -162,6 +170,26 @@ export function AppNavigator({ initialRoute, initialParams }: AppNavigatorProps)
           name="ImportMusic"
           component={ImportMusicScreen}
           options={{ title: "Import Music" }}
+        />
+        <Stack.Screen
+          name="ScoreViewer"
+          component={ScoreViewerScreen}
+          options={{ title: "Score", headerShown: false }}
+        />
+        <Stack.Screen
+          name="ScoreCorrection"
+          component={ScoreCorrectionScreen}
+          options={{ title: "Review Score" }}
+        />
+        <Stack.Screen
+          name="MyScores"
+          component={MyScoresScreen}
+          options={{ title: "My Scores" }}
+        />
+        <Stack.Screen
+          name="ImportedScorePractice"
+          component={ImportedScorePracticeScreen}
+          options={{ title: "Practice", headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>
