@@ -341,6 +341,7 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
     let currentBeat = 0; // Current beat in playback
     let totalBeats = 0; // Total beats in piece
     let currentPlaybackTimestamp = 0; // Current position for metronome-synced cursor (in whole notes)
+    let lastScrolledMeasureIndex = -1; // Track which measure we last scrolled to (for once-per-measure scrolling)
     
     // Build the timeline after rendering - but now we also extract time sig and tempo
     function buildCursorTimeline() {
@@ -785,6 +786,7 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
       osmd.cursor.reset();
       currentCursorIndex = 0;
       currentPlaybackTimestamp = 0;
+      lastScrolledMeasureIndex = -1; // Reset measure tracking
       // Don't show cursor here - let caller decide visibility
       osmd.cursor.hide();
       // Reset scroll position to beginning
@@ -799,12 +801,18 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
       if (!osmd.cursor.iterator.EndReached) {
         osmd.cursor.next();
         currentCursorIndex++;
-        // Auto-scroll to keep cursor visible
-        if (autoScrollEnabled) {
+        
+        // Get current measure index
+        const currentMeasureIndex = osmd.cursor.iterator.CurrentMeasureIndex;
+        
+        // Auto-scroll only when measure changes (once per measure)
+        if (autoScrollEnabled && currentMeasureIndex !== lastScrolledMeasureIndex) {
+          lastScrolledMeasureIndex = currentMeasureIndex;
           scrollToCursor();
         }
+        
         sendMessage('cursorMoved', { 
-          measureNumber: osmd.cursor.iterator.CurrentMeasureIndex + 1,
+          measureNumber: currentMeasureIndex + 1,
           endReached: osmd.cursor.iterator.EndReached
         });
       } else {
@@ -849,13 +857,17 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
       if (targetIndex !== currentCursorIndex) {
         moveCursorToIndex(targetIndex);
         
-        // Scroll immediately after cursor moves (no animation loop lag)
-        if (isScrolling && autoScrollEnabled) {
+        // Get current measure index
+        const currentMeasureIndex = osmd.cursor.iterator.CurrentMeasureIndex;
+        
+        // Scroll only when measure changes (once per measure, not every beat)
+        if (isScrolling && autoScrollEnabled && currentMeasureIndex !== lastScrolledMeasureIndex) {
+          lastScrolledMeasureIndex = currentMeasureIndex;
           scrollToCursorDirect();
         }
         
         sendMessage('cursorMoved', { 
-          measureNumber: osmd.cursor.iterator.CurrentMeasureIndex + 1,
+          measureNumber: currentMeasureIndex + 1,
           timestamp: currentPlaybackTimestamp.toFixed(3),
           cursorIndex: currentCursorIndex
         });
@@ -889,6 +901,7 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
     // Reset playback timestamp (called by resetCursor)
     window.resetPlaybackTimestamp = function() {
       currentPlaybackTimestamp = 0;
+      lastScrolledMeasureIndex = -1;
     };
 
     window.cursorToMeasure = function(measureNumber) {
@@ -902,6 +915,8 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
         currentCursorIndex++;
       }
       osmd.cursor.show();
+      // Update last scrolled measure to match where we jumped to
+      lastScrolledMeasureIndex = osmd.cursor.iterator.CurrentMeasureIndex;
       sendMessage('cursorMoved', { measureNumber });
     };
 
