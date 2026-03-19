@@ -341,7 +341,7 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
     let currentBeat = 0; // Current beat in playback
     let totalBeats = 0; // Total beats in piece
     let currentPlaybackTimestamp = 0; // Current position for metronome-synced cursor (in whole notes)
-    let lastScrolledMeasureIndex = -1; // Track which measure we last scrolled to (for once-per-measure scrolling)
+    let lastScrolledMeasureIndex = 0; // Track which measure we last scrolled to (for once-per-measure scrolling)
     
     // Build the timeline after rendering - but now we also extract time sig and tempo
     function buildCursorTimeline() {
@@ -786,13 +786,15 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
       osmd.cursor.reset();
       currentCursorIndex = 0;
       currentPlaybackTimestamp = 0;
-      lastScrolledMeasureIndex = -1; // Reset measure tracking
       // Don't show cursor here - let caller decide visibility
       osmd.cursor.hide();
       // Reset scroll position to beginning
       if (autoScrollEnabled) {
         resetScroll();
       }
+      // Set to 0 since we're now showing measure 0 (after resetScroll)
+      // This prevents spurious scroll on beat 2 of measure 1
+      lastScrolledMeasureIndex = 0;
       sendMessage('cursorReset');
     };
 
@@ -901,7 +903,7 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
     // Reset playback timestamp (called by resetCursor)
     window.resetPlaybackTimestamp = function() {
       currentPlaybackTimestamp = 0;
-      lastScrolledMeasureIndex = -1;
+      lastScrolledMeasureIndex = 0; // We're at measure 0, so mark it as scrolled
     };
 
     window.cursorToMeasure = function(measureNumber) {
