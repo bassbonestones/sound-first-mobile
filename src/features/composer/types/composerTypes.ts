@@ -62,6 +62,12 @@ export const DEFAULT_OCTAVE_MIDI: Record<Clef, number> = {
   bass: 48, // C3
 };
 
+/** Staff center pitch by clef - reference for smart octave when no previous note */
+export const STAFF_CENTER_MIDI: Record<Clef, number> = {
+  treble: 71, // B4 (center of treble staff)
+  bass: 50, // D3 (center of bass staff)
+};
+
 /** Pitch class to semitone offset from C */
 export const PITCH_TO_SEMITONE: Record<PitchName, number> = {
   C: 0,

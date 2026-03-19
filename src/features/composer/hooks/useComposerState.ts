@@ -26,6 +26,7 @@ import {
   createRest,
   createScore,
   DEFAULT_OCTAVE_MIDI,
+  STAFF_CENTER_MIDI,
   getBeatsPerMeasure,
   getMeasureDuration,
   validateMeasure,
@@ -43,6 +44,7 @@ import {
   clampCursor,
   findNotePosition,
   getNoteAtCursor,
+  getNoteBefore,
   moveCursorLeft,
   moveCursorRight,
   moveCursorToEnd,
@@ -50,6 +52,7 @@ import {
 } from "../utils/cursorUtils";
 import {
   getDefaultMidiForPitch,
+  getNearestMidiForPitch,
   getNextDiatonicPitch,
   getPreviousDiatonicPitch,
   isValidMidi,
@@ -203,16 +206,18 @@ export function useComposerState(
         return false;
       }
 
-      // Get MIDI pitch based on selected octave and key signature
-      const { midi, accidental } = getDefaultMidiForPitch(
+      // Get MIDI pitch - use smart octave based on previous note or staff center
+      const previousNote = getNoteBefore(state.cursor, state.score);
+      const referenceMidi =
+        previousNote?.midi ?? STAFF_CENTER_MIDI[state.score.clef];
+
+      const { midi, accidental } = getNearestMidiForPitch(
         pitchName,
-        state.score.clef,
+        referenceMidi,
         state.score.keySignature,
       );
-      const adjustedMidi =
-        midi - DEFAULT_OCTAVE_MIDI[state.score.clef] + state.selectedOctave;
 
-      const note = createNote(adjustedMidi, state.selectedDuration, {
+      const note = createNote(midi, state.selectedDuration, {
         accidental,
       });
 

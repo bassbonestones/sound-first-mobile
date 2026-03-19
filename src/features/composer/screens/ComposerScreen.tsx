@@ -47,7 +47,7 @@ import type {
   PitchName,
 } from "../types";
 import ErrorBoundary from "../../../components/ErrorBoundary";
-import { composerScoreToImportedScore, midiToOctave } from "../utils";
+import { composerScoreToImportedScore } from "../utils";
 
 // =============================================================================
 // Types
@@ -419,11 +419,10 @@ function ComposerScreenContent({
         {/* Entry Palette */}
         <EntryPalette
           selectedDuration={composerState.state.selectedDuration}
-          currentOctave={midiToOctave(composerState.state.selectedOctave)}
           selectedNote={composerState.selectedNote}
           onDurationSelect={composerState.setDuration}
           onPitchTap={handlePitchEnter}
-          onOctaveChange={(dir) => composerState.changeOctave(dir)}
+          onOctaveChange={composerState.changeOctave}
           onAccidental={composerState.applyAccidental}
           onInsertRest={handleRestEnter}
           onToggleTie={composerState.toggleTie}

@@ -161,3 +161,50 @@ export function isValidMidi(midi: number): boolean {
 export function clampMidi(midi: number): number {
   return Math.max(MIN_MIDI, Math.min(MAX_MIDI, midi));
 }
+
+/**
+ * Get the MIDI pitch for a note name that's closest to a reference pitch.
+ * This enables "smart octave" - choosing the nearest octave to the previous note.
+ *
+ * @param pitchName - The pitch name (C, D, E, etc.)
+ * @param referenceMidi - The MIDI pitch to stay closest to (typically previous note)
+ * @param keySignature - Key signature for accidentals
+ * @returns The MIDI pitch in the nearest octave, with any key-signature accidental
+ */
+export function getNearestMidiForPitch(
+  pitchName: PitchName,
+  referenceMidi: number,
+  keySignature: KeySignature = 0,
+): { midi: number; accidental?: Accidental } {
+  const referenceOctave = midiToOctave(referenceMidi);
+
+  // Try the same octave, one above, and one below
+  const candidates = [
+    referenceOctave - 1,
+    referenceOctave,
+    referenceOctave + 1,
+  ];
+
+  let bestMidi = 0;
+  let bestDistance = Infinity;
+  let bestAccidental: Accidental | undefined;
+
+  for (const octave of candidates) {
+    const { midi, accidental } = getPitchInKey(pitchName, octave, keySignature);
+    if (!isValidMidi(midi)) continue;
+
+    const distance = Math.abs(midi - referenceMidi);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestMidi = midi;
+      bestAccidental = accidental;
+    }
+  }
+
+  // If no valid candidate found, fall back to reference octave
+  if (bestDistance === Infinity) {
+    return getPitchInKey(pitchName, referenceOctave, keySignature);
+  }
+
+  return { midi: bestMidi, accidental: bestAccidental };
+}

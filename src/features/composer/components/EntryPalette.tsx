@@ -2,11 +2,11 @@
  * EntryPalette Component
  *
  * Main note entry interface combining duration selection, pitch input,
- * modifiers, and octave controls. This is the primary interaction area
+ * and modifiers. This is the primary interaction area
  * for step-entry music composition.
  */
 
-import React, { memo, useCallback } from "react";
+import React, { memo } from "react";
 import { View, StyleSheet } from "react-native";
 
 import { colors, spacing } from "../../../constants";
@@ -23,8 +23,6 @@ import type { DurationValue, PitchName, Accidental, Note } from "../types";
 export interface EntryPaletteProps {
   /** Currently selected duration for new notes */
   selectedDuration: DurationValue;
-  /** Current octave for new notes */
-  currentOctave: number;
   /** Currently selected note (if any) */
   selectedNote: Note | null;
   /** Called when duration is selected */
@@ -51,7 +49,6 @@ export interface EntryPaletteProps {
 
 function EntryPaletteComponent({
   selectedDuration,
-  currentOctave,
   selectedNote,
   onDurationSelect,
   onPitchTap,
@@ -78,7 +75,7 @@ function EntryPaletteComponent({
 
       {/* Pitch row with octave controls */}
       <View style={styles.pitchRow}>
-        <View style={styles.pitchSelectorContainer}>
+        <View style={styles.pitchSelectorWrapper}>
           <PitchSelector
             onSelectPitch={onPitchTap}
             disabled={disabled}
@@ -86,7 +83,6 @@ function EntryPaletteComponent({
           />
         </View>
         <OctaveControls
-          currentOctave={currentOctave}
           onOctaveChange={onOctaveChange}
           disabled={disabled}
           testID="octave-controls"
@@ -123,10 +119,10 @@ const styles = StyleSheet.create({
   },
   pitchRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     gap: spacing.sm,
   },
-  pitchSelectorContainer: {
+  pitchSelectorWrapper: {
     flex: 1,
   },
 });

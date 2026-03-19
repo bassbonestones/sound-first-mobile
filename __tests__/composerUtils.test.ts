@@ -15,6 +15,7 @@ import {
   shiftOctave,
   getPitchInKey,
   getDefaultMidiForPitch,
+  getNearestMidiForPitch,
   isValidMidi,
   clampMidi,
   MIN_MIDI,
@@ -188,6 +189,49 @@ describe("Pitch Utils", () => {
       expect(clampMidi(60)).toBe(60);
       expect(clampMidi(0)).toBe(MIN_MIDI);
       expect(clampMidi(200)).toBe(MAX_MIDI);
+    });
+  });
+
+  describe("getNearestMidiForPitch", () => {
+    it("should choose octave closest to reference - step up", () => {
+      // Reference: C4 (60), target: E
+      // E3=52, E4=64, E5=76
+      // E4 (64) is closest to C4 (60) with distance 4
+      const result = getNearestMidiForPitch("E", 60, 0);
+      expect(result.midi).toBe(64); // E4
+    });
+
+    it("should choose octave closest to reference - step down", () => {
+      // Reference: E4 (64), target: C
+      // C3=48, C4=60, C5=72
+      // C4 (60) is closest to E4 (64) with distance 4
+      const result = getNearestMidiForPitch("C", 64, 0);
+      expect(result.midi).toBe(60); // C4
+    });
+
+    it("should prefer lower octave when equidistant going down", () => {
+      // Reference: F#4 (66), target: C
+      // C4=60 (distance 6), C5=72 (distance 6)
+      // Should pick lower C4 when equidistant
+      const result = getNearestMidiForPitch("C", 66, 0);
+      // Actually C4=60 is 6 away, C5=72 is 6 away - equal, should pick first found (C3 at 48, C4 at 60, C5 at 72)
+      // With our algorithm checking octave-1, octave, octave+1, it finds C4 first with distance 6
+      expect(result.midi).toBe(60); // C4
+    });
+
+    it("should apply key signature accidentals", () => {
+      // Reference: G4 (67), target: F in key of G major (1 sharp = F#)
+      const result = getNearestMidiForPitch("F", 67, 1);
+      expect(result.midi).toBe(66); // F#4
+      expect(result.accidental).toBe("sharp");
+    });
+
+    it("should handle octave leaps correctly", () => {
+      // Reference: C5 (72), target: B
+      // B3=59, B4=71, B5=83
+      // B4 (71) is closest to C5 (72) with distance 1
+      const result = getNearestMidiForPitch("B", 72, 0);
+      expect(result.midi).toBe(71); // B4
     });
   });
 });

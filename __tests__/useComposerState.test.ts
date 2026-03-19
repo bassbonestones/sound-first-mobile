@@ -96,6 +96,41 @@ describe("useComposerState", () => {
       expect(insertResult).toBe(false);
       expect(result.current.score.measures[0].notes).toHaveLength(1);
     });
+
+    it("should use smart octave - choose nearest octave to staff center", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // First note uses staff center (B4 = 71) as reference
+      // Insert C - nearest to B4 is C5 (72), not C4 (60)
+      act(() => {
+        result.current.insertNote("C");
+      });
+      const cMidi = result.current.score.measures[0].notes[0].midi;
+      expect(cMidi).toBe(72); // C5 (closest to B4)
+
+      // Insert E - should be E5 (76) since it's closer to C5 (72)
+      act(() => {
+        result.current.insertNote("E");
+      });
+      const eMidi = result.current.score.measures[0].notes[1].midi;
+      expect(eMidi).toBe(76); // E5
+
+      // Insert G - should be G4 (67) since it's closer to E5 (76) than G5 (79)
+      act(() => {
+        result.current.insertNote("G");
+      });
+      const gMidi = result.current.score.measures[0].notes[2].midi;
+      // G4=67 is 9 below E5=76, G5=79 is 3 above E5=76
+      expect(gMidi).toBe(79); // G5 is closer
+
+      // Insert B - should be B4 (71) since it's closer to G5 (79)
+      act(() => {
+        result.current.insertNote("B");
+      });
+      const bMidi = result.current.score.measures[0].notes[3].midi;
+      // B4=71 is 8 below G5=79, B5=83 is 4 above G5=79
+      expect(bMidi).toBe(83); // B5 is closer
+    });
   });
 
   describe("rest insertion", () => {

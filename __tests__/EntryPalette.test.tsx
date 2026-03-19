@@ -265,7 +265,6 @@ describe("ModifierRow", () => {
 
 describe("OctaveControls", () => {
   const defaultProps = {
-    currentOctave: 4,
     onOctaveChange: jest.fn(),
   };
 
@@ -273,14 +272,11 @@ describe("OctaveControls", () => {
     jest.clearAllMocks();
   });
 
-  it("should render octave display and controls", () => {
-    const { getByTestId, getByText } = render(
-      <OctaveControls {...defaultProps} />,
-    );
+  it("should render octave controls", () => {
+    const { getByTestId } = render(<OctaveControls {...defaultProps} />);
 
     expect(getByTestId("octave-up")).toBeTruthy();
     expect(getByTestId("octave-down")).toBeTruthy();
-    expect(getByText("4")).toBeTruthy();
   });
 
   it("should call onOctaveChange up", () => {
@@ -303,33 +299,17 @@ describe("OctaveControls", () => {
     expect(onOctaveChange).toHaveBeenCalledWith("down");
   });
 
-  it("should disable up at max octave", () => {
+  it("should disable when disabled prop is true", () => {
     const onOctaveChange = jest.fn();
     const { getByTestId } = render(
       <OctaveControls
         {...defaultProps}
-        currentOctave={8}
-        maxOctave={8}
         onOctaveChange={onOctaveChange}
+        disabled
       />,
     );
 
     fireEvent.press(getByTestId("octave-up"));
-    expect(onOctaveChange).not.toHaveBeenCalled();
-  });
-
-  it("should disable down at min octave", () => {
-    const onOctaveChange = jest.fn();
-    const { getByTestId } = render(
-      <OctaveControls
-        {...defaultProps}
-        currentOctave={1}
-        minOctave={1}
-        onOctaveChange={onOctaveChange}
-      />,
-    );
-
-    fireEvent.press(getByTestId("octave-down"));
     expect(onOctaveChange).not.toHaveBeenCalled();
   });
 
@@ -344,7 +324,6 @@ describe("OctaveControls", () => {
 describe("EntryPalette", () => {
   const defaultProps = {
     selectedDuration: DURATION.QUARTER,
-    currentOctave: 4,
     selectedNote: null,
     onDurationSelect: jest.fn(),
     onPitchTap: jest.fn(),
