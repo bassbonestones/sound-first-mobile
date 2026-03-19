@@ -16,8 +16,8 @@ describe("DEV_NAV_ITEMS", () => {
       expect(DEV_NAV_ITEMS.length).toBeGreaterThan(0);
     });
 
-    it("has exactly 11 items", () => {
-      expect(DEV_NAV_ITEMS.length).toBe(11);
+    it("has exactly 12 items", () => {
+      expect(DEV_NAV_ITEMS.length).toBe(12);
     });
 
     it("is not empty", () => {
@@ -68,6 +68,12 @@ describe("DEV_NAV_ITEMS", () => {
       );
       expect(tuneMastery).toBeDefined();
       expect(tuneMastery?.label).toBe("Tune Mastery");
+    });
+
+    it("contains Composer screen", () => {
+      const composer = DEV_NAV_ITEMS.find((item) => item.screen === "Composer");
+      expect(composer).toBeDefined();
+      expect(composer?.label).toBe("Practice Composer");
     });
 
     it("contains ImportMusic screen", () => {

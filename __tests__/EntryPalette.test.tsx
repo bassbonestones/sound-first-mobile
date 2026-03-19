@@ -1,0 +1,474 @@
+/**
+ * Entry Palette Component Tests
+ *
+ * Tests for DurationSelector, PitchSelector, ModifierRow,
+ * OctaveControls, and EntryPalette components.
+ */
+
+import React from "react";
+import { render, fireEvent } from "@testing-library/react-native";
+
+import {
+  DurationSelector,
+  PitchSelector,
+  ModifierRow,
+  OctaveControls,
+  EntryPalette,
+} from "../src/features/composer/components";
+import {
+  DURATION,
+  createNote,
+  type PitchName,
+} from "../src/features/composer/types";
+
+describe("DurationSelector", () => {
+  const defaultProps = {
+    selectedDuration: DURATION.QUARTER,
+    onSelectDuration: jest.fn(),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("should render all duration options", () => {
+    const { getByTestId } = render(<DurationSelector {...defaultProps} />);
+
+    expect(getByTestId("duration-whole")).toBeTruthy();
+    expect(getByTestId("duration-half")).toBeTruthy();
+    expect(getByTestId("duration-quarter")).toBeTruthy();
+    expect(getByTestId("duration-eighth")).toBeTruthy();
+    expect(getByTestId("duration-sixteenth")).toBeTruthy();
+  });
+
+  it("should highlight selected duration", () => {
+    const { getByTestId, rerender } = render(
+      <DurationSelector {...defaultProps} selectedDuration={DURATION.HALF} />,
+    );
+
+    const halfButton = getByTestId("duration-half");
+    expect(halfButton.props.accessibilityState.selected).toBe(true);
+
+    const quarterButton = getByTestId("duration-quarter");
+    expect(quarterButton.props.accessibilityState.selected).toBe(false);
+  });
+
+  it("should call onSelectDuration when tapped", () => {
+    const onSelectDuration = jest.fn();
+    const { getByTestId } = render(
+      <DurationSelector
+        {...defaultProps}
+        onSelectDuration={onSelectDuration}
+      />,
+    );
+
+    fireEvent.press(getByTestId("duration-half"));
+    expect(onSelectDuration).toHaveBeenCalledWith(DURATION.HALF);
+
+    fireEvent.press(getByTestId("duration-whole"));
+    expect(onSelectDuration).toHaveBeenCalledWith(DURATION.WHOLE);
+  });
+
+  it("should not call onSelectDuration when disabled", () => {
+    const onSelectDuration = jest.fn();
+    const { getByTestId } = render(
+      <DurationSelector
+        {...defaultProps}
+        onSelectDuration={onSelectDuration}
+        disabled
+      />,
+    );
+
+    fireEvent.press(getByTestId("duration-half"));
+    expect(onSelectDuration).not.toHaveBeenCalled();
+  });
+
+  it("should have accessible labels", () => {
+    const { getByLabelText } = render(<DurationSelector {...defaultProps} />);
+
+    expect(getByLabelText("Whole note")).toBeTruthy();
+    expect(getByLabelText("Half note")).toBeTruthy();
+    expect(getByLabelText("Quarter note")).toBeTruthy();
+    expect(getByLabelText("8th note")).toBeTruthy();
+    expect(getByLabelText("16th note")).toBeTruthy();
+  });
+});
+
+describe("PitchSelector", () => {
+  const defaultProps = {
+    onSelectPitch: jest.fn(),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("should render all pitch options", () => {
+    const { getByTestId } = render(<PitchSelector {...defaultProps} />);
+
+    const pitches: PitchName[] = ["C", "D", "E", "F", "G", "A", "B"];
+    pitches.forEach((pitch) => {
+      expect(getByTestId(`pitch-${pitch}`)).toBeTruthy();
+    });
+  });
+
+  it("should call onSelectPitch when tapped", () => {
+    const onSelectPitch = jest.fn();
+    const { getByTestId } = render(
+      <PitchSelector {...defaultProps} onSelectPitch={onSelectPitch} />,
+    );
+
+    fireEvent.press(getByTestId("pitch-C"));
+    expect(onSelectPitch).toHaveBeenCalledWith("C");
+
+    fireEvent.press(getByTestId("pitch-G"));
+    expect(onSelectPitch).toHaveBeenCalledWith("G");
+  });
+
+  it("should not call onSelectPitch when disabled", () => {
+    const onSelectPitch = jest.fn();
+    const { getByTestId } = render(
+      <PitchSelector
+        {...defaultProps}
+        onSelectPitch={onSelectPitch}
+        disabled
+      />,
+    );
+
+    fireEvent.press(getByTestId("pitch-C"));
+    expect(onSelectPitch).not.toHaveBeenCalled();
+  });
+
+  it("should highlight specified pitch", () => {
+    const { getByTestId, rerender } = render(
+      <PitchSelector {...defaultProps} highlightedPitch="E" />,
+    );
+
+    // E should have highlighted style (we can't directly check style, but we verify it renders)
+    expect(getByTestId("pitch-E")).toBeTruthy();
+  });
+
+  it("should have accessible labels", () => {
+    const { getByLabelText } = render(<PitchSelector {...defaultProps} />);
+
+    expect(getByLabelText("Note C")).toBeTruthy();
+    expect(getByLabelText("Note D")).toBeTruthy();
+    expect(getByLabelText("Note G")).toBeTruthy();
+  });
+});
+
+describe("ModifierRow", () => {
+  const defaultProps = {
+    onAccidental: jest.fn(),
+    onRest: jest.fn(),
+    onTie: jest.fn(),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("should render all modifier buttons", () => {
+    const { getByTestId } = render(<ModifierRow {...defaultProps} />);
+
+    expect(getByTestId("modifier-sharp")).toBeTruthy();
+    expect(getByTestId("modifier-flat")).toBeTruthy();
+    expect(getByTestId("modifier-natural")).toBeTruthy();
+    expect(getByTestId("modifier-rest")).toBeTruthy();
+    expect(getByTestId("modifier-tie")).toBeTruthy();
+  });
+
+  it("should call onAccidental when accidental pressed", () => {
+    const onAccidental = jest.fn();
+    const { getByTestId } = render(
+      <ModifierRow
+        {...defaultProps}
+        onAccidental={onAccidental}
+        hasSelection
+      />,
+    );
+
+    fireEvent.press(getByTestId("modifier-sharp"));
+    expect(onAccidental).toHaveBeenCalledWith("sharp");
+
+    fireEvent.press(getByTestId("modifier-flat"));
+    expect(onAccidental).toHaveBeenCalledWith("flat");
+  });
+
+  it("should call onRest when rest pressed", () => {
+    const onRest = jest.fn();
+    const { getByTestId } = render(
+      <ModifierRow {...defaultProps} onRest={onRest} />,
+    );
+
+    fireEvent.press(getByTestId("modifier-rest"));
+    expect(onRest).toHaveBeenCalled();
+  });
+
+  it("should call onTie when tie pressed", () => {
+    const onTie = jest.fn();
+    const { getByTestId } = render(
+      <ModifierRow {...defaultProps} onTie={onTie} hasSelection />,
+    );
+
+    fireEvent.press(getByTestId("modifier-tie"));
+    expect(onTie).toHaveBeenCalled();
+  });
+
+  it("should disable accidentals and tie when no selection", () => {
+    const onAccidental = jest.fn();
+    const onTie = jest.fn();
+    const { getByTestId } = render(
+      <ModifierRow
+        {...defaultProps}
+        onAccidental={onAccidental}
+        onTie={onTie}
+        hasSelection={false}
+      />,
+    );
+
+    fireEvent.press(getByTestId("modifier-sharp"));
+    expect(onAccidental).not.toHaveBeenCalled();
+
+    fireEvent.press(getByTestId("modifier-tie"));
+    expect(onTie).not.toHaveBeenCalled();
+  });
+
+  it("should allow rest even without selection", () => {
+    const onRest = jest.fn();
+    const { getByTestId } = render(
+      <ModifierRow {...defaultProps} onRest={onRest} hasSelection={false} />,
+    );
+
+    fireEvent.press(getByTestId("modifier-rest"));
+    expect(onRest).toHaveBeenCalled();
+  });
+
+  it("should highlight active accidental", () => {
+    const { getByTestId } = render(
+      <ModifierRow {...defaultProps} activeAccidental="sharp" hasSelection />,
+    );
+
+    const sharpButton = getByTestId("modifier-sharp");
+    expect(sharpButton.props.accessibilityState.selected).toBe(true);
+  });
+
+  it("should highlight when tie is active", () => {
+    const { getByTestId } = render(
+      <ModifierRow {...defaultProps} tieActive hasSelection />,
+    );
+
+    const tieButton = getByTestId("modifier-tie");
+    expect(tieButton.props.accessibilityState.selected).toBe(true);
+  });
+});
+
+describe("OctaveControls", () => {
+  const defaultProps = {
+    currentOctave: 4,
+    onOctaveChange: jest.fn(),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("should render octave display and controls", () => {
+    const { getByTestId, getByText } = render(
+      <OctaveControls {...defaultProps} />,
+    );
+
+    expect(getByTestId("octave-up")).toBeTruthy();
+    expect(getByTestId("octave-down")).toBeTruthy();
+    expect(getByText("4")).toBeTruthy();
+  });
+
+  it("should call onOctaveChange up", () => {
+    const onOctaveChange = jest.fn();
+    const { getByTestId } = render(
+      <OctaveControls {...defaultProps} onOctaveChange={onOctaveChange} />,
+    );
+
+    fireEvent.press(getByTestId("octave-up"));
+    expect(onOctaveChange).toHaveBeenCalledWith("up");
+  });
+
+  it("should call onOctaveChange down", () => {
+    const onOctaveChange = jest.fn();
+    const { getByTestId } = render(
+      <OctaveControls {...defaultProps} onOctaveChange={onOctaveChange} />,
+    );
+
+    fireEvent.press(getByTestId("octave-down"));
+    expect(onOctaveChange).toHaveBeenCalledWith("down");
+  });
+
+  it("should disable up at max octave", () => {
+    const onOctaveChange = jest.fn();
+    const { getByTestId } = render(
+      <OctaveControls
+        {...defaultProps}
+        currentOctave={8}
+        maxOctave={8}
+        onOctaveChange={onOctaveChange}
+      />,
+    );
+
+    fireEvent.press(getByTestId("octave-up"));
+    expect(onOctaveChange).not.toHaveBeenCalled();
+  });
+
+  it("should disable down at min octave", () => {
+    const onOctaveChange = jest.fn();
+    const { getByTestId } = render(
+      <OctaveControls
+        {...defaultProps}
+        currentOctave={1}
+        minOctave={1}
+        onOctaveChange={onOctaveChange}
+      />,
+    );
+
+    fireEvent.press(getByTestId("octave-down"));
+    expect(onOctaveChange).not.toHaveBeenCalled();
+  });
+
+  it("should have accessible labels", () => {
+    const { getByLabelText } = render(<OctaveControls {...defaultProps} />);
+
+    expect(getByLabelText("Octave up")).toBeTruthy();
+    expect(getByLabelText("Octave down")).toBeTruthy();
+  });
+});
+
+describe("EntryPalette", () => {
+  const defaultProps = {
+    selectedDuration: DURATION.QUARTER,
+    currentOctave: 4,
+    selectedNote: null,
+    onDurationSelect: jest.fn(),
+    onPitchTap: jest.fn(),
+    onOctaveChange: jest.fn(),
+    onAccidental: jest.fn(),
+    onInsertRest: jest.fn(),
+    onToggleTie: jest.fn(),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("should render all sub-components", () => {
+    const { getByTestId } = render(<EntryPalette {...defaultProps} />);
+
+    expect(getByTestId("duration-selector")).toBeTruthy();
+    expect(getByTestId("pitch-selector")).toBeTruthy();
+    expect(getByTestId("octave-controls")).toBeTruthy();
+    expect(getByTestId("modifier-row")).toBeTruthy();
+  });
+
+  it("should pass duration to DurationSelector", () => {
+    const { getByTestId } = render(
+      <EntryPalette {...defaultProps} selectedDuration={DURATION.HALF} />,
+    );
+
+    const halfButton = getByTestId("duration-half");
+    expect(halfButton.props.accessibilityState.selected).toBe(true);
+  });
+
+  it("should call onDurationSelect", () => {
+    const onDurationSelect = jest.fn();
+    const { getByTestId } = render(
+      <EntryPalette {...defaultProps} onDurationSelect={onDurationSelect} />,
+    );
+
+    fireEvent.press(getByTestId("duration-whole"));
+    expect(onDurationSelect).toHaveBeenCalledWith(DURATION.WHOLE);
+  });
+
+  it("should call onPitchTap", () => {
+    const onPitchTap = jest.fn();
+    const { getByTestId } = render(
+      <EntryPalette {...defaultProps} onPitchTap={onPitchTap} />,
+    );
+
+    fireEvent.press(getByTestId("pitch-E"));
+    expect(onPitchTap).toHaveBeenCalledWith("E");
+  });
+
+  it("should call onOctaveChange", () => {
+    const onOctaveChange = jest.fn();
+    const { getByTestId } = render(
+      <EntryPalette {...defaultProps} onOctaveChange={onOctaveChange} />,
+    );
+
+    fireEvent.press(getByTestId("octave-up"));
+    expect(onOctaveChange).toHaveBeenCalledWith("up");
+  });
+
+  it("should call onInsertRest", () => {
+    const onInsertRest = jest.fn();
+    const { getByTestId } = render(
+      <EntryPalette {...defaultProps} onInsertRest={onInsertRest} />,
+    );
+
+    fireEvent.press(getByTestId("modifier-rest"));
+    expect(onInsertRest).toHaveBeenCalled();
+  });
+
+  it("should pass selected note accidental to ModifierRow", () => {
+    const selectedNote = createNote(60, DURATION.QUARTER, {
+      accidental: "flat",
+    });
+    const { getByTestId } = render(
+      <EntryPalette {...defaultProps} selectedNote={selectedNote} />,
+    );
+
+    const flatButton = getByTestId("modifier-flat");
+    expect(flatButton.props.accessibilityState.selected).toBe(true);
+  });
+
+  it("should pass tie state to ModifierRow", () => {
+    const selectedNote = createNote(60, DURATION.QUARTER, { tieStart: true });
+    const { getByTestId } = render(
+      <EntryPalette {...defaultProps} selectedNote={selectedNote} />,
+    );
+
+    const tieButton = getByTestId("modifier-tie");
+    expect(tieButton.props.accessibilityState.selected).toBe(true);
+  });
+
+  it("should enable accidentals when note selected", () => {
+    const onAccidental = jest.fn();
+    const selectedNote = createNote(60, DURATION.QUARTER);
+    const { getByTestId } = render(
+      <EntryPalette
+        {...defaultProps}
+        selectedNote={selectedNote}
+        onAccidental={onAccidental}
+      />,
+    );
+
+    fireEvent.press(getByTestId("modifier-sharp"));
+    expect(onAccidental).toHaveBeenCalledWith("sharp");
+  });
+
+  it("should disable all when disabled prop is true", () => {
+    const onPitchTap = jest.fn();
+    const onDurationSelect = jest.fn();
+    const { getByTestId } = render(
+      <EntryPalette
+        {...defaultProps}
+        onPitchTap={onPitchTap}
+        onDurationSelect={onDurationSelect}
+        disabled
+      />,
+    );
+
+    fireEvent.press(getByTestId("pitch-C"));
+    expect(onPitchTap).not.toHaveBeenCalled();
+
+    fireEvent.press(getByTestId("duration-half"));
+    expect(onDurationSelect).not.toHaveBeenCalled();
+  });
+});

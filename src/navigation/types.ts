@@ -54,6 +54,9 @@ export type RootStackParamList = {
   ScoreCorrection: ScoreCorrectionParams;
   MyScores: MyScoresParams;
   ImportedScorePractice: ImportedScorePracticeParams;
+
+  // Practice Composer feature
+  Composer: ComposerParams;
 };
 
 // ============================================================================
@@ -212,6 +215,16 @@ export interface ImportedScorePracticeParams {
     start: number;
     end: number;
   };
+}
+
+// ============================================================================
+// Practice Composer Params
+// ============================================================================
+
+/** Params for ComposerScreen */
+export interface ComposerParams {
+  /** Score ID to load from storage (undefined for new score) */
+  scoreId?: string;
 }
 
 // ============================================================================

@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   AccessibilityInfo,
   ViewStyle,
+  Platform,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
@@ -355,11 +356,16 @@ const styles = StyleSheet.create({
   cardActive: {
     borderColor: colors.primary,
     borderWidth: 2,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...Platform.select({
+      web: { boxShadow: `0px 2px 4px rgba(0, 122, 255, 0.1)` },
+      default: {
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+      },
+    }),
   },
   cardReviewed: {
     opacity: 0.8,
