@@ -807,10 +807,17 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
         // Get current measure index
         const currentMeasureIndex = osmd.cursor.iterator.CurrentMeasureIndex;
         
-        // Auto-scroll only when measure changes (once per measure)
-        if (autoScrollEnabled && currentMeasureIndex !== lastScrolledMeasureIndex) {
-          lastScrolledMeasureIndex = currentMeasureIndex;
-          scrollToCursor();
+        // Scroll if:
+        // 1. Measure changed (once per measure), OR
+        // 2. Cursor is past 70% of visible screen (for long measures)
+        if (autoScrollEnabled) {
+          const shouldScrollForMeasure = currentMeasureIndex !== lastScrolledMeasureIndex;
+          const shouldScrollForPosition = isCursorPastThreshold(0.7);
+          
+          if (shouldScrollForMeasure || shouldScrollForPosition) {
+            lastScrolledMeasureIndex = currentMeasureIndex;
+            scrollToCursor();
+          }
         }
         
         sendMessage('cursorMoved', { 
@@ -862,10 +869,17 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
         // Get current measure index
         const currentMeasureIndex = osmd.cursor.iterator.CurrentMeasureIndex;
         
-        // Scroll only when measure changes (once per measure, not every beat)
-        if (isScrolling && autoScrollEnabled && currentMeasureIndex !== lastScrolledMeasureIndex) {
-          lastScrolledMeasureIndex = currentMeasureIndex;
-          scrollToCursorDirect();
+        // Scroll if:
+        // 1. Measure changed (once per measure), OR
+        // 2. Cursor is past 70% of visible screen (for long measures)
+        if (isScrolling && autoScrollEnabled) {
+          const shouldScrollForMeasure = currentMeasureIndex !== lastScrolledMeasureIndex;
+          const shouldScrollForPosition = isCursorPastThreshold(0.7);
+          
+          if (shouldScrollForMeasure || shouldScrollForPosition) {
+            lastScrolledMeasureIndex = currentMeasureIndex;
+            scrollToCursorDirect();
+          }
         }
         
         sendMessage('cursorMoved', { 
@@ -875,6 +889,27 @@ export function generateOsmdHtml(options: OsmdHtmlOptions = {}): string {
         });
       }
     };
+    
+    // Check if cursor is past a certain percentage of the visible container width
+    function isCursorPastThreshold(threshold) {
+      const container = document.getElementById('container');
+      if (!container || !osmd || !osmd.cursor || !osmd.cursor.cursorElement) return false;
+      
+      try {
+        const cursorEl = osmd.cursor.cursorElement;
+        const cursorRect = cursorEl.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        
+        // Cursor position relative to the visible viewport (not scroll content)
+        const cursorXInViewport = cursorRect.left - containerRect.left;
+        const viewportWidth = containerRect.width;
+        
+        // Check if cursor is past threshold percentage of visible width
+        return cursorXInViewport > viewportWidth * threshold;
+      } catch (e) {
+        return false;
+      }
+    }
     
     // Direct scroll to cursor - called synchronously when cursor moves
     function scrollToCursorDirect() {
