@@ -28,9 +28,12 @@ jest.mock("../src/features/importMusic/utils/networkUtils", () => ({
 }));
 
 // Mock analytics to prevent side effects
-jest.mock("../src/features/importMusic/services/importAnalyticsService", () => ({
-  trackEvent: jest.fn(),
-}));
+jest.mock(
+  "../src/features/importMusic/services/importAnalyticsService",
+  () => ({
+    trackEvent: jest.fn(),
+  }),
+);
 
 // Mock devLogger
 jest.mock("../src/utils/devLogger", () => ({
@@ -40,7 +43,9 @@ jest.mock("../src/utils/devLogger", () => ({
 }));
 
 const mockAsyncStorage = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
-const { isNetworkAvailable } = require("../src/features/importMusic/utils/networkUtils");
+const {
+  isNetworkAvailable,
+} = require("../src/features/importMusic/utils/networkUtils");
 
 describe("offlineQueueService", () => {
   beforeEach(async () => {
@@ -80,7 +85,11 @@ describe("offlineQueueService", () => {
     });
 
     it("should accept priority option", async () => {
-      await enqueue("omr_submission", { scoreId: "score-123" }, { priority: 1 });
+      await enqueue(
+        "omr_submission",
+        { scoreId: "score-123" },
+        { priority: 1 },
+      );
 
       const items = getQueueItems();
       const item = items.find((i) => i.priority === 1);
@@ -91,7 +100,7 @@ describe("offlineQueueService", () => {
       await enqueue(
         "omr_submission",
         { scoreId: "score-123" },
-        { expirationMs: 60000 }
+        { expirationMs: 60000 },
       );
 
       const items = getQueueItems();
@@ -102,7 +111,7 @@ describe("offlineQueueService", () => {
       await enqueue(
         "omr_submission",
         { scoreId: "score-123" },
-        { maxRetries: 5 }
+        { maxRetries: 5 },
       );
 
       const items = getQueueItems();
@@ -202,7 +211,7 @@ describe("offlineQueueService", () => {
     it("should count pending items", async () => {
       // Make network unavailable so items stay pending
       (isNetworkAvailable as jest.Mock).mockReturnValue(false);
-      
+
       await enqueue("omr_submission", { scoreId: "score-1" });
       await enqueue("omr_submission", { scoreId: "score-2" });
 
@@ -288,7 +297,7 @@ describe("offlineQueueService", () => {
             maxRetries: 3,
             payload: { scoreId: "score-123" },
           },
-        ])
+        ]),
       );
 
       await initializeQueue();
@@ -302,7 +311,7 @@ describe("offlineQueueService", () => {
         initializeQueue({
           maxItems: 100,
           maxRetries: 5,
-        })
+        }),
       ).resolves.not.toThrow();
     });
   });

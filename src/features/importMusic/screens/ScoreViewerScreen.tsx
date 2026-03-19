@@ -4,7 +4,7 @@
  * Full-screen view of an imported score with notation rendering.
  * Shows the music notation using ScorePreview component and provides
  * actions for practice, editing, and navigation.
- * 
+ *
  * Includes tabbed view for Score display and Capability Discovery.
  *
  * Navigation params:
@@ -31,10 +31,17 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../constants";
-import { ScorePreview, CapabilityDiscovery, ScoreCurriculum } from "../components";
+import {
+  ScorePreview,
+  CapabilityDiscovery,
+  ScoreCurriculum,
+} from "../components";
 import { saveScore, getScore } from "../services/scoreStorageService";
 import type { ImportedScore, UncertainMeasure } from "../../../types/import";
-import type { LearningPathResponse, LearningPathCapability } from "../types/analysisTypes";
+import type {
+  LearningPathResponse,
+  LearningPathCapability,
+} from "../types/analysisTypes";
 
 // ============================================================================
 // Types
@@ -114,7 +121,9 @@ export function ScoreViewerScreen({
   const [activeTab, setActiveTab] = useState<ViewTab>("score");
 
   // Capabilities discovered from the score (for passing to ScoreCurriculum)
-  const [discoveredCapabilities, setDiscoveredCapabilities] = useState<string[]>([]);
+  const [discoveredCapabilities, setDiscoveredCapabilities] = useState<
+    string[]
+  >([]);
 
   // TODO: Get actual user ID from auth context/state
   const userId = 1;
@@ -424,7 +433,9 @@ export function ScoreViewerScreen({
           <Feather
             name="music"
             size={18}
-            color={activeTab === "score" ? colors.primary : colors.textSecondary}
+            color={
+              activeTab === "score" ? colors.primary : colors.textSecondary
+            }
           />
           <Text
             style={[
@@ -445,7 +456,11 @@ export function ScoreViewerScreen({
           <Feather
             name="list"
             size={18}
-            color={activeTab === "capabilities" ? colors.primary : colors.textSecondary}
+            color={
+              activeTab === "capabilities"
+                ? colors.primary
+                : colors.textSecondary
+            }
           />
           <Text
             style={[
@@ -466,7 +481,9 @@ export function ScoreViewerScreen({
           <Feather
             name="trending-up"
             size={18}
-            color={activeTab === "curriculum" ? colors.primary : colors.textSecondary}
+            color={
+              activeTab === "curriculum" ? colors.primary : colors.textSecondary
+            }
           />
           <Text
             style={[

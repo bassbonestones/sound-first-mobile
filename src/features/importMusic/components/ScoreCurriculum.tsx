@@ -60,8 +60,9 @@ export function ScoreCurriculum({
   onStartLearning,
 }: ScoreCurriculumProps) {
   const [loadState, setLoadState] = useState<LoadState>("idle");
-  const [learningPath, setLearningPath] =
-    useState<LearningPathResponse | null>(null);
+  const [learningPath, setLearningPath] = useState<LearningPathResponse | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [expandedDomains, setExpandedDomains] = useState<Set<string>>(
     new Set(),
@@ -147,22 +148,16 @@ export function ScoreCurriculum({
 
         <View style={styles.summaryStats}>
           <View style={styles.statItem}>
-            <Feather
-              name="check-circle"
-              size={16}
-              color={colors.success}
-            />
+            <Feather name="check-circle" size={16} color={colors.success} />
             <Text style={styles.statText}>
               {capabilities_already_mastered} mastered
             </Text>
           </View>
           <View style={styles.statItem}>
-            <Feather
-              name="target"
-              size={16}
-              color={colors.warning}
-            />
-            <Text style={styles.statText}>{capabilities_to_learn} to learn</Text>
+            <Feather name="target" size={16} color={colors.warning} />
+            <Text style={styles.statText}>
+              {capabilities_to_learn} to learn
+            </Text>
           </View>
         </View>
 
@@ -198,11 +193,7 @@ export function ScoreCurriculum({
       >
         <View style={styles.capabilityIcon}>
           {cap.is_mastered ? (
-            <Feather
-              name="check-circle"
-              size={20}
-              color={colors.success}
-            />
+            <Feather name="check-circle" size={20} color={colors.success} />
           ) : cap.depth > 0 ? (
             <Feather name="lock" size={20} color={colors.textSecondary} />
           ) : (
@@ -238,7 +229,10 @@ export function ScoreCurriculum({
     );
   };
 
-  const renderDomain = (domain: string, capabilities: LearningPathCapability[]) => {
+  const renderDomain = (
+    domain: string,
+    capabilities: LearningPathCapability[],
+  ) => {
     const domainInfo = DOMAIN_DISPLAY_INFO[domain] || {
       label: domain,
       icon: "circle",

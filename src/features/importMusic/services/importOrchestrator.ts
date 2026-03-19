@@ -371,10 +371,15 @@ async function runOmrPath(
       score.confidence = {
         overall: omrResult.result.confidence,
         measureConfidence: [],
-        needsReview: omrResult.result.confidence < 0.8 || omrResult.result.uncertainMeasures.length > 0,
+        needsReview:
+          omrResult.result.confidence < 0.8 ||
+          omrResult.result.uncertainMeasures.length > 0,
       };
     } else {
-      devError("[Orchestrator] Failed to parse OMR MusicXML:", parseResult.error);
+      devError(
+        "[Orchestrator] Failed to parse OMR MusicXML:",
+        parseResult.error,
+      );
       // Fall back to normalizeOmrResult placeholder
       score = normalizeOmrResult(omrResult.result, {
         sourceType: asset.sourceType,

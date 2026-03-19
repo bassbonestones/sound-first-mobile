@@ -249,9 +249,11 @@ export type ExerciseTestScreenProps = RootStackScreenProps<"ExerciseTest">;
 export type TuneMasteryScreenProps = RootStackScreenProps<"TuneMastery">;
 export type ImportMusicScreenProps = RootStackScreenProps<"ImportMusic">;
 export type ScoreViewerScreenProps = RootStackScreenProps<"ScoreViewer">;
-export type ScoreCorrectionScreenProps = RootStackScreenProps<"ScoreCorrection">;
+export type ScoreCorrectionScreenProps =
+  RootStackScreenProps<"ScoreCorrection">;
 export type MyScoresScreenProps = RootStackScreenProps<"MyScores">;
-export type ImportedScorePracticeScreenProps = RootStackScreenProps<"ImportedScorePractice">;
+export type ImportedScorePracticeScreenProps =
+  RootStackScreenProps<"ImportedScorePractice">;
 
 // ============================================================================
 // Type Guards
@@ -263,7 +265,9 @@ export type ImportedScorePracticeScreenProps = RootStackScreenProps<"ImportedSco
 export function isDirectScoreParams(
   params: ScoreViewerParams | undefined,
 ): params is ScoreViewerDirectParams {
-  return params !== undefined && "score" in params && params.score !== undefined;
+  return (
+    params !== undefined && "score" in params && params.score !== undefined
+  );
 }
 
 /**
@@ -272,7 +276,9 @@ export function isDirectScoreParams(
 export function isStorageScoreParams(
   params: ScoreViewerParams | undefined,
 ): params is ScoreViewerFromStorageParams {
-  return params !== undefined && "scoreId" in params && params.scoreId !== undefined;
+  return (
+    params !== undefined && "scoreId" in params && params.scoreId !== undefined
+  );
 }
 
 // ============================================================================

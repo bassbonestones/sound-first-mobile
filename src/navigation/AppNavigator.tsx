@@ -96,7 +96,10 @@ interface AppNavigatorProps {
 /**
  * Main App Navigator Component
  */
-export function AppNavigator({ initialRoute, initialParams }: AppNavigatorProps) {
+export function AppNavigator({
+  initialRoute,
+  initialParams,
+}: AppNavigatorProps) {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName={initialRoute}>

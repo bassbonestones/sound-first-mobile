@@ -13,7 +13,10 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { devLog, devError } from "../../../utils/devLogger";
-import { isNetworkAvailable, subscribeToNetworkChanges } from "../utils/networkUtils";
+import {
+  isNetworkAvailable,
+  subscribeToNetworkChanges,
+} from "../utils/networkUtils";
 import { trackEvent } from "./importAnalyticsService";
 
 // ============================================================================
@@ -22,7 +25,10 @@ import { trackEvent } from "./importAnalyticsService";
 
 export type QueueItemStatus = "pending" | "processing" | "completed" | "failed";
 
-export type QueueItemType = "omr_submission" | "score_save" | "capability_analysis";
+export type QueueItemType =
+  | "omr_submission"
+  | "score_save"
+  | "capability_analysis";
 
 export interface QueueItem {
   id: string;
@@ -72,7 +78,8 @@ let networkUnsubscribe: (() => void) | null = null;
 let config = DEFAULT_CONFIG;
 
 // Handler registry for different queue item types
-const handlers: Map<QueueItemType, (payload: unknown) => Promise<void>> = new Map();
+const handlers: Map<QueueItemType, (payload: unknown) => Promise<void>> =
+  new Map();
 
 // ============================================================================
 // Initialization
@@ -81,7 +88,9 @@ const handlers: Map<QueueItemType, (payload: unknown) => Promise<void>> = new Ma
 /**
  * Initialize the offline queue
  */
-export async function initializeQueue(customConfig?: Partial<QueueConfig>): Promise<void> {
+export async function initializeQueue(
+  customConfig?: Partial<QueueConfig>,
+): Promise<void> {
   config = { ...DEFAULT_CONFIG, ...customConfig };
 
   // Load persisted queue
@@ -293,7 +302,11 @@ export async function processQueue(): Promise<void> {
 
       if (item.retryCount >= item.maxRetries) {
         item.status = "failed";
-        devError("[OfflineQueue] Failed after retries:", item.id, item.lastError);
+        devError(
+          "[OfflineQueue] Failed after retries:",
+          item.id,
+          item.lastError,
+        );
         trackEvent("upload_failed", {
           offline: true,
           queueId: item.id,
@@ -402,7 +415,9 @@ function sortQueue(): void {
 function cleanupExpiredItems(): void {
   const now = Date.now();
   const beforeCount = queue.length;
-  queue = queue.filter((item) => item.expiresAt > now || item.status === "processing");
+  queue = queue.filter(
+    (item) => item.expiresAt > now || item.status === "processing",
+  );
   const removed = beforeCount - queue.length;
   if (removed > 0) {
     devLog("[OfflineQueue] Cleaned up", removed, "expired items");

@@ -161,7 +161,12 @@ export function trackSourceSelected(source: ImportSourceType): void {
  */
 export function trackFileAcquisition(
   status: "started" | "completed" | "failed" | "cancelled",
-  properties?: { source?: ImportSourceType; fileType?: string; fileSizeBytes?: number; error?: string },
+  properties?: {
+    source?: ImportSourceType;
+    fileType?: string;
+    fileSizeBytes?: number;
+    error?: string;
+  },
 ): void {
   trackEvent(`file_acquisition_${status}` as ImportEventType, properties);
 }
@@ -171,7 +176,13 @@ export function trackFileAcquisition(
  */
 export function trackUpload(
   status: "started" | "progress" | "completed" | "failed" | "retried",
-  properties?: { progress?: number; fileSizeBytes?: number; durationMs?: number; error?: string; retryCount?: number },
+  properties?: {
+    progress?: number;
+    fileSizeBytes?: number;
+    durationMs?: number;
+    error?: string;
+    retryCount?: number;
+  },
 ): void {
   trackEvent(`upload_${status}` as ImportEventType, properties);
 }
@@ -181,7 +192,12 @@ export function trackUpload(
  */
 export function trackOmrJob(
   status: "submitted" | "polling" | "completed" | "failed" | "timeout",
-  properties?: { jobId?: string; durationMs?: number; confidence?: number; error?: string },
+  properties?: {
+    jobId?: string;
+    durationMs?: number;
+    confidence?: number;
+    error?: string;
+  },
 ): void {
   trackEvent(`omr_job_${status}` as ImportEventType, properties);
 }
@@ -191,7 +207,12 @@ export function trackOmrJob(
  */
 export function trackMusicXmlParse(
   status: "started" | "completed" | "failed",
-  properties?: { measureCount?: number; partCount?: number; durationMs?: number; error?: string },
+  properties?: {
+    measureCount?: number;
+    partCount?: number;
+    durationMs?: number;
+    error?: string;
+  },
 ): void {
   trackEvent(`musicxml_parse_${status}` as ImportEventType, properties);
 }

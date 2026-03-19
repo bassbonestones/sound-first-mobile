@@ -100,7 +100,9 @@ export function useRateLimit(): UseRateLimitReturn {
   /**
    * Calculate warning level for rate limit
    */
-  const calculateRateLimitWarning = (remaining: number): "none" | "low" | "critical" => {
+  const calculateRateLimitWarning = (
+    remaining: number,
+  ): "none" | "low" | "critical" => {
     if (remaining <= CRITICAL_REQUESTS_THRESHOLD) return "critical";
     if (remaining <= LOW_REQUESTS_THRESHOLD) return "low";
     return "none";
@@ -109,7 +111,9 @@ export function useRateLimit(): UseRateLimitReturn {
   /**
    * Calculate warning level for OMR quota
    */
-  const calculateQuotaWarning = (remaining: number): "none" | "low" | "critical" => {
+  const calculateQuotaWarning = (
+    remaining: number,
+  ): "none" | "low" | "critical" => {
     if (remaining <= CRITICAL_PAGES_THRESHOLD) return "critical";
     if (remaining <= LOW_PAGES_THRESHOLD) return "low";
     return "none";

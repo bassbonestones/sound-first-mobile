@@ -104,10 +104,9 @@ export async function analyzeCapabilities(
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => "Unknown error");
-        devError(
-          `CapabilityAnalysis: Analysis failed: ${response.status}`,
-          { errorText },
-        );
+        devError(`CapabilityAnalysis: Analysis failed: ${response.status}`, {
+          errorText,
+        });
         return {
           success: false,
           error: {
@@ -325,14 +324,17 @@ export async function generateLearningPath(
     );
 
     try {
-      const response = await fetch(`${finalConfig.materialsUrl}/learning-path`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `${finalConfig.materialsUrl}/learning-path`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(request),
+          signal: controller.signal,
         },
-        body: JSON.stringify(request),
-        signal: controller.signal,
-      });
+      );
 
       clearTimeout(timeoutId);
 
@@ -399,7 +401,9 @@ export function getMockLearningPath(
     (name, index) => ({
       id: index + 1,
       name,
-      display_name: name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+      display_name: name
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase()),
       domain: name.includes("clef")
         ? "clef"
         : name.includes("time")

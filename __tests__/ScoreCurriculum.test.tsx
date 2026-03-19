@@ -277,7 +277,9 @@ describe("ScoreCurriculum", () => {
 
   describe("mock mode", () => {
     it("uses mock service when useMock is true", async () => {
-      (capabilityService.generateLearningPathMock as jest.Mock).mockResolvedValue({
+      (
+        capabilityService.generateLearningPathMock as jest.Mock
+      ).mockResolvedValue({
         success: true,
         data: mockLearningPath,
       });

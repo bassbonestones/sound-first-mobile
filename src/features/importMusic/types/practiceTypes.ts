@@ -137,7 +137,20 @@ export interface PracticeSessionResult {
  * MIDI note number to note name
  */
 export function midiToNoteName(midiNote: number): string {
-  const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const noteNames = [
+    "C",
+    "C#",
+    "D",
+    "D#",
+    "E",
+    "F",
+    "F#",
+    "G",
+    "G#",
+    "A",
+    "A#",
+    "B",
+  ];
   const octave = Math.floor(midiNote / 12) - 1;
   const noteIndex = midiNote % 12;
   return `${noteNames[noteIndex]}${octave}`;
@@ -152,13 +165,19 @@ export function noteNameToMidi(noteName: string): number {
 
   const [, letter, accidental, octaveStr] = match;
   const noteMap: Record<string, number> = {
-    C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11,
+    C: 0,
+    D: 2,
+    E: 4,
+    F: 5,
+    G: 7,
+    A: 9,
+    B: 11,
   };
-  
+
   const baseNote = noteMap[letter.toUpperCase()] ?? 0;
   const alter = accidental === "#" ? 1 : accidental === "b" ? -1 : 0;
   const octave = parseInt(octaveStr, 10);
-  
+
   return (octave + 1) * 12 + baseNote + alter;
 }
 
@@ -189,17 +208,17 @@ export function isPitchMatch(
   },
 ): boolean {
   const { allowOctaveEquivalent = true, centsTolerance = 50 } = options ?? {};
-  
+
   // Check cents deviation first
   if (Math.abs(centsDeviation) > centsTolerance) {
     return false;
   }
-  
+
   // Check octave equivalence
   if (allowOctaveEquivalent) {
-    return (detectedMidi % 12) === (targetMidi % 12);
+    return detectedMidi % 12 === targetMidi % 12;
   }
-  
+
   return detectedMidi === targetMidi;
 }
 
@@ -231,28 +250,33 @@ export function calculateStats(
   if (performances.length === 0) {
     return createEmptyStats();
   }
-  
+
   const correctNotes = performances.filter((p) => p.wasCorrect).length;
-  const missedNotes = performances.filter((p) => p.playedMidiNote === null).length;
+  const missedNotes = performances.filter(
+    (p) => p.playedMidiNote === null,
+  ).length;
   const incorrectNotes = performances.length - correctNotes - missedNotes;
-  
-  const playedPerformances = performances.filter((p) => p.centsDeviation !== null);
+
+  const playedPerformances = performances.filter(
+    (p) => p.centsDeviation !== null,
+  );
   const totalCentsDeviation = playedPerformances.reduce(
     (sum, p) => sum + Math.abs(p.centsDeviation!),
     0,
   );
-  
+
   const measureNumbers = performances.map((p) => p.measureNumber);
-  
+
   return {
     totalNotes: performances.length,
     correctNotes,
     incorrectNotes,
     missedNotes,
     accuracy: (correctNotes / performances.length) * 100,
-    averageCentsDeviation: playedPerformances.length > 0
-      ? totalCentsDeviation / playedPerformances.length
-      : 0,
+    averageCentsDeviation:
+      playedPerformances.length > 0
+        ? totalCentsDeviation / playedPerformances.length
+        : 0,
     practiceTimeSeconds,
     tempoBpm,
     measuresRange: {

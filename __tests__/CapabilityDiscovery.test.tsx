@@ -291,7 +291,7 @@ describe("CapabilityDiscovery", () => {
     // Small domains are auto-expanded, so Collapse All should be visible
     // (all our test domains have <= 3 items)
     expect(getByText("Collapse All")).toBeTruthy();
-    
+
     // Press collapse all
     fireEvent.press(getByText("Collapse All"));
 

@@ -36,20 +36,32 @@ type HomeParamsTest = AssertEqual<RootStackParamList["Home"], undefined>;
 const _homeParamsCorrect: HomeParamsTest = true;
 
 // Test: Session params are correctly typed
-type SessionParamsTest = AssertEqual<RootStackParamList["Session"], SessionParams>;
+type SessionParamsTest = AssertEqual<
+  RootStackParamList["Session"],
+  SessionParams
+>;
 const _sessionParamsCorrect: SessionParamsTest = true;
 
 // Test: Session params include expected fields
-type SessionHasDuration = SessionParams extends { duration?: number } ? true : false;
+type SessionHasDuration = SessionParams extends { duration?: number }
+  ? true
+  : false;
 const _sessionHasDuration: SessionHasDuration = true;
 
 // Test: ScoreViewer params are union type
-type ScoreViewerIsUnion = ScoreViewerParams extends { score?: ImportedScore } | { scoreId?: string } ? true : false;
+type ScoreViewerIsUnion = ScoreViewerParams extends
+  | { score?: ImportedScore }
+  | { scoreId?: string }
+  ? true
+  : false;
 const _scoreViewerIsUnion: ScoreViewerIsUnion = true;
 
 // Test: ImportedScorePractice requires score and rawMusicXml
-type PracticeRequiresScore = "score" extends keyof ImportedScorePracticeParams ? true : false;
-type PracticeRequiresMusicXml = "rawMusicXml" extends keyof ImportedScorePracticeParams ? true : false;
+type PracticeRequiresScore = "score" extends keyof ImportedScorePracticeParams
+  ? true
+  : false;
+type PracticeRequiresMusicXml =
+  "rawMusicXml" extends keyof ImportedScorePracticeParams ? true : false;
 const _practiceRequiresScore: PracticeRequiresScore = true;
 const _practiceRequiresMusicXml: PracticeRequiresMusicXml = true;
 

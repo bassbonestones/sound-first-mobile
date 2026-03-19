@@ -123,8 +123,12 @@ describe("practiceTypes", () => {
 
     it("handles octave equivalents", () => {
       // C4 and C5 are octave equivalent
-      expect(isPitchMatch(72, 60, 0, { allowOctaveEquivalent: true })).toBe(true);
-      expect(isPitchMatch(72, 60, 0, { allowOctaveEquivalent: false })).toBe(false);
+      expect(isPitchMatch(72, 60, 0, { allowOctaveEquivalent: true })).toBe(
+        true,
+      );
+      expect(isPitchMatch(72, 60, 0, { allowOctaveEquivalent: false })).toBe(
+        false,
+      );
     });
 
     it("respects custom tolerance", () => {
@@ -152,10 +156,50 @@ describe("practiceTypes", () => {
 
     it("calculates accuracy correctly", () => {
       const performances: NotePerformance[] = [
-        { targetMidiNote: 60, playedMidiNote: 60, centsDeviation: 5, wasCorrect: true, noteIndex: 0, measureNumber: 1, beatNumber: 1, expectedTime: 0, detectedTime: 100 },
-        { targetMidiNote: 62, playedMidiNote: 62, centsDeviation: 10, wasCorrect: true, noteIndex: 1, measureNumber: 1, beatNumber: 2, expectedTime: 500, detectedTime: 600 },
-        { targetMidiNote: 64, playedMidiNote: 65, centsDeviation: 100, wasCorrect: false, noteIndex: 2, measureNumber: 1, beatNumber: 3, expectedTime: 1000, detectedTime: 1100 },
-        { targetMidiNote: 65, playedMidiNote: null, centsDeviation: null, wasCorrect: false, noteIndex: 3, measureNumber: 1, beatNumber: 4, expectedTime: 1500, detectedTime: null },
+        {
+          targetMidiNote: 60,
+          playedMidiNote: 60,
+          centsDeviation: 5,
+          wasCorrect: true,
+          noteIndex: 0,
+          measureNumber: 1,
+          beatNumber: 1,
+          expectedTime: 0,
+          detectedTime: 100,
+        },
+        {
+          targetMidiNote: 62,
+          playedMidiNote: 62,
+          centsDeviation: 10,
+          wasCorrect: true,
+          noteIndex: 1,
+          measureNumber: 1,
+          beatNumber: 2,
+          expectedTime: 500,
+          detectedTime: 600,
+        },
+        {
+          targetMidiNote: 64,
+          playedMidiNote: 65,
+          centsDeviation: 100,
+          wasCorrect: false,
+          noteIndex: 2,
+          measureNumber: 1,
+          beatNumber: 3,
+          expectedTime: 1000,
+          detectedTime: 1100,
+        },
+        {
+          targetMidiNote: 65,
+          playedMidiNote: null,
+          centsDeviation: null,
+          wasCorrect: false,
+          noteIndex: 3,
+          measureNumber: 1,
+          beatNumber: 4,
+          expectedTime: 1500,
+          detectedTime: null,
+        },
       ];
 
       const stats = calculateStats(performances, 5, 120);
@@ -173,9 +217,39 @@ describe("practiceTypes", () => {
 
     it("calculates average cents deviation", () => {
       const performances: NotePerformance[] = [
-        { targetMidiNote: 60, playedMidiNote: 60, centsDeviation: 10, wasCorrect: true, noteIndex: 0, measureNumber: 1, beatNumber: 1, expectedTime: 0, detectedTime: 100 },
-        { targetMidiNote: 62, playedMidiNote: 62, centsDeviation: -20, wasCorrect: true, noteIndex: 1, measureNumber: 1, beatNumber: 2, expectedTime: 500, detectedTime: 600 },
-        { targetMidiNote: 64, playedMidiNote: 64, centsDeviation: 30, wasCorrect: true, noteIndex: 2, measureNumber: 1, beatNumber: 3, expectedTime: 1000, detectedTime: 1100 },
+        {
+          targetMidiNote: 60,
+          playedMidiNote: 60,
+          centsDeviation: 10,
+          wasCorrect: true,
+          noteIndex: 0,
+          measureNumber: 1,
+          beatNumber: 1,
+          expectedTime: 0,
+          detectedTime: 100,
+        },
+        {
+          targetMidiNote: 62,
+          playedMidiNote: 62,
+          centsDeviation: -20,
+          wasCorrect: true,
+          noteIndex: 1,
+          measureNumber: 1,
+          beatNumber: 2,
+          expectedTime: 500,
+          detectedTime: 600,
+        },
+        {
+          targetMidiNote: 64,
+          playedMidiNote: 64,
+          centsDeviation: 30,
+          wasCorrect: true,
+          noteIndex: 2,
+          measureNumber: 1,
+          beatNumber: 3,
+          expectedTime: 1000,
+          detectedTime: 1100,
+        },
       ];
 
       const stats = calculateStats(performances, 5, 120);

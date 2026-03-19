@@ -152,7 +152,7 @@ async function submitOmrJobToBackend(
   devLog("[OMR] Submitting job:", request);
 
   const url = `${config.baseUrl}/omr/submit`;
-  
+
   // Convert to snake_case for backend
   const backendRequest = {
     asset_id: request.assetId,
@@ -257,7 +257,7 @@ async function fetchJobStatus(
   devLog("[OMR] Fetching status for job:", jobId);
 
   const url = `${config.baseUrl}/omr/status/${jobId}`;
-  
+
   const response = await fetch(url, {
     method: "GET",
     headers: {
@@ -283,14 +283,16 @@ async function fetchJobStatus(
     jobId: data.job_id ?? jobId,
     status: data.status,
     progress: data.progress ?? null,
-    result: data.result ? {
-      confidence: data.result.confidence,
-      musicXml: data.result.music_xml ?? null,
-      measureConfidence: data.result.measure_confidence ?? [],
-      uncertainMeasures: data.result.uncertain_measures ?? [],
-      previewUrl: data.result.preview_url ?? null,
-      metadata: data.result.metadata ?? null,
-    } : null,
+    result: data.result
+      ? {
+          confidence: data.result.confidence,
+          musicXml: data.result.music_xml ?? null,
+          measureConfidence: data.result.measure_confidence ?? [],
+          uncertainMeasures: data.result.uncertain_measures ?? [],
+          previewUrl: data.result.preview_url ?? null,
+          metadata: data.result.metadata ?? null,
+        }
+      : null,
     error: data.error ?? null,
   };
 }

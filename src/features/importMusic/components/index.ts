@@ -54,16 +54,10 @@ export {
 } from "./CapabilityDiscovery";
 
 // Score Curriculum (Learning Path)
-export {
-  ScoreCurriculum,
-  type ScoreCurriculumProps,
-} from "./ScoreCurriculum";
+export { ScoreCurriculum, type ScoreCurriculumProps } from "./ScoreCurriculum";
 
 // Pitch Feedback
-export {
-  PitchFeedback,
-  type PitchFeedbackProps,
-} from "./PitchFeedback";
+export { PitchFeedback, type PitchFeedbackProps } from "./PitchFeedback";
 
 // Re-export correction types from types/ for backward compatibility
 export {

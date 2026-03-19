@@ -7,7 +7,11 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { usePitchDetection } from "../../../hooks/usePitchDetection";
-import type { CurrentNoteTarget, PitchMatchState, NotePerformance } from "../types/practiceTypes";
+import type {
+  CurrentNoteTarget,
+  PitchMatchState,
+  NotePerformance,
+} from "../types/practiceTypes";
 import {
   midiToFrequency,
   calculateCents,
@@ -83,7 +87,7 @@ export function usePracticePitchDetection({
 
   // Performance tracking
   const [performances, setPerformances] = useState<NotePerformance[]>([]);
-  
+
   // Refs for tracking the current note's best match
   const currentNoteRef = useRef<{
     targetMidi: number;
@@ -98,16 +102,22 @@ export function usePracticePitchDetection({
   } | null>(null);
 
   // Frequency range for the current target note (±2 octaves for tolerance)
-  const frequencyRange = targetNote && !targetNote.isRest
-    ? {
-        min: midiToFrequency(targetNote.midiNote - 24),
-        max: midiToFrequency(targetNote.midiNote + 24),
-      }
-    : null;
+  const frequencyRange =
+    targetNote && !targetNote.isRest
+      ? {
+          min: midiToFrequency(targetNote.midiNote - 24),
+          max: midiToFrequency(targetNote.midiNote + 24),
+        }
+      : null;
 
   // Handle pitch detection callback
   const handlePitchDetected = useCallback(
-    (noteInfo: { noteName: string; midiNote: number; frequency: number; cents: number }) => {
+    (noteInfo: {
+      noteName: string;
+      midiNote: number;
+      frequency: number;
+      cents: number;
+    }) => {
       if (!targetNote || targetNote.isRest) {
         setPitchState((prev) => ({
           ...prev,
@@ -123,7 +133,7 @@ export function usePracticePitchDetection({
       // Calculate cents deviation from target
       const targetFreq = midiToFrequency(targetNote.midiNote);
       const cents = calculateCents(noteInfo.frequency, targetFreq);
-      
+
       // Check if this is a match
       const isMatch = isPitchMatch(
         noteInfo.midiNote,
@@ -169,7 +179,13 @@ export function usePracticePitchDetection({
         }
       }
     },
-    [targetNote, currentMeasure, currentBeat, centsTolerance, allowOctaveEquivalent],
+    [
+      targetNote,
+      currentMeasure,
+      currentBeat,
+      centsTolerance,
+      allowOctaveEquivalent,
+    ],
   );
 
   // Handle volume changes
@@ -223,7 +239,9 @@ export function usePracticePitchDetection({
       const performance: NotePerformance = {
         targetMidiNote: prevRef.targetMidi,
         playedMidiNote: prevRef.bestMatch.playedMidi,
-        centsDeviation: prevRef.bestMatch.playedMidi ? prevRef.bestMatch.cents : null,
+        centsDeviation: prevRef.bestMatch.playedMidi
+          ? prevRef.bestMatch.cents
+          : null,
         wasCorrect: prevRef.bestMatch.wasCorrect,
         noteIndex: 0, // Could be enhanced to track position
         measureNumber: prevRef.measureNumber,
@@ -231,7 +249,7 @@ export function usePracticePitchDetection({
         expectedTime: Date.now() - 1000, // Approximate
         detectedTime: prevRef.bestMatch.detectedTime,
       };
-      
+
       setPerformances((prev) => [...prev, performance]);
       onNotePerformance?.(performance);
     }

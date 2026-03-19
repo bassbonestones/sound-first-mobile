@@ -254,7 +254,12 @@ export function useImportMusic(): UseImportMusicReturn {
             error: null,
           });
         } else {
-          devError("[useImportMusic] Import failed:", result.error?.code, result.error?.message, result.error);
+          devError(
+            "[useImportMusic] Import failed:",
+            result.error?.code,
+            result.error?.message,
+            result.error,
+          );
           updateState({
             result,
             error: result.error,

@@ -27,10 +27,10 @@ export interface UsePracticeNotesReturn {
     measureNumber: number,
     beatNumber: number,
   ) => CurrentNoteTarget | null;
-  
+
   /** Get all notes in a measure */
   getNotesInMeasure: (measureNumber: number) => CurrentNoteTarget[];
-  
+
   /** Total note count in the score */
   totalNotes: number;
 }
@@ -45,15 +45,24 @@ export interface UsePracticeNotesReturn {
  */
 function getDurationInBeats(durationType: string): number {
   switch (durationType) {
-    case "whole": return 4;
-    case "half": return 2;
-    case "quarter": return 1;
-    case "eighth": return 0.5;
-    case "16th": return 0.25;
-    case "32nd": return 0.125;
-    case "64th": return 0.0625;
-    case "128th": return 0.03125;
-    default: return 1;
+    case "whole":
+      return 4;
+    case "half":
+      return 2;
+    case "quarter":
+      return 1;
+    case "eighth":
+      return 0.5;
+    case "16th":
+      return 0.25;
+    case "32nd":
+      return 0.125;
+    case "64th":
+      return 0.0625;
+    case "128th":
+      return 0.03125;
+    default:
+      return 1;
   }
 }
 
@@ -67,13 +76,19 @@ function pitchToMidi(pitch: {
   alter?: number;
 }): number {
   const noteMap: Record<string, number> = {
-    C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11,
+    C: 0,
+    D: 2,
+    E: 4,
+    F: 5,
+    G: 7,
+    A: 9,
+    B: 11,
   };
-  
+
   const baseNote = noteMap[pitch.step.toUpperCase()] ?? 0;
   const alter = pitch.alter ?? 0;
   const octave = pitch.octave;
-  
+
   return (octave + 1) * 12 + baseNote + alter;
 }
 
@@ -87,7 +102,7 @@ function noteEventToTarget(
 ): CurrentNoteTarget | null {
   const durationBeats = getDurationInBeats(note.durationType);
   const isRest = note.type === "rest";
-  
+
   // Handle rests
   if (isRest || !note.pitch) {
     return {
@@ -100,9 +115,9 @@ function noteEventToTarget(
       isRest: true,
     };
   }
-  
+
   const midiNote = pitchToMidi(note.pitch);
-  
+
   return {
     midiNote,
     noteName: midiToNoteName(midiNote),
@@ -128,21 +143,21 @@ export function usePracticeNotes({
   // Build a map of measure -> notes for efficient lookup
   const notesByMeasure = useMemo(() => {
     const map = new Map<number, CurrentNoteTarget[]>();
-    
+
     if (!score || score.parts.length === 0) {
       return map;
     }
-    
+
     const part = score.parts[partIndex];
     if (!part?.measures) return map;
-    
+
     for (const measure of part.measures) {
       const targets: CurrentNoteTarget[] = [];
-      
+
       // Calculate beat positions from sequential events
       // Beat position starts at 1 (music notation convention)
       let currentBeat = 1;
-      
+
       // Use 'events' not 'notes' - matches ImportedMeasure interface
       for (const note of measure.events ?? []) {
         const target = noteEventToTarget(note, measure.number, currentBeat);
@@ -152,13 +167,13 @@ export function usePracticeNotes({
           currentBeat += target.durationBeats;
         }
       }
-      
+
       // Sort by beat position (should already be in order, but ensure it)
       targets.sort((a, b) => a.beatPosition - b.beatPosition);
-      
+
       map.set(measure.number, targets);
     }
-    
+
     return map;
   }, [score, partIndex]);
 
@@ -178,19 +193,19 @@ export function usePracticeNotes({
       if (!notes || notes.length === 0) {
         return null;
       }
-      
+
       // Find the note that covers this beat position
       // beatNumber is 1-indexed, but our note positions may vary
       for (const note of notes) {
         const noteStart = note.beatPosition;
         const noteEnd = noteStart + note.durationBeats;
-        
+
         // Check if this beat falls within this note's duration
         if (beatNumber >= noteStart && beatNumber < noteEnd) {
           return note;
         }
       }
-      
+
       // If no note found at exact position, return the closest note
       // that starts before or at this beat
       for (let i = notes.length - 1; i >= 0; i--) {
@@ -198,7 +213,7 @@ export function usePracticeNotes({
           return notes[i];
         }
       }
-      
+
       return notes[0] ?? null;
     },
     [notesByMeasure],

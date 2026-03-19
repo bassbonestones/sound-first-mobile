@@ -6,11 +6,7 @@
  */
 
 import React, { useMemo } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-} from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../constants";
@@ -77,12 +73,16 @@ interface PitchMeterProps {
   isSounding: boolean;
 }
 
-function PitchMeter({ cents, isMatching, isSounding }: PitchMeterProps): React.ReactElement {
+function PitchMeter({
+  cents,
+  isMatching,
+  isSounding,
+}: PitchMeterProps): React.ReactElement {
   // Clamp cents to -50 to +50 range for display
   const clampedCents = Math.max(-50, Math.min(50, cents));
   // Convert to percentage (-50 to +50 -> 0% to 100%)
   const percent = ((clampedCents + 50) / 100) * 100;
-  
+
   const indicatorColor = !isSounding
     ? colors.textSecondary
     : isMatching
@@ -95,15 +95,15 @@ function PitchMeter({ cents, isMatching, isSounding }: PitchMeterProps): React.R
     <View style={styles.meterContainer}>
       {/* Flat/Sharp labels */}
       <Text style={styles.meterLabel}>♭</Text>
-      
+
       {/* Meter track */}
       <View style={styles.meterTrack}>
         {/* Center marker */}
         <View style={styles.meterCenter} />
-        
+
         {/* Tolerance zone */}
         <View style={styles.meterTolerance} />
-        
+
         {/* Indicator needle */}
         {isSounding && (
           <View
@@ -114,7 +114,7 @@ function PitchMeter({ cents, isMatching, isSounding }: PitchMeterProps): React.R
           />
         )}
       </View>
-      
+
       <Text style={styles.meterLabel}>♯</Text>
     </View>
   );
@@ -125,7 +125,10 @@ interface VolumeIndicatorProps {
   isSounding: boolean;
 }
 
-function VolumeIndicator({ volume, isSounding }: VolumeIndicatorProps): React.ReactElement {
+function VolumeIndicator({
+  volume,
+  isSounding,
+}: VolumeIndicatorProps): React.ReactElement {
   // Clamp and scale volume
   const displayVolume = Math.min(1, Math.max(0, volume));
   const bars = 5;
@@ -171,12 +174,18 @@ export function PitchFeedback({
     isSounding,
   } = pitchState;
 
-  const statusColor = useMemo(() => getPitchStatusColor(pitchState), [pitchState]);
+  const statusColor = useMemo(
+    () => getPitchStatusColor(pitchState),
+    [pitchState],
+  );
 
   // Not active state
   if (!isActive) {
     return (
-      <View style={[styles.container, compact && styles.containerCompact]} testID={testID}>
+      <View
+        style={[styles.container, compact && styles.containerCompact]}
+        testID={testID}
+      >
         <View style={styles.inactiveState}>
           <Feather name="mic-off" size={20} color={colors.textSecondary} />
           <Text style={styles.inactiveText}>Pitch detection off</Text>
@@ -188,7 +197,10 @@ export function PitchFeedback({
   // Rest state (no target note expected)
   if (targetNote?.isRest) {
     return (
-      <View style={[styles.container, compact && styles.containerCompact]} testID={testID}>
+      <View
+        style={[styles.container, compact && styles.containerCompact]}
+        testID={testID}
+      >
         <View style={styles.restState}>
           <Feather name="pause" size={20} color={colors.textSecondary} />
           <Text style={styles.restText}>Rest</Text>
@@ -256,13 +268,12 @@ export function PitchFeedback({
       <View style={styles.topRow}>
         <VolumeIndicator volume={volume} isSounding={isSounding} />
         <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: statusColor + "20" },
-          ]}
+          style={[styles.statusBadge, { backgroundColor: statusColor + "20" }]}
         >
           <Feather
-            name={isMatching ? "check-circle" : isSounding ? "alert-circle" : "mic"}
+            name={
+              isMatching ? "check-circle" : isSounding ? "alert-circle" : "mic"
+            }
             size={14}
             color={statusColor}
           />
@@ -280,9 +291,7 @@ export function PitchFeedback({
       <View style={styles.notesRow}>
         <View style={styles.noteBox}>
           <Text style={styles.noteLabel}>Target</Text>
-          <Text style={styles.targetNote}>
-            {targetNote?.noteName ?? "—"}
-          </Text>
+          <Text style={styles.targetNote}>{targetNote?.noteName ?? "—"}</Text>
         </View>
         <View style={styles.arrowContainer}>
           <Feather
@@ -308,9 +317,7 @@ export function PitchFeedback({
 
       {/* Cents deviation text */}
       {isSounding && (
-        <Text style={styles.centsText}>
-          {formatCents(centsDeviation)}
-        </Text>
+        <Text style={styles.centsText}>{formatCents(centsDeviation)}</Text>
       )}
     </View>
   );

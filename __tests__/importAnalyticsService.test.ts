@@ -284,7 +284,11 @@ describe("importAnalyticsService", () => {
     it("should count sessions correctly", () => {
       const events = [
         { type: "import_started" as const, sessionId: "s1", timestamp: 1 },
-        { type: "import_source_selected" as const, sessionId: "s1", timestamp: 2 },
+        {
+          type: "import_source_selected" as const,
+          sessionId: "s1",
+          timestamp: 2,
+        },
         { type: "import_started" as const, sessionId: "s2", timestamp: 3 },
       ];
 
@@ -299,7 +303,11 @@ describe("importAnalyticsService", () => {
         { type: "import_started" as const, sessionId: "s1", timestamp: 1 },
         { type: "upload_completed" as const, sessionId: "s1", timestamp: 2 },
         { type: "omr_job_completed" as const, sessionId: "s1", timestamp: 3 },
-        { type: "musicxml_parse_completed" as const, sessionId: "s1", timestamp: 4 },
+        {
+          type: "musicxml_parse_completed" as const,
+          sessionId: "s1",
+          timestamp: 4,
+        },
         { type: "score_saved" as const, sessionId: "s1", timestamp: 5 },
       ];
 
@@ -314,7 +322,11 @@ describe("importAnalyticsService", () => {
     it("should count practice started as completion", () => {
       const events = [
         { type: "import_started" as const, sessionId: "s1", timestamp: 1 },
-        { type: "score_practice_started" as const, sessionId: "s1", timestamp: 2 },
+        {
+          type: "score_practice_started" as const,
+          sessionId: "s1",
+          timestamp: 2,
+        },
       ];
 
       const metrics = calculateFunnelMetrics(events);

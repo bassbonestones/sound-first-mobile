@@ -6,7 +6,12 @@
 
 import { renderHook } from "@testing-library/react-native";
 import { usePracticeNotes } from "../src/features/importMusic/hooks/usePracticeNotes";
-import type { ImportedScore, ImportedNoteEvent, ImportedMeasure, ImportedPart } from "../src/types/import";
+import type {
+  ImportedScore,
+  ImportedNoteEvent,
+  ImportedMeasure,
+  ImportedPart,
+} from "../src/types/import";
 
 // Helper to create a note event matching the actual interface
 const createNoteEvent = (
@@ -48,7 +53,9 @@ const createRestEvent = (
   tiedFromPrevious: false,
 });
 
-const createMockScore = (overrides: Partial<ImportedScore> = {}): ImportedScore => ({
+const createMockScore = (
+  overrides: Partial<ImportedScore> = {},
+): ImportedScore => ({
   id: "test-score-1",
   sourceInfo: {
     sourceType: "musicxml",
@@ -143,7 +150,7 @@ describe("usePracticeNotes", () => {
 
       const note1 = result.current.getNoteAtPosition(2, 1);
       const note2 = result.current.getNoteAtPosition(2, 2);
-      
+
       expect(note1?.noteName).toBe("F4");
       expect(note1?.durationBeats).toBe(2);
       // Beat 2 should still be the same note
@@ -160,9 +167,7 @@ describe("usePracticeNotes", () => {
     });
 
     it("returns null when score is null", () => {
-      const { result } = renderHook(() =>
-        usePracticeNotes({ score: null }),
-      );
+      const { result } = renderHook(() => usePracticeNotes({ score: null }));
 
       const note = result.current.getNoteAtPosition(1, 1);
       expect(note).toBeNull();
@@ -216,7 +221,15 @@ describe("usePracticeNotes", () => {
 
     it("returns 0 for empty score", () => {
       const emptyScore = createMockScore({
-        parts: [{ id: "P1", name: "Piano", abbreviation: null, instrument: null, measures: [] }],
+        parts: [
+          {
+            id: "P1",
+            name: "Piano",
+            abbreviation: null,
+            instrument: null,
+            measures: [],
+          },
+        ],
       });
       const { result } = renderHook(() =>
         usePracticeNotes({ score: emptyScore }),
@@ -226,9 +239,7 @@ describe("usePracticeNotes", () => {
     });
 
     it("returns 0 for null score", () => {
-      const { result } = renderHook(() =>
-        usePracticeNotes({ score: null }),
-      );
+      const { result } = renderHook(() => usePracticeNotes({ score: null }));
 
       expect(result.current.totalNotes).toBe(0);
     });

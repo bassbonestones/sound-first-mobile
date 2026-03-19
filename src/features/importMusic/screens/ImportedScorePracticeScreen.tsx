@@ -10,7 +10,13 @@
  * - rawMusicXml: MusicXML content for rendering
  */
 
-import React, { useCallback, useState, useRef, useEffect, useMemo } from "react";
+import React, {
+  useCallback,
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+} from "react";
 import {
   View,
   Text,
@@ -31,7 +37,11 @@ import { Feather } from "@expo/vector-icons";
 import * as ScreenOrientation from "expo-screen-orientation";
 
 import { colors, spacing } from "../../../constants";
-import { ScorePreview, PitchFeedback, type ScorePreviewRef } from "../components";
+import {
+  ScorePreview,
+  PitchFeedback,
+  type ScorePreviewRef,
+} from "../components";
 import { useImportedScorePractice } from "../hooks/useImportedScorePractice";
 import { usePracticeNotes } from "../hooks/usePracticeNotes";
 import { usePracticePitchDetection } from "../hooks/usePracticePitchDetection";
@@ -331,7 +341,12 @@ export function ImportedScorePracticeScreen({
   const currentTargetNote = useMemo(() => {
     if (practiceState !== "playing") return null;
     return getNoteAtPosition(progress.currentMeasure, progress.currentBeat);
-  }, [practiceState, progress.currentMeasure, progress.currentBeat, getNoteAtPosition]);
+  }, [
+    practiceState,
+    progress.currentMeasure,
+    progress.currentBeat,
+    getNoteAtPosition,
+  ]);
 
   // Pitch detection hook
   const {
@@ -367,7 +382,12 @@ export function ImportedScorePracticeScreen({
       setPitchDetectionEnabled(true);
       await startListening();
     }
-  }, [pitchDetectionEnabled, pitchDetectionAvailable, startListening, stopListening]);
+  }, [
+    pitchDetectionEnabled,
+    pitchDetectionAvailable,
+    startListening,
+    stopListening,
+  ]);
 
   // Start/stop pitch detection with practice state
   useEffect(() => {
@@ -378,15 +398,20 @@ export function ImportedScorePracticeScreen({
     } else if (practiceState === "idle") {
       // Show results if we have performances
       if (performances.length > 0 && practiceStartTimeRef.current) {
-        const practiceTimeSeconds = (Date.now() - practiceStartTimeRef.current) / 1000;
-        const stats = calculateStats(performances, practiceTimeSeconds, config.tempo);
-        
+        const practiceTimeSeconds =
+          (Date.now() - practiceStartTimeRef.current) / 1000;
+        const stats = calculateStats(
+          performances,
+          practiceTimeSeconds,
+          config.tempo,
+        );
+
         if (stats.totalNotes > 0) {
-          const message = 
+          const message =
             `Accuracy: ${stats.accuracy.toFixed(1)}%\n` +
             `Correct: ${stats.correctNotes}/${stats.totalNotes} notes\n` +
             `Avg. deviation: ${stats.averageCentsDeviation.toFixed(1)}¢`;
-          
+
           if (Platform.OS === "web") {
             // Use window.alert on web since Alert.alert doesn't work
             window.alert(`Practice Complete\n\n${message}`);
@@ -398,7 +423,13 @@ export function ImportedScorePracticeScreen({
       }
       practiceStartTimeRef.current = null;
     }
-  }, [practiceState, pitchDetectionEnabled, performances, config.tempo, clearPerformances]);
+  }, [
+    practiceState,
+    pitchDetectionEnabled,
+    performances,
+    config.tempo,
+    clearPerformances,
+  ]);
 
   // Toggle cursor following
   const toggleCursor = useCallback(() => {
@@ -536,7 +567,9 @@ export function ImportedScorePracticeScreen({
           ]}
           accessibilityRole="button"
           accessibilityLabel={
-            pitchDetectionEnabled ? "Disable pitch detection" : "Enable pitch detection"
+            pitchDetectionEnabled
+              ? "Disable pitch detection"
+              : "Enable pitch detection"
           }
           // @ts-expect-error - title works on web for tooltip
           title="Pitch Detection"
@@ -544,7 +577,9 @@ export function ImportedScorePracticeScreen({
           <Feather
             name={pitchDetectionEnabled ? "mic" : "mic-off"}
             size={20}
-            color={pitchDetectionEnabled ? colors.primary : colors.textSecondary}
+            color={
+              pitchDetectionEnabled ? colors.primary : colors.textSecondary
+            }
           />
         </TouchableOpacity>
         <TouchableOpacity
@@ -590,7 +625,11 @@ export function ImportedScorePracticeScreen({
           <ScorePreview
             ref={scorePreviewRef}
             musicXml={rawMusicXml}
-            height={pitchDetectionEnabled ? scorePreviewHeight - 60 : scorePreviewHeight}
+            height={
+              pitchDetectionEnabled
+                ? scorePreviewHeight - 60
+                : scorePreviewHeight
+            }
             showZoomControls={false}
             enableCursor={cursorEnabled}
             fixedWidth={1200}
