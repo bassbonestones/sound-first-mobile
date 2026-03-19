@@ -159,7 +159,7 @@ function ScorePreviewInner(
     minZoom = 0.5,
     maxZoom = 3.0,
     showZoomControls = true,
-    enableCursor = false,
+    enableCursor = true,
     onCursorNext,
     fixedWidth = 0,
     autoScrollToCursor = false,

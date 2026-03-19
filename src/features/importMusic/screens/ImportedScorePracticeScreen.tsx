@@ -285,7 +285,7 @@ export function ImportedScorePracticeScreen({
   );
 
   // Cursor following state
-  const [cursorEnabled, setCursorEnabled] = useState(false);
+  const [cursorEnabled, setCursorEnabled] = useState(true);
   const scorePreviewRef = useRef<ScorePreviewRef>(null);
 
   // Beat tick callback - always advances cursor position (even when hidden)
