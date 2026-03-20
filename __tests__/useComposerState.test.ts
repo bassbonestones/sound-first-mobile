@@ -432,17 +432,19 @@ describe("useComposerState", () => {
         result.current.deleteNote();
       });
 
-      // Cursor should still be at position 1 (where D was, now a rest)
-      expect(result.current.cursor.noteIndex).toBe(1);
+      // After deleting D, all rests should merge into one whole rest
+      // So the measure now has just one note (a whole rest)
+      expect(result.current.score.measures[0].notes.length).toBe(1);
+      expect(result.current.score.measures[0].notes[0].midi).toBeNull();
+      expect(result.current.cursor.noteIndex).toBe(0);
 
-      // Insert E - should go at cursor position 1, not selection position 0
+      // Insert E - should replace the whole rest
       act(() => {
         result.current.insertNote("E");
       });
 
-      // Rest should still be at 0, E should be at 1
-      expect(result.current.score.measures[0].notes[0].midi).toBeNull(); // rest at 0
-      expect(result.current.score.measures[0].notes[1].midi).toBe(76); // E at 1
+      // E should be at position 0 now
+      expect(result.current.score.measures[0].notes[0].midi).toBe(76); // E at 0
     });
   });
 

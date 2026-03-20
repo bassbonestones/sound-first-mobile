@@ -1500,24 +1500,41 @@ export function useComposerState(
     // - Cursor stays at the deleted position (now a rest) so next insert fills that spot
     // - Selection is the replacement rest - this aligns cursor and selection
     //   so what user sees selected matches where insert will happen
-    const newCursor = currentPosition;
-    const newSelectedId = replacementRests[0]?.id || null;
 
     // Update cursorRef BEFORE setState to avoid race conditions
-    cursorRef.current = newCursor;
+    cursorRef.current = currentPosition;
 
     setState((prevState) => {
       const newMeasures = prevState.score.measures.map((m, i) => {
         if (i !== currentPosition.measureIndex) return m;
 
         // Replace the deleted note with rests
-        const newNotes = [
+        let newNotes = [
           ...m.notes.slice(0, currentPosition.noteIndex),
           ...replacementRests,
           ...m.notes.slice(currentPosition.noteIndex + 1),
         ];
+
+        // Merge adjacent rests for cleaner notation
+        newNotes = mergeAdjacentRests(newNotes, prevState.score.timeSignature);
+
         return { ...m, notes: newNotes };
       });
+
+      // Find the new cursor position (may have changed due to rest merging)
+      const newMeasure = newMeasures[currentPosition.measureIndex];
+      const newCursorIndex = Math.min(
+        currentPosition.noteIndex,
+        newMeasure.notes.length - 1,
+      );
+      const newCursor = {
+        measureIndex: currentPosition.measureIndex,
+        noteIndex: newCursorIndex,
+      };
+      const newSelectedId = newMeasure.notes[newCursorIndex]?.id || null;
+
+      // Update cursorRef again in case it changed
+      cursorRef.current = newCursor;
 
       return {
         ...prevState,
