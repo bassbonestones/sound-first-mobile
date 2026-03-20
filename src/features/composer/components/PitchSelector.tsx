@@ -104,9 +104,11 @@ function PitchSelectorComponent({
 }: PitchSelectorProps): React.ReactElement {
   const [scrollState, setScrollState] = useState({
     scrollX: 0,
-    contentWidth: 0,
     containerWidth: 0,
   });
+
+  // Calculate minimum content width: 8 buttons (rest + 7 pitches) * 44px + 7 gaps * 2px
+  const MIN_CONTENT_WIDTH = 8 * 44 + 7 * 2; // 366px
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -117,10 +119,6 @@ function PitchSelectorComponent({
     },
     [],
   );
-
-  const handleContentSizeChange = useCallback((width: number) => {
-    setScrollState((prev) => ({ ...prev, contentWidth: width }));
-  }, []);
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     setScrollState((prev) => ({
@@ -149,12 +147,14 @@ function PitchSelectorComponent({
   const restSymbol =
     REST_SYMBOLS[selectedDuration] || REST_SYMBOLS[DURATION.QUARTER];
 
-  // Calculate fade visibility
+  // Calculate fade visibility based on minimum content width
   const canScrollLeft = scrollState.scrollX > 2;
   const canScrollRight =
-    scrollState.contentWidth > scrollState.containerWidth &&
-    scrollState.scrollX <
-      scrollState.contentWidth - scrollState.containerWidth - 2;
+    MIN_CONTENT_WIDTH > scrollState.containerWidth &&
+    scrollState.scrollX < MIN_CONTENT_WIDTH - scrollState.containerWidth - 2;
+
+  // Check if there's extra space - buttons should stretch to fill
+  const hasExtraSpace = scrollState.containerWidth > MIN_CONTENT_WIDTH;
 
   return (
     <View style={styles.container} testID={testID}>
@@ -162,15 +162,21 @@ function PitchSelectorComponent({
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            hasExtraSpace && styles.scrollContentFlex,
+          ]}
           onScroll={handleScroll}
-          onContentSizeChange={handleContentSizeChange}
           onLayout={handleLayout}
           scrollEventThrottle={16}
         >
           {/* Rest button at the beginning */}
           <TouchableOpacity
-            style={[styles.button, disabled && styles.buttonDisabled]}
+            style={[
+              styles.button,
+              hasExtraSpace && styles.buttonFlex,
+              disabled && styles.buttonDisabled,
+            ]}
             onPress={handleRest}
             disabled={disabled}
             accessibilityRole={"button" as AccessibilityRole}
@@ -202,6 +208,7 @@ function PitchSelectorComponent({
                 key={pitch}
                 style={[
                   styles.button,
+                  hasExtraSpace && styles.buttonFlex,
                   isHighlighted && styles.buttonHighlighted,
                   disabled && styles.buttonDisabled,
                 ]}
@@ -274,6 +281,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 2,
   },
+  scrollContentFlex: {
+    flexGrow: 1,
+  },
   fadeLeft: {
     position: "absolute",
     left: 4,
@@ -300,6 +310,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     height: 44,
+  },
+  buttonFlex: {
+    flex: 1,
+    width: undefined,
   },
   restSymbol: {
     fontFamily: "Bravura",

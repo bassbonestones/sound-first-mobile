@@ -130,9 +130,11 @@ function ModifierRowComponent({
 }: ModifierRowProps): React.ReactElement {
   const [scrollState, setScrollState] = useState({
     scrollX: 0,
-    contentWidth: 0,
     containerWidth: 0,
   });
+
+  // Calculate minimum content width: 6 buttons * 44px + 5 gaps * 2px
+  const MIN_CONTENT_WIDTH = 6 * 44 + 5 * 2; // 274px
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -143,10 +145,6 @@ function ModifierRowComponent({
     },
     [],
   );
-
-  const handleContentSizeChange = useCallback((width: number) => {
-    setScrollState((prev) => ({ ...prev, contentWidth: width }));
-  }, []);
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     setScrollState((prev) => ({
@@ -192,12 +190,14 @@ function ModifierRowComponent({
     return false;
   };
 
-  // Calculate fade visibility
+  // Calculate fade visibility based on minimum content width
   const canScrollLeft = scrollState.scrollX > 2;
   const canScrollRight =
-    scrollState.contentWidth > scrollState.containerWidth &&
-    scrollState.scrollX <
-      scrollState.contentWidth - scrollState.containerWidth - 2;
+    MIN_CONTENT_WIDTH > scrollState.containerWidth &&
+    scrollState.scrollX < MIN_CONTENT_WIDTH - scrollState.containerWidth - 2;
+
+  // Check if there's extra space - buttons should stretch to fill
+  const hasExtraSpace = scrollState.containerWidth > MIN_CONTENT_WIDTH;
 
   return (
     <View style={styles.container} testID={testID}>
@@ -206,9 +206,11 @@ function ModifierRowComponent({
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            hasExtraSpace && styles.scrollContentFlex,
+          ]}
           onScroll={handleScroll}
-          onContentSizeChange={handleContentSizeChange}
           onLayout={handleLayout}
           scrollEventThrottle={16}
         >
@@ -221,6 +223,7 @@ function ModifierRowComponent({
                 key={button.id}
                 style={[
                   styles.button,
+                  hasExtraSpace && styles.buttonFlex,
                   isActive && styles.buttonActive,
                   buttonDisabled && styles.buttonDisabled,
                 ]}
@@ -352,6 +355,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 2,
   },
+  scrollContentFlex: {
+    flexGrow: 1,
+  },
   fadeLeft: {
     position: "absolute",
     left: 4,
@@ -380,6 +386,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     height: 44,
+  },
+  buttonFlex: {
+    flex: 1,
+    width: undefined,
   },
   buttonActive: {
     backgroundColor: colors.warningLight,
