@@ -125,26 +125,33 @@ function DurationSelectorComponent({
       <View style={styles.buttonRow}>
         {DURATION_OPTIONS.map((option) => {
           const isSelected = selectedDuration === option.value;
+          // Disable sixteenth note when dotted mode is active (since we don't support 32nd notes)
+          const isSixteenthDisabledByDot =
+            dottedMode && option.value === DURATION.SIXTEENTH;
+          const isButtonDisabled = disabled || isSixteenthDisabledByDot;
           return (
             <TouchableOpacity
               key={option.name}
               style={[
                 styles.button,
                 isSelected && styles.buttonSelected,
-                disabled && styles.buttonDisabled,
+                isButtonDisabled && styles.buttonDisabled,
               ]}
               onPress={() => handlePress(option.value)}
-              disabled={disabled}
+              disabled={isButtonDisabled}
               accessibilityRole={"button" as AccessibilityRole}
               accessibilityLabel={`${option.label} note`}
-              accessibilityState={{ selected: isSelected, disabled }}
+              accessibilityState={{
+                selected: isSelected,
+                disabled: isButtonDisabled,
+              }}
               testID={`duration-${option.name}`}
             >
               <Text
                 style={[
                   styles.symbol,
                   isSelected && styles.symbolSelected,
-                  disabled && styles.symbolDisabled,
+                  isButtonDisabled && styles.symbolDisabled,
                   { marginTop: option.topOffset },
                 ]}
               >
