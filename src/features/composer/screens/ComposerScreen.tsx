@@ -126,6 +126,12 @@ function ComposerScreenContent({
     targetClef: Clef;
   }>({ visible: false, targetClef: "treble" });
 
+  // Key change modal state
+  const [keyChangeModal, setKeyChangeModal] = useState<{
+    visible: boolean;
+    targetKey: KeySignature;
+  }>({ visible: false, targetKey: 0 });
+
   // Load existing score or check for autosave recovery
   useEffect(() => {
     const loadScore = async () => {
@@ -236,13 +242,67 @@ function ComposerScreenContent({
     [composerState],
   );
 
-  // Key signature change
+  // Key signature change - with transposition prompt if there are notes
   const handleKeySignatureChange = useCallback(
     (key: KeySignature) => {
-      composerState.setKeySignature(key);
+      const currentKey = composerState.score.keySignature;
+      if (key === currentKey) return;
+
+      // If no actual notes, just change key without prompting
+      if (!composerState.hasActualNotes()) {
+        composerState.setKeySignature(key);
+        return;
+      }
+
+      // Show custom modal for transposition options
+      setKeyChangeModal({ visible: true, targetKey: key });
     },
     [composerState],
   );
+
+  // Convert key signature to root note semitones (C=0, Db=1, D=2, etc.)
+  const keyToSemitones = useCallback((key: KeySignature): number => {
+    // Each step on circle of fifths = 7 semitones, handle negative modulo
+    return (((key * 7) % 12) + 12) % 12;
+  }, []);
+
+  // Calculate transpose intervals for key change
+  const getKeyTransposeIntervals = useCallback(
+    (
+      newKey: KeySignature,
+    ): { down: number; up: number } => {
+      const currentSemitones = keyToSemitones(composerState.score.keySignature);
+      const newSemitones = keyToSemitones(newKey);
+
+      // Calculate the interval (can be 0-11)
+      const rawInterval = ((newSemitones - currentSemitones) % 12 + 12) % 12;
+
+      // Down interval is negative, up interval is positive
+      // e.g., C to Bb: rawInterval = 10, so down = -2, up = +10
+      const down = rawInterval === 0 ? 0 : rawInterval - 12;
+      const up = rawInterval;
+
+      return { down, up };
+    },
+    [composerState.score.keySignature, keyToSemitones],
+  );
+
+  // Handle key transposition selection from modal
+  const handleKeyTranspose = useCallback(
+    (semitones: number) => {
+      composerState.setKeySignatureWithTransposition(
+        keyChangeModal.targetKey,
+        semitones,
+      );
+      setKeyChangeModal({ visible: false, targetKey: 0 });
+    },
+    [composerState, keyChangeModal.targetKey],
+  );
+
+  // Cancel key change modal
+  const handleKeyChangeCancel = useCallback(() => {
+    setKeyChangeModal({ visible: false, targetKey: 0 });
+  }, []);
 
   // Tempo change
   const handleTempoChange = useCallback(
@@ -612,6 +672,63 @@ function ComposerScreenContent({
               <TouchableOpacity
                 style={styles.modalCancel}
                 onPress={handleClefChangeCancel}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Modal>
+
+        {/* Key Change Transposition Modal */}
+        <Modal
+          visible={keyChangeModal.visible}
+          transparent
+          animationType="fade"
+          onRequestClose={handleKeyChangeCancel}
+        >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={handleKeyChangeCancel}
+          >
+            <View
+              style={styles.modalContent}
+              onStartShouldSetResponder={() => true}
+            >
+              <Text style={styles.modalTitle}>Transpose Notes?</Text>
+              <Text style={styles.modalMessage}>
+                You have notes on the staff. How would you like to handle them
+                when changing key?
+              </Text>
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={() => handleKeyTranspose(0)}
+              >
+                <Text style={styles.modalOptionText}>Keep Pitch</Text>
+              </TouchableOpacity>
+              {(() => {
+                const { down, up } = getKeyTransposeIntervals(
+                  keyChangeModal.targetKey,
+                );
+                return (
+                  <>
+                    <TouchableOpacity
+                      style={styles.modalOption}
+                      onPress={() => handleKeyTranspose(up)}
+                    >
+                      <Text style={styles.modalOptionText}>Transpose Up</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.modalOption}
+                      onPress={() => handleKeyTranspose(down)}
+                    >
+                      <Text style={styles.modalOptionText}>Transpose Down</Text>
+                    </TouchableOpacity>
+                  </>
+                );
+              })()}
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={handleKeyChangeCancel}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>

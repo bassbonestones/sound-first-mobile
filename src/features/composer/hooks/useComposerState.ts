@@ -109,6 +109,11 @@ export interface UseComposerStateReturn {
   /** Check if score has any actual notes (not just rests) */
   hasActualNotes: () => boolean;
   setKeySignature: (key: KeySignature) => void;
+  /** Change key signature with transposition (in semitones) */
+  setKeySignatureWithTransposition: (
+    key: KeySignature,
+    transposeSemitones: number,
+  ) => void;
   setTimeSignature: (timeSig: TimeSignature) => void;
   setTempo: (tempo: number) => void;
   setTitle: (title: string) => void;
@@ -997,6 +1002,45 @@ export function useComposerState(
     [state.score.keySignature, undoManager, updateScore],
   );
 
+  // Change key signature with transposition
+  const setKeySignatureWithTransposition = useCallback(
+    (key: KeySignature, transposeSemitones: number) => {
+      const prevKey = state.score.keySignature;
+      if (key === prevKey && transposeSemitones === 0) return;
+
+      undoManager.pushAction({
+        type: "CHANGE_KEY_SIGNATURE",
+        previousKey: prevKey,
+        newKey: key,
+      });
+
+      setState((prev) => {
+        const newMeasures = prev.score.measures.map((measure) => ({
+          ...measure,
+          notes: measure.notes.map((note) => {
+            if (note.midi === null) return note; // Keep rests unchanged
+            const newMidi = note.midi + transposeSemitones;
+            // Clamp to valid MIDI range (0-127)
+            if (newMidi < 0 || newMidi > 127) return note;
+            return { ...note, midi: newMidi };
+          }),
+        }));
+
+        return {
+          ...prev,
+          score: {
+            ...prev.score,
+            keySignature: key,
+            measures: newMeasures,
+            updatedAt: new Date().toISOString(),
+          },
+          isDirty: true,
+        };
+      });
+    },
+    [state.score.keySignature, undoManager],
+  );
+
   const setTimeSignature = useCallback(
     (timeSig: TimeSignature) => {
       const prevTimeSig = state.score.timeSignature;
@@ -1138,6 +1182,7 @@ export function useComposerState(
     setClefWithTransposition,
     hasActualNotes,
     setKeySignature,
+    setKeySignatureWithTransposition,
     setTimeSignature,
     setTempo,
     setTitle,

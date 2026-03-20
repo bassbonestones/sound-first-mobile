@@ -343,6 +343,46 @@ describe("useComposerState", () => {
       expect(result.current.score.keySignature).toBe(2);
     });
 
+    it("should change key signature with transposition", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Insert a note first
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      const originalMidi = result.current.score.measures[0].notes[0].midi;
+
+      // Change key and transpose up by 7 semitones
+      act(() => {
+        result.current.setKeySignatureWithTransposition(1, 7);
+      });
+
+      expect(result.current.score.keySignature).toBe(1);
+      expect(result.current.score.measures[0].notes[0].midi).toBe(
+        originalMidi! + 7,
+      );
+    });
+
+    it("should keep pitch when transposing by 0 semitones", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Insert a note first
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      const originalMidi = result.current.score.measures[0].notes[0].midi;
+
+      // Change key without transposition
+      act(() => {
+        result.current.setKeySignatureWithTransposition(2, 0);
+      });
+
+      expect(result.current.score.keySignature).toBe(2);
+      expect(result.current.score.measures[0].notes[0].midi).toBe(originalMidi);
+    });
+
     it("should change time signature", () => {
       const { result } = renderHook(() => useComposerState());
 
