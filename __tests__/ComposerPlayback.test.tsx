@@ -5,8 +5,18 @@
  */
 
 import React from "react";
-import { render, fireEvent, act } from "@testing-library/react-native";
+import { render, fireEvent, act, waitFor } from "@testing-library/react-native";
 import { renderHook } from "@testing-library/react-native";
+
+// Mock composerSynth to avoid audio setup in tests
+jest.mock("../src/features/composer/services/composerSynth", () => ({
+  composerSynth: {
+    isReady: () => true,
+    init: jest.fn().mockResolvedValue(undefined),
+    resume: jest.fn().mockResolvedValue(undefined),
+    playNote: jest.fn(),
+  },
+}));
 
 import { useComposerPlayback } from "../src/features/composer/hooks/useComposerPlayback";
 import { ComposerTransport } from "../src/features/composer/components";
@@ -85,23 +95,23 @@ describe("useComposerPlayback", () => {
   });
 
   describe("Play/Pause/Stop", () => {
-    it("should transition to playing on play", () => {
+    it("should transition to playing on play", async () => {
       const score = createTestScore();
       const { result } = renderHook(() => useComposerPlayback(score));
 
-      act(() => {
-        result.current.actions.play();
+      await act(async () => {
+        await result.current.actions.play();
       });
 
       expect(result.current.playback.state).toBe("playing");
     });
 
-    it("should transition to paused on pause", () => {
+    it("should transition to paused on pause", async () => {
       const score = createTestScore();
       const { result } = renderHook(() => useComposerPlayback(score));
 
-      act(() => {
-        result.current.actions.play();
+      await act(async () => {
+        await result.current.actions.play();
       });
       act(() => {
         result.current.actions.pause();
@@ -110,12 +120,12 @@ describe("useComposerPlayback", () => {
       expect(result.current.playback.state).toBe("paused");
     });
 
-    it("should transition to stopped and reset position on stop", () => {
+    it("should transition to stopped and reset position on stop", async () => {
       const score = createTestScore();
       const { result } = renderHook(() => useComposerPlayback(score));
 
-      act(() => {
-        result.current.actions.play();
+      await act(async () => {
+        await result.current.actions.play();
       });
       act(() => {
         result.current.actions.stop();
@@ -126,12 +136,12 @@ describe("useComposerPlayback", () => {
       expect(result.current.playback.position.noteIndex).toBe(0);
     });
 
-    it("should stop at specific position", () => {
+    it("should stop at specific position", async () => {
       const score = createTestScore();
       const { result } = renderHook(() => useComposerPlayback(score));
 
-      act(() => {
-        result.current.actions.play();
+      await act(async () => {
+        await result.current.actions.play();
       });
       act(() => {
         result.current.actions.stopAt({
@@ -148,12 +158,12 @@ describe("useComposerPlayback", () => {
   });
 
   describe("Play From Cursor", () => {
-    it("should start from specified position", () => {
+    it("should start from specified position", async () => {
       const score = createTestScore();
       const { result } = renderHook(() => useComposerPlayback(score));
 
-      act(() => {
-        result.current.actions.playFromCursor(1, 2);
+      await act(async () => {
+        await result.current.actions.playFromCursor(1, 2);
       });
 
       expect(result.current.playback.state).toBe("playing");

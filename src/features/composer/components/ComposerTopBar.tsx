@@ -8,6 +8,7 @@ import React, { memo, useCallback, useState } from "react";
 import {
   View,
   TouchableOpacity,
+  Pressable,
   Text,
   TextInput,
   StyleSheet,
@@ -269,12 +270,14 @@ function ComposerTopBarComponent({
         animationType="fade"
         onRequestClose={() => setShowClefModal(false)}
       >
-        <TouchableOpacity
+        <Pressable
           style={styles.modalOverlay}
           onPress={() => setShowClefModal(false)}
-          activeOpacity={1}
         >
-          <View style={styles.modalContent}>
+          <View
+            style={styles.modalContent}
+            onStartShouldSetResponder={() => true}
+          >
             <Text style={styles.modalTitle}>Select Clef</Text>
             <TouchableOpacity
               style={[
@@ -300,7 +303,7 @@ function ComposerTopBarComponent({
               )}
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </Pressable>
       </Modal>
 
       {/* Time Signature Modal */}
@@ -310,12 +313,14 @@ function ComposerTopBarComponent({
         animationType="fade"
         onRequestClose={() => setShowTimeModal(false)}
       >
-        <TouchableOpacity
+        <Pressable
           style={styles.modalOverlay}
           onPress={() => setShowTimeModal(false)}
-          activeOpacity={1}
         >
-          <View style={styles.modalContent}>
+          <View
+            style={styles.modalContent}
+            onStartShouldSetResponder={() => true}
+          >
             <Text style={styles.modalTitle}>Select Time Signature</Text>
             <ScrollView style={styles.optionScroll}>
               {TIME_SIGNATURES.map((ts) => {
@@ -339,7 +344,7 @@ function ComposerTopBarComponent({
               })}
             </ScrollView>
           </View>
-        </TouchableOpacity>
+        </Pressable>
       </Modal>
 
       {/* Key Signature Modal */}
@@ -349,12 +354,14 @@ function ComposerTopBarComponent({
         animationType="fade"
         onRequestClose={() => setShowKeyModal(false)}
       >
-        <TouchableOpacity
+        <Pressable
           style={styles.modalOverlay}
           onPress={() => setShowKeyModal(false)}
-          activeOpacity={1}
         >
-          <View style={styles.modalContent}>
+          <View
+            style={styles.modalContent}
+            onStartShouldSetResponder={() => true}
+          >
             <Text style={styles.modalTitle}>Select Key</Text>
             <ScrollView style={styles.optionScroll}>
               {Array.from({ length: 15 }, (_, i) => i - 7).map((k) => {
@@ -376,7 +383,7 @@ function ComposerTopBarComponent({
               })}
             </ScrollView>
           </View>
-        </TouchableOpacity>
+        </Pressable>
       </Modal>
 
       {/* Tempo Modal */}
@@ -386,12 +393,14 @@ function ComposerTopBarComponent({
         animationType="fade"
         onRequestClose={() => setShowTempoModal(false)}
       >
-        <TouchableOpacity
+        <Pressable
           style={styles.modalOverlay}
           onPress={() => setShowTempoModal(false)}
-          activeOpacity={1}
         >
-          <View style={[styles.modalContent, styles.tempoModalContent]}>
+          <View
+            style={[styles.modalContent, styles.tempoModalContent]}
+            onStartShouldSetResponder={() => true}
+          >
             <Text style={styles.modalTitle}>Set Tempo (BPM)</Text>
             <TextInput
               style={styles.tempoInput}
@@ -421,7 +430,7 @@ function ComposerTopBarComponent({
               </TouchableOpacity>
             </View>
           </View>
-        </TouchableOpacity>
+        </Pressable>
       </Modal>
     </View>
   );
@@ -573,7 +582,7 @@ const styles = StyleSheet.create({
   tempoConfirmText: {
     fontSize: 14,
     fontWeight: "600",
-    color: colors.onPrimary,
+    color: colors.white,
   },
 });
 

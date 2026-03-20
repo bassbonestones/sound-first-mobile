@@ -5,7 +5,7 @@
  * Manages score data, cursor position, selection, and all editing operations.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   Accidental,
   Clef,
@@ -104,6 +104,10 @@ export interface UseComposerStateReturn {
 
   // Score Settings
   setClef: (clef: Clef) => void;
+  /** Change clef with optional transposition (in octaves, e.g., -1 = octave down) */
+  setClefWithTransposition: (clef: Clef, transposeOctaves: number) => void;
+  /** Check if score has any actual notes (not just rests) */
+  hasActualNotes: () => boolean;
   setKeySignature: (key: KeySignature) => void;
   setTimeSignature: (timeSig: TimeSignature) => void;
   setTempo: (tempo: number) => void;
@@ -135,6 +139,15 @@ export function useComposerState(
   );
 
   const undoManager = useComposerUndo(100);
+
+  // Ref to track cursor position for rapid consecutive inserts
+  // This is updated synchronously so multiple inserts in the same render cycle work correctly
+  const cursorRef = useRef(state.cursor);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    cursorRef.current = state.cursor;
+  }, [state.cursor]);
 
   // ==========================================================================
   // Derived State
@@ -192,22 +205,49 @@ export function useComposerState(
 
   const insertNote = useCallback(
     (pitchName: PitchName): boolean => {
-      const measure = state.score.measures[state.cursor.measureIndex];
-      if (!measure) return false;
+      // Use ref for cursor position to handle rapid consecutive inserts
+      const currentCursor = cursorRef.current;
 
-      // Check if note would overflow
-      if (
-        wouldOverflow(
-          measure,
-          state.selectedDuration,
-          state.score.timeSignature,
-        )
-      ) {
+      // Find the first measure with space for this note, starting from cursor
+      let targetMeasureIndex = currentCursor.measureIndex;
+      let targetNoteIndex = currentCursor.noteIndex;
+
+      while (targetMeasureIndex < state.score.measures.length) {
+        const measure = state.score.measures[targetMeasureIndex];
+        if (!measure) return false;
+
+        // If we moved to a new measure, start at position 0
+        if (targetMeasureIndex > currentCursor.measureIndex) {
+          targetNoteIndex = measure.notes.length; // Append at end
+        }
+
+        // Check if note fits in this measure
+        if (
+          !wouldOverflow(
+            measure,
+            state.selectedDuration,
+            state.score.timeSignature,
+          )
+        ) {
+          break; // Found a measure with space
+        }
+
+        // Move to next measure
+        targetMeasureIndex++;
+        targetNoteIndex = 0;
+      }
+
+      // No measure found with space
+      if (targetMeasureIndex >= state.score.measures.length) {
         return false;
       }
 
       // Get MIDI pitch - use smart octave based on previous note or staff center
-      const previousNote = getNoteBefore(state.cursor, state.score);
+      const targetCursor = {
+        measureIndex: targetMeasureIndex,
+        noteIndex: targetNoteIndex,
+      };
+      const previousNote = getNoteBefore(targetCursor, state.score);
       const referenceMidi =
         previousNote?.midi ?? STAFF_CENTER_MIDI[state.score.clef];
 
@@ -222,18 +262,25 @@ export function useComposerState(
       });
 
       // Record action for undo
-      const action = createInsertNoteAction(state.cursor, note);
+      const action = createInsertNoteAction(targetCursor, note);
       undoManager.pushAction(action);
+
+      // Update cursor ref immediately for consecutive inserts
+      const newCursor = {
+        measureIndex: targetMeasureIndex,
+        noteIndex: targetNoteIndex + 1,
+      };
+      cursorRef.current = newCursor;
 
       setState((prev) => {
         const newMeasures = prev.score.measures.map((m, i) =>
-          i === prev.cursor.measureIndex
+          i === targetMeasureIndex
             ? {
                 ...m,
                 notes: [
-                  ...m.notes.slice(0, prev.cursor.noteIndex),
+                  ...m.notes.slice(0, targetNoteIndex),
                   note,
-                  ...m.notes.slice(prev.cursor.noteIndex),
+                  ...m.notes.slice(targetNoteIndex),
                 ],
               }
             : m,
@@ -246,10 +293,7 @@ export function useComposerState(
             measures: newMeasures,
             updatedAt: new Date().toISOString(),
           },
-          cursor: {
-            measureIndex: prev.cursor.measureIndex,
-            noteIndex: prev.cursor.noteIndex + 1,
-          },
+          cursor: newCursor,
           selectedNoteId: note.id,
           isDirty: true,
         };
@@ -257,38 +301,71 @@ export function useComposerState(
 
       return true;
     },
-    [
-      state.score,
-      state.cursor,
-      state.selectedDuration,
-      state.selectedOctave,
-      undoManager,
-    ],
+    [state.score, state.selectedDuration, state.selectedOctave, undoManager],
   );
 
   const insertRest = useCallback((): boolean => {
-    const measure = state.score.measures[state.cursor.measureIndex];
-    if (!measure) return false;
+    // Use ref for cursor position to handle rapid consecutive inserts
+    const currentCursor = cursorRef.current;
 
-    if (
-      wouldOverflow(measure, state.selectedDuration, state.score.timeSignature)
-    ) {
+    // Find the first measure with space for this rest, starting from cursor
+    let targetMeasureIndex = currentCursor.measureIndex;
+    let targetNoteIndex = currentCursor.noteIndex;
+
+    while (targetMeasureIndex < state.score.measures.length) {
+      const measure = state.score.measures[targetMeasureIndex];
+      if (!measure) return false;
+
+      // If we moved to a new measure, append at end
+      if (targetMeasureIndex > currentCursor.measureIndex) {
+        targetNoteIndex = measure.notes.length;
+      }
+
+      // Check if rest fits in this measure
+      if (
+        !wouldOverflow(
+          measure,
+          state.selectedDuration,
+          state.score.timeSignature,
+        )
+      ) {
+        break; // Found a measure with space
+      }
+
+      // Move to next measure
+      targetMeasureIndex++;
+      targetNoteIndex = 0;
+    }
+
+    // No measure found with space
+    if (targetMeasureIndex >= state.score.measures.length) {
       return false;
     }
 
     const rest = createRest(state.selectedDuration);
-    const action = createInsertNoteAction(state.cursor, rest);
+    const targetCursor = {
+      measureIndex: targetMeasureIndex,
+      noteIndex: targetNoteIndex,
+    };
+    const action = createInsertNoteAction(targetCursor, rest);
     undoManager.pushAction(action);
+
+    // Update cursor ref immediately for consecutive inserts
+    const newCursor = {
+      measureIndex: targetMeasureIndex,
+      noteIndex: targetNoteIndex + 1,
+    };
+    cursorRef.current = newCursor;
 
     setState((prev) => {
       const newMeasures = prev.score.measures.map((m, i) =>
-        i === prev.cursor.measureIndex
+        i === targetMeasureIndex
           ? {
               ...m,
               notes: [
-                ...m.notes.slice(0, prev.cursor.noteIndex),
+                ...m.notes.slice(0, targetNoteIndex),
                 rest,
-                ...m.notes.slice(prev.cursor.noteIndex),
+                ...m.notes.slice(targetNoteIndex),
               ],
             }
           : m,
@@ -301,34 +378,96 @@ export function useComposerState(
           measures: newMeasures,
           updatedAt: new Date().toISOString(),
         },
-        cursor: {
-          measureIndex: prev.cursor.measureIndex,
-          noteIndex: prev.cursor.noteIndex + 1,
-        },
+        cursor: newCursor,
         selectedNoteId: rest.id,
         isDirty: true,
       };
     });
 
     return true;
-  }, [state.score, state.cursor, state.selectedDuration, undoManager]);
+  }, [state.score, state.selectedDuration, undoManager]);
 
   const deleteNote = useCallback((): boolean => {
-    const note = getNoteAtCursor(state.cursor, state.score);
-    if (!note) return false;
+    // Try to get note at cursor position
+    let note = getNoteAtCursor(state.cursor, state.score);
+    let deleteFromCursor = state.cursor;
 
-    const action = createDeleteNoteAction(state.cursor, note);
+    // If no note at cursor (cursor is at end), delete the note before cursor
+    if (!note) {
+      note = getNoteBefore(state.cursor, state.score);
+      if (!note) return false;
+
+      // Find the position of the note before
+      if (state.cursor.noteIndex > 0) {
+        deleteFromCursor = {
+          ...state.cursor,
+          noteIndex: state.cursor.noteIndex - 1,
+        };
+      } else if (state.cursor.measureIndex > 0) {
+        const prevMeasure = state.score.measures[state.cursor.measureIndex - 1];
+        deleteFromCursor = {
+          measureIndex: state.cursor.measureIndex - 1,
+          noteIndex: prevMeasure.notes.length - 1,
+        };
+      } else {
+        return false; // At absolute start, nothing to delete
+      }
+    }
+
+    const action = createDeleteNoteAction(deleteFromCursor, note);
     undoManager.pushAction(action);
 
     setState((prev) => {
       const newMeasures = prev.score.measures.map((m, i) =>
-        i === prev.cursor.measureIndex
+        i === deleteFromCursor.measureIndex
           ? {
               ...m,
               notes: m.notes.filter((n) => n.id !== note.id),
             }
           : m,
       );
+
+      // Calculate new cursor position (move to previous note position)
+      let newCursor = deleteFromCursor;
+      let newSelectedNoteId: string | null = null;
+
+      // After deletion, the cursor should stay at the same index,
+      // but we want to select the note that's now at the previous position
+      const newMeasure = newMeasures[deleteFromCursor.measureIndex];
+      const previousNoteIndex = deleteFromCursor.noteIndex - 1;
+
+      if (previousNoteIndex >= 0 && newMeasure.notes[previousNoteIndex]) {
+        // Select the note before the deleted one
+        newCursor = {
+          measureIndex: deleteFromCursor.measureIndex,
+          noteIndex: previousNoteIndex,
+        };
+        newSelectedNoteId = newMeasure.notes[previousNoteIndex].id;
+      } else if (deleteFromCursor.measureIndex > 0) {
+        // Move to last note of previous measure
+        const prevMeasure = newMeasures[deleteFromCursor.measureIndex - 1];
+        if (prevMeasure.notes.length > 0) {
+          newCursor = {
+            measureIndex: deleteFromCursor.measureIndex - 1,
+            noteIndex: prevMeasure.notes.length - 1,
+          };
+          newSelectedNoteId =
+            prevMeasure.notes[prevMeasure.notes.length - 1].id;
+        } else {
+          // Previous measure is empty, go to start of it
+          newCursor = {
+            measureIndex: deleteFromCursor.measureIndex - 1,
+            noteIndex: 0,
+          };
+        }
+      } else {
+        // At start of first measure, cursor stays at 0
+        newCursor = { measureIndex: 0, noteIndex: 0 };
+        // Select first note if exists
+        if (newMeasure.notes.length > 0) {
+          newSelectedNoteId = newMeasure.notes[0].id;
+        }
+      }
 
       return {
         ...prev,
@@ -337,7 +476,8 @@ export function useComposerState(
           measures: newMeasures,
           updatedAt: new Date().toISOString(),
         },
-        selectedNoteId: null,
+        cursor: newCursor,
+        selectedNoteId: newSelectedNoteId,
         isDirty: true,
       };
     });
@@ -483,9 +623,43 @@ export function useComposerState(
 
     const note =
       state.score.measures[position.measureIndex]?.notes[position.noteIndex];
-    if (!note) return;
+    if (!note || note.midi === null) return; // Can't tie rests
 
     const newTieStart = !note.tieStart;
+
+    // Find the next note with matching pitch
+    let nextNotePosition: { measureIndex: number; noteIndex: number } | null =
+      null;
+    let nextNote: Note | null = null;
+
+    // Check in same measure first
+    const currentMeasure = state.score.measures[position.measureIndex];
+    if (position.noteIndex + 1 < currentMeasure.notes.length) {
+      const candidate = currentMeasure.notes[position.noteIndex + 1];
+      if (candidate.midi === note.midi) {
+        nextNotePosition = {
+          measureIndex: position.measureIndex,
+          noteIndex: position.noteIndex + 1,
+        };
+        nextNote = candidate;
+      }
+    }
+
+    // Check next measure if not found
+    if (!nextNote && position.measureIndex + 1 < state.score.measures.length) {
+      const nextMeasure = state.score.measures[position.measureIndex + 1];
+      if (nextMeasure.notes.length > 0) {
+        const candidate = nextMeasure.notes[0];
+        if (candidate.midi === note.midi) {
+          nextNotePosition = {
+            measureIndex: position.measureIndex + 1,
+            noteIndex: 0,
+          };
+          nextNote = candidate;
+        }
+      }
+    }
+
     const action = createToggleTieAction(
       position,
       note.id,
@@ -497,16 +671,52 @@ export function useComposerState(
 
     updateScore((score) => ({
       ...score,
-      measures: score.measures.map((m, mi) =>
-        mi === position.measureIndex
-          ? {
+      measures: score.measures
+        .map((m, mi) => {
+          // Update the selected note's tieStart
+          if (mi === position.measureIndex) {
+            return {
               ...m,
               notes: m.notes.map((n) =>
                 n.id === note.id ? { ...n, tieStart: newTieStart } : n,
               ),
-            }
-          : m,
-      ),
+            };
+          }
+          // Update the next note's tieEnd (if in different measure)
+          if (
+            nextNote &&
+            nextNotePosition &&
+            mi === nextNotePosition.measureIndex &&
+            mi !== position.measureIndex
+          ) {
+            return {
+              ...m,
+              notes: m.notes.map((n) =>
+                n.id === nextNote!.id ? { ...n, tieEnd: newTieStart } : n,
+              ),
+            };
+          }
+          return m;
+        })
+        .map((m, mi) => {
+          // Handle case where next note is in the same measure
+          if (
+            nextNote &&
+            nextNotePosition &&
+            mi === position.measureIndex &&
+            nextNotePosition.measureIndex === position.measureIndex
+          ) {
+            return {
+              ...m,
+              notes: m.notes.map((n) => {
+                if (n.id === note.id) return { ...n, tieStart: newTieStart };
+                if (n.id === nextNote!.id) return { ...n, tieEnd: newTieStart };
+                return n;
+              }),
+            };
+          }
+          return m;
+        }),
     }));
   }, [state.selectedNoteId, state.score, undoManager, updateScore]);
 
@@ -635,10 +845,6 @@ export function useComposerState(
         ],
         updatedAt: new Date().toISOString(),
       },
-      cursor: {
-        measureIndex: insertIndex,
-        noteIndex: 0,
-      },
       isDirty: true,
     }));
   }, [state.cursor.measureIndex, undoManager]);
@@ -719,6 +925,58 @@ export function useComposerState(
         selectedOctave: DEFAULT_OCTAVE_MIDI[clef],
         isDirty: true,
       }));
+    },
+    [state.score.clef, undoManager],
+  );
+
+  // Check if score has any actual notes (not just rests)
+  const hasActualNotes = useCallback((): boolean => {
+    return state.score.measures.some((measure) =>
+      measure.notes.some((note) => note.midi !== null),
+    );
+  }, [state.score.measures]);
+
+  // Change clef with optional transposition
+  const setClefWithTransposition = useCallback(
+    (clef: Clef, transposeOctaves: number) => {
+      const prevClef = state.score.clef;
+      if (clef === prevClef && transposeOctaves === 0) return;
+
+      // Record the action for undo
+      // Note: For simplicity, we don't track the full transpose in undo
+      // A full implementation would need a complex action type
+      undoManager.pushAction({
+        type: "CHANGE_CLEF",
+        previousClef: prevClef,
+        newClef: clef,
+      });
+
+      setState((prev) => {
+        // Transpose all notes by the specified octaves
+        const semitoneShift = transposeOctaves * 12;
+        const newMeasures = prev.score.measures.map((measure) => ({
+          ...measure,
+          notes: measure.notes.map((note) => {
+            if (note.midi === null) return note; // Keep rests unchanged
+            const newMidi = note.midi + semitoneShift;
+            // Clamp to valid MIDI range (0-127)
+            if (newMidi < 0 || newMidi > 127) return note;
+            return { ...note, midi: newMidi };
+          }),
+        }));
+
+        return {
+          ...prev,
+          score: {
+            ...prev.score,
+            clef,
+            measures: newMeasures,
+            updatedAt: new Date().toISOString(),
+          },
+          selectedOctave: DEFAULT_OCTAVE_MIDI[clef],
+          isDirty: true,
+        };
+      });
     },
     [state.score.clef, undoManager],
   );
@@ -877,6 +1135,8 @@ export function useComposerState(
 
     // Score Settings
     setClef,
+    setClefWithTransposition,
+    hasActualNotes,
     setKeySignature,
     setTimeSignature,
     setTempo,

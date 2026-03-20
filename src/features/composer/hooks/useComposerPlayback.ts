@@ -9,6 +9,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 
 import type { ComposerScore, Note } from "../types";
 import { getBeatsPerMeasure } from "../types";
+import { composerSynth } from "../services/composerSynth";
 
 // =============================================================================
 // Types
@@ -104,6 +105,7 @@ export function useComposerPlayback(
     startMeasure: number;
     endMeasure: number;
   } | null>(null);
+  const lastPlayedPositionRef = useRef<string | null>(null);
 
   // Sync tempo from score
   useEffect(() => {
@@ -189,6 +191,16 @@ export function useComposerPlayback(
       // Initialize timing on first tick
       if (lastTickRef.current === 0) {
         lastTickRef.current = timestamp;
+
+        // Play the first note immediately
+        const firstNote = getNoteAtPosition(position);
+        if (firstNote) {
+          const secondsPerBeat = getSecondsPerBeat(tempo);
+          const noteDuration = firstNote.duration * secondsPerBeat;
+          composerSynth.playNote(firstNote.midi, noteDuration * 1000);
+          lastPlayedPositionRef.current = `${position.measureIndex}-${position.noteIndex}`;
+        }
+
         animationFrameRef.current = requestAnimationFrame(tick);
         return;
       }
@@ -204,6 +216,7 @@ export function useComposerPlayback(
         // End of score
         setState("stopped");
         setCurrentEvent(null);
+        lastPlayedPositionRef.current = null;
         return;
       }
 
@@ -227,12 +240,21 @@ export function useComposerPlayback(
 
         if (nextPos) {
           setPosition(nextPos);
+
+          // Play the next note
+          const nextNote = getNoteAtPosition(nextPos);
+          if (nextNote) {
+            const nextDuration = nextNote.duration * secondsPerBeat;
+            composerSynth.playNote(nextNote.midi, nextDuration * 1000);
+            lastPlayedPositionRef.current = `${nextPos.measureIndex}-${nextPos.noteIndex}`;
+          }
         } else {
           // End of playback
           setState("stopped");
           setPosition(INITIAL_POSITION);
           setCurrentEvent(null);
           playRangeRef.current = null;
+          lastPlayedPositionRef.current = null;
           return;
         }
       }
@@ -267,8 +289,15 @@ export function useComposerPlayback(
   }, [state, tick]);
 
   // Actions
-  const play = useCallback(() => {
+  const play = useCallback(async () => {
+    // Initialize synth if needed
+    if (!composerSynth.isReady()) {
+      await composerSynth.init();
+    }
+    await composerSynth.resume();
+
     playRangeRef.current = null;
+    lastPlayedPositionRef.current = null;
     setState("playing");
   }, []);
 
@@ -282,6 +311,7 @@ export function useComposerPlayback(
     setCurrentEvent(null);
     playRangeRef.current = null;
     accumulatedTimeRef.current = 0;
+    lastPlayedPositionRef.current = null;
   }, []);
 
   const stopAt = useCallback((pos: PlaybackPosition) => {
@@ -290,10 +320,17 @@ export function useComposerPlayback(
     setCurrentEvent(null);
     playRangeRef.current = null;
     accumulatedTimeRef.current = 0;
+    lastPlayedPositionRef.current = null;
   }, []);
 
   const playFromCursor = useCallback(
-    (cursorMeasure: number, cursorNote: number) => {
+    async (cursorMeasure: number, cursorNote: number) => {
+      // Initialize synth if needed
+      if (!composerSynth.isReady()) {
+        await composerSynth.init();
+      }
+      await composerSynth.resume();
+
       setPosition({
         measureIndex: cursorMeasure,
         beat: 0,
@@ -301,12 +338,19 @@ export function useComposerPlayback(
       });
       playRangeRef.current = null;
       accumulatedTimeRef.current = 0;
+      lastPlayedPositionRef.current = null;
       setState("playing");
     },
     [],
   );
 
-  const playMeasure = useCallback((measureIndex: number) => {
+  const playMeasure = useCallback(async (measureIndex: number) => {
+    // Initialize synth if needed
+    if (!composerSynth.isReady()) {
+      await composerSynth.init();
+    }
+    await composerSynth.resume();
+
     setPosition({
       measureIndex,
       beat: 0,
@@ -317,6 +361,7 @@ export function useComposerPlayback(
       endMeasure: measureIndex,
     };
     accumulatedTimeRef.current = 0;
+    lastPlayedPositionRef.current = null;
     setState("playing");
   }, []);
 

@@ -147,7 +147,7 @@ function ComposerTransportComponent({
           <Feather
             name={isPlaying ? "pause" : "play"}
             size={28}
-            color={disabled ? colors.textSecondary : colors.onPrimary}
+            color={disabled ? colors.textSecondary : colors.white}
           />
         </TouchableOpacity>
 

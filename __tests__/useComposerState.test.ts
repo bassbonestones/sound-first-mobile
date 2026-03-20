@@ -268,7 +268,8 @@ describe("useComposerState", () => {
       });
 
       expect(result.current.score.measures).toHaveLength(2);
-      expect(result.current.cursor.measureIndex).toBe(1);
+      // Cursor should stay where it was (not move to new measure)
+      expect(result.current.cursor.measureIndex).toBe(0);
     });
 
     it("should delete current measure", () => {

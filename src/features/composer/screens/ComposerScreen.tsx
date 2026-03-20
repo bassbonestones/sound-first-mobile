@@ -5,7 +5,13 @@
  * Assembles all composer components into a complete editing experience.
  */
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  useMemo,
+} from "react";
 import {
   View,
   StyleSheet,
@@ -16,6 +22,9 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Text,
+  ScrollView,
+  Modal,
+  Pressable,
 } from "react-native";
 import {
   useNavigation,
@@ -32,7 +41,6 @@ import {
   EntryPalette,
   NavigationControls,
   MeasureControls,
-  ComposerTransport,
 } from "../components";
 import {
   composerStorageService,
@@ -112,6 +120,12 @@ function ComposerScreenContent({
   // Autosave handler
   const autosaveRef = useRef(createAutosaveHandler(30000));
 
+  // Clef change modal state (needed for web where Alert.alert doesn't work)
+  const [clefChangeModal, setClefChangeModal] = useState<{
+    visible: boolean;
+    targetClef: Clef;
+  }>({ visible: false, targetClef: "treble" });
+
   // Load existing score or check for autosave recovery
   useEffect(() => {
     const loadScore = async () => {
@@ -179,13 +193,40 @@ function ComposerScreenContent({
     [composerState],
   );
 
-  // Clef change
+  // Clef change - with transposition prompt if there are notes
   const handleClefChange = useCallback(
-    (clef: Clef) => {
-      composerState.setClef(clef);
+    (newClef: Clef) => {
+      const currentClef = composerState.score.clef;
+      if (newClef === currentClef) return;
+
+      // If no actual notes, just change clef without prompting
+      if (!composerState.hasActualNotes()) {
+        composerState.setClef(newClef);
+        return;
+      }
+
+      // Show custom modal for transposition options (works on web + native)
+      setClefChangeModal({ visible: true, targetClef: newClef });
     },
     [composerState],
   );
+
+  // Handle clef transposition selection from modal
+  const handleClefTranspose = useCallback(
+    (octaves: number) => {
+      composerState.setClefWithTransposition(
+        clefChangeModal.targetClef,
+        octaves,
+      );
+      setClefChangeModal({ visible: false, targetClef: "treble" });
+    },
+    [composerState, clefChangeModal.targetClef],
+  );
+
+  // Cancel clef change modal
+  const handleClefChangeCancel = useCallback(() => {
+    setClefChangeModal({ visible: false, targetClef: "treble" });
+  }, []);
 
   // Time signature change
   const handleTimeSignatureChange = useCallback(
@@ -271,17 +312,6 @@ function ComposerScreenContent({
   const handleStop = useCallback(() => {
     playbackActions.stop();
   }, [playbackActions]);
-
-  const handlePlayFromCursor = useCallback(() => {
-    playbackActions.playFromCursor(
-      composerState.cursor.measureIndex,
-      composerState.cursor.noteIndex,
-    );
-  }, [playbackActions, composerState.cursor]);
-
-  const handlePlayMeasure = useCallback(() => {
-    playbackActions.playMeasure(composerState.cursor.measureIndex);
-  }, [playbackActions, composerState.cursor.measureIndex]);
 
   // Save
   const handleSave = useCallback(async () => {
@@ -370,6 +400,26 @@ function ComposerScreenContent({
 
   const isPlaying = playback.state === "playing";
 
+  // Compute which note should be highlighted
+  // When playing: highlight the note at playback position
+  // When not playing: highlight the selected note
+  const highlightedNoteId = useMemo(() => {
+    if (isPlaying) {
+      const { measureIndex, noteIndex } = playback.position;
+      const measure = composerState.score.measures[measureIndex];
+      if (measure && measure.notes[noteIndex]) {
+        return measure.notes[noteIndex].id;
+      }
+      return null;
+    }
+    return composerState.state.selectedNoteId;
+  }, [
+    isPlaying,
+    playback.position,
+    composerState.score.measures,
+    composerState.state.selectedNoteId,
+  ]);
+
   // ==========================================================================
   // Render
   // ==========================================================================
@@ -405,96 +455,169 @@ function ComposerScreenContent({
           testID="composer-topbar"
         />
 
-        {/* Score Viewport */}
-        <View style={styles.viewportContainer}>
-          <ComposerScoreViewport
-            score={composerState.score}
-            cursor={composerState.cursor}
-            selectedNoteId={composerState.state.selectedNoteId}
-            onNoteTap={handleScoreTap}
-            testID="composer-viewport"
-          />
-        </View>
+        <ScrollView
+          style={styles.scrollContent}
+          contentContainerStyle={styles.scrollContentContainer}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Score Viewport with integrated playback controls */}
+          <View style={styles.viewportContainer}>
+            <ComposerScoreViewport
+              score={composerState.score}
+              cursor={composerState.cursor}
+              selectedNoteId={highlightedNoteId}
+              onNoteTap={handleScoreTap}
+              playbackState={playback.state}
+              playbackMeasureIndex={playback.position.measureIndex}
+              onPlay={handlePlay}
+              onPause={handlePause}
+              onStop={handleStop}
+              testID="composer-viewport"
+            />
+          </View>
 
-        {/* Entry Palette */}
-        <EntryPalette
-          selectedDuration={composerState.state.selectedDuration}
-          selectedNote={composerState.selectedNote}
-          onDurationSelect={composerState.setDuration}
-          onPitchTap={handlePitchEnter}
-          onOctaveChange={composerState.changeOctave}
-          onAccidental={composerState.applyAccidental}
-          onInsertRest={handleRestEnter}
-          onToggleTie={composerState.toggleTie}
-          disabled={isPlaying}
-          testID="composer-palette"
-        />
-
-        {/* Navigation Controls */}
-        <View style={styles.controlsRow}>
-          <NavigationControls
-            onLeft={handleLeft}
-            onRight={handleRight}
-            onUp={handleUp}
-            onDown={handleDown}
-            onDelete={handleDelete}
-            canGoLeft={canGoLeft}
-            canGoRight={canGoRight}
-            hasSelection={hasSelection}
+          {/* Entry Palette */}
+          <EntryPalette
+            selectedDuration={composerState.state.selectedDuration}
+            selectedNote={composerState.selectedNote}
+            onDurationSelect={composerState.setDuration}
+            onPitchTap={handlePitchEnter}
+            onOctaveChange={composerState.changeOctave}
+            onAccidental={composerState.applyAccidental}
+            onInsertRest={handleRestEnter}
+            onToggleTie={composerState.toggleTie}
             disabled={isPlaying}
-            testID="composer-nav"
+            testID="composer-palette"
           />
 
-          <MeasureControls
-            currentMeasure={composerState.cursor.measureIndex + 1}
-            totalMeasures={composerState.score.measures.length}
-            validation={measureValidation}
-            onAddMeasure={handleAddMeasure}
-            onDeleteMeasure={handleDeleteMeasure}
-            onFillWithRests={handleFillWithRests}
-            canDelete={canDeleteMeasure}
-            disabled={isPlaying}
-            testID="composer-measure"
-          />
-        </View>
+          {/* Navigation Controls */}
+          <View style={styles.controlsRow}>
+            <NavigationControls
+              onLeft={handleLeft}
+              onRight={handleRight}
+              onUp={handleUp}
+              onDown={handleDown}
+              onDelete={handleDelete}
+              canGoLeft={canGoLeft}
+              canGoRight={canGoRight}
+              hasSelection={hasSelection}
+              disabled={isPlaying}
+              testID="composer-nav"
+            />
 
-        {/* Transport */}
-        <ComposerTransport
-          state={playback.state}
-          position={playback.position}
-          tempo={playback.tempo}
-          totalMeasures={composerState.score.measures.length}
-          onPlay={handlePlay}
-          onPause={handlePause}
-          onStop={handleStop}
-          onPlayFromCursor={handlePlayFromCursor}
-          onPlayMeasure={handlePlayMeasure}
-          testID="composer-transport"
-        />
+            <MeasureControls
+              currentMeasure={composerState.cursor.measureIndex + 1}
+              totalMeasures={composerState.score.measures.length}
+              validation={measureValidation}
+              onAddMeasure={handleAddMeasure}
+              onDeleteMeasure={handleDeleteMeasure}
+              onFillWithRests={handleFillWithRests}
+              canDelete={canDeleteMeasure}
+              disabled={isPlaying}
+              testID="composer-measure"
+            />
+          </View>
 
-        {/* Action Buttons */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={styles.saveButton}
-            onPress={handleSave}
-            disabled={isPlaying}
-            accessibilityLabel="Save score"
-            accessibilityRole="button"
-            testID="composer-save-button"
+          {/* Action Buttons */}
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleSave}
+              disabled={isPlaying}
+              accessibilityLabel="Save score"
+              accessibilityRole="button"
+              testID="composer-save-button"
+            >
+              <Text style={styles.saveButtonText}>Save</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.practiceButton}
+              onPress={handlePractice}
+              disabled={isPlaying}
+              accessibilityLabel="Practice this score"
+              accessibilityRole="button"
+              testID="composer-practice-button"
+            >
+              <Text style={styles.practiceButtonText}>Practice</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+
+        {/* Clef Change Transposition Modal */}
+        <Modal
+          visible={clefChangeModal.visible}
+          transparent
+          animationType="fade"
+          onRequestClose={handleClefChangeCancel}
+        >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={handleClefChangeCancel}
           >
-            <Text style={styles.saveButtonText}>Save</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.practiceButton}
-            onPress={handlePractice}
-            disabled={isPlaying}
-            accessibilityLabel="Practice this score"
-            accessibilityRole="button"
-            testID="composer-practice-button"
-          >
-            <Text style={styles.practiceButtonText}>Practice</Text>
-          </TouchableOpacity>
-        </View>
+            <View
+              style={styles.modalContent}
+              onStartShouldSetResponder={() => true}
+            >
+              <Text style={styles.modalTitle}>Transpose Notes?</Text>
+              <Text style={styles.modalMessage}>
+                You have notes on the staff. How would you like to transpose
+                them when switching to{" "}
+                {clefChangeModal.targetClef === "bass" ? "bass" : "treble"}{" "}
+                clef?
+              </Text>
+              {clefChangeModal.targetClef === "bass" ? (
+                <>
+                  <TouchableOpacity
+                    style={styles.modalOption}
+                    onPress={() => handleClefTranspose(0)}
+                  >
+                    <Text style={styles.modalOptionText}>No Transpose</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalOption}
+                    onPress={() => handleClefTranspose(-1)}
+                  >
+                    <Text style={styles.modalOptionText}>Octave Down</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalOption}
+                    onPress={() => handleClefTranspose(-2)}
+                  >
+                    <Text style={styles.modalOptionText}>2 Octaves Down</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={styles.modalOption}
+                    onPress={() => handleClefTranspose(0)}
+                  >
+                    <Text style={styles.modalOptionText}>No Transpose</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalOption}
+                    onPress={() => handleClefTranspose(1)}
+                  >
+                    <Text style={styles.modalOptionText}>Octave Up</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalOption}
+                    onPress={() => handleClefTranspose(2)}
+                  >
+                    <Text style={styles.modalOptionText}>2 Octaves Up</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={handleClefChangeCancel}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -524,6 +647,12 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  scrollContent: {
+    flex: 1,
+  },
+  scrollContentContainer: {
+    flexGrow: 1,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -531,8 +660,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   viewportContainer: {
-    flex: 1,
-    minHeight: 200,
+    height: 200,
+    minHeight: 150,
   },
   controlsRow: {
     flexDirection: "row",
@@ -576,5 +705,51 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  // Clef change modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.lg,
+    width: "85%",
+    maxWidth: 320,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.text,
+    marginBottom: spacing.sm,
+    textAlign: "center",
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+    textAlign: "center",
+  },
+  modalOption: {
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalOptionText: {
+    fontSize: 16,
+    color: colors.primary,
+    textAlign: "center",
+  },
+  modalCancel: {
+    paddingVertical: spacing.md,
+    marginTop: spacing.sm,
+  },
+  modalCancelText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: "center",
   },
 });

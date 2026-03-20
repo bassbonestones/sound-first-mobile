@@ -70,6 +70,16 @@ export interface ComposerScoreViewportProps {
   minZoom?: number;
   /** Maximum zoom */
   maxZoom?: number;
+  /** Playback state: stopped, playing, paused */
+  playbackState?: "stopped" | "playing" | "paused";
+  /** Current playback measure index (for auto-scroll during playback) */
+  playbackMeasureIndex?: number;
+  /** Called when play is pressed */
+  onPlay?: () => void;
+  /** Called when pause is pressed */
+  onPause?: () => void;
+  /** Called when stop is pressed */
+  onStop?: () => void;
   /** Test ID for testing */
   testID?: string;
 }
@@ -94,6 +104,11 @@ function ComposerScoreViewportComponent({
   initialZoom = 1.0,
   minZoom = 0.5,
   maxZoom = 2.5,
+  playbackState = "stopped",
+  playbackMeasureIndex,
+  onPlay,
+  onPause,
+  onStop,
   testID,
 }: ComposerScoreViewportProps): React.ReactElement {
   const webViewRef = useRef<InstanceType<typeof WebView> | null>(null);
@@ -141,12 +156,23 @@ function ComposerScoreViewportComponent({
     }
   }, [isReady, musicXml, executeScript]);
 
-  // Scroll to cursor when it changes
+  // Scroll to cursor or playback position
   useEffect(() => {
     if (isReady) {
-      executeScript(`window.scrollToMeasure(${cursor.measureIndex})`);
+      // During playback, scroll to playback position; otherwise cursor
+      const measureToShow =
+        playbackState === "playing" && playbackMeasureIndex !== undefined
+          ? playbackMeasureIndex
+          : cursor.measureIndex;
+      executeScript(`window.scrollToMeasure(${measureToShow})`);
     }
-  }, [isReady, cursor.measureIndex, executeScript]);
+  }, [
+    isReady,
+    cursor.measureIndex,
+    playbackState,
+    playbackMeasureIndex,
+    executeScript,
+  ]);
 
   // Handle messages from WebView
   const handleMessage = useCallback(
@@ -312,35 +338,82 @@ function ComposerScoreViewportComponent({
         )}
       </View>
 
-      {/* Zoom controls */}
+      {/* Controls bar with playback and zoom */}
       {showZoomControls && (
-        <View style={styles.zoomControls}>
-          <TouchableOpacity
-            style={styles.zoomButton}
-            onPress={handleZoomOut}
-            accessibilityLabel="Zoom out"
-            accessibilityRole="button"
-          >
-            <Feather name="minus" size={20} color={colors.textPrimary} />
-          </TouchableOpacity>
+        <View style={styles.controlsBar}>
+          {/* Playback controls */}
+          <View style={styles.playbackControls}>
+            <TouchableOpacity
+              style={[
+                styles.playbackButton,
+                playbackState === "stopped" && styles.playbackButtonDisabled,
+              ]}
+              onPress={onStop}
+              disabled={playbackState === "stopped"}
+              accessibilityLabel="Stop"
+              accessibilityRole="button"
+              testID="viewport-stop"
+            >
+              <Feather
+                name="square"
+                size={18}
+                color={
+                  playbackState !== "stopped"
+                    ? colors.error
+                    : colors.textSecondary
+                }
+              />
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.zoomLabelButton}
-            onPress={handleZoomReset}
-            accessibilityLabel={`Zoom ${Math.round(zoom * 100)}%. Tap to reset`}
-            accessibilityRole="button"
-          >
-            <Text style={styles.zoomLabel}>{Math.round(zoom * 100)}%</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.playButton}
+              onPress={playbackState === "playing" ? onPause : onPlay}
+              accessibilityLabel={
+                playbackState === "playing" ? "Pause" : "Play"
+              }
+              accessibilityRole="button"
+              testID="viewport-play"
+            >
+              <Feather
+                name={playbackState === "playing" ? "pause" : "play"}
+                size={22}
+                color={colors.white}
+              />
+            </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity
-            style={styles.zoomButton}
-            onPress={handleZoomIn}
-            accessibilityLabel="Zoom in"
-            accessibilityRole="button"
-          >
-            <Feather name="plus" size={20} color={colors.textPrimary} />
-          </TouchableOpacity>
+          {/* Spacer */}
+          <View style={styles.controlsSpacer} />
+
+          {/* Zoom controls */}
+          <View style={styles.zoomControls}>
+            <TouchableOpacity
+              style={styles.zoomButton}
+              onPress={handleZoomOut}
+              accessibilityLabel="Zoom out"
+              accessibilityRole="button"
+            >
+              <Feather name="minus" size={18} color={colors.textPrimary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.zoomLabelButton}
+              onPress={handleZoomReset}
+              accessibilityLabel={`Zoom ${Math.round(zoom * 100)}%. Tap to reset`}
+              accessibilityRole="button"
+            >
+              <Text style={styles.zoomLabel}>{Math.round(zoom * 100)}%</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.zoomButton}
+              onPress={handleZoomIn}
+              accessibilityLabel="Zoom in"
+              accessibilityRole="button"
+            >
+              <Feather name="plus" size={18} color={colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </View>
@@ -398,30 +471,60 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
   },
-  zoomControls: {
+  controlsBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    justifyContent: "space-between",
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
+  playbackControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  playbackButton: {
+    padding: spacing.xs,
+    borderRadius: 6,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  playbackButtonDisabled: {
+    opacity: 0.4,
+  },
+  playButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  controlsSpacer: {
+    flex: 1,
+  },
+  zoomControls: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   zoomButton: {
-    padding: spacing.sm,
-    borderRadius: 8,
+    padding: spacing.xs,
+    borderRadius: 6,
     backgroundColor: colors.background,
   },
   zoomLabelButton: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },
   zoomLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: colors.textPrimary,
     fontWeight: "500",
-    minWidth: 48,
+    minWidth: 40,
     textAlign: "center",
   },
 });
