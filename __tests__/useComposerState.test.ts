@@ -986,6 +986,28 @@ describe("useComposerState", () => {
       });
     });
 
+    it("should disallow time signature change when notes exist", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Insert a note
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      // Try to change time signature - should fail
+      let changeResult = false;
+      act(() => {
+        changeResult = result.current.setTimeSignature({ beats: 3, beatUnit: 4 });
+      });
+
+      expect(changeResult).toBe(false);
+      // Time signature should remain unchanged (4/4)
+      expect(result.current.score.timeSignature).toEqual({
+        beats: 4,
+        beatUnit: 4,
+      });
+    });
+
     it("should change tempo", () => {
       const { result } = renderHook(() => useComposerState());
 

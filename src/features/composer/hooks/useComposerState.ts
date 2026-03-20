@@ -127,7 +127,8 @@ export interface UseComposerStateReturn {
     key: KeySignature,
     transposeSemitones: number,
   ) => void;
-  setTimeSignature: (timeSig: TimeSignature) => void;
+  /** Change time signature (only allowed when no notes exist, returns false if blocked) */
+  setTimeSignature: (timeSig: TimeSignature) => boolean;
   setTempo: (tempo: number) => void;
   setTitle: (title: string) => void;
 
@@ -1250,8 +1251,20 @@ export function useComposerState(
   );
 
   const setTimeSignature = useCallback(
-    (timeSig: TimeSignature) => {
+    (timeSig: TimeSignature): boolean => {
+      // Disallow changing time signature if there are actual notes
+      // (This is a lightweight tool - no re-barring/reflow support)
+      if (hasActualNotes()) {
+        return false;
+      }
+
       const prevTimeSig = state.score.timeSignature;
+      if (
+        timeSig.beats === prevTimeSig.beats &&
+        timeSig.beatUnit === prevTimeSig.beatUnit
+      ) {
+        return true; // No change needed
+      }
 
       undoManager.pushAction({
         type: "CHANGE_TIME_SIGNATURE",
@@ -1259,9 +1272,28 @@ export function useComposerState(
         newTimeSig: timeSig,
       });
 
-      updateScore((score) => ({ ...score, timeSignature: timeSig }));
+      // Recreate measures with new time signature (pre-filled with appropriate rests)
+      setState((prev) => {
+        const newMeasures = prev.score.measures.map(() =>
+          createMeasure(timeSig),
+        );
+        return {
+          ...prev,
+          score: {
+            ...prev.score,
+            timeSignature: timeSig,
+            measures: newMeasures,
+            updatedAt: new Date().toISOString(),
+          },
+          cursor: { measureIndex: 0, noteIndex: 0 },
+          selectedNoteId: newMeasures[0]?.notes[0]?.id ?? null,
+          isDirty: true,
+        };
+      });
+
+      return true;
     },
-    [state.score.timeSignature, undoManager, updateScore],
+    [state.score.timeSignature, undoManager, hasActualNotes],
   );
 
   const setTempo = useCallback(

@@ -46,6 +46,8 @@ export interface ComposerTopBarProps {
   timeSignature: TimeSignature;
   /** Called when time signature changes */
   onTimeSignatureChange: (ts: TimeSignature) => void;
+  /** Whether time signature is locked (notes exist) */
+  timeSignatureLocked?: boolean;
   /** Current key signature (-7 to +7) */
   keySignature: KeySignature;
   /** Called when key signature changes */
@@ -153,6 +155,7 @@ function ComposerTopBarComponent({
   onClefChange,
   timeSignature,
   onTimeSignatureChange,
+  timeSignatureLocked = false,
   keySignature,
   onKeySignatureChange,
   tempo,
@@ -316,8 +319,20 @@ function ComposerTopBarComponent({
 
         <Dropdown
           label="Time"
-          value={tsDisplay}
-          onPress={() => setShowTimeModal(true)}
+          value={timeSignatureLocked ? `${tsDisplay} 🔒` : tsDisplay}
+          onPress={() => {
+            if (timeSignatureLocked) {
+              const title = "Time Signature Locked";
+              const message = "Time signature cannot be changed when notes are present. For complex pieces with time signature changes, use a full-featured score editor like MuseScore.";
+              if (Platform.OS === "web") {
+                window.alert(`${title}\n\n${message}`);
+              } else {
+                Alert.alert(title, message);
+              }
+              return;
+            }
+            setShowTimeModal(true);
+          }}
           disabled={disabled}
           testID="topbar-time"
         />

@@ -254,7 +254,7 @@ function ComposerScreenContent({
     setClefChangeModal({ visible: false, targetClef: "treble" });
   }, []);
 
-  // Time signature change
+  // Time signature change (UI prevents this when notes exist, so no check needed here)
   const handleTimeSignatureChange = useCallback(
     (ts: TimeSignature) => {
       composerState.setTimeSignature(ts);
@@ -559,6 +559,7 @@ function ComposerScreenContent({
           onClefChange={handleClefChange}
           timeSignature={composerState.score.timeSignature}
           onTimeSignatureChange={handleTimeSignatureChange}
+          timeSignatureLocked={composerState.hasActualNotes()}
           keySignature={composerState.score.keySignature}
           onKeySignatureChange={handleKeySignatureChange}
           tempo={composerState.score.tempo}
