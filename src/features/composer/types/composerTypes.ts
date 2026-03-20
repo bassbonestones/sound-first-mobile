@@ -191,8 +191,8 @@ export interface Note {
   tieStart?: boolean;
   /** Whether this note ends a tie */
   tieEnd?: boolean;
-  /** Position within a triplet group (1, 2, or 3) */
-  tripletPosition?: 1 | 2 | 3;
+  /** Position within a triplet group (1-based, up to 6 for 2-beat groups) */
+  tripletPosition?: 1 | 2 | 3 | 4 | 5 | 6;
   /** Unique ID linking notes in the same triplet group */
   tripletGroupId?: string;
 }
@@ -251,7 +251,7 @@ export function isTripletDuration(duration: DurationValue): boolean {
 export function createTripletNote(
   midi: number | null,
   duration: typeof DURATION.TRIPLET_EIGHTH | typeof DURATION.TRIPLET_QUARTER,
-  position: 1 | 2 | 3,
+  position: 1 | 2 | 3 | 4 | 5 | 6,
   tripletGroupId: string,
   options?: Partial<Pick<Note, "accidental">>,
 ): Note {
@@ -262,17 +262,15 @@ export function createTripletNote(
   });
 }
 
-/** Create a triplet eighth rest */
+/** Create a triplet rest (eighth or quarter) */
 export function createTripletRest(
-  position: 1 | 2 | 3,
+  position: 1 | 2 | 3 | 4 | 5 | 6,
   tripletGroupId: string,
+  duration:
+    | typeof DURATION.TRIPLET_EIGHTH
+    | typeof DURATION.TRIPLET_QUARTER = DURATION.TRIPLET_EIGHTH,
 ): Note {
-  return createTripletNote(
-    null,
-    DURATION.TRIPLET_EIGHTH,
-    position,
-    tripletGroupId,
-  );
+  return createTripletNote(null, duration, position, tripletGroupId);
 }
 
 /** Create a rest */

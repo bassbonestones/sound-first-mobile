@@ -39,6 +39,7 @@ import {
   replaceNoteAtIndex,
   generateRestsForDurationAtPosition,
   getBeatPositionAt,
+  getHalfMeasureBoundary,
   generateId,
   createInsertNoteAction,
   createDeleteNoteAction,
@@ -116,6 +117,8 @@ export interface UseComposerStateReturn {
   toggleDottedMode: () => void;
   /** Current triplet position (1, 2, or 3) if on a triplet note, undefined otherwise */
   tripletPosition: 1 | 2 | 3 | undefined;
+  /** Current triplet group type: 'eighth' (only eighths), 'quarter' (only quarters), 'mixed' (both allowed) */
+  tripletGroupType: "eighth" | "quarter" | "mixed" | undefined;
 
   // Navigation
   moveCursor: (direction: "left" | "right" | "start" | "end") => void;
@@ -207,6 +210,50 @@ export function useComposerState(
     return measure.notes[cursor.noteIndex] ?? null;
   }, [score.measures, cursor.measureIndex, cursor.noteIndex]);
 
+  // Calculate triplet group info based on group structure
+  const tripletGroupInfo = useMemo((): {
+    type: "eighth" | "quarter" | "mixed";
+    totalDuration: number;
+  } | null => {
+    if (!noteAtCursor?.tripletGroupId) return null;
+    const measure = score.measures[cursor.measureIndex];
+    if (!measure) return null;
+
+    // Find all notes in this triplet group
+    const groupNotes = measure.notes.filter(
+      (n) => n.tripletGroupId === noteAtCursor.tripletGroupId,
+    );
+
+    // Calculate total duration
+    const totalDuration = groupNotes.reduce(
+      (sum, n) => sum + getNoteDuration(n),
+      0,
+    );
+
+    // Determine group type based on ACTUAL notes (not rests)
+    // Only lock group type when filled with 3 actual notes of the same type
+    const tolerance = 0.001;
+    const actualNotes = groupNotes.filter((n) => n.midi !== null);
+
+    // Check if all actual notes are the same type
+    const allActualAreEighths = actualNotes.every(
+      (n) => Math.abs(getNoteDuration(n) - DURATION.TRIPLET_EIGHTH) < tolerance,
+    );
+    const allActualAreQuarters = actualNotes.every(
+      (n) =>
+        Math.abs(getNoteDuration(n) - DURATION.TRIPLET_QUARTER) < tolerance,
+    );
+
+    // Only lock if 3 actual notes of same type
+    if (actualNotes.length === 3 && allActualAreEighths) {
+      return { type: "eighth", totalDuration };
+    } else if (actualNotes.length === 3 && allActualAreQuarters) {
+      return { type: "quarter", totalDuration };
+    }
+    // Otherwise it's a mixed group (both types allowed)
+    return { type: "mixed", totalDuration };
+  }, [score.measures, cursor.measureIndex, noteAtCursor]);
+
   const currentMeasureValidation = useMemo((): MeasureValidation => {
     const measure = score.measures[cursor.measureIndex];
     if (!measure) {
@@ -258,6 +305,8 @@ export function useComposerState(
       tripletDuration:
         | typeof DURATION.TRIPLET_EIGHTH
         | typeof DURATION.TRIPLET_QUARTER,
+      beatPosition: number,
+      timeSignature: TimeSignature,
     ): {
       notes: Note[];
       insertedIndex: number;
@@ -270,8 +319,11 @@ export function useComposerState(
       // Generate a unique ID for this triplet group
       const tripletGroupId = generateId();
 
-      // We need to replace enough duration to fit 1 beat (the triplet group)
-      const tripletGroupDuration = 1; // 3 x 1/3 = 1 beat
+      // Always create 1-beat groups when starting fresh
+      // - Quarter triplets: 1-beat mixed group (quarter 2/3 + eighth rest 1/3)
+      // - Eighth triplets: 1-beat group (3 x 1/3)
+      // Pure 2-beat quarter groups (3 x 2/3) would require explicit creation
+      const tripletGroupDuration = 1;
 
       // Collect notes to replace, starting from current position
       let durationConsumed = 0;
@@ -289,12 +341,12 @@ export function useComposerState(
         return null;
       }
 
-      // Build the triplet notes based on duration
+      // Build the triplet notes based on duration and group type
       let tripletNotes: Note[];
       let cursorAdvance: number;
 
       if (tripletDuration === DURATION.TRIPLET_QUARTER) {
-        // Triplet quarter (2/3 beat) + triplet eighth rest (1/3 beat)
+        // 1-beat mixed group: quarter (2/3) at position 1 + eighth rest (1/3) at position 3
         const tripletQuarter = createTripletNote(
           midi,
           DURATION.TRIPLET_QUARTER,
@@ -302,11 +354,15 @@ export function useComposerState(
           tripletGroupId,
           { accidental },
         );
-        const tripletRest = createTripletRest(3, tripletGroupId);
+        const tripletRest = createTripletRest(
+          3,
+          tripletGroupId,
+          DURATION.TRIPLET_EIGHTH,
+        );
         tripletNotes = [tripletQuarter, tripletRest];
-        cursorAdvance = 1; // Move to the rest
+        cursorAdvance = 1; // Move to the eighth rest
       } else {
-        // Triplet eighth: create 3 slots (entered note + 2 rests)
+        // Triplet eighth: create 3 slots (entered note + 2 rests) = 1 beat
         const triplet1 = createTripletNote(
           midi,
           DURATION.TRIPLET_EIGHTH,
@@ -314,8 +370,16 @@ export function useComposerState(
           tripletGroupId,
           { accidental },
         );
-        const triplet2 = createTripletRest(2, tripletGroupId);
-        const triplet3 = createTripletRest(3, tripletGroupId);
+        const triplet2 = createTripletRest(
+          2,
+          tripletGroupId,
+          DURATION.TRIPLET_EIGHTH,
+        );
+        const triplet3 = createTripletRest(
+          3,
+          tripletGroupId,
+          DURATION.TRIPLET_EIGHTH,
+        );
         tripletNotes = [triplet1, triplet2, triplet3];
         cursorAdvance = 1; // Move to position 2
       }
@@ -390,62 +454,139 @@ export function useComposerState(
           const currentPosition = currentNote.tripletPosition!;
           const tripletGroupId = currentNote.tripletGroupId!;
 
-          if (isTripletQuarter) {
-            // Triplet quarter takes 2 positions
-            if (currentPosition === 3) {
-              // Can't fit a triplet quarter at position 3
+          // Determine group type based on actual notes (not rests)
+          // Only lock group type when filled with actual notes - rests can be replaced
+          const groupNotes = measure.notes.filter(
+            (n) => n.tripletGroupId === tripletGroupId,
+          );
+          const actualNotes = groupNotes.filter((n) => n.midi !== null);
+          const tolerance = 0.001;
+
+          // Check if all actual notes are the same type
+          const allActualAreEighths = actualNotes.every(
+            (n) =>
+              Math.abs(getNoteDuration(n) - DURATION.TRIPLET_EIGHTH) <
+              tolerance,
+          );
+          const allActualAreQuarters = actualNotes.every(
+            (n) =>
+              Math.abs(getNoteDuration(n) - DURATION.TRIPLET_QUARTER) <
+              tolerance,
+          );
+
+          // Only restrict if we're replacing an actual note (not a rest)
+          // and the group is "locked" with 3 actual notes of the same type
+          const isGroupLocked = actualNotes.length === 3;
+          const isLockedEighthGroup = isGroupLocked && allActualAreEighths;
+          const isLockedQuarterGroup = isGroupLocked && allActualAreQuarters;
+
+          // In locked quarter groups, only quarter triplets allowed
+          if (isLockedQuarterGroup && isTripletEighth) {
+            return false;
+          }
+          // In locked eighth groups, only eighth triplets allowed
+          if (isLockedEighthGroup && isTripletQuarter) {
+            return false;
+          }
+
+          // Calculate current group structure
+          const totalGroupDuration = groupNotes.reduce(
+            (sum, n) => sum + getNoteDuration(n),
+            0,
+          );
+          const is1BeatGroup = Math.abs(totalGroupDuration - 1) < tolerance;
+          const is2BeatGroup = Math.abs(totalGroupDuration - 2) < tolerance;
+
+          // Check if we're changing duration type within a 1-beat group (3 eighths → mixed)
+          const isChangingToQuarterIn1BeatGroup =
+            is1BeatGroup && groupNotes.length === 3 && isTripletQuarter;
+
+          // Check if position 2 has an actual note (not a rest)
+          const positionTwoNote = groupNotes.find(
+            (n) => n.tripletPosition === 2,
+          );
+          const positionTwoHasNote =
+            positionTwoNote && positionTwoNote.midi !== null;
+
+          // If at position 3 and position 2 has actual note, EXPAND to 2-beat group
+          // 8th(1/3) + 8th(1/3) + quarter(2/3) + quarter rest(2/3) = 2 beats
+          if (
+            isChangingToQuarterIn1BeatGroup &&
+            currentPosition === 3 &&
+            positionTwoHasNote
+          ) {
+            // Find where this triplet group is in the measure
+            const firstGroupNoteIdx = measure.notes.findIndex(
+              (n) => n.tripletGroupId === tripletGroupId,
+            );
+            const lastGroupNoteIdx = measure.notes.findIndex(
+              (n) =>
+                n.tripletGroupId === tripletGroupId && n.tripletPosition === 3,
+            );
+
+            // Check if there's space for an additional 1 beat after this group
+            let durationAvailable = 0;
+            let endIdx = lastGroupNoteIdx + 1;
+            while (
+              endIdx < measure.notes.length &&
+              durationAvailable < 1 - 0.001
+            ) {
+              durationAvailable += getNoteDuration(measure.notes[endIdx]);
+              endIdx++;
+            }
+
+            if (durationAvailable < 1 - 0.001) {
+              // Not enough space to expand to 2-beat group
               return false;
             }
 
-            // Create triplet quarter at current position
-            const newTripletNote = createTripletNote(
+            // Build the expanded 2-beat group:
+            // Keep eighth at pos 1, eighth at pos 2, add quarter at pos 3, add quarter rest at pos 4
+            const pos1Note = groupNotes.find((n) => n.tripletPosition === 1)!;
+            const pos2Note = groupNotes.find((n) => n.tripletPosition === 2)!;
+
+            const newQuarter = createTripletNote(
               midi,
               DURATION.TRIPLET_QUARTER,
-              currentPosition,
+              3,
               tripletGroupId,
               { accidental },
             );
+            const quarterRest = createTripletRest(
+              4,
+              tripletGroupId,
+              DURATION.TRIPLET_QUARTER,
+            );
 
-            // Find and remove the next triplet note in the group (if exists)
-            // Triplet quarter consumes current position + next one
-            const newNotes = measure.notes.filter((n, ni) => {
-              if (ni === currentCursor.noteIndex) return false; // Will be replaced
-              // Remove the next note if it's part of the same triplet group and is position currentPosition + 1
-              if (n.tripletGroupId === tripletGroupId) {
-                if (currentPosition === 1 && n.tripletPosition === 2)
-                  return false;
-                if (currentPosition === 2 && n.tripletPosition === 3)
-                  return false;
-              }
-              return true;
-            });
+            // Build new notes array
+            const newNotes: Note[] = [
+              ...measure.notes.slice(0, firstGroupNoteIdx),
+              pos1Note, // Keep position 1 eighth
+              pos2Note, // Keep position 2 eighth
+              newQuarter, // New quarter at position 3
+              quarterRest, // Quarter rest at position 4
+            ];
 
-            // Insert the new triplet quarter at the right position
-            const insertPosition = currentCursor.noteIndex;
-            newNotes.splice(insertPosition, 0, newTripletNote);
+            // Handle remainder if we consumed more than 1 additional beat
+            const consumed = measure.notes
+              .slice(lastGroupNoteIdx + 1, endIdx)
+              .reduce((sum, n) => sum + getNoteDuration(n), 0);
+            const remainder = consumed - 1;
+            if (remainder > 0.001) {
+              const remainderRests = generateRestsForDuration(remainder);
+              newNotes.push(...remainderRests);
+            }
 
-            const action = createInsertNoteAction(targetCursor, newTripletNote);
+            // Add remaining notes after the consumed portion
+            newNotes.push(...measure.notes.slice(endIdx));
+
+            const action = createInsertNoteAction(targetCursor, newQuarter);
             undoManager.pushAction(action);
 
-            // Move cursor to next note after the triplet quarter
-            const newNoteIndex = insertPosition + 1;
-            let newCursor: CursorPosition;
-            if (newNoteIndex >= newNotes.length) {
-              const nextMeasureIndex = currentCursor.measureIndex + 1;
-              if (nextMeasureIndex < state.score.measures.length) {
-                newCursor = { measureIndex: nextMeasureIndex, noteIndex: 0 };
-              } else {
-                newCursor = {
-                  measureIndex: currentCursor.measureIndex,
-                  noteIndex: newNotes.length - 1,
-                };
-              }
-            } else {
-              newCursor = {
-                measureIndex: currentCursor.measureIndex,
-                noteIndex: newNoteIndex,
-              };
-            }
+            const newCursor: CursorPosition = {
+              measureIndex: currentCursor.measureIndex,
+              noteIndex: firstGroupNoteIdx + 3, // Move to the quarter rest at position 4
+            };
             cursorRef.current = newCursor;
 
             setState((prev) => ({
@@ -460,43 +601,87 @@ export function useComposerState(
                 updatedAt: new Date().toISOString(),
               },
               cursor: newCursor,
-              selectedNoteId: newTripletNote.id,
+              selectedNoteId: newQuarter.id,
               isDirty: true,
             }));
 
             return true;
-          } else {
-            // Triplet eighth - simple replacement preserving group info
-            const newTripletNote = createTripletNote(
-              midi,
-              DURATION.TRIPLET_EIGHTH,
-              currentPosition,
-              tripletGroupId,
-              { accidental },
-            );
+          }
 
-            const action = createInsertNoteAction(targetCursor, newTripletNote);
+          if (isChangingToQuarterIn1BeatGroup) {
+            // Converting 3-eighth group to mixed group (eighth + quarter = 1 beat)
+            // Quarter triplet (2/3) consumes positions 2 and 3
+            // Keep position 1 as is, replace 2-3 with single quarter at position 3
+            const firstGroupNoteIdx = measure.notes.findIndex(
+              (n) => n.tripletGroupId === tripletGroupId,
+            );
+            const positionOneNote = groupNotes.find(
+              (n) => n.tripletPosition === 1,
+            )!;
+
+            // If we're at position 1, quarter goes here and we remove positions 2-3
+            // Otherwise (position 2 or 3), keep position 1 and quarter takes the rest
+            let newNotes: Note[];
+            let newCursorIndex: number;
+
+            if (currentPosition === 1) {
+              // Quarter at position 1 (spans 1-2), keep position 3 as eighth rest
+              const quarterNote = createTripletNote(
+                midi,
+                DURATION.TRIPLET_QUARTER,
+                1,
+                tripletGroupId,
+                { accidental },
+              );
+              const eighthRest = createTripletRest(
+                3,
+                tripletGroupId,
+                DURATION.TRIPLET_EIGHTH,
+              );
+              newNotes = [
+                ...measure.notes.slice(0, firstGroupNoteIdx),
+                quarterNote,
+                eighthRest,
+                ...measure.notes.slice(firstGroupNoteIdx + 3),
+              ];
+              newCursorIndex = firstGroupNoteIdx + 1; // Move to the eighth rest
+            } else {
+              // Keep position 1, quarter at position 3 (spans 2-3)
+              const keepNote =
+                positionOneNote.midi !== null
+                  ? positionOneNote
+                  : createTripletNote(
+                      positionOneNote.midi,
+                      DURATION.TRIPLET_EIGHTH,
+                      1,
+                      tripletGroupId,
+                    );
+              const quarterNote = createTripletNote(
+                midi,
+                DURATION.TRIPLET_QUARTER,
+                3,
+                tripletGroupId,
+                { accidental },
+              );
+              newNotes = [
+                ...measure.notes.slice(0, firstGroupNoteIdx),
+                keepNote,
+                quarterNote,
+                ...measure.notes.slice(firstGroupNoteIdx + 3),
+              ];
+              newCursorIndex = firstGroupNoteIdx + 2; // Move past the new quarter
+            }
+
+            const action = createInsertNoteAction(
+              targetCursor,
+              newNotes[firstGroupNoteIdx],
+            );
             undoManager.pushAction(action);
 
-            // Move to next position
-            const newNoteIndex = currentCursor.noteIndex + 1;
-            let newCursor: CursorPosition;
-            if (newNoteIndex >= measure.notes.length) {
-              const nextMeasureIndex = currentCursor.measureIndex + 1;
-              if (nextMeasureIndex < state.score.measures.length) {
-                newCursor = { measureIndex: nextMeasureIndex, noteIndex: 0 };
-              } else {
-                newCursor = {
-                  measureIndex: currentCursor.measureIndex,
-                  noteIndex: measure.notes.length - 1,
-                };
-              }
-            } else {
-              newCursor = {
-                measureIndex: currentCursor.measureIndex,
-                noteIndex: newNoteIndex,
-              };
-            }
+            const newCursor: CursorPosition = {
+              measureIndex: currentCursor.measureIndex,
+              noteIndex: Math.min(newCursorIndex, newNotes.length - 1),
+            };
             cursorRef.current = newCursor;
 
             setState((prev) => ({
@@ -505,34 +690,95 @@ export function useComposerState(
                 ...prev.score,
                 measures: prev.score.measures.map((m, i) =>
                   i === currentCursor.measureIndex
-                    ? {
-                        ...m,
-                        notes: m.notes.map((n, ni) =>
-                          ni === currentCursor.noteIndex ? newTripletNote : n,
-                        ),
-                      }
+                    ? { ...m, notes: newNotes }
                     : m,
                 ),
                 updatedAt: new Date().toISOString(),
               },
               cursor: newCursor,
-              selectedNoteId: newTripletNote.id,
+              selectedNoteId:
+                newNotes[firstGroupNoteIdx + (currentPosition === 1 ? 0 : 1)]
+                  .id,
               isDirty: true,
             }));
 
             return true;
           }
+
+          // Simple replacement (same duration type)
+          const newTripletNote = createTripletNote(
+            midi,
+            state.selectedDuration as
+              | typeof DURATION.TRIPLET_EIGHTH
+              | typeof DURATION.TRIPLET_QUARTER,
+            currentPosition,
+            tripletGroupId,
+            { accidental },
+          );
+
+          const action = createInsertNoteAction(targetCursor, newTripletNote);
+          undoManager.pushAction(action);
+
+          // Move to next position
+          const newNoteIndex = currentCursor.noteIndex + 1;
+          let newCursor: CursorPosition;
+          if (newNoteIndex >= measure.notes.length) {
+            const nextMeasureIndex = currentCursor.measureIndex + 1;
+            if (nextMeasureIndex < state.score.measures.length) {
+              newCursor = { measureIndex: nextMeasureIndex, noteIndex: 0 };
+            } else {
+              newCursor = {
+                measureIndex: currentCursor.measureIndex,
+                noteIndex: measure.notes.length - 1,
+              };
+            }
+          } else {
+            newCursor = {
+              measureIndex: currentCursor.measureIndex,
+              noteIndex: newNoteIndex,
+            };
+          }
+          cursorRef.current = newCursor;
+
+          setState((prev) => ({
+            ...prev,
+            score: {
+              ...prev.score,
+              measures: prev.score.measures.map((m, i) =>
+                i === currentCursor.measureIndex
+                  ? {
+                      ...m,
+                      notes: m.notes.map((n, ni) =>
+                        ni === currentCursor.noteIndex ? newTripletNote : n,
+                      ),
+                    }
+                  : m,
+              ),
+              updatedAt: new Date().toISOString(),
+            },
+            cursor: newCursor,
+            selectedNoteId: newTripletNote.id,
+            isDirty: true,
+          }));
+
+          return true;
         } else {
           // Creating new triplet group on non-triplet note
           const tripletDuration = isTripletQuarter
             ? DURATION.TRIPLET_QUARTER
             : DURATION.TRIPLET_EIGHTH;
+          const beatPosition = getBeatPositionAt(
+            measure,
+            currentCursor.noteIndex,
+          );
           const result = insertTripletGroup(
             measure.notes,
             currentCursor.noteIndex,
             midi,
             accidental,
             tripletDuration,
+            beatPosition,
+            state.score.timeSignature,
           );
           if (!result) return false;
 
@@ -733,140 +979,109 @@ export function useComposerState(
         const currentPosition = currentNote.tripletPosition!;
         const tripletGroupId = currentNote.tripletGroupId!;
 
-        if (isTripletQuarter) {
-          // Triplet quarter rest takes 2 positions
-          if (currentPosition === 3) {
-            // Can't fit triplet quarter at position 3
-            return false;
-          }
+        // Determine group type based on actual notes (not rests)
+        // Only lock group type when filled with actual notes - rests can be replaced
+        const groupNotes = measure.notes.filter(
+          (n) => n.tripletGroupId === tripletGroupId,
+        );
+        const actualNotes = groupNotes.filter((n) => n.midi !== null);
+        const tolerance = 0.001;
 
-          // Create triplet quarter rest at current position
-          const newTripletRest = createTripletNote(
-            null,
-            DURATION.TRIPLET_QUARTER,
-            currentPosition,
-            tripletGroupId,
-          );
+        // Check if all actual notes are the same type
+        const allActualAreEighths = actualNotes.every(
+          (n) =>
+            Math.abs(getNoteDuration(n) - DURATION.TRIPLET_EIGHTH) < tolerance,
+        );
+        const allActualAreQuarters = actualNotes.every(
+          (n) =>
+            Math.abs(getNoteDuration(n) - DURATION.TRIPLET_QUARTER) < tolerance,
+        );
 
-          // Find and remove the next triplet note in the group
-          const newNotes = measure.notes.filter((n, ni) => {
-            if (ni === currentCursor.noteIndex) return false;
-            if (n.tripletGroupId === tripletGroupId) {
-              if (currentPosition === 1 && n.tripletPosition === 2)
-                return false;
-              if (currentPosition === 2 && n.tripletPosition === 3)
-                return false;
-            }
-            return true;
-          });
+        // Only restrict if the group is "locked" with 3 actual notes of the same type
+        const isGroupLocked = actualNotes.length === 3;
+        const isLockedEighthGroup = isGroupLocked && allActualAreEighths;
+        const isLockedQuarterGroup = isGroupLocked && allActualAreQuarters;
 
-          const insertPosition = currentCursor.noteIndex;
-          newNotes.splice(insertPosition, 0, newTripletRest);
-
-          const action = createInsertNoteAction(targetCursor, newTripletRest);
-          undoManager.pushAction(action);
-
-          const newNoteIndex = insertPosition + 1;
-          let newCursor: CursorPosition;
-          if (newNoteIndex >= newNotes.length) {
-            const nextMeasureIndex = currentCursor.measureIndex + 1;
-            if (nextMeasureIndex < state.score.measures.length) {
-              newCursor = { measureIndex: nextMeasureIndex, noteIndex: 0 };
-            } else {
-              newCursor = {
-                measureIndex: currentCursor.measureIndex,
-                noteIndex: newNotes.length - 1,
-              };
-            }
-          } else {
-            newCursor = {
-              measureIndex: currentCursor.measureIndex,
-              noteIndex: newNoteIndex,
-            };
-          }
-          cursorRef.current = newCursor;
-
-          setState((prev) => ({
-            ...prev,
-            score: {
-              ...prev.score,
-              measures: prev.score.measures.map((m, i) =>
-                i === currentCursor.measureIndex
-                  ? { ...m, notes: newNotes }
-                  : m,
-              ),
-              updatedAt: new Date().toISOString(),
-            },
-            cursor: newCursor,
-            selectedNoteId: newTripletRest.id,
-            isDirty: true,
-          }));
-
-          return true;
-        } else {
-          // Triplet eighth rest - simple replacement
-          const newTripletRest = createTripletRest(
-            currentPosition,
-            tripletGroupId,
-          );
-
-          const action = createInsertNoteAction(targetCursor, newTripletRest);
-          undoManager.pushAction(action);
-
-          const newNoteIndex = currentCursor.noteIndex + 1;
-          let newCursor: CursorPosition;
-          if (newNoteIndex >= measure.notes.length) {
-            const nextMeasureIndex = currentCursor.measureIndex + 1;
-            if (nextMeasureIndex < state.score.measures.length) {
-              newCursor = { measureIndex: nextMeasureIndex, noteIndex: 0 };
-            } else {
-              newCursor = {
-                measureIndex: currentCursor.measureIndex,
-                noteIndex: measure.notes.length - 1,
-              };
-            }
-          } else {
-            newCursor = {
-              measureIndex: currentCursor.measureIndex,
-              noteIndex: newNoteIndex,
-            };
-          }
-          cursorRef.current = newCursor;
-
-          setState((prev) => ({
-            ...prev,
-            score: {
-              ...prev.score,
-              measures: prev.score.measures.map((m, i) =>
-                i === currentCursor.measureIndex
-                  ? {
-                      ...m,
-                      notes: m.notes.map((n, ni) =>
-                        ni === currentCursor.noteIndex ? newTripletRest : n,
-                      ),
-                    }
-                  : m,
-              ),
-              updatedAt: new Date().toISOString(),
-            },
-            cursor: newCursor,
-            selectedNoteId: newTripletRest.id,
-            isDirty: true,
-          }));
-
-          return true;
+        // In locked quarter groups, only quarter triplets allowed
+        if (isLockedQuarterGroup && isTripletEighth) {
+          return false;
         }
+        // In locked eighth groups, only eighth triplets allowed
+        if (isLockedEighthGroup && isTripletQuarter) {
+          return false;
+        }
+
+        // Simple replacement
+        const newTripletRest = createTripletRest(
+          currentPosition,
+          tripletGroupId,
+          state.selectedDuration as
+            | typeof DURATION.TRIPLET_EIGHTH
+            | typeof DURATION.TRIPLET_QUARTER,
+        );
+
+        const action = createInsertNoteAction(targetCursor, newTripletRest);
+        undoManager.pushAction(action);
+
+        const newNoteIndex = currentCursor.noteIndex + 1;
+        let newCursor: CursorPosition;
+        if (newNoteIndex >= measure.notes.length) {
+          const nextMeasureIndex = currentCursor.measureIndex + 1;
+          if (nextMeasureIndex < state.score.measures.length) {
+            newCursor = { measureIndex: nextMeasureIndex, noteIndex: 0 };
+          } else {
+            newCursor = {
+              measureIndex: currentCursor.measureIndex,
+              noteIndex: measure.notes.length - 1,
+            };
+          }
+        } else {
+          newCursor = {
+            measureIndex: currentCursor.measureIndex,
+            noteIndex: newNoteIndex,
+          };
+        }
+        cursorRef.current = newCursor;
+
+        setState((prev) => ({
+          ...prev,
+          score: {
+            ...prev.score,
+            measures: prev.score.measures.map((m, i) =>
+              i === currentCursor.measureIndex
+                ? {
+                    ...m,
+                    notes: m.notes.map((n, ni) =>
+                      ni === currentCursor.noteIndex ? newTripletRest : n,
+                    ),
+                  }
+                : m,
+            ),
+            updatedAt: new Date().toISOString(),
+          },
+          cursor: newCursor,
+          selectedNoteId: newTripletRest.id,
+          isDirty: true,
+        }));
+
+        return true;
       } else {
         // Creating new triplet group with rest as first note
         const tripletDuration = isTripletQuarter
           ? DURATION.TRIPLET_QUARTER
           : DURATION.TRIPLET_EIGHTH;
+        const beatPosition = getBeatPositionAt(
+          measure,
+          currentCursor.noteIndex,
+        );
         const result = insertTripletGroup(
           measure.notes,
           currentCursor.noteIndex,
           null,
           undefined,
           tripletDuration,
+          beatPosition,
+          state.score.timeSignature,
         );
         if (!result) return false;
 
@@ -1227,9 +1442,15 @@ export function useComposerState(
         return true;
       } else {
         // Some notes in triplet group are still pitched - just replace with triplet rest
+        // Use the correct triplet duration based on the group type
+        const isQuarterTripletGroup =
+          currentNote.duration === DURATION.TRIPLET_QUARTER;
         const tripletRest = createTripletRest(
           currentNote.tripletPosition,
           tripletGroupId,
+          isQuarterTripletGroup
+            ? DURATION.TRIPLET_QUARTER
+            : DURATION.TRIPLET_EIGHTH,
         );
 
         const newNotes = [
@@ -2181,6 +2402,7 @@ export function useComposerState(
     dottedMode: state.dottedMode,
     toggleDottedMode,
     tripletPosition: noteAtCursor?.tripletPosition,
+    tripletGroupType: tripletGroupInfo?.type,
 
     // Navigation
     moveCursor,

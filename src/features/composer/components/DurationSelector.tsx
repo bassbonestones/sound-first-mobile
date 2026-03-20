@@ -31,8 +31,10 @@ export interface DurationSelectorProps {
   dottedMode?: boolean;
   /** Called when dotted mode is toggled */
   onToggleDotted?: () => void;
-  /** Current triplet position (1, 2, or 3) - when on 2 or 3, only triplet durations allowed */
+  /** Current triplet position (1, 2, or 3) - when in triplet, only triplet durations allowed */
   tripletPosition?: 1 | 2 | 3;
+  /** Current triplet group type: 'eighth' (only eighths), 'quarter' (only quarters), 'mixed' (both allowed) */
+  tripletGroupType?: "eighth" | "quarter" | "mixed";
   /** Whether the selector is disabled */
   disabled?: boolean;
   /** Test ID for testing */
@@ -127,6 +129,7 @@ function DurationSelectorComponent({
   dottedMode = false,
   onToggleDotted,
   tripletPosition,
+  tripletGroupType,
   disabled = false,
   testID,
 }: DurationSelectorProps): React.ReactElement {
@@ -172,12 +175,19 @@ function DurationSelectorComponent({
             isButtonDisabled = true;
           }
 
-          // At position 3, triplet quarter is not allowed (needs 2 positions)
-          if (
-            tripletPosition === 3 &&
-            option.value === DURATION.TRIPLET_QUARTER
-          ) {
-            isButtonDisabled = true;
+          // In triplet groups, restrict based on group type:
+          // - 'eighth': only eighth triplets allowed
+          // - 'quarter': only quarter triplets allowed
+          // - 'mixed': both allowed
+          if (inTripletGroup && option.isTriplet) {
+            const isQuarterTriplet = option.value === DURATION.TRIPLET_QUARTER;
+            if (tripletGroupType === "eighth" && isQuarterTriplet) {
+              isButtonDisabled = true;
+            }
+            if (tripletGroupType === "quarter" && !isQuarterTriplet) {
+              isButtonDisabled = true;
+            }
+            // "mixed" allows both, so no additional restriction
           }
 
           return (

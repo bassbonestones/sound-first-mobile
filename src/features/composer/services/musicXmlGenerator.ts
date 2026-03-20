@@ -178,6 +178,7 @@ function generateNoteXml(
   note: Note,
   preferFlats: boolean,
   options: MusicXmlGeneratorOptions,
+  isLastInTripletGroup: boolean = false,
 ): string {
   // Calculate duration accounting for dots (dotted = 1.5x)
   const baseDuration = DURATION_TO_DIVISIONS[note.duration];
@@ -200,19 +201,13 @@ function generateNoteXml(
         </time-modification>`
     : "";
 
-  // Tuplet notation for triplets (start on position 1, stop on position 3 or triplet quarter at position 2)
-  // A triplet quarter at position 2 consumes positions 2-3, so it ends the bracket
-  const isTripletQuarter = note.duration === DURATION.TRIPLET_QUARTER;
+  // Tuplet notation for triplets (start on position 1, stop on last note in group)
   let notationsContent = "";
   if (isTriplet) {
     if (note.tripletPosition === 1) {
       notationsContent += '<tuplet type="start" bracket="yes" number="1"/>';
     }
-    // Stop on position 3, OR on triplet quarter at position 2 (spans 2-3)
-    if (
-      note.tripletPosition === 3 ||
-      (isTripletQuarter && note.tripletPosition === 2)
-    ) {
+    if (isLastInTripletGroup) {
       notationsContent += '<tuplet type="stop" number="1"/>';
     }
   }
@@ -346,9 +341,26 @@ function generateMeasureXml(
     notesXml += `\n      <!-- cursor:${options.cursorPosition.noteIndex} -->`;
   }
 
+  // Pre-compute which notes are the last in their triplet group
+  const lastInTripletGroup = new Set<string>();
+  for (let i = 0; i < measure.notes.length; i++) {
+    const note = measure.notes[i];
+    if (note.tripletGroupId) {
+      const nextNote = measure.notes[i + 1];
+      // This note is last in its group if:
+      // - There's no next note, OR
+      // - The next note has a different (or no) triplet group ID
+      if (!nextNote || nextNote.tripletGroupId !== note.tripletGroupId) {
+        lastInTripletGroup.add(note.id);
+      }
+    }
+  }
+
   // Generate notes
   for (const note of measure.notes) {
-    notesXml += "\n" + generateNoteXml(note, preferFlats, options);
+    const isLastInTriplet = lastInTripletGroup.has(note.id);
+    notesXml +=
+      "\n" + generateNoteXml(note, preferFlats, options, isLastInTriplet);
   }
 
   // Include attributes only in first measure
