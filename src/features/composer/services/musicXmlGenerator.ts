@@ -116,12 +116,16 @@ function midiToPitch(
  */
 function accidentalToAlter(accidental: Accidental | undefined): number {
   switch (accidental) {
+    case "double-sharp":
+      return 2;
     case "sharp":
       return 1;
-    case "flat":
-      return -1;
     case "natural":
       return 0;
+    case "flat":
+      return -1;
+    case "double-flat":
+      return -2;
     default:
       return 0;
   }
@@ -132,12 +136,16 @@ function accidentalToAlter(accidental: Accidental | undefined): number {
  */
 function accidentalToXml(accidental: Accidental | undefined): string | null {
   switch (accidental) {
+    case "double-sharp":
+      return "double-sharp";
     case "sharp":
       return "sharp";
-    case "flat":
-      return "flat";
     case "natural":
       return "natural";
+    case "flat":
+      return "flat";
+    case "double-flat":
+      return "flat-flat";
     default:
       return null;
   }
@@ -182,14 +190,30 @@ function generateNoteXml(
       </note>`;
   }
 
-  // Convert MIDI to pitch
-  const { step, octave } = midiToPitch(note.midi!, preferFlats);
+  // Determine step (letter name) and alter
+  // If there's an explicit accidental, we need to derive the base MIDI (without accidental)
+  // to get the correct letter name
+  let step: string;
+  let octave: number;
+  let alter: number;
 
-  // Determine alter value - explicit accidental overrides MIDI-derived value
-  const alter =
-    note.accidental !== undefined
-      ? accidentalToAlter(note.accidental)
-      : midiToPitch(note.midi!, preferFlats).alter;
+  if (note.accidental !== undefined) {
+    // Calculate the base MIDI by reversing the accidental's effect
+    const accidentalOffset = accidentalToAlter(note.accidental);
+    const baseMidi = note.midi! - accidentalOffset;
+    
+    // Get the step from the base MIDI (which should be a natural note)
+    const basePitch = midiToPitch(baseMidi, preferFlats);
+    step = basePitch.step;
+    octave = basePitch.octave;
+    alter = accidentalOffset;
+  } else {
+    // No explicit accidental - derive from MIDI normally
+    const pitch = midiToPitch(note.midi!, preferFlats);
+    step = pitch.step;
+    octave = pitch.octave;
+    alter = pitch.alter;
+  }
 
   // Build pitch element
   let pitchXml = `        <pitch>

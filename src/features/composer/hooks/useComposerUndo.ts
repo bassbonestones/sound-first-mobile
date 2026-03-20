@@ -206,7 +206,7 @@ export function reverseAction(
     }
 
     case "APPLY_ACCIDENTAL": {
-      // Undo accidental = restore previous
+      // Undo accidental = restore previous accidental and MIDI
       return {
         ...updatedScore,
         measures: updatedScore.measures.map((m, mi) =>
@@ -215,7 +215,7 @@ export function reverseAction(
                 ...m,
                 notes: m.notes.map((n) =>
                   n.id === action.noteId
-                    ? { ...n, accidental: action.previousAccidental }
+                    ? { ...n, accidental: action.previousAccidental, midi: action.previousMidi }
                     : n,
                 ),
               }
@@ -367,6 +367,7 @@ export function reapplyAction(
     }
 
     case "APPLY_ACCIDENTAL": {
+      // Redo accidental = apply new accidental and MIDI
       return {
         ...updatedScore,
         measures: updatedScore.measures.map((m, mi) =>
@@ -375,7 +376,7 @@ export function reapplyAction(
                 ...m,
                 notes: m.notes.map((n) =>
                   n.id === action.noteId
-                    ? { ...n, accidental: action.newAccidental }
+                    ? { ...n, accidental: action.newAccidental, midi: action.newMidi }
                     : n,
                 ),
               }

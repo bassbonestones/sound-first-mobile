@@ -72,18 +72,36 @@ const REST_SYMBOLS: Record<DurationValue, string> = {
  * SMuFL codepoints for Bravura accidentals
  */
 const ACCIDENTAL_SYMBOLS = {
+  "double-sharp": "\uE263", // accidentalDoubleSharp
   sharp: "\uE262", // accidentalSharp
-  flat: "\uE260", // accidentalFlat
   natural: "\uE261", // accidentalNatural
+  flat: "\uE260", // accidentalFlat
+  "double-flat": "\uE264", // accidentalDoubleFlat
 };
 
 const BASE_MODIFIER_BUTTONS: ModifierButton[] = [
+  {
+    id: "double-sharp",
+    label: "Double Sharp",
+    symbol: ACCIDENTAL_SYMBOLS["double-sharp"],
+    type: "accidental",
+    value: "double-sharp",
+    useBravura: true,
+  },
   {
     id: "sharp",
     label: "Sharp",
     symbol: ACCIDENTAL_SYMBOLS.sharp,
     type: "accidental",
     value: "sharp",
+    useBravura: true,
+  },
+  {
+    id: "natural",
+    label: "Natural",
+    symbol: ACCIDENTAL_SYMBOLS.natural,
+    type: "accidental",
+    value: "natural",
     useBravura: true,
   },
   {
@@ -95,11 +113,11 @@ const BASE_MODIFIER_BUTTONS: ModifierButton[] = [
     useBravura: true,
   },
   {
-    id: "natural",
-    label: "Natural",
-    symbol: ACCIDENTAL_SYMBOLS.natural,
+    id: "double-flat",
+    label: "Double Flat",
+    symbol: ACCIDENTAL_SYMBOLS["double-flat"],
     type: "accidental",
-    value: "natural",
+    value: "double-flat",
     useBravura: true,
   },
   // Rest button is added dynamically based on selectedDuration

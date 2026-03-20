@@ -89,6 +89,10 @@ export interface ApplyAccidentalAction {
   previousAccidental?: Accidental;
   /** New accidental (undefined to remove) */
   newAccidental?: Accidental;
+  /** Previous MIDI value */
+  previousMidi: number;
+  /** New MIDI value */
+  newMidi: number;
 }
 
 export interface ToggleTieAction {
@@ -223,6 +227,8 @@ export function createApplyAccidentalAction(
   noteId: string,
   previousAccidental: Accidental | undefined,
   newAccidental: Accidental | undefined,
+  previousMidi: number,
+  newMidi: number,
 ): ApplyAccidentalAction {
   return {
     type: "APPLY_ACCIDENTAL",
@@ -230,6 +236,8 @@ export function createApplyAccidentalAction(
     noteId,
     previousAccidental,
     newAccidental,
+    previousMidi,
+    newMidi,
   };
 }
 

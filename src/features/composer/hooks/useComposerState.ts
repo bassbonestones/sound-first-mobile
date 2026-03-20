@@ -51,12 +51,17 @@ import {
   moveCursorToStart,
 } from "../utils/cursorUtils";
 import {
+  getAccidentalForMidi,
   getDefaultMidiForPitch,
   getNearestMidiForPitch,
   getNextDiatonicPitch,
   getPreviousDiatonicPitch,
   isValidMidi,
   shiftOctave,
+  transposeNoteByFunction,
+  noteToMidi,
+  midiToNoteName,
+  midiToOctave,
 } from "../utils/pitchUtils";
 import {
   useComposerUndo,
@@ -595,11 +600,27 @@ export function useComposerState(
         state.score.measures[position.measureIndex]?.notes[position.noteIndex];
       if (!note || note.midi === null) return;
 
+      // Calculate the base MIDI (the pitch without any accidental)
+      // by reversing the effect of the current accidental
+      let baseMidi = note.midi;
+      if (note.accidental === "double-sharp") baseMidi -= 2;
+      else if (note.accidental === "sharp") baseMidi -= 1;
+      else if (note.accidental === "flat") baseMidi += 1;
+      else if (note.accidental === "double-flat") baseMidi += 2;
+      // "natural" means the note is at its unaltered pitch
+
+      // Calculate new MIDI by applying the new accidental to the base
+      const noteName = midiToNoteName(baseMidi);
+      const octave = midiToOctave(baseMidi);
+      const newMidi = noteToMidi(noteName, octave, accidental);
+
       const action = createApplyAccidentalAction(
         position,
         note.id,
         note.accidental,
         accidental,
+        note.midi,
+        newMidi,
       );
       undoManager.pushAction(action);
 
@@ -610,7 +631,7 @@ export function useComposerState(
             ? {
                 ...m,
                 notes: m.notes.map((n) =>
-                  n.id === note.id ? { ...n, accidental } : n,
+                  n.id === note.id ? { ...n, accidental, midi: newMidi } : n,
                 ),
               }
             : m,
@@ -1019,10 +1040,33 @@ export function useComposerState(
           ...measure,
           notes: measure.notes.map((note) => {
             if (note.midi === null) return note; // Keep rests unchanged
-            const newMidi = note.midi + transposeSemitones;
+
+            if (transposeSemitones === 0) {
+              // Keep pitch, just recalculate accidental for new key
+              const newAccidental = getAccidentalForMidi(note.midi, key);
+              return {
+                ...note,
+                accidental: newAccidental,
+              };
+            }
+
+            // Use function-preserving transposition
+            // This preserves the note's scale degree and alteration when changing keys
+            const transposed = transposeNoteByFunction(
+              note.midi,
+              note.accidental,
+              prev.score.keySignature,
+              key,
+            );
+
             // Clamp to valid MIDI range (0-127)
-            if (newMidi < 0 || newMidi > 127) return note;
-            return { ...note, midi: newMidi };
+            if (transposed.midi < 0 || transposed.midi > 127) return note;
+
+            return {
+              ...note,
+              midi: transposed.midi,
+              accidental: transposed.accidental,
+            };
           }),
         }));
 

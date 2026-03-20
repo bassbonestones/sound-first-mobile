@@ -383,6 +383,62 @@ describe("useComposerState", () => {
       expect(result.current.score.measures[0].notes[0].midi).toBe(originalMidi);
     });
 
+    it("should recalculate accidentals after key transposition", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Set initial key to Bb major (key = -2)
+      act(() => {
+        result.current.setKeySignature(-2);
+      });
+
+      // Insert a C note (diatonic in Bb major)
+      // Due to smart octave, will be near staff center
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      // C in Bb major should have no accidental
+      expect(result.current.score.measures[0].notes[0].accidental).toBeUndefined();
+
+      const originalMidi = result.current.score.measures[0].notes[0].midi;
+
+      // Now transpose to C major, up 2 semitones
+      act(() => {
+        result.current.setKeySignatureWithTransposition(0, 2);
+      });
+
+      // D in C major should have no accidental
+      expect(result.current.score.measures[0].notes[0].midi).toBe(originalMidi! + 2);
+      expect(result.current.score.measures[0].notes[0].accidental).toBeUndefined();
+    });
+
+    it("should preserve scale degree when transposing (function-preserving)", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Set initial key to C major
+      act(() => {
+        result.current.setKeySignature(0);
+      });
+
+      // Insert E note - due to smart octave, this will be E5 (MIDI 76) near staff center
+      // E is scale degree 2 (mediant) in C major
+      act(() => {
+        result.current.insertNote("E");
+      });
+
+      // Transpose to G major (key=1)
+      // E (degree 2 in C) → B (degree 2 in G)
+      // E5 (76) → B5 (83)
+      act(() => {
+        result.current.setKeySignatureWithTransposition(1, 7); // 7 semitones = C to G
+      });
+
+      // B in G major is scale degree 2 (mediant), diatonic
+      expect(result.current.score.measures[0].notes[0].midi).toBe(83); // B5
+      // In G major, B is diatonic, so no accidental needed
+      expect(result.current.score.measures[0].notes[0].accidental).toBeUndefined();
+    });
+
     it("should change time signature", () => {
       const { result } = renderHook(() => useComposerState());
 
@@ -599,6 +655,8 @@ describe("useComposerState", () => {
         result.current.insertNote("C");
       });
 
+      const originalMidi = result.current.score.measures[0].notes[0].midi;
+
       act(() => {
         result.current.moveCursor("left");
       });
@@ -608,6 +666,43 @@ describe("useComposerState", () => {
       });
 
       expect(result.current.selectedNote?.accidental).toBe("sharp");
+      // MIDI should increase by 1 for sharp
+      expect(result.current.selectedNote?.midi).toBe(originalMidi! + 1);
+    });
+
+    it("should apply double accidentals and update MIDI", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      const originalMidi = result.current.score.measures[0].notes[0].midi;
+
+      act(() => {
+        result.current.moveCursor("left");
+      });
+
+      // Apply double-sharp
+      act(() => {
+        result.current.applyAccidental("double-sharp");
+      });
+      expect(result.current.selectedNote?.accidental).toBe("double-sharp");
+      expect(result.current.selectedNote?.midi).toBe(originalMidi! + 2);
+
+      // Change to double-flat
+      act(() => {
+        result.current.applyAccidental("double-flat");
+      });
+      expect(result.current.selectedNote?.accidental).toBe("double-flat");
+      expect(result.current.selectedNote?.midi).toBe(originalMidi! - 2);
+
+      // Remove accidental
+      act(() => {
+        result.current.applyAccidental(undefined);
+      });
+      expect(result.current.selectedNote?.accidental).toBeUndefined();
+      expect(result.current.selectedNote?.midi).toBe(originalMidi);
     });
 
     it("should remove accidental", () => {

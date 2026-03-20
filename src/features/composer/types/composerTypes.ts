@@ -54,7 +54,7 @@ export type Clef = "treble" | "bass";
 
 export type PitchName = "C" | "D" | "E" | "F" | "G" | "A" | "B";
 
-export type Accidental = "sharp" | "flat" | "natural";
+export type Accidental = "sharp" | "flat" | "natural" | "double-sharp" | "double-flat";
 
 /** Default starting octave by clef (MIDI note number for C) */
 export const DEFAULT_OCTAVE_MIDI: Record<Clef, number> = {
