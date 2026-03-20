@@ -290,6 +290,7 @@ function generateMeasureXml(
   measure: Measure,
   measureNumber: number,
   isFirstMeasure: boolean,
+  isLastMeasure: boolean,
   score: ComposerScore,
   options: MusicXmlGeneratorOptions,
   scoreHasNotes: boolean,
@@ -331,7 +332,14 @@ function generateMeasureXml(
       </direction>`
       : "";
 
-  return `    <measure number="${measureNumber}">${attributesXml}${directionXml}${notesXml}
+  // Add final barline (double bar) for last measure
+  const barlineXml = isLastMeasure
+    ? `\n      <barline location="right">
+        <bar-style>light-heavy</bar-style>
+      </barline>`
+    : "";
+
+  return `    <measure number="${measureNumber}">${attributesXml}${directionXml}${notesXml}${barlineXml}
     </measure>`;
 }
 
@@ -360,6 +368,7 @@ export function generateMusicXml(
         measure,
         index + 1,
         index === 0,
+        index === score.measures.length - 1,
         score,
         options,
         scoreHasNotes,
