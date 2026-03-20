@@ -91,6 +91,13 @@ const DURATION_OPTIONS: DurationOption[] = [
     topOffset: 0,
   },
   {
+    value: DURATION.SIXTEENTH,
+    name: "sixteenth",
+    label: "16th",
+    symbol: "\uE1D9", // note16thUp
+    topOffset: 0,
+  },
+  {
     value: DURATION.TRIPLET_QUARTER,
     name: "triplet-quarter",
     label: "Triplet Qtr",
@@ -107,13 +114,6 @@ const DURATION_OPTIONS: DurationOption[] = [
     overlayText: "3",
     topOffset: 0,
     isTriplet: true,
-  },
-  {
-    value: DURATION.SIXTEENTH,
-    name: "sixteenth",
-    label: "16th",
-    symbol: "\uE1D9", // note16thUp
-    topOffset: 0,
   },
 ];
 
@@ -302,6 +302,7 @@ const styles = StyleSheet.create({
     position: "relative",
     alignItems: "center",
     justifyContent: "center",
+    height: 30,
   },
   symbol: {
     fontFamily: "Bravura",
@@ -318,8 +319,8 @@ const styles = StyleSheet.create({
   },
   tripletOverlay: {
     position: "absolute",
-    top: -8,
-    right: -6,
+    top: 0,
+    left: 14,
     fontSize: 10,
     fontWeight: "700",
     color: colors.textPrimary,
