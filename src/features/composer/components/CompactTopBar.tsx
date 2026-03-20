@@ -1,0 +1,600 @@
+/**
+ * CompactTopBar Component
+ *
+ * Minimal top bar for small screens: back button, title, validation indicator, and settings gear.
+ * All score settings (clef, time, key, tempo) are accessed via a single settings modal.
+ */
+
+import React, { memo, useCallback, useState } from "react";
+import {
+  View,
+  TouchableOpacity,
+  Text,
+  TextInput,
+  StyleSheet,
+  Modal,
+  ScrollView,
+  AccessibilityRole,
+  Alert,
+  Platform,
+  Pressable,
+} from "react-native";
+import { Feather } from "@expo/vector-icons";
+
+import { colors, spacing } from "../../../constants";
+import TimeSignaturePickerModal from "../../../components/Metronome/TimeSignaturePickerModal";
+import type {
+  Clef,
+  TimeSignature,
+  KeySignature,
+  MeasureValidation,
+} from "../types";
+
+// =============================================================================
+// Types
+// =============================================================================
+
+export interface CompactTopBarProps {
+  /** Score title */
+  title: string;
+  /** Called when title changes */
+  onTitleChange: (title: string) => void;
+  /** Current clef */
+  clef: Clef;
+  /** Called when clef changes */
+  onClefChange: (clef: Clef) => void;
+  /** Current time signature */
+  timeSignature: TimeSignature;
+  /** Called when time signature changes */
+  onTimeSignatureChange: (ts: TimeSignature) => void;
+  /** Current key signature (-7 to +7) */
+  keySignature: KeySignature;
+  /** Called when key signature changes */
+  onKeySignatureChange: (key: KeySignature) => void;
+  /** Current tempo in BPM */
+  tempo: number;
+  /** Called when tempo changes */
+  onTempoChange: (tempo: number) => void;
+  /** Validation state of current measure */
+  measureValidation?: MeasureValidation;
+  /** Called when back is pressed */
+  onBack?: () => void;
+  /** Whether controls are disabled */
+  disabled?: boolean;
+  /** Test ID for testing */
+  testID?: string;
+}
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const KEY_NAMES: Record<string, string> = {
+  "-7": "C♭ Major",
+  "-6": "G♭ Major",
+  "-5": "D♭ Major",
+  "-4": "A♭ Major",
+  "-3": "E♭ Major",
+  "-2": "B♭ Major",
+  "-1": "F Major",
+  "0": "C Major",
+  "1": "G Major",
+  "2": "D Major",
+  "3": "A Major",
+  "4": "E Major",
+  "5": "B Major",
+  "6": "F♯ Major",
+  "7": "C♯ Major",
+};
+
+// =============================================================================
+// Component
+// =============================================================================
+
+function CompactTopBarComponent({
+  title: _title,
+  onTitleChange: _onTitleChange,
+  clef,
+  onClefChange,
+  timeSignature,
+  onTimeSignatureChange,
+  keySignature,
+  onKeySignatureChange,
+  tempo,
+  onTempoChange,
+  measureValidation,
+  onBack,
+  disabled = false,
+  testID,
+}: CompactTopBarProps): React.ReactElement {
+  // Modal states
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showTimeModal, setShowTimeModal] = useState(false);
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [tempoInput, setTempoInput] = useState(tempo.toString());
+
+  // Validation status handler
+  const handleValidationPress = useCallback(() => {
+    if (!measureValidation) return;
+
+    let alertTitle: string;
+    let message: string;
+
+    if (measureValidation.isComplete) {
+      alertTitle = "Measure Complete";
+      message = "This measure has the correct number of beats.";
+    } else if (measureValidation.difference > 0) {
+      alertTitle = "Measure Overflowed";
+      message = "This measure has too many beats. Remove some notes or rests.";
+    } else {
+      const beatsLeft = Math.abs(measureValidation.difference);
+      alertTitle = "Measure Incomplete";
+      message = `This measure needs ${beatsLeft} more beat${beatsLeft !== 1 ? "s" : ""}.`;
+    }
+
+    if (Platform.OS === "web") {
+      window.alert(`${alertTitle}\n\n${message}`);
+    } else {
+      Alert.alert(alertTitle, message);
+    }
+  }, [measureValidation]);
+
+  // Handlers
+  const handleClefToggle = useCallback(() => {
+    onClefChange(clef === "treble" ? "bass" : "treble");
+  }, [clef, onClefChange]);
+
+  const handleBeatsChange = useCallback(
+    (beats: number) => {
+      onTimeSignatureChange({ beats, beatUnit: timeSignature.beatUnit });
+    },
+    [onTimeSignatureChange, timeSignature.beatUnit],
+  );
+
+  const handleNoteValueChange = useCallback(
+    (beatUnit: number) => {
+      onTimeSignatureChange({ beats: timeSignature.beats, beatUnit });
+    },
+    [onTimeSignatureChange, timeSignature.beats],
+  );
+
+  const handleKeySelect = useCallback(
+    (k: KeySignature) => {
+      onKeySignatureChange(k);
+      setShowKeyModal(false);
+    },
+    [onKeySignatureChange],
+  );
+
+  const handleTempoChange = useCallback(
+    (delta: number) => {
+      const newTempo = Math.max(20, Math.min(300, tempo + delta));
+      onTempoChange(newTempo);
+      setTempoInput(newTempo.toString());
+    },
+    [tempo, onTempoChange],
+  );
+
+  const handleTempoInputBlur = useCallback(() => {
+    const parsed = parseInt(tempoInput, 10);
+    if (!isNaN(parsed) && parsed >= 20 && parsed <= 300) {
+      onTempoChange(parsed);
+    } else {
+      setTempoInput(tempo.toString());
+    }
+  }, [tempoInput, tempo, onTempoChange]);
+
+  const tsDisplay = `${timeSignature.beats}/${timeSignature.beatUnit}`;
+  const keyName = KEY_NAMES[String(keySignature)] || "C Major";
+
+  return (
+    <View style={styles.container} testID={testID}>
+      {/* Back button */}
+      {onBack && (
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={onBack}
+          accessibilityRole={"button" as AccessibilityRole}
+          accessibilityLabel="Go back"
+          testID="topbar-back"
+        >
+          <Feather name="arrow-left" size={22} color={colors.textPrimary} />
+        </TouchableOpacity>
+      )}
+
+      {/* Title with validation indicator */}
+      <View style={styles.titleContainer}>
+        {measureValidation && (
+          <TouchableOpacity
+            style={styles.validationButton}
+            onPress={handleValidationPress}
+            accessibilityLabel={
+              measureValidation.isComplete
+                ? "Measure complete"
+                : "Measure incomplete"
+            }
+            accessibilityRole="button"
+            testID="topbar-validation"
+          >
+            <Feather
+              name={
+                measureValidation.isComplete ? "check-circle" : "alert-circle"
+              }
+              size={18}
+              color={
+                measureValidation.isComplete ? colors.success : colors.warning
+              }
+            />
+          </TouchableOpacity>
+        )}
+        <Text style={styles.title} numberOfLines={1}>
+          Composer
+        </Text>
+      </View>
+
+      {/* Settings gear button */}
+      <TouchableOpacity
+        style={styles.settingsButton}
+        onPress={() => setShowSettingsModal(true)}
+        disabled={disabled}
+        accessibilityRole={"button" as AccessibilityRole}
+        accessibilityLabel="Score settings"
+        testID="topbar-settings"
+      >
+        <Feather
+          name="settings"
+          size={22}
+          color={disabled ? colors.textSecondary : colors.textPrimary}
+        />
+      </TouchableOpacity>
+
+      {/* Unified Settings Modal */}
+      <Modal
+        visible={showSettingsModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSettingsModal(false)}
+      >
+        <View style={styles.settingsModalContainer}>
+          <View style={styles.settingsModalContent}>
+            <View style={styles.settingsHeader}>
+              <Text style={styles.settingsTitle}>Score Settings</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowSettingsModal(false)}
+                testID="settings-close"
+              >
+                <Feather name="x" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.settingsBody}>
+              {/* Clef */}
+              <View style={styles.settingRow}>
+                <Text style={styles.settingLabel}>Clef</Text>
+                <TouchableOpacity
+                  style={styles.settingButton}
+                  onPress={handleClefToggle}
+                  testID="settings-clef"
+                >
+                  <Text style={styles.settingValue}>
+                    {clef === "treble" ? "Treble 𝄞" : "Bass 𝄢"}
+                  </Text>
+                  <Feather
+                    name="repeat"
+                    size={16}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* Time Signature */}
+              <View style={styles.settingRow}>
+                <Text style={styles.settingLabel}>Time</Text>
+                <TouchableOpacity
+                  style={styles.settingButton}
+                  onPress={() => {
+                    setShowSettingsModal(false);
+                    setTimeout(() => setShowTimeModal(true), 300);
+                  }}
+                  testID="settings-time"
+                >
+                  <Text style={styles.settingValue}>{tsDisplay}</Text>
+                  <Feather
+                    name="chevron-right"
+                    size={18}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* Key Signature */}
+              <View style={styles.settingRow}>
+                <Text style={styles.settingLabel}>Key</Text>
+                <TouchableOpacity
+                  style={styles.settingButton}
+                  onPress={() => {
+                    setShowSettingsModal(false);
+                    setTimeout(() => setShowKeyModal(true), 300);
+                  }}
+                  testID="settings-key"
+                >
+                  <Text style={styles.settingValue}>{keyName}</Text>
+                  <Feather
+                    name="chevron-right"
+                    size={18}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* Tempo */}
+              <View style={styles.settingRow}>
+                <Text style={styles.settingLabel}>Tempo</Text>
+                <View style={styles.tempoControls}>
+                  <TouchableOpacity
+                    style={styles.tempoButton}
+                    onPress={() => handleTempoChange(-5)}
+                    testID="settings-tempo-down"
+                  >
+                    <Feather
+                      name="minus"
+                      size={18}
+                      color={colors.textPrimary}
+                    />
+                  </TouchableOpacity>
+                  <TextInput
+                    style={styles.tempoInput}
+                    value={tempoInput}
+                    onChangeText={setTempoInput}
+                    onBlur={handleTempoInputBlur}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                    textAlign="center"
+                    testID="settings-tempo-input"
+                  />
+                  <TouchableOpacity
+                    style={styles.tempoButton}
+                    onPress={() => handleTempoChange(5)}
+                    testID="settings-tempo-up"
+                  >
+                    <Feather name="plus" size={18} color={colors.textPrimary} />
+                  </TouchableOpacity>
+                  <Text style={styles.bpmLabel}>BPM</Text>
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Time Signature Picker */}
+      <TimeSignaturePickerModal
+        visible={showTimeModal}
+        onClose={() => setShowTimeModal(false)}
+        beatsPerMeasure={timeSignature.beats}
+        noteValue={timeSignature.beatUnit}
+        onBeatsChange={handleBeatsChange}
+        onNoteValueChange={handleNoteValueChange}
+      />
+
+      {/* Key Signature Modal */}
+      <Modal
+        visible={showKeyModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowKeyModal(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowKeyModal(false)}
+        >
+          <View
+            style={styles.keyModalContent}
+            onStartShouldSetResponder={() => true}
+          >
+            <Text style={styles.keyModalTitle}>Select Key</Text>
+            <ScrollView style={styles.keyScroll}>
+              {Array.from({ length: 15 }, (_, i) => i - 7).map((k) => {
+                const isSelected = k === keySignature;
+                const kName = KEY_NAMES[String(k)] || "C Major";
+                return (
+                  <TouchableOpacity
+                    key={k}
+                    style={[
+                      styles.keyOption,
+                      isSelected && styles.keyOptionSelected,
+                    ]}
+                    onPress={() => handleKeySelect(k as KeySignature)}
+                    testID={`key-${k}`}
+                  >
+                    <Text style={styles.keyOptionText}>{kName}</Text>
+                    {isSelected && (
+                      <Feather name="check" size={18} color={colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
+
+// =============================================================================
+// Styles
+// =============================================================================
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    height: 44,
+  },
+  backButton: {
+    padding: spacing.xs,
+  },
+  titleContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.textPrimary,
+  },
+  validationButton: {
+    padding: 2,
+  },
+  settingsButton: {
+    padding: spacing.xs,
+  },
+  // Settings Modal
+  settingsModalContainer: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  settingsModalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: "70%",
+  },
+  settingsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  settingsTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.textPrimary,
+  },
+  closeButton: {
+    padding: spacing.xs,
+  },
+  settingsBody: {
+    padding: spacing.md,
+  },
+  settingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  settingLabel: {
+    fontSize: 16,
+    color: colors.textPrimary,
+  },
+  settingButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+  },
+  settingValue: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: colors.textPrimary,
+  },
+  tempoControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  tempoButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  tempoInput: {
+    width: 50,
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.textPrimary,
+    backgroundColor: colors.background,
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  bpmLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginLeft: 2,
+  },
+  // Key Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  keyModalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.md,
+    width: "85%",
+    maxWidth: 320,
+    maxHeight: "70%",
+  },
+  keyModalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.textPrimary,
+    textAlign: "center",
+    marginBottom: spacing.md,
+  },
+  keyScroll: {
+    maxHeight: 350,
+  },
+  keyOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 8,
+    marginBottom: spacing.xs,
+  },
+  keyOptionSelected: {
+    backgroundColor: colors.primaryLight,
+  },
+  keyOptionText: {
+    fontSize: 16,
+    color: colors.textPrimary,
+  },
+});
+
+// =============================================================================
+// Export
+// =============================================================================
+
+export const CompactTopBar = memo(CompactTopBarComponent);

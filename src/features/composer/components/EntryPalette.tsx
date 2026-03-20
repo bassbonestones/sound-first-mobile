@@ -13,7 +13,6 @@ import { colors, spacing } from "../../../constants";
 import { DurationSelector } from "./DurationSelector";
 import { PitchSelector } from "./PitchSelector";
 import { ModifierRow } from "./ModifierRow";
-import { OctaveControls } from "./OctaveControls";
 import type { DurationValue, PitchName, Accidental, Note } from "../types";
 
 // =============================================================================
@@ -73,28 +72,20 @@ function EntryPaletteComponent({
         testID="duration-selector"
       />
 
-      {/* Pitch row with octave controls */}
-      <View style={styles.pitchRow}>
-        <View style={styles.pitchSelectorWrapper}>
-          <PitchSelector
-            onSelectPitch={onPitchTap}
-            disabled={disabled}
-            testID="pitch-selector"
-          />
-        </View>
-        <OctaveControls
-          onOctaveChange={onOctaveChange}
-          disabled={disabled}
-          testID="octave-controls"
-        />
-      </View>
+      {/* Pitch row (includes rest at beginning) */}
+      <PitchSelector
+        onSelectPitch={onPitchTap}
+        onInsertRest={onInsertRest}
+        selectedDuration={selectedDuration}
+        disabled={disabled}
+        testID="pitch-selector"
+      />
 
       {/* Modifier row */}
       <ModifierRow
         onAccidental={onAccidental}
-        onRest={onInsertRest}
         onTie={onToggleTie}
-        selectedDuration={selectedDuration}
+        onOctaveChange={onOctaveChange}
         activeAccidental={activeAccidental}
         tieActive={tieActive}
         hasSelection={hasSelection}
@@ -116,14 +107,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-  },
-  pitchRow: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: spacing.sm,
-  },
-  pitchSelectorWrapper: {
-    flex: 1,
   },
 });
 

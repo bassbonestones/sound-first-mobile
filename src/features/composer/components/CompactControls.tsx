@@ -1,0 +1,321 @@
+/**
+ * CompactControls Component
+ *
+ * Unified compact control bar for small screens.
+ * Combines minimal navigation (delete only) + overflow menu with measure controls.
+ * Navigation uses swipe gestures on viewport, so only delete button shown here.
+ */
+
+import React, { memo, useCallback, useState } from "react";
+import {
+  View,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  Modal,
+  Pressable,
+  AccessibilityRole,
+  useWindowDimensions,
+} from "react-native";
+import { Feather } from "@expo/vector-icons";
+
+import { colors, spacing } from "../../../constants";
+import type { MeasureValidation } from "../types";
+
+// =============================================================================
+// Types
+// =============================================================================
+
+export interface CompactControlsProps {
+  /** Current measure number (1-based) */
+  currentMeasure: number;
+  /** Total measure count */
+  totalMeasures: number;
+  /** Validation state of current measure */
+  validation: MeasureValidation;
+  /** Called when delete is pressed */
+  onDelete: () => void;
+  /** Called when add measure is pressed */
+  onAddMeasure: () => void;
+  /** Called when delete measure is pressed */
+  onDeleteMeasure: () => void;
+  /** Called when fill with rests is pressed */
+  onFillWithRests: () => void;
+  /** Whether there's a selected note (for delete) */
+  hasSelection?: boolean;
+  /** Whether delete measure is allowed */
+  canDeleteMeasure?: boolean;
+  /** Whether controls are disabled */
+  disabled?: boolean;
+  /** Test ID for testing */
+  testID?: string;
+}
+
+// =============================================================================
+// Component
+// =============================================================================
+
+function CompactControlsComponent({
+  currentMeasure,
+  totalMeasures,
+  validation,
+  onDelete,
+  onAddMeasure,
+  onDeleteMeasure,
+  onFillWithRests,
+  hasSelection = false,
+  canDeleteMeasure = true,
+  disabled = false,
+  testID,
+}: CompactControlsProps): React.ReactElement {
+  const [showMenu, setShowMenu] = useState(false);
+  const { width } = useWindowDimensions();
+  const showMeasureInfo = width >= 400;
+
+  const handleDelete = useCallback(() => {
+    if (!disabled && hasSelection) onDelete();
+  }, [disabled, hasSelection, onDelete]);
+
+  const handleAddMeasure = useCallback(() => {
+    if (!disabled) {
+      onAddMeasure();
+      setShowMenu(false);
+    }
+  }, [disabled, onAddMeasure]);
+
+  const handleDeleteMeasure = useCallback(() => {
+    if (!disabled && canDeleteMeasure) {
+      onDeleteMeasure();
+      setShowMenu(false);
+    }
+  }, [disabled, canDeleteMeasure, onDeleteMeasure]);
+
+  const handleFillWithRests = useCallback(() => {
+    if (!disabled && !validation.isComplete && validation.difference < 0) {
+      onFillWithRests();
+      setShowMenu(false);
+    }
+  }, [disabled, validation, onFillWithRests]);
+
+  const canFill = !validation.isComplete && validation.difference < 0;
+
+  return (
+    <View style={styles.container} testID={testID}>
+      {/* Measure indicator - hidden on narrow screens */}
+      {showMeasureInfo && (
+        <View style={styles.measureInfo}>
+          <Text style={styles.measureText}>
+            M{currentMeasure}/{totalMeasures}
+          </Text>
+        </View>
+      )}
+
+      {/* Delete note button */}
+      <TouchableOpacity
+        style={[
+          styles.iconButton,
+          styles.deleteButton,
+          (!hasSelection || disabled) && styles.buttonDisabled,
+        ]}
+        onPress={handleDelete}
+        disabled={!hasSelection || disabled}
+        accessibilityRole={"button" as AccessibilityRole}
+        accessibilityLabel="Delete note"
+        accessibilityState={{ disabled: !hasSelection || disabled }}
+        testID="compact-delete"
+      >
+        <Feather
+          name="trash-2"
+          size={18}
+          color={
+            hasSelection && !disabled ? colors.error : colors.textSecondary
+          }
+        />
+      </TouchableOpacity>
+
+      {/* Overflow menu button */}
+      <TouchableOpacity
+        style={[styles.iconButton, disabled && styles.buttonDisabled]}
+        onPress={() => setShowMenu(true)}
+        disabled={disabled}
+        accessibilityRole={"button" as AccessibilityRole}
+        accessibilityLabel="More options"
+        testID="compact-more"
+      >
+        <Feather
+          name="more-vertical"
+          size={20}
+          color={disabled ? colors.textSecondary : colors.textPrimary}
+        />
+      </TouchableOpacity>
+
+      {/* Overflow Menu Modal */}
+      <Modal
+        visible={showMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <Pressable
+          style={styles.menuOverlay}
+          onPress={() => setShowMenu(false)}
+        >
+          <View
+            style={styles.menuContent}
+            onStartShouldSetResponder={() => true}
+          >
+            {/* Fill with rests - only show if measure incomplete */}
+            {canFill && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={handleFillWithRests}
+                testID="menu-fill"
+              >
+                <Feather name="pause" size={18} color={colors.primary} />
+                <Text style={styles.menuItemText}>Fill with Rests</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Add measure */}
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={handleAddMeasure}
+              testID="menu-add"
+            >
+              <Feather name="plus-square" size={18} color={colors.success} />
+              <Text style={styles.menuItemText}>Add Measure</Text>
+            </TouchableOpacity>
+
+            {/* Delete measure */}
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                !canDeleteMeasure && styles.menuItemDisabled,
+              ]}
+              onPress={handleDeleteMeasure}
+              disabled={!canDeleteMeasure}
+              testID="menu-delete-measure"
+            >
+              <Feather
+                name="minus-square"
+                size={18}
+                color={canDeleteMeasure ? colors.error : colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.menuItemText,
+                  !canDeleteMeasure && styles.menuItemTextDisabled,
+                ]}
+              >
+                Delete Measure
+              </Text>
+            </TouchableOpacity>
+
+            {/* Cancel */}
+            <TouchableOpacity
+              style={[styles.menuItem, styles.cancelItem]}
+              onPress={() => setShowMenu(false)}
+              testID="menu-cancel"
+            >
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
+
+// =============================================================================
+// Styles
+// =============================================================================
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.surface,
+  },
+  measureInfo: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    backgroundColor: colors.background,
+    borderRadius: 4,
+  },
+  measureText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: colors.textSecondary,
+  },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  deleteButton: {
+    // Delete could have special styling if needed
+  },
+  buttonDisabled: {
+    opacity: 0.4,
+  },
+  // Menu styles
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  menuContent: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.sm,
+    width: "75%",
+    maxWidth: 280,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 8,
+  },
+  menuItemDisabled: {
+    opacity: 0.5,
+  },
+  menuItemText: {
+    fontSize: 16,
+    color: colors.textPrimary,
+  },
+  menuItemTextDisabled: {
+    color: colors.textSecondary,
+  },
+  cancelItem: {
+    justifyContent: "center",
+    marginTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.md,
+  },
+  cancelText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: colors.textSecondary,
+    textAlign: "center",
+  },
+});
+
+// =============================================================================
+// Export
+// =============================================================================
+
+export const CompactControls = memo(CompactControlsComponent);

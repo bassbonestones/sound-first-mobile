@@ -3,6 +3,7 @@
  *
  * Main screen for the Practice Composer feature.
  * Assembles all composer components into a complete editing experience.
+ * Optimized for small screens (320x568 minimum).
  */
 
 import React, {
@@ -25,6 +26,9 @@ import {
   ScrollView,
   Modal,
   Pressable,
+  PanResponder,
+  GestureResponderEvent,
+  PanResponderGestureState,
 } from "react-native";
 import {
   useNavigation,
@@ -32,15 +36,15 @@ import {
   type RouteProp,
 } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../constants";
 import { useComposerState, useComposerPlayback } from "../hooks";
 import {
-  ComposerTopBar,
+  CompactTopBar,
   ComposerScoreViewport,
   EntryPalette,
-  NavigationControls,
-  MeasureControls,
+  CompactControls,
 } from "../components";
 import {
   composerStorageService,
@@ -479,6 +483,41 @@ function ComposerScreenContent({
   ]);
 
   // ==========================================================================
+  // Swipe Gesture Handling
+  // ==========================================================================
+
+  const swipeThreshold = 50;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (
+        _evt: GestureResponderEvent,
+        gestureState: PanResponderGestureState,
+      ) => {
+        // Only respond to horizontal swipes
+        return (
+          Math.abs(gestureState.dx) > 20 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy)
+        );
+      },
+      onPanResponderRelease: (
+        _evt: GestureResponderEvent,
+        gestureState: PanResponderGestureState,
+      ) => {
+        if (isPlaying) return;
+
+        if (gestureState.dx > swipeThreshold) {
+          // Swipe right = go left (previous)
+          handleLeft();
+        } else if (gestureState.dx < -swipeThreshold) {
+          // Swipe left = go right (next)
+          handleRight();
+        }
+      },
+    }),
+  ).current;
+
+  // ==========================================================================
   // Render
   // ==========================================================================
 
@@ -496,8 +535,8 @@ function ComposerScreenContent({
         style={styles.content}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {/* Top Bar */}
-        <ComposerTopBar
+        {/* Compact Top Bar */}
+        <CompactTopBar
           title={composerState.score.title || ""}
           onTitleChange={handleTitleChange}
           clef={composerState.score.clef}
@@ -514,28 +553,66 @@ function ComposerScreenContent({
           testID="composer-topbar"
         />
 
+        {/* Score Viewport with swipe gestures */}
+        <View style={styles.viewportWrapper} {...panResponder.panHandlers}>
+          <ComposerScoreViewport
+            score={composerState.score}
+            cursor={composerState.cursor}
+            selectedNoteId={highlightedNoteId}
+            onNoteTap={handleScoreTap}
+            playbackState={playback.state}
+            playbackMeasureIndex={playback.position.measureIndex}
+            onPlay={handlePlay}
+            onPause={handlePause}
+            onStop={handleStop}
+            showZoomControls={false}
+            testID="composer-viewport"
+          />
+
+          {/* Floating Playback Controls */}
+          <View style={styles.floatingPlayback}>
+            <TouchableOpacity
+              style={[
+                styles.floatingButton,
+                styles.stopButton,
+                playback.state === "stopped" && styles.buttonDisabled,
+              ]}
+              onPress={handleStop}
+              disabled={playback.state === "stopped"}
+              accessibilityLabel="Stop"
+              accessibilityRole="button"
+            >
+              <Feather
+                name="square"
+                size={16}
+                color={
+                  playback.state !== "stopped"
+                    ? colors.error
+                    : colors.textSecondary
+                }
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.floatingButton, styles.playButton]}
+              onPress={isPlaying ? handlePause : handlePlay}
+              accessibilityLabel={isPlaying ? "Pause" : "Play"}
+              accessibilityRole="button"
+            >
+              <Feather
+                name={isPlaying ? "pause" : "play"}
+                size={20}
+                color={colors.white}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <ScrollView
           style={styles.scrollContent}
           contentContainerStyle={styles.scrollContentContainer}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Score Viewport with integrated playback controls */}
-          <View style={styles.viewportContainer}>
-            <ComposerScoreViewport
-              score={composerState.score}
-              cursor={composerState.cursor}
-              selectedNoteId={highlightedNoteId}
-              onNoteTap={handleScoreTap}
-              playbackState={playback.state}
-              playbackMeasureIndex={playback.position.measureIndex}
-              onPlay={handlePlay}
-              onPause={handlePause}
-              onStop={handleStop}
-              testID="composer-viewport"
-            />
-          </View>
-
           {/* Entry Palette */}
           <EntryPalette
             selectedDuration={composerState.state.selectedDuration}
@@ -550,58 +627,148 @@ function ComposerScreenContent({
             testID="composer-palette"
           />
 
-          {/* Navigation Controls */}
-          <View style={styles.controlsRow}>
-            <NavigationControls
-              onLeft={handleLeft}
-              onRight={handleRight}
-              onUp={handleUp}
-              onDown={handleDown}
-              onDelete={handleDelete}
-              canGoLeft={canGoLeft}
-              canGoRight={canGoRight}
-              hasSelection={hasSelection}
-              disabled={isPlaying}
-              testID="composer-nav"
-            />
+          {/* Compact Controls Row */}
+          <View style={styles.compactControlsRow}>
+            {/* Pitch up/down buttons */}
+            <View style={styles.pitchButtons}>
+              <TouchableOpacity
+                style={[
+                  styles.pitchButton,
+                  (!hasSelection || isPlaying) && styles.buttonDisabled,
+                ]}
+                onPress={handleUp}
+                disabled={!hasSelection || isPlaying}
+                accessibilityLabel="Pitch up"
+              >
+                <Feather
+                  name="chevron-up"
+                  size={22}
+                  color={
+                    hasSelection && !isPlaying
+                      ? colors.textPrimary
+                      : colors.textSecondary
+                  }
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.pitchButton,
+                  (!hasSelection || isPlaying) && styles.buttonDisabled,
+                ]}
+                onPress={handleDown}
+                disabled={!hasSelection || isPlaying}
+                accessibilityLabel="Pitch down"
+              >
+                <Feather
+                  name="chevron-down"
+                  size={22}
+                  color={
+                    hasSelection && !isPlaying
+                      ? colors.textPrimary
+                      : colors.textSecondary
+                  }
+                />
+              </TouchableOpacity>
+            </View>
 
-            <MeasureControls
+            {/* Compact measure controls with overflow menu */}
+            <CompactControls
               currentMeasure={composerState.cursor.measureIndex + 1}
               totalMeasures={composerState.score.measures.length}
               validation={measureValidation}
+              onDelete={handleDelete}
               onAddMeasure={handleAddMeasure}
               onDeleteMeasure={handleDeleteMeasure}
               onFillWithRests={handleFillWithRests}
-              canDelete={canDeleteMeasure}
+              hasSelection={hasSelection}
+              canDeleteMeasure={canDeleteMeasure}
               disabled={isPlaying}
-              testID="composer-measure"
+              testID="composer-controls"
             />
-          </View>
 
-          {/* Action Buttons */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={handleSave}
-              disabled={isPlaying}
-              accessibilityLabel="Save score"
-              accessibilityRole="button"
-              testID="composer-save-button"
-            >
-              <Text style={styles.saveButtonText}>Save</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.practiceButton}
-              onPress={handlePractice}
-              disabled={isPlaying}
-              accessibilityLabel="Practice this score"
-              accessibilityRole="button"
-              testID="composer-practice-button"
-            >
-              <Text style={styles.practiceButtonText}>Practice</Text>
-            </TouchableOpacity>
+            {/* Nav arrows for precise control */}
+            <View style={styles.navButtons}>
+              <TouchableOpacity
+                style={[
+                  styles.navButton,
+                  (!canGoLeft || isPlaying) && styles.buttonDisabled,
+                ]}
+                onPress={handleLeft}
+                disabled={!canGoLeft || isPlaying}
+                accessibilityLabel="Previous"
+              >
+                <Feather
+                  name="chevron-left"
+                  size={22}
+                  color={
+                    canGoLeft && !isPlaying
+                      ? colors.textPrimary
+                      : colors.textSecondary
+                  }
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.navButton,
+                  (!canGoRight || isPlaying) && styles.buttonDisabled,
+                ]}
+                onPress={handleRight}
+                disabled={!canGoRight || isPlaying}
+                accessibilityLabel="Next"
+              >
+                <Feather
+                  name="chevron-right"
+                  size={22}
+                  color={
+                    canGoRight && !isPlaying
+                      ? colors.textPrimary
+                      : colors.textSecondary
+                  }
+                />
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
+
+        {/* Action Buttons - pinned to bottom */}
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[
+              styles.saveButton,
+              (!composerState.allMeasuresValid || isPlaying) &&
+                styles.saveButtonDisabled,
+            ]}
+            onPress={handleSave}
+            disabled={!composerState.allMeasuresValid || isPlaying}
+            accessibilityLabel="Save score"
+            accessibilityRole="button"
+            testID="composer-save-button"
+          >
+            <Text
+              style={[
+                styles.saveButtonText,
+                (!composerState.allMeasuresValid || isPlaying) &&
+                  styles.saveButtonTextDisabled,
+              ]}
+            >
+              Save
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.practiceButton,
+              (!composerState.allMeasuresValid || isPlaying) &&
+                styles.practiceButtonDisabled,
+            ]}
+            onPress={handlePractice}
+            disabled={!composerState.allMeasuresValid || isPlaying}
+            accessibilityLabel="Practice this score"
+            accessibilityRole="button"
+            testID="composer-practice-button"
+          >
+            <Text style={styles.practiceButtonText}>Practice</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Clef Change Transposition Modal */}
         <Modal
@@ -775,52 +942,129 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.background,
   },
-  viewportContainer: {
-    height: 200,
-    minHeight: 150,
+  // Viewport with floating playback
+  viewportWrapper: {
+    height: 160,
+    minHeight: 120,
+    position: "relative",
   },
-  controlsRow: {
+  floatingPlayback: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: 6,
+    zIndex: 10,
+  },
+  floatingButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 22,
+  },
+  stopButton: {
+    width: 44,
+    height: 44,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  playButton: {
+    width: 44,
+    height: 44,
+    backgroundColor: colors.primary,
+  },
+  buttonDisabled: {
+    opacity: 0.4,
+  },
+  // Compact controls row
+  compactControlsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 4,
     paddingHorizontal: spacing.sm,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    backgroundColor: colors.surface,
   },
+  pitchButtons: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  pitchButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  navButtons: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  navButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  // Action buttons - pinned to bottom
   actionRow: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
   saveButton: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xl,
+    flex: 1,
+    marginRight: spacing.sm,
+    minHeight: 44,
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: colors.surface,
-    borderRadius: 8,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: colors.primary,
   },
   saveButtonText: {
     color: colors.primary,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
   },
   practiceButton: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xl,
+    flex: 1,
+    marginLeft: spacing.sm,
+    minHeight: 44,
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: colors.primary,
-    borderRadius: 8,
+    borderRadius: 6,
+  },
+  practiceButtonDisabled: {
+    backgroundColor: colors.textSecondary,
+    opacity: 0.5,
   },
   practiceButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
+  },
+  saveButtonDisabled: {
+    borderColor: colors.textSecondary,
+    opacity: 0.5,
+  },
+  saveButtonTextDisabled: {
+    color: colors.textSecondary,
   },
   // Clef change modal styles
   modalOverlay: {
@@ -839,7 +1083,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
     textAlign: "center",
   },

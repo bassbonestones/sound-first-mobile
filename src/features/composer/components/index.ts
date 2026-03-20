@@ -38,6 +38,12 @@ export type { MeasureControlsProps } from "./MeasureControls";
 export { ComposerTopBar } from "./ComposerTopBar";
 export type { ComposerTopBarProps } from "./ComposerTopBar";
 
+export { CompactTopBar } from "./CompactTopBar";
+export type { CompactTopBarProps } from "./CompactTopBar";
+
+export { CompactControls } from "./CompactControls";
+export type { CompactControlsProps } from "./CompactControls";
+
 // Transport / playback
 export { ComposerTransport } from "./ComposerTransport";
 export type { ComposerTransportProps } from "./ComposerTransport";

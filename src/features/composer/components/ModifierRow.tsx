@@ -5,19 +5,23 @@
  * rest insertion, and tie toggling.
  */
 
-import React, { memo, useCallback } from "react";
+import React, { memo, useCallback, useState } from "react";
 import {
   View,
   TouchableOpacity,
   Text,
   StyleSheet,
   AccessibilityRole,
+  ScrollView,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  LayoutChangeEvent,
 } from "react-native";
-import Svg, { Rect, Line } from "react-native-svg";
+import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
-import { colors, spacing } from "../../../constants";
-import type { Accidental, DurationValue } from "../types";
-import { DURATION } from "../types";
+import { colors } from "../../../constants";
+import type { Accidental } from "../types";
 
 // =============================================================================
 // Types
@@ -26,12 +30,10 @@ import { DURATION } from "../types";
 export interface ModifierRowProps {
   /** Called when an accidental is selected */
   onAccidental: (accidental: Accidental) => void;
-  /** Called when rest button is pressed */
-  onRest: () => void;
   /** Called when tie button is pressed */
   onTie: () => void;
-  /** Currently selected duration (for dynamic rest symbol) */
-  selectedDuration: DurationValue;
+  /** Called when octave changes */
+  onOctaveChange: (direction: "up" | "down") => void;
   /** Currently active accidental (if any) */
   activeAccidental?: Accidental | null;
   /** Whether a tie is currently active on selected note */
@@ -48,7 +50,7 @@ interface ModifierButton {
   id: string;
   label: string;
   symbol: string;
-  type: "accidental" | "rest" | "tie";
+  type: "accidental" | "tie";
   value?: Accidental;
   useBravura?: boolean;
 }
@@ -58,28 +60,17 @@ interface ModifierButton {
 // =============================================================================
 
 /**
- * SMuFL codepoints for Bravura font rest symbols
- */
-const REST_SYMBOLS: Record<DurationValue, string> = {
-  [DURATION.WHOLE]: "\uE4E3", // restWhole
-  [DURATION.HALF]: "\uE4E4", // restHalf
-  [DURATION.QUARTER]: "\uE4E5", // restQuarter
-  [DURATION.EIGHTH]: "\uE4E6", // rest8th
-  [DURATION.SIXTEENTH]: "\uE4E7", // rest16th
-};
-
-/**
  * SMuFL codepoints for Bravura accidentals
  */
 const ACCIDENTAL_SYMBOLS = {
-  "double-sharp": "\uE263", // accidentalDoubleSharp
-  sharp: "\uE262", // accidentalSharp
-  natural: "\uE261", // accidentalNatural
-  flat: "\uE260", // accidentalFlat
-  "double-flat": "\uE264", // accidentalDoubleFlat
+  "double-sharp": "\uE263",
+  sharp: "\uE262",
+  natural: "\uE261",
+  flat: "\uE260",
+  "double-flat": "\uE264",
 };
 
-const BASE_MODIFIER_BUTTONS: ModifierButton[] = [
+const MODIFIER_BUTTONS: ModifierButton[] = [
   {
     id: "double-sharp",
     label: "Double Sharp",
@@ -120,50 +111,8 @@ const BASE_MODIFIER_BUTTONS: ModifierButton[] = [
     value: "double-flat",
     useBravura: true,
   },
-  // Rest button is added dynamically based on selectedDuration
-  { id: "tie", label: "Tie", symbol: "\uE1FD", type: "tie", useBravura: true }, // tie SMuFL
+  { id: "tie", label: "Tie", symbol: "\uE1FD", type: "tie", useBravura: true },
 ];
-
-// =============================================================================
-// SVG Rest Components
-// =============================================================================
-
-/** Whole rest: rectangle hanging below the line */
-function WholeRestSvg({
-  disabled,
-}: {
-  disabled?: boolean;
-}): React.ReactElement {
-  const fillColor = disabled ? colors.textSecondary : colors.textPrimary;
-  return (
-    <Svg width={24} height={24} viewBox="0 0 24 24">
-      {/* Staff line */}
-      <Line x1={2} y1={8} x2={22} y2={8} stroke={fillColor} strokeWidth={1.5} />
-      {/* Rest rectangle hanging below */}
-      <Rect x={7} y={8} width={10} height={5} fill={fillColor} />
-    </Svg>
-  );
-}
-
-/** Half rest: rectangle sitting on top of the line */
-function HalfRestSvg({ disabled }: { disabled?: boolean }): React.ReactElement {
-  const fillColor = disabled ? colors.textSecondary : colors.textPrimary;
-  return (
-    <Svg width={24} height={24} viewBox="0 0 24 24">
-      {/* Staff line */}
-      <Line
-        x1={2}
-        y1={16}
-        x2={22}
-        y2={16}
-        stroke={fillColor}
-        strokeWidth={1.5}
-      />
-      {/* Rest rectangle sitting on top */}
-      <Rect x={7} y={11} width={10} height={5} fill={fillColor} />
-    </Svg>
-  );
-}
 
 // =============================================================================
 // Component
@@ -171,31 +120,40 @@ function HalfRestSvg({ disabled }: { disabled?: boolean }): React.ReactElement {
 
 function ModifierRowComponent({
   onAccidental,
-  onRest,
   onTie,
-  selectedDuration,
+  onOctaveChange,
   activeAccidental,
   tieActive = false,
   disabled = false,
   hasSelection = false,
   testID,
 }: ModifierRowProps): React.ReactElement {
-  // Build buttons with dynamic rest symbol
-  const MODIFIER_BUTTONS: ModifierButton[] = [
-    ...BASE_MODIFIER_BUTTONS.slice(0, 3), // accidentals
-    {
-      id: "rest",
-      label: "Rest",
-      symbol: REST_SYMBOLS[selectedDuration] || REST_SYMBOLS[DURATION.QUARTER],
-      type: "rest",
-      useBravura: true,
-    },
-    ...BASE_MODIFIER_BUTTONS.slice(3), // tie
-  ];
+  const [scrollState, setScrollState] = useState({
+    scrollX: 0,
+    contentWidth: 0,
+    containerWidth: 0,
+  });
 
-  // Check if rest needs special SVG rendering (whole or half)
-  const isWholeRest = selectedDuration === DURATION.WHOLE;
-  const isHalfRest = selectedDuration === DURATION.HALF;
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      setScrollState((prev) => ({
+        ...prev,
+        scrollX: event.nativeEvent.contentOffset.x,
+      }));
+    },
+    [],
+  );
+
+  const handleContentSizeChange = useCallback((width: number) => {
+    setScrollState((prev) => ({ ...prev, contentWidth: width }));
+  }, []);
+
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    setScrollState((prev) => ({
+      ...prev,
+      containerWidth: event.nativeEvent.layout.width,
+    }));
+  }, []);
 
   const handlePress = useCallback(
     (button: ModifierButton) => {
@@ -207,15 +165,12 @@ function ModifierRowComponent({
             onAccidental(button.value);
           }
           break;
-        case "rest":
-          onRest();
-          break;
         case "tie":
           onTie();
           break;
       }
     },
-    [disabled, onAccidental, onRest, onTie],
+    [disabled, onAccidental, onTie],
   );
 
   const isButtonActive = (button: ModifierButton): boolean => {
@@ -237,51 +192,138 @@ function ModifierRowComponent({
     return false;
   };
 
+  // Calculate fade visibility
+  const canScrollLeft = scrollState.scrollX > 2;
+  const canScrollRight =
+    scrollState.contentWidth > scrollState.containerWidth &&
+    scrollState.scrollX <
+      scrollState.contentWidth - scrollState.containerWidth - 2;
+
   return (
     <View style={styles.container} testID={testID}>
-      <Text style={styles.label}>Modifiers</Text>
-      <View style={styles.buttonRow}>
-        {MODIFIER_BUTTONS.map((button) => {
-          const isActive = isButtonActive(button);
-          const buttonDisabled = isButtonDisabled(button);
+      {/* Scrollable modifier buttons with border */}
+      <View style={styles.scrollBorder}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          onScroll={handleScroll}
+          onContentSizeChange={handleContentSizeChange}
+          onLayout={handleLayout}
+          scrollEventThrottle={16}
+        >
+          {MODIFIER_BUTTONS.map((button) => {
+            const isActive = isButtonActive(button);
+            const buttonDisabled = isButtonDisabled(button);
 
-          return (
-            <TouchableOpacity
-              key={button.id}
-              style={[
-                styles.button,
-                isActive && styles.buttonActive,
-                buttonDisabled && styles.buttonDisabled,
-              ]}
-              onPress={() => handlePress(button)}
-              disabled={buttonDisabled}
-              accessibilityRole={"button" as AccessibilityRole}
-              accessibilityLabel={button.label}
-              accessibilityState={{
-                selected: isActive,
-                disabled: buttonDisabled,
-              }}
-              testID={`modifier-${button.id}`}
-            >
-              {button.type === "rest" && isWholeRest ? (
-                <WholeRestSvg disabled={buttonDisabled} />
-              ) : button.type === "rest" && isHalfRest ? (
-                <HalfRestSvg disabled={buttonDisabled} />
-              ) : (
+            return (
+              <TouchableOpacity
+                key={button.id}
+                style={[
+                  styles.button,
+                  isActive && styles.buttonActive,
+                  buttonDisabled && styles.buttonDisabled,
+                ]}
+                onPress={() => handlePress(button)}
+                disabled={buttonDisabled}
+                accessibilityRole={"button" as AccessibilityRole}
+                accessibilityLabel={button.label}
+                accessibilityState={{
+                  selected: isActive,
+                  disabled: buttonDisabled,
+                }}
+                testID={`modifier-${button.id}`}
+              >
                 <Text
                   style={[
                     styles.symbol,
                     button.useBravura && styles.bravuraSymbol,
+                    button.type === "tie" && styles.tieSymbol,
                     isActive && styles.symbolActive,
                     buttonDisabled && styles.symbolDisabled,
                   ]}
                 >
                   {button.symbol}
                 </Text>
-              )}
-            </TouchableOpacity>
-          );
-        })}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* Left fade */}
+        {canScrollLeft && (
+          <LinearGradient
+            colors={[colors.primaryLight, `${colors.primaryLight}00`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.fadeLeft}
+            pointerEvents="none"
+          />
+        )}
+
+        {/* Right fade */}
+        {canScrollRight && (
+          <LinearGradient
+            colors={[`${colors.primaryLight}00`, colors.primaryLight]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.fadeRight}
+            pointerEvents="none"
+          />
+        )}
+      </View>
+
+      {/* Fixed octave controls with fieldset-style border */}
+      <View style={styles.octaveFieldset}>
+        <View style={styles.octaveLabelContainer}>
+          <Text style={styles.octaveLabel}>Octave</Text>
+        </View>
+        <View style={styles.octaveControls}>
+          <TouchableOpacity
+            style={[
+              styles.octaveButton,
+              (!hasSelection || disabled) && styles.buttonDisabled,
+            ]}
+            onPress={() => hasSelection && !disabled && onOctaveChange("up")}
+            disabled={!hasSelection || disabled}
+            accessibilityRole={"button" as AccessibilityRole}
+            accessibilityLabel="Octave up"
+            accessibilityState={{ disabled: !hasSelection || disabled }}
+            testID="octave-up"
+          >
+            <Feather
+              name="chevron-up"
+              size={20}
+              color={
+                hasSelection && !disabled
+                  ? colors.textPrimary
+                  : colors.textSecondary
+              }
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.octaveButton,
+              (!hasSelection || disabled) && styles.buttonDisabled,
+            ]}
+            onPress={() => hasSelection && !disabled && onOctaveChange("down")}
+            disabled={!hasSelection || disabled}
+            accessibilityRole={"button" as AccessibilityRole}
+            accessibilityLabel="Octave down"
+            accessibilityState={{ disabled: !hasSelection || disabled }}
+            testID="octave-down"
+          >
+            <Feather
+              name="chevron-down"
+              size={20}
+              color={
+                hasSelection && !disabled
+                  ? colors.textPrimary
+                  : colors.textSecondary
+              }
+            />
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -293,33 +335,51 @@ function ModifierRowComponent({
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: spacing.sm,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-    marginLeft: spacing.xs,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  buttonRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: spacing.xs,
+    alignItems: "stretch",
+    paddingVertical: 0,
+    gap: 8,
+  },
+  scrollBorder: {
+    flex: 1,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderRadius: 6,
+    padding: 4,
+    position: "relative",
+  },
+  scrollContent: {
+    flexDirection: "row",
+    gap: 2,
+  },
+  fadeLeft: {
+    position: "absolute",
+    left: 4,
+    top: 4,
+    bottom: 4,
+    width: 32,
+    borderRadius: 4,
+  },
+  fadeRight: {
+    position: "absolute",
+    right: 4,
+    top: 4,
+    bottom: 4,
+    width: 32,
+    borderRadius: 4,
   },
   button: {
-    flex: 1,
+    width: 44,
+    minWidth: 44,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.xs,
-    borderRadius: 8,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    borderRadius: 4,
     backgroundColor: colors.surface,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.border,
-    minHeight: 44,
+    height: 44,
   },
   buttonActive: {
     backgroundColor: colors.warningLight,
@@ -336,11 +396,52 @@ const styles = StyleSheet.create({
     fontFamily: "Bravura",
     fontSize: 24,
   },
+  tieSymbol: {
+    transform: [{ scaleY: -1 }],
+  },
   symbolActive: {
     color: colors.warning,
   },
   symbolDisabled: {
     color: colors.textSecondary,
+  },
+  octaveFieldset: {
+    borderWidth: 2,
+    borderColor: colors.textSecondary,
+    borderRadius: 6,
+    padding: 4,
+    position: "relative",
+  },
+  octaveLabelContainer: {
+    position: "absolute",
+    top: -7,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  octaveLabel: {
+    fontSize: 9,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    backgroundColor: colors.background,
+    paddingHorizontal: 3,
+  },
+  octaveControls: {
+    flexDirection: "row",
+    gap: 2,
+  },
+  octaveButton: {
+    width: 44,
+    minWidth: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 4,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    height: 44,
   },
 });
 

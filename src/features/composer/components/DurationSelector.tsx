@@ -170,6 +170,7 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
+    minWidth: 44,
     alignItems: "center",
     justifyContent: "center",
     paddingTop: 8,
@@ -178,7 +179,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    height: 36,
+    height: 44,
   },
   buttonSelected: {
     backgroundColor: colors.primaryLight,

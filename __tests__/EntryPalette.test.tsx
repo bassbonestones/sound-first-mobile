@@ -97,6 +97,8 @@ describe("DurationSelector", () => {
 describe("PitchSelector", () => {
   const defaultProps = {
     onSelectPitch: jest.fn(),
+    onInsertRest: jest.fn(),
+    selectedDuration: DURATION.QUARTER,
   };
 
   beforeEach(() => {
@@ -106,10 +108,23 @@ describe("PitchSelector", () => {
   it("should render all pitch options", () => {
     const { getByTestId } = render(<PitchSelector {...defaultProps} />);
 
+    // Rest button should be at the beginning
+    expect(getByTestId("pitch-rest")).toBeTruthy();
+
     const pitches: PitchName[] = ["C", "D", "E", "F", "G", "A", "B"];
     pitches.forEach((pitch) => {
       expect(getByTestId(`pitch-${pitch}`)).toBeTruthy();
     });
+  });
+
+  it("should call onInsertRest when rest tapped", () => {
+    const onInsertRest = jest.fn();
+    const { getByTestId } = render(
+      <PitchSelector {...defaultProps} onInsertRest={onInsertRest} />,
+    );
+
+    fireEvent.press(getByTestId("pitch-rest"));
+    expect(onInsertRest).toHaveBeenCalled();
   });
 
   it("should call onSelectPitch when tapped", () => {
@@ -160,8 +175,8 @@ describe("PitchSelector", () => {
 describe("ModifierRow", () => {
   const defaultProps = {
     onAccidental: jest.fn(),
-    onRest: jest.fn(),
     onTie: jest.fn(),
+    onOctaveChange: jest.fn(),
   };
 
   beforeEach(() => {
@@ -174,8 +189,9 @@ describe("ModifierRow", () => {
     expect(getByTestId("modifier-sharp")).toBeTruthy();
     expect(getByTestId("modifier-flat")).toBeTruthy();
     expect(getByTestId("modifier-natural")).toBeTruthy();
-    expect(getByTestId("modifier-rest")).toBeTruthy();
     expect(getByTestId("modifier-tie")).toBeTruthy();
+    expect(getByTestId("octave-up")).toBeTruthy();
+    expect(getByTestId("octave-down")).toBeTruthy();
   });
 
   it("should call onAccidental when accidental pressed", () => {
@@ -193,16 +209,6 @@ describe("ModifierRow", () => {
 
     fireEvent.press(getByTestId("modifier-flat"));
     expect(onAccidental).toHaveBeenCalledWith("flat");
-  });
-
-  it("should call onRest when rest pressed", () => {
-    const onRest = jest.fn();
-    const { getByTestId } = render(
-      <ModifierRow {...defaultProps} onRest={onRest} />,
-    );
-
-    fireEvent.press(getByTestId("modifier-rest"));
-    expect(onRest).toHaveBeenCalled();
   });
 
   it("should call onTie when tie pressed", () => {
@@ -232,16 +238,6 @@ describe("ModifierRow", () => {
 
     fireEvent.press(getByTestId("modifier-tie"));
     expect(onTie).not.toHaveBeenCalled();
-  });
-
-  it("should allow rest even without selection", () => {
-    const onRest = jest.fn();
-    const { getByTestId } = render(
-      <ModifierRow {...defaultProps} onRest={onRest} hasSelection={false} />,
-    );
-
-    fireEvent.press(getByTestId("modifier-rest"));
-    expect(onRest).toHaveBeenCalled();
   });
 
   it("should highlight active accidental", () => {
@@ -342,8 +338,10 @@ describe("EntryPalette", () => {
 
     expect(getByTestId("duration-selector")).toBeTruthy();
     expect(getByTestId("pitch-selector")).toBeTruthy();
-    expect(getByTestId("octave-controls")).toBeTruthy();
     expect(getByTestId("modifier-row")).toBeTruthy();
+    // Octave controls are now part of modifier-row
+    expect(getByTestId("octave-up")).toBeTruthy();
+    expect(getByTestId("octave-down")).toBeTruthy();
   });
 
   it("should pass duration to DurationSelector", () => {
@@ -377,8 +375,14 @@ describe("EntryPalette", () => {
 
   it("should call onOctaveChange", () => {
     const onOctaveChange = jest.fn();
+    // Need selectedNote for octave buttons to be enabled
+    const selectedNote = createNote(60, DURATION.QUARTER);
     const { getByTestId } = render(
-      <EntryPalette {...defaultProps} onOctaveChange={onOctaveChange} />,
+      <EntryPalette
+        {...defaultProps}
+        onOctaveChange={onOctaveChange}
+        selectedNote={selectedNote}
+      />,
     );
 
     fireEvent.press(getByTestId("octave-up"));
@@ -391,7 +395,7 @@ describe("EntryPalette", () => {
       <EntryPalette {...defaultProps} onInsertRest={onInsertRest} />,
     );
 
-    fireEvent.press(getByTestId("modifier-rest"));
+    fireEvent.press(getByTestId("pitch-rest"));
     expect(onInsertRest).toHaveBeenCalled();
   });
 
