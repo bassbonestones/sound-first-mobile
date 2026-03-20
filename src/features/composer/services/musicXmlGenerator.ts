@@ -201,7 +201,7 @@ function generateNoteXml(
     // Calculate the base MIDI by reversing the accidental's effect
     const accidentalOffset = accidentalToAlter(note.accidental);
     const baseMidi = note.midi! - accidentalOffset;
-    
+
     // Get the step from the base MIDI (which should be a natural note)
     const basePitch = midiToPitch(baseMidi, preferFlats);
     step = basePitch.step;

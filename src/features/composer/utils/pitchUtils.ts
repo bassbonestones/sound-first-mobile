@@ -27,153 +27,783 @@ type KeyAlterations = DegreeAlterations[]; // degrees 0-6
 const KEY_ALTERATION_MAP: Record<KeySignature, KeyAlterations> = {
   // Cb Major (7 flats)
   [-7]: [
-    { [-2]: { letter: "B", accidental: "double-flat" }, [-1]: { letter: "C", accidental: "double-flat" }, [0]: { letter: "C", accidental: "flat" }, [1]: { letter: "C", accidental: "natural" }, [2]: { letter: "C", accidental: "sharp" } },
-    { [-2]: { letter: "C", accidental: "flat" }, [-1]: { letter: "D", accidental: "double-flat" }, [0]: { letter: "D", accidental: "flat" }, [1]: { letter: "D", accidental: "natural" }, [2]: { letter: "D", accidental: "sharp" } },
-    { [-2]: { letter: "D", accidental: "flat" }, [-1]: { letter: "E", accidental: "double-flat" }, [0]: { letter: "E", accidental: "flat" }, [1]: { letter: "E", accidental: "natural" }, [2]: { letter: "E", accidental: "sharp" } },
-    { [-2]: { letter: "E", accidental: "double-flat" }, [-1]: { letter: "F", accidental: "double-flat" }, [0]: { letter: "F", accidental: "flat" }, [1]: { letter: "F", accidental: "natural" }, [2]: { letter: "F", accidental: "sharp" } },
-    { [-2]: { letter: "F", accidental: "flat" }, [-1]: { letter: "G", accidental: "double-flat" }, [0]: { letter: "G", accidental: "flat" }, [1]: { letter: "G", accidental: "natural" }, [2]: { letter: "G", accidental: "sharp" } },
-    { [-2]: { letter: "G", accidental: "flat" }, [-1]: { letter: "A", accidental: "double-flat" }, [0]: { letter: "A", accidental: "flat" }, [1]: { letter: "A", accidental: "natural" }, [2]: { letter: "A", accidental: "sharp" } },
-    { [-2]: { letter: "A", accidental: "flat" }, [-1]: { letter: "B", accidental: "double-flat" }, [0]: { letter: "B", accidental: "flat" }, [1]: { letter: "B", accidental: "natural" }, [2]: { letter: "B", accidental: "sharp" } },
+    {
+      [-2]: { letter: "B", accidental: "double-flat" },
+      [-1]: { letter: "C", accidental: "double-flat" },
+      [0]: { letter: "C", accidental: "flat" },
+      [1]: { letter: "C", accidental: "natural" },
+      [2]: { letter: "C", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "C", accidental: "flat" },
+      [-1]: { letter: "D", accidental: "double-flat" },
+      [0]: { letter: "D", accidental: "flat" },
+      [1]: { letter: "D", accidental: "natural" },
+      [2]: { letter: "D", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "D", accidental: "flat" },
+      [-1]: { letter: "E", accidental: "double-flat" },
+      [0]: { letter: "E", accidental: "flat" },
+      [1]: { letter: "E", accidental: "natural" },
+      [2]: { letter: "E", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "E", accidental: "double-flat" },
+      [-1]: { letter: "F", accidental: "double-flat" },
+      [0]: { letter: "F", accidental: "flat" },
+      [1]: { letter: "F", accidental: "natural" },
+      [2]: { letter: "F", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "F", accidental: "flat" },
+      [-1]: { letter: "G", accidental: "double-flat" },
+      [0]: { letter: "G", accidental: "flat" },
+      [1]: { letter: "G", accidental: "natural" },
+      [2]: { letter: "G", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "G", accidental: "flat" },
+      [-1]: { letter: "A", accidental: "double-flat" },
+      [0]: { letter: "A", accidental: "flat" },
+      [1]: { letter: "A", accidental: "natural" },
+      [2]: { letter: "A", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "A", accidental: "flat" },
+      [-1]: { letter: "B", accidental: "double-flat" },
+      [0]: { letter: "B", accidental: "flat" },
+      [1]: { letter: "B", accidental: "natural" },
+      [2]: { letter: "B", accidental: "sharp" },
+    },
   ],
   // Gb Major (6 flats)
   [-6]: [
-    { [-2]: { letter: "F", accidental: "flat" }, [-1]: { letter: "G", accidental: "double-flat" }, [0]: { letter: "G", accidental: "flat" }, [1]: { letter: "G", accidental: "natural" }, [2]: { letter: "G", accidental: "sharp" } },
-    { [-2]: { letter: "G", accidental: "flat" }, [-1]: { letter: "A", accidental: "double-flat" }, [0]: { letter: "A", accidental: "flat" }, [1]: { letter: "A", accidental: "natural" }, [2]: { letter: "A", accidental: "sharp" } },
-    { [-2]: { letter: "A", accidental: "flat" }, [-1]: { letter: "B", accidental: "double-flat" }, [0]: { letter: "B", accidental: "flat" }, [1]: { letter: "B", accidental: "natural" }, [2]: { letter: "B", accidental: "sharp" } },
-    { [-2]: { letter: "B", accidental: "double-flat" }, [-1]: { letter: "C", accidental: "double-flat" }, [0]: { letter: "C", accidental: "flat" }, [1]: { letter: "C", accidental: "natural" }, [2]: { letter: "C", accidental: "sharp" } },
-    { [-2]: { letter: "C", accidental: "flat" }, [-1]: { letter: "D", accidental: "double-flat" }, [0]: { letter: "D", accidental: "flat" }, [1]: { letter: "D", accidental: "natural" }, [2]: { letter: "D", accidental: "sharp" } },
-    { [-2]: { letter: "D", accidental: "flat" }, [-1]: { letter: "E", accidental: "double-flat" }, [0]: { letter: "E", accidental: "flat" }, [1]: { letter: "E", accidental: "natural" }, [2]: { letter: "E", accidental: "sharp" } },
-    { [-2]: { letter: "F", accidental: "double-flat" }, [-1]: { letter: "F", accidental: "flat" }, [0]: { letter: "F", accidental: undefined }, [1]: { letter: "F", accidental: "sharp" }, [2]: { letter: "F", accidental: "double-sharp" } },
+    {
+      [-2]: { letter: "F", accidental: "flat" },
+      [-1]: { letter: "G", accidental: "double-flat" },
+      [0]: { letter: "G", accidental: "flat" },
+      [1]: { letter: "G", accidental: "natural" },
+      [2]: { letter: "G", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "G", accidental: "flat" },
+      [-1]: { letter: "A", accidental: "double-flat" },
+      [0]: { letter: "A", accidental: "flat" },
+      [1]: { letter: "A", accidental: "natural" },
+      [2]: { letter: "A", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "A", accidental: "flat" },
+      [-1]: { letter: "B", accidental: "double-flat" },
+      [0]: { letter: "B", accidental: "flat" },
+      [1]: { letter: "B", accidental: "natural" },
+      [2]: { letter: "B", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "B", accidental: "double-flat" },
+      [-1]: { letter: "C", accidental: "double-flat" },
+      [0]: { letter: "C", accidental: "flat" },
+      [1]: { letter: "C", accidental: "natural" },
+      [2]: { letter: "C", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "C", accidental: "flat" },
+      [-1]: { letter: "D", accidental: "double-flat" },
+      [0]: { letter: "D", accidental: "flat" },
+      [1]: { letter: "D", accidental: "natural" },
+      [2]: { letter: "D", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "D", accidental: "flat" },
+      [-1]: { letter: "E", accidental: "double-flat" },
+      [0]: { letter: "E", accidental: "flat" },
+      [1]: { letter: "E", accidental: "natural" },
+      [2]: { letter: "E", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "F", accidental: "double-flat" },
+      [-1]: { letter: "F", accidental: "flat" },
+      [0]: { letter: "F", accidental: undefined },
+      [1]: { letter: "F", accidental: "sharp" },
+      [2]: { letter: "F", accidental: "double-sharp" },
+    },
   ],
   // Db Major (5 flats)
   [-5]: [
-    { [-2]: { letter: "C", accidental: "flat" }, [-1]: { letter: "D", accidental: "double-flat" }, [0]: { letter: "D", accidental: "flat" }, [1]: { letter: "D", accidental: "natural" }, [2]: { letter: "D", accidental: "sharp" } },
-    { [-2]: { letter: "D", accidental: "flat" }, [-1]: { letter: "E", accidental: "double-flat" }, [0]: { letter: "E", accidental: "flat" }, [1]: { letter: "E", accidental: "natural" }, [2]: { letter: "E", accidental: "sharp" } },
-    { [-2]: { letter: "F", accidental: "double-flat" }, [-1]: { letter: "F", accidental: "flat" }, [0]: { letter: "F", accidental: undefined }, [1]: { letter: "F", accidental: "sharp" }, [2]: { letter: "F", accidental: "double-sharp" } },
-    { [-2]: { letter: "F", accidental: "flat" }, [-1]: { letter: "G", accidental: "double-flat" }, [0]: { letter: "G", accidental: "flat" }, [1]: { letter: "G", accidental: "natural" }, [2]: { letter: "G", accidental: "sharp" } },
-    { [-2]: { letter: "G", accidental: "flat" }, [-1]: { letter: "A", accidental: "double-flat" }, [0]: { letter: "A", accidental: "flat" }, [1]: { letter: "A", accidental: "natural" }, [2]: { letter: "A", accidental: "sharp" } },
-    { [-2]: { letter: "A", accidental: "flat" }, [-1]: { letter: "B", accidental: "double-flat" }, [0]: { letter: "B", accidental: "flat" }, [1]: { letter: "B", accidental: "natural" }, [2]: { letter: "B", accidental: "sharp" } },
-    { [-2]: { letter: "C", accidental: "double-flat" }, [-1]: { letter: "C", accidental: "flat" }, [0]: { letter: "C", accidental: undefined }, [1]: { letter: "C", accidental: "sharp" }, [2]: { letter: "C", accidental: "double-sharp" } },
+    {
+      [-2]: { letter: "C", accidental: "flat" },
+      [-1]: { letter: "D", accidental: "double-flat" },
+      [0]: { letter: "D", accidental: "flat" },
+      [1]: { letter: "D", accidental: "natural" },
+      [2]: { letter: "D", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "D", accidental: "flat" },
+      [-1]: { letter: "E", accidental: "double-flat" },
+      [0]: { letter: "E", accidental: "flat" },
+      [1]: { letter: "E", accidental: "natural" },
+      [2]: { letter: "E", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "F", accidental: "double-flat" },
+      [-1]: { letter: "F", accidental: "flat" },
+      [0]: { letter: "F", accidental: undefined },
+      [1]: { letter: "F", accidental: "sharp" },
+      [2]: { letter: "F", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "F", accidental: "flat" },
+      [-1]: { letter: "G", accidental: "double-flat" },
+      [0]: { letter: "G", accidental: "flat" },
+      [1]: { letter: "G", accidental: "natural" },
+      [2]: { letter: "G", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "G", accidental: "flat" },
+      [-1]: { letter: "A", accidental: "double-flat" },
+      [0]: { letter: "A", accidental: "flat" },
+      [1]: { letter: "A", accidental: "natural" },
+      [2]: { letter: "A", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "A", accidental: "flat" },
+      [-1]: { letter: "B", accidental: "double-flat" },
+      [0]: { letter: "B", accidental: "flat" },
+      [1]: { letter: "B", accidental: "natural" },
+      [2]: { letter: "B", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "C", accidental: "double-flat" },
+      [-1]: { letter: "C", accidental: "flat" },
+      [0]: { letter: "C", accidental: undefined },
+      [1]: { letter: "C", accidental: "sharp" },
+      [2]: { letter: "C", accidental: "double-sharp" },
+    },
   ],
   // Ab Major (4 flats)
   [-4]: [
-    { [-2]: { letter: "G", accidental: "flat" }, [-1]: { letter: "A", accidental: "double-flat" }, [0]: { letter: "A", accidental: "flat" }, [1]: { letter: "A", accidental: "natural" }, [2]: { letter: "A", accidental: "sharp" } },
-    { [-2]: { letter: "A", accidental: "flat" }, [-1]: { letter: "B", accidental: "double-flat" }, [0]: { letter: "B", accidental: "flat" }, [1]: { letter: "B", accidental: "natural" }, [2]: { letter: "B", accidental: "sharp" } },
-    { [-2]: { letter: "C", accidental: "double-flat" }, [-1]: { letter: "C", accidental: "flat" }, [0]: { letter: "C", accidental: undefined }, [1]: { letter: "C", accidental: "sharp" }, [2]: { letter: "C", accidental: "double-sharp" } },
-    { [-2]: { letter: "C", accidental: "flat" }, [-1]: { letter: "D", accidental: "double-flat" }, [0]: { letter: "D", accidental: "flat" }, [1]: { letter: "D", accidental: "natural" }, [2]: { letter: "D", accidental: "sharp" } },
-    { [-2]: { letter: "D", accidental: "flat" }, [-1]: { letter: "E", accidental: "double-flat" }, [0]: { letter: "E", accidental: "flat" }, [1]: { letter: "E", accidental: "natural" }, [2]: { letter: "E", accidental: "sharp" } },
-    { [-2]: { letter: "F", accidental: "double-flat" }, [-1]: { letter: "F", accidental: "flat" }, [0]: { letter: "F", accidental: undefined }, [1]: { letter: "F", accidental: "sharp" }, [2]: { letter: "F", accidental: "double-sharp" } },
-    { [-2]: { letter: "G", accidental: "double-flat" }, [-1]: { letter: "G", accidental: "flat" }, [0]: { letter: "G", accidental: undefined }, [1]: { letter: "G", accidental: "sharp" }, [2]: { letter: "G", accidental: "double-sharp" } },
+    {
+      [-2]: { letter: "G", accidental: "flat" },
+      [-1]: { letter: "A", accidental: "double-flat" },
+      [0]: { letter: "A", accidental: "flat" },
+      [1]: { letter: "A", accidental: "natural" },
+      [2]: { letter: "A", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "A", accidental: "flat" },
+      [-1]: { letter: "B", accidental: "double-flat" },
+      [0]: { letter: "B", accidental: "flat" },
+      [1]: { letter: "B", accidental: "natural" },
+      [2]: { letter: "B", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "C", accidental: "double-flat" },
+      [-1]: { letter: "C", accidental: "flat" },
+      [0]: { letter: "C", accidental: undefined },
+      [1]: { letter: "C", accidental: "sharp" },
+      [2]: { letter: "C", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "C", accidental: "flat" },
+      [-1]: { letter: "D", accidental: "double-flat" },
+      [0]: { letter: "D", accidental: "flat" },
+      [1]: { letter: "D", accidental: "natural" },
+      [2]: { letter: "D", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "D", accidental: "flat" },
+      [-1]: { letter: "E", accidental: "double-flat" },
+      [0]: { letter: "E", accidental: "flat" },
+      [1]: { letter: "E", accidental: "natural" },
+      [2]: { letter: "E", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "F", accidental: "double-flat" },
+      [-1]: { letter: "F", accidental: "flat" },
+      [0]: { letter: "F", accidental: undefined },
+      [1]: { letter: "F", accidental: "sharp" },
+      [2]: { letter: "F", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "G", accidental: "double-flat" },
+      [-1]: { letter: "G", accidental: "flat" },
+      [0]: { letter: "G", accidental: undefined },
+      [1]: { letter: "G", accidental: "sharp" },
+      [2]: { letter: "G", accidental: "double-sharp" },
+    },
   ],
   // Eb Major (3 flats)
   [-3]: [
-    { [-2]: { letter: "D", accidental: "flat" }, [-1]: { letter: "E", accidental: "double-flat" }, [0]: { letter: "E", accidental: "flat" }, [1]: { letter: "E", accidental: "natural" }, [2]: { letter: "E", accidental: "sharp" } },
-    { [-2]: { letter: "F", accidental: "double-flat" }, [-1]: { letter: "F", accidental: "flat" }, [0]: { letter: "F", accidental: undefined }, [1]: { letter: "F", accidental: "sharp" }, [2]: { letter: "F", accidental: "double-sharp" } },
-    { [-2]: { letter: "G", accidental: "double-flat" }, [-1]: { letter: "G", accidental: "flat" }, [0]: { letter: "G", accidental: undefined }, [1]: { letter: "G", accidental: "sharp" }, [2]: { letter: "G", accidental: "double-sharp" } },
-    { [-2]: { letter: "G", accidental: "flat" }, [-1]: { letter: "A", accidental: "double-flat" }, [0]: { letter: "A", accidental: "flat" }, [1]: { letter: "A", accidental: "natural" }, [2]: { letter: "A", accidental: "sharp" } },
-    { [-2]: { letter: "A", accidental: "flat" }, [-1]: { letter: "B", accidental: "double-flat" }, [0]: { letter: "B", accidental: "flat" }, [1]: { letter: "B", accidental: "natural" }, [2]: { letter: "B", accidental: "sharp" } },
-    { [-2]: { letter: "C", accidental: "double-flat" }, [-1]: { letter: "C", accidental: "flat" }, [0]: { letter: "C", accidental: undefined }, [1]: { letter: "C", accidental: "sharp" }, [2]: { letter: "C", accidental: "double-sharp" } },
-    { [-2]: { letter: "D", accidental: "double-flat" }, [-1]: { letter: "D", accidental: "flat" }, [0]: { letter: "D", accidental: undefined }, [1]: { letter: "D", accidental: "sharp" }, [2]: { letter: "D", accidental: "double-sharp" } },
+    {
+      [-2]: { letter: "D", accidental: "flat" },
+      [-1]: { letter: "E", accidental: "double-flat" },
+      [0]: { letter: "E", accidental: "flat" },
+      [1]: { letter: "E", accidental: "natural" },
+      [2]: { letter: "E", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "F", accidental: "double-flat" },
+      [-1]: { letter: "F", accidental: "flat" },
+      [0]: { letter: "F", accidental: undefined },
+      [1]: { letter: "F", accidental: "sharp" },
+      [2]: { letter: "F", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "G", accidental: "double-flat" },
+      [-1]: { letter: "G", accidental: "flat" },
+      [0]: { letter: "G", accidental: undefined },
+      [1]: { letter: "G", accidental: "sharp" },
+      [2]: { letter: "G", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "G", accidental: "flat" },
+      [-1]: { letter: "A", accidental: "double-flat" },
+      [0]: { letter: "A", accidental: "flat" },
+      [1]: { letter: "A", accidental: "natural" },
+      [2]: { letter: "A", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "A", accidental: "flat" },
+      [-1]: { letter: "B", accidental: "double-flat" },
+      [0]: { letter: "B", accidental: "flat" },
+      [1]: { letter: "B", accidental: "natural" },
+      [2]: { letter: "B", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "C", accidental: "double-flat" },
+      [-1]: { letter: "C", accidental: "flat" },
+      [0]: { letter: "C", accidental: undefined },
+      [1]: { letter: "C", accidental: "sharp" },
+      [2]: { letter: "C", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "D", accidental: "double-flat" },
+      [-1]: { letter: "D", accidental: "flat" },
+      [0]: { letter: "D", accidental: undefined },
+      [1]: { letter: "D", accidental: "sharp" },
+      [2]: { letter: "D", accidental: "double-sharp" },
+    },
   ],
   // Bb Major (2 flats)
   [-2]: [
-    { [-2]: { letter: "A", accidental: "flat" }, [-1]: { letter: "B", accidental: "double-flat" }, [0]: { letter: "B", accidental: "flat" }, [1]: { letter: "B", accidental: "natural" }, [2]: { letter: "B", accidental: "sharp" } },
-    { [-2]: { letter: "C", accidental: "double-flat" }, [-1]: { letter: "C", accidental: "flat" }, [0]: { letter: "C", accidental: undefined }, [1]: { letter: "C", accidental: "sharp" }, [2]: { letter: "C", accidental: "double-sharp" } },
-    { [-2]: { letter: "D", accidental: "double-flat" }, [-1]: { letter: "D", accidental: "flat" }, [0]: { letter: "D", accidental: undefined }, [1]: { letter: "D", accidental: "sharp" }, [2]: { letter: "D", accidental: "double-sharp" } },
-    { [-2]: { letter: "D", accidental: "flat" }, [-1]: { letter: "E", accidental: "double-flat" }, [0]: { letter: "E", accidental: "flat" }, [1]: { letter: "E", accidental: "natural" }, [2]: { letter: "E", accidental: "sharp" } },
-    { [-2]: { letter: "F", accidental: "double-flat" }, [-1]: { letter: "F", accidental: "flat" }, [0]: { letter: "F", accidental: undefined }, [1]: { letter: "F", accidental: "sharp" }, [2]: { letter: "F", accidental: "double-sharp" } },
-    { [-2]: { letter: "G", accidental: "double-flat" }, [-1]: { letter: "G", accidental: "flat" }, [0]: { letter: "G", accidental: undefined }, [1]: { letter: "G", accidental: "sharp" }, [2]: { letter: "G", accidental: "double-sharp" } },
-    { [-2]: { letter: "A", accidental: "double-flat" }, [-1]: { letter: "A", accidental: "flat" }, [0]: { letter: "A", accidental: undefined }, [1]: { letter: "A", accidental: "sharp" }, [2]: { letter: "A", accidental: "double-sharp" } },
+    {
+      [-2]: { letter: "A", accidental: "flat" },
+      [-1]: { letter: "B", accidental: "double-flat" },
+      [0]: { letter: "B", accidental: "flat" },
+      [1]: { letter: "B", accidental: "natural" },
+      [2]: { letter: "B", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "C", accidental: "double-flat" },
+      [-1]: { letter: "C", accidental: "flat" },
+      [0]: { letter: "C", accidental: undefined },
+      [1]: { letter: "C", accidental: "sharp" },
+      [2]: { letter: "C", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "D", accidental: "double-flat" },
+      [-1]: { letter: "D", accidental: "flat" },
+      [0]: { letter: "D", accidental: undefined },
+      [1]: { letter: "D", accidental: "sharp" },
+      [2]: { letter: "D", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "D", accidental: "flat" },
+      [-1]: { letter: "E", accidental: "double-flat" },
+      [0]: { letter: "E", accidental: "flat" },
+      [1]: { letter: "E", accidental: "natural" },
+      [2]: { letter: "E", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "F", accidental: "double-flat" },
+      [-1]: { letter: "F", accidental: "flat" },
+      [0]: { letter: "F", accidental: undefined },
+      [1]: { letter: "F", accidental: "sharp" },
+      [2]: { letter: "F", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "G", accidental: "double-flat" },
+      [-1]: { letter: "G", accidental: "flat" },
+      [0]: { letter: "G", accidental: undefined },
+      [1]: { letter: "G", accidental: "sharp" },
+      [2]: { letter: "G", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "A", accidental: "double-flat" },
+      [-1]: { letter: "A", accidental: "flat" },
+      [0]: { letter: "A", accidental: undefined },
+      [1]: { letter: "A", accidental: "sharp" },
+      [2]: { letter: "A", accidental: "double-sharp" },
+    },
   ],
   // F Major (1 flat)
   [-1]: [
-    { [-2]: { letter: "F", accidental: "double-flat" }, [-1]: { letter: "F", accidental: "flat" }, [0]: { letter: "F", accidental: undefined }, [1]: { letter: "F", accidental: "sharp" }, [2]: { letter: "F", accidental: "double-sharp" } },
-    { [-2]: { letter: "G", accidental: "double-flat" }, [-1]: { letter: "G", accidental: "flat" }, [0]: { letter: "G", accidental: undefined }, [1]: { letter: "G", accidental: "sharp" }, [2]: { letter: "G", accidental: "double-sharp" } },
-    { [-2]: { letter: "A", accidental: "double-flat" }, [-1]: { letter: "A", accidental: "flat" }, [0]: { letter: "A", accidental: undefined }, [1]: { letter: "A", accidental: "sharp" }, [2]: { letter: "A", accidental: "double-sharp" } },
-    { [-2]: { letter: "A", accidental: "flat" }, [-1]: { letter: "B", accidental: "double-flat" }, [0]: { letter: "B", accidental: "flat" }, [1]: { letter: "B", accidental: "natural" }, [2]: { letter: "B", accidental: "sharp" } },
-    { [-2]: { letter: "C", accidental: "double-flat" }, [-1]: { letter: "C", accidental: "flat" }, [0]: { letter: "C", accidental: undefined }, [1]: { letter: "C", accidental: "sharp" }, [2]: { letter: "C", accidental: "double-sharp" } },
-    { [-2]: { letter: "D", accidental: "double-flat" }, [-1]: { letter: "D", accidental: "flat" }, [0]: { letter: "D", accidental: undefined }, [1]: { letter: "D", accidental: "sharp" }, [2]: { letter: "D", accidental: "double-sharp" } },
-    { [-2]: { letter: "E", accidental: "double-flat" }, [-1]: { letter: "E", accidental: "flat" }, [0]: { letter: "E", accidental: undefined }, [1]: { letter: "E", accidental: "sharp" }, [2]: { letter: "E", accidental: "double-sharp" } },
+    {
+      [-2]: { letter: "F", accidental: "double-flat" },
+      [-1]: { letter: "F", accidental: "flat" },
+      [0]: { letter: "F", accidental: undefined },
+      [1]: { letter: "F", accidental: "sharp" },
+      [2]: { letter: "F", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "G", accidental: "double-flat" },
+      [-1]: { letter: "G", accidental: "flat" },
+      [0]: { letter: "G", accidental: undefined },
+      [1]: { letter: "G", accidental: "sharp" },
+      [2]: { letter: "G", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "A", accidental: "double-flat" },
+      [-1]: { letter: "A", accidental: "flat" },
+      [0]: { letter: "A", accidental: undefined },
+      [1]: { letter: "A", accidental: "sharp" },
+      [2]: { letter: "A", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "A", accidental: "flat" },
+      [-1]: { letter: "B", accidental: "double-flat" },
+      [0]: { letter: "B", accidental: "flat" },
+      [1]: { letter: "B", accidental: "natural" },
+      [2]: { letter: "B", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "C", accidental: "double-flat" },
+      [-1]: { letter: "C", accidental: "flat" },
+      [0]: { letter: "C", accidental: undefined },
+      [1]: { letter: "C", accidental: "sharp" },
+      [2]: { letter: "C", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "D", accidental: "double-flat" },
+      [-1]: { letter: "D", accidental: "flat" },
+      [0]: { letter: "D", accidental: undefined },
+      [1]: { letter: "D", accidental: "sharp" },
+      [2]: { letter: "D", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "E", accidental: "double-flat" },
+      [-1]: { letter: "E", accidental: "flat" },
+      [0]: { letter: "E", accidental: undefined },
+      [1]: { letter: "E", accidental: "sharp" },
+      [2]: { letter: "E", accidental: "double-sharp" },
+    },
   ],
   // C Major (no sharps or flats)
   [0]: [
-    { [-2]: { letter: "C", accidental: "double-flat" }, [-1]: { letter: "C", accidental: "flat" }, [0]: { letter: "C", accidental: undefined }, [1]: { letter: "C", accidental: "sharp" }, [2]: { letter: "C", accidental: "double-sharp" } },
-    { [-2]: { letter: "D", accidental: "double-flat" }, [-1]: { letter: "D", accidental: "flat" }, [0]: { letter: "D", accidental: undefined }, [1]: { letter: "D", accidental: "sharp" }, [2]: { letter: "D", accidental: "double-sharp" } },
-    { [-2]: { letter: "E", accidental: "double-flat" }, [-1]: { letter: "E", accidental: "flat" }, [0]: { letter: "E", accidental: undefined }, [1]: { letter: "E", accidental: "sharp" }, [2]: { letter: "E", accidental: "double-sharp" } },
-    { [-2]: { letter: "F", accidental: "double-flat" }, [-1]: { letter: "F", accidental: "flat" }, [0]: { letter: "F", accidental: undefined }, [1]: { letter: "F", accidental: "sharp" }, [2]: { letter: "F", accidental: "double-sharp" } },
-    { [-2]: { letter: "G", accidental: "double-flat" }, [-1]: { letter: "G", accidental: "flat" }, [0]: { letter: "G", accidental: undefined }, [1]: { letter: "G", accidental: "sharp" }, [2]: { letter: "G", accidental: "double-sharp" } },
-    { [-2]: { letter: "A", accidental: "double-flat" }, [-1]: { letter: "A", accidental: "flat" }, [0]: { letter: "A", accidental: undefined }, [1]: { letter: "A", accidental: "sharp" }, [2]: { letter: "A", accidental: "double-sharp" } },
-    { [-2]: { letter: "B", accidental: "double-flat" }, [-1]: { letter: "B", accidental: "flat" }, [0]: { letter: "B", accidental: undefined }, [1]: { letter: "B", accidental: "sharp" }, [2]: { letter: "B", accidental: "double-sharp" } },
+    {
+      [-2]: { letter: "C", accidental: "double-flat" },
+      [-1]: { letter: "C", accidental: "flat" },
+      [0]: { letter: "C", accidental: undefined },
+      [1]: { letter: "C", accidental: "sharp" },
+      [2]: { letter: "C", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "D", accidental: "double-flat" },
+      [-1]: { letter: "D", accidental: "flat" },
+      [0]: { letter: "D", accidental: undefined },
+      [1]: { letter: "D", accidental: "sharp" },
+      [2]: { letter: "D", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "E", accidental: "double-flat" },
+      [-1]: { letter: "E", accidental: "flat" },
+      [0]: { letter: "E", accidental: undefined },
+      [1]: { letter: "E", accidental: "sharp" },
+      [2]: { letter: "E", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "F", accidental: "double-flat" },
+      [-1]: { letter: "F", accidental: "flat" },
+      [0]: { letter: "F", accidental: undefined },
+      [1]: { letter: "F", accidental: "sharp" },
+      [2]: { letter: "F", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "G", accidental: "double-flat" },
+      [-1]: { letter: "G", accidental: "flat" },
+      [0]: { letter: "G", accidental: undefined },
+      [1]: { letter: "G", accidental: "sharp" },
+      [2]: { letter: "G", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "A", accidental: "double-flat" },
+      [-1]: { letter: "A", accidental: "flat" },
+      [0]: { letter: "A", accidental: undefined },
+      [1]: { letter: "A", accidental: "sharp" },
+      [2]: { letter: "A", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "B", accidental: "double-flat" },
+      [-1]: { letter: "B", accidental: "flat" },
+      [0]: { letter: "B", accidental: undefined },
+      [1]: { letter: "B", accidental: "sharp" },
+      [2]: { letter: "B", accidental: "double-sharp" },
+    },
   ],
   // G Major (1 sharp)
   [1]: [
-    { [-2]: { letter: "G", accidental: "double-flat" }, [-1]: { letter: "G", accidental: "flat" }, [0]: { letter: "G", accidental: undefined }, [1]: { letter: "G", accidental: "sharp" }, [2]: { letter: "G", accidental: "double-sharp" } },
-    { [-2]: { letter: "A", accidental: "double-flat" }, [-1]: { letter: "A", accidental: "flat" }, [0]: { letter: "A", accidental: undefined }, [1]: { letter: "A", accidental: "sharp" }, [2]: { letter: "A", accidental: "double-sharp" } },
-    { [-2]: { letter: "B", accidental: "double-flat" }, [-1]: { letter: "B", accidental: "flat" }, [0]: { letter: "B", accidental: undefined }, [1]: { letter: "B", accidental: "sharp" }, [2]: { letter: "B", accidental: "double-sharp" } },
-    { [-2]: { letter: "C", accidental: "double-flat" }, [-1]: { letter: "C", accidental: "flat" }, [0]: { letter: "C", accidental: undefined }, [1]: { letter: "C", accidental: "sharp" }, [2]: { letter: "C", accidental: "double-sharp" } },
-    { [-2]: { letter: "D", accidental: "double-flat" }, [-1]: { letter: "D", accidental: "flat" }, [0]: { letter: "D", accidental: undefined }, [1]: { letter: "D", accidental: "sharp" }, [2]: { letter: "D", accidental: "double-sharp" } },
-    { [-2]: { letter: "E", accidental: "double-flat" }, [-1]: { letter: "E", accidental: "flat" }, [0]: { letter: "E", accidental: undefined }, [1]: { letter: "E", accidental: "sharp" }, [2]: { letter: "E", accidental: "double-sharp" } },
-    { [-2]: { letter: "F", accidental: "flat" }, [-1]: { letter: "F", accidental: "natural" }, [0]: { letter: "F", accidental: "sharp" }, [1]: { letter: "F", accidental: "double-sharp" }, [2]: { letter: "G", accidental: "sharp" } },
+    {
+      [-2]: { letter: "G", accidental: "double-flat" },
+      [-1]: { letter: "G", accidental: "flat" },
+      [0]: { letter: "G", accidental: undefined },
+      [1]: { letter: "G", accidental: "sharp" },
+      [2]: { letter: "G", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "A", accidental: "double-flat" },
+      [-1]: { letter: "A", accidental: "flat" },
+      [0]: { letter: "A", accidental: undefined },
+      [1]: { letter: "A", accidental: "sharp" },
+      [2]: { letter: "A", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "B", accidental: "double-flat" },
+      [-1]: { letter: "B", accidental: "flat" },
+      [0]: { letter: "B", accidental: undefined },
+      [1]: { letter: "B", accidental: "sharp" },
+      [2]: { letter: "B", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "C", accidental: "double-flat" },
+      [-1]: { letter: "C", accidental: "flat" },
+      [0]: { letter: "C", accidental: undefined },
+      [1]: { letter: "C", accidental: "sharp" },
+      [2]: { letter: "C", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "D", accidental: "double-flat" },
+      [-1]: { letter: "D", accidental: "flat" },
+      [0]: { letter: "D", accidental: undefined },
+      [1]: { letter: "D", accidental: "sharp" },
+      [2]: { letter: "D", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "E", accidental: "double-flat" },
+      [-1]: { letter: "E", accidental: "flat" },
+      [0]: { letter: "E", accidental: undefined },
+      [1]: { letter: "E", accidental: "sharp" },
+      [2]: { letter: "E", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "F", accidental: "flat" },
+      [-1]: { letter: "F", accidental: "natural" },
+      [0]: { letter: "F", accidental: "sharp" },
+      [1]: { letter: "F", accidental: "double-sharp" },
+      [2]: { letter: "G", accidental: "sharp" },
+    },
   ],
   // D Major (2 sharps)
   [2]: [
-    { [-2]: { letter: "D", accidental: "double-flat" }, [-1]: { letter: "D", accidental: "flat" }, [0]: { letter: "D", accidental: undefined }, [1]: { letter: "D", accidental: "sharp" }, [2]: { letter: "D", accidental: "double-sharp" } },
-    { [-2]: { letter: "E", accidental: "double-flat" }, [-1]: { letter: "E", accidental: "flat" }, [0]: { letter: "E", accidental: undefined }, [1]: { letter: "E", accidental: "sharp" }, [2]: { letter: "E", accidental: "double-sharp" } },
-    { [-2]: { letter: "F", accidental: "flat" }, [-1]: { letter: "F", accidental: "natural" }, [0]: { letter: "F", accidental: "sharp" }, [1]: { letter: "F", accidental: "double-sharp" }, [2]: { letter: "G", accidental: "sharp" } },
-    { [-2]: { letter: "G", accidental: "double-flat" }, [-1]: { letter: "G", accidental: "flat" }, [0]: { letter: "G", accidental: undefined }, [1]: { letter: "G", accidental: "sharp" }, [2]: { letter: "G", accidental: "double-sharp" } },
-    { [-2]: { letter: "A", accidental: "double-flat" }, [-1]: { letter: "A", accidental: "flat" }, [0]: { letter: "A", accidental: undefined }, [1]: { letter: "A", accidental: "sharp" }, [2]: { letter: "A", accidental: "double-sharp" } },
-    { [-2]: { letter: "B", accidental: "double-flat" }, [-1]: { letter: "B", accidental: "flat" }, [0]: { letter: "B", accidental: undefined }, [1]: { letter: "B", accidental: "sharp" }, [2]: { letter: "B", accidental: "double-sharp" } },
-    { [-2]: { letter: "C", accidental: "flat" }, [-1]: { letter: "C", accidental: "natural" }, [0]: { letter: "C", accidental: "sharp" }, [1]: { letter: "C", accidental: "double-sharp" }, [2]: { letter: "D", accidental: "sharp" } },
+    {
+      [-2]: { letter: "D", accidental: "double-flat" },
+      [-1]: { letter: "D", accidental: "flat" },
+      [0]: { letter: "D", accidental: undefined },
+      [1]: { letter: "D", accidental: "sharp" },
+      [2]: { letter: "D", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "E", accidental: "double-flat" },
+      [-1]: { letter: "E", accidental: "flat" },
+      [0]: { letter: "E", accidental: undefined },
+      [1]: { letter: "E", accidental: "sharp" },
+      [2]: { letter: "E", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "F", accidental: "flat" },
+      [-1]: { letter: "F", accidental: "natural" },
+      [0]: { letter: "F", accidental: "sharp" },
+      [1]: { letter: "F", accidental: "double-sharp" },
+      [2]: { letter: "G", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "G", accidental: "double-flat" },
+      [-1]: { letter: "G", accidental: "flat" },
+      [0]: { letter: "G", accidental: undefined },
+      [1]: { letter: "G", accidental: "sharp" },
+      [2]: { letter: "G", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "A", accidental: "double-flat" },
+      [-1]: { letter: "A", accidental: "flat" },
+      [0]: { letter: "A", accidental: undefined },
+      [1]: { letter: "A", accidental: "sharp" },
+      [2]: { letter: "A", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "B", accidental: "double-flat" },
+      [-1]: { letter: "B", accidental: "flat" },
+      [0]: { letter: "B", accidental: undefined },
+      [1]: { letter: "B", accidental: "sharp" },
+      [2]: { letter: "B", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "C", accidental: "flat" },
+      [-1]: { letter: "C", accidental: "natural" },
+      [0]: { letter: "C", accidental: "sharp" },
+      [1]: { letter: "C", accidental: "double-sharp" },
+      [2]: { letter: "D", accidental: "sharp" },
+    },
   ],
   // A Major (3 sharps)
   [3]: [
-    { [-2]: { letter: "A", accidental: "double-flat" }, [-1]: { letter: "A", accidental: "flat" }, [0]: { letter: "A", accidental: undefined }, [1]: { letter: "A", accidental: "sharp" }, [2]: { letter: "A", accidental: "double-sharp" } },
-    { [-2]: { letter: "B", accidental: "double-flat" }, [-1]: { letter: "B", accidental: "flat" }, [0]: { letter: "B", accidental: undefined }, [1]: { letter: "B", accidental: "sharp" }, [2]: { letter: "B", accidental: "double-sharp" } },
-    { [-2]: { letter: "C", accidental: "flat" }, [-1]: { letter: "C", accidental: "natural" }, [0]: { letter: "C", accidental: "sharp" }, [1]: { letter: "C", accidental: "double-sharp" }, [2]: { letter: "D", accidental: "sharp" } },
-    { [-2]: { letter: "D", accidental: "double-flat" }, [-1]: { letter: "D", accidental: "flat" }, [0]: { letter: "D", accidental: undefined }, [1]: { letter: "D", accidental: "sharp" }, [2]: { letter: "D", accidental: "double-sharp" } },
-    { [-2]: { letter: "E", accidental: "double-flat" }, [-1]: { letter: "E", accidental: "flat" }, [0]: { letter: "E", accidental: undefined }, [1]: { letter: "E", accidental: "sharp" }, [2]: { letter: "E", accidental: "double-sharp" } },
-    { [-2]: { letter: "F", accidental: "flat" }, [-1]: { letter: "F", accidental: "natural" }, [0]: { letter: "F", accidental: "sharp" }, [1]: { letter: "F", accidental: "double-sharp" }, [2]: { letter: "G", accidental: "sharp" } },
-    { [-2]: { letter: "G", accidental: "flat" }, [-1]: { letter: "G", accidental: "natural" }, [0]: { letter: "G", accidental: "sharp" }, [1]: { letter: "G", accidental: "double-sharp" }, [2]: { letter: "A", accidental: "sharp" } },
+    {
+      [-2]: { letter: "A", accidental: "double-flat" },
+      [-1]: { letter: "A", accidental: "flat" },
+      [0]: { letter: "A", accidental: undefined },
+      [1]: { letter: "A", accidental: "sharp" },
+      [2]: { letter: "A", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "B", accidental: "double-flat" },
+      [-1]: { letter: "B", accidental: "flat" },
+      [0]: { letter: "B", accidental: undefined },
+      [1]: { letter: "B", accidental: "sharp" },
+      [2]: { letter: "B", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "C", accidental: "flat" },
+      [-1]: { letter: "C", accidental: "natural" },
+      [0]: { letter: "C", accidental: "sharp" },
+      [1]: { letter: "C", accidental: "double-sharp" },
+      [2]: { letter: "D", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "D", accidental: "double-flat" },
+      [-1]: { letter: "D", accidental: "flat" },
+      [0]: { letter: "D", accidental: undefined },
+      [1]: { letter: "D", accidental: "sharp" },
+      [2]: { letter: "D", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "E", accidental: "double-flat" },
+      [-1]: { letter: "E", accidental: "flat" },
+      [0]: { letter: "E", accidental: undefined },
+      [1]: { letter: "E", accidental: "sharp" },
+      [2]: { letter: "E", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "F", accidental: "flat" },
+      [-1]: { letter: "F", accidental: "natural" },
+      [0]: { letter: "F", accidental: "sharp" },
+      [1]: { letter: "F", accidental: "double-sharp" },
+      [2]: { letter: "G", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "G", accidental: "flat" },
+      [-1]: { letter: "G", accidental: "natural" },
+      [0]: { letter: "G", accidental: "sharp" },
+      [1]: { letter: "G", accidental: "double-sharp" },
+      [2]: { letter: "A", accidental: "sharp" },
+    },
   ],
   // E Major (4 sharps)
   [4]: [
-    { [-2]: { letter: "E", accidental: "double-flat" }, [-1]: { letter: "E", accidental: "flat" }, [0]: { letter: "E", accidental: undefined }, [1]: { letter: "E", accidental: "sharp" }, [2]: { letter: "E", accidental: "double-sharp" } },
-    { [-2]: { letter: "F", accidental: "flat" }, [-1]: { letter: "F", accidental: "natural" }, [0]: { letter: "F", accidental: "sharp" }, [1]: { letter: "F", accidental: "double-sharp" }, [2]: { letter: "G", accidental: "sharp" } },
-    { [-2]: { letter: "G", accidental: "flat" }, [-1]: { letter: "G", accidental: "natural" }, [0]: { letter: "G", accidental: "sharp" }, [1]: { letter: "G", accidental: "double-sharp" }, [2]: { letter: "A", accidental: "sharp" } },
-    { [-2]: { letter: "A", accidental: "double-flat" }, [-1]: { letter: "A", accidental: "flat" }, [0]: { letter: "A", accidental: undefined }, [1]: { letter: "A", accidental: "sharp" }, [2]: { letter: "A", accidental: "double-sharp" } },
-    { [-2]: { letter: "B", accidental: "double-flat" }, [-1]: { letter: "B", accidental: "flat" }, [0]: { letter: "B", accidental: undefined }, [1]: { letter: "B", accidental: "sharp" }, [2]: { letter: "B", accidental: "double-sharp" } },
-    { [-2]: { letter: "C", accidental: "flat" }, [-1]: { letter: "C", accidental: "natural" }, [0]: { letter: "C", accidental: "sharp" }, [1]: { letter: "C", accidental: "double-sharp" }, [2]: { letter: "D", accidental: "sharp" } },
-    { [-2]: { letter: "D", accidental: "flat" }, [-1]: { letter: "D", accidental: "natural" }, [0]: { letter: "D", accidental: "sharp" }, [1]: { letter: "D", accidental: "double-sharp" }, [2]: { letter: "E", accidental: "sharp" } },
+    {
+      [-2]: { letter: "E", accidental: "double-flat" },
+      [-1]: { letter: "E", accidental: "flat" },
+      [0]: { letter: "E", accidental: undefined },
+      [1]: { letter: "E", accidental: "sharp" },
+      [2]: { letter: "E", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "F", accidental: "flat" },
+      [-1]: { letter: "F", accidental: "natural" },
+      [0]: { letter: "F", accidental: "sharp" },
+      [1]: { letter: "F", accidental: "double-sharp" },
+      [2]: { letter: "G", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "G", accidental: "flat" },
+      [-1]: { letter: "G", accidental: "natural" },
+      [0]: { letter: "G", accidental: "sharp" },
+      [1]: { letter: "G", accidental: "double-sharp" },
+      [2]: { letter: "A", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "A", accidental: "double-flat" },
+      [-1]: { letter: "A", accidental: "flat" },
+      [0]: { letter: "A", accidental: undefined },
+      [1]: { letter: "A", accidental: "sharp" },
+      [2]: { letter: "A", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "B", accidental: "double-flat" },
+      [-1]: { letter: "B", accidental: "flat" },
+      [0]: { letter: "B", accidental: undefined },
+      [1]: { letter: "B", accidental: "sharp" },
+      [2]: { letter: "B", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "C", accidental: "flat" },
+      [-1]: { letter: "C", accidental: "natural" },
+      [0]: { letter: "C", accidental: "sharp" },
+      [1]: { letter: "C", accidental: "double-sharp" },
+      [2]: { letter: "D", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "D", accidental: "flat" },
+      [-1]: { letter: "D", accidental: "natural" },
+      [0]: { letter: "D", accidental: "sharp" },
+      [1]: { letter: "D", accidental: "double-sharp" },
+      [2]: { letter: "E", accidental: "sharp" },
+    },
   ],
   // B Major (5 sharps)
   [5]: [
-    { [-2]: { letter: "B", accidental: "double-flat" }, [-1]: { letter: "B", accidental: "flat" }, [0]: { letter: "B", accidental: undefined }, [1]: { letter: "B", accidental: "sharp" }, [2]: { letter: "B", accidental: "double-sharp" } },
-    { [-2]: { letter: "C", accidental: "flat" }, [-1]: { letter: "C", accidental: "natural" }, [0]: { letter: "C", accidental: "sharp" }, [1]: { letter: "C", accidental: "double-sharp" }, [2]: { letter: "D", accidental: "sharp" } },
-    { [-2]: { letter: "D", accidental: "flat" }, [-1]: { letter: "D", accidental: "natural" }, [0]: { letter: "D", accidental: "sharp" }, [1]: { letter: "D", accidental: "double-sharp" }, [2]: { letter: "E", accidental: "sharp" } },
-    { [-2]: { letter: "E", accidental: "double-flat" }, [-1]: { letter: "E", accidental: "flat" }, [0]: { letter: "E", accidental: undefined }, [1]: { letter: "E", accidental: "sharp" }, [2]: { letter: "E", accidental: "double-sharp" } },
-    { [-2]: { letter: "F", accidental: "flat" }, [-1]: { letter: "F", accidental: "natural" }, [0]: { letter: "F", accidental: "sharp" }, [1]: { letter: "F", accidental: "double-sharp" }, [2]: { letter: "G", accidental: "sharp" } },
-    { [-2]: { letter: "G", accidental: "flat" }, [-1]: { letter: "G", accidental: "natural" }, [0]: { letter: "G", accidental: "sharp" }, [1]: { letter: "G", accidental: "double-sharp" }, [2]: { letter: "A", accidental: "sharp" } },
-    { [-2]: { letter: "A", accidental: "flat" }, [-1]: { letter: "A", accidental: "natural" }, [0]: { letter: "A", accidental: "sharp" }, [1]: { letter: "A", accidental: "double-sharp" }, [2]: { letter: "B", accidental: "sharp" } },
+    {
+      [-2]: { letter: "B", accidental: "double-flat" },
+      [-1]: { letter: "B", accidental: "flat" },
+      [0]: { letter: "B", accidental: undefined },
+      [1]: { letter: "B", accidental: "sharp" },
+      [2]: { letter: "B", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "C", accidental: "flat" },
+      [-1]: { letter: "C", accidental: "natural" },
+      [0]: { letter: "C", accidental: "sharp" },
+      [1]: { letter: "C", accidental: "double-sharp" },
+      [2]: { letter: "D", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "D", accidental: "flat" },
+      [-1]: { letter: "D", accidental: "natural" },
+      [0]: { letter: "D", accidental: "sharp" },
+      [1]: { letter: "D", accidental: "double-sharp" },
+      [2]: { letter: "E", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "E", accidental: "double-flat" },
+      [-1]: { letter: "E", accidental: "flat" },
+      [0]: { letter: "E", accidental: undefined },
+      [1]: { letter: "E", accidental: "sharp" },
+      [2]: { letter: "E", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "F", accidental: "flat" },
+      [-1]: { letter: "F", accidental: "natural" },
+      [0]: { letter: "F", accidental: "sharp" },
+      [1]: { letter: "F", accidental: "double-sharp" },
+      [2]: { letter: "G", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "G", accidental: "flat" },
+      [-1]: { letter: "G", accidental: "natural" },
+      [0]: { letter: "G", accidental: "sharp" },
+      [1]: { letter: "G", accidental: "double-sharp" },
+      [2]: { letter: "A", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "A", accidental: "flat" },
+      [-1]: { letter: "A", accidental: "natural" },
+      [0]: { letter: "A", accidental: "sharp" },
+      [1]: { letter: "A", accidental: "double-sharp" },
+      [2]: { letter: "B", accidental: "sharp" },
+    },
   ],
   // F# Major (6 sharps)
   [6]: [
-    { [-2]: { letter: "F", accidental: "flat" }, [-1]: { letter: "F", accidental: "natural" }, [0]: { letter: "F", accidental: "sharp" }, [1]: { letter: "F", accidental: "double-sharp" }, [2]: { letter: "G", accidental: "sharp" } },
-    { [-2]: { letter: "G", accidental: "flat" }, [-1]: { letter: "G", accidental: "natural" }, [0]: { letter: "G", accidental: "sharp" }, [1]: { letter: "G", accidental: "double-sharp" }, [2]: { letter: "A", accidental: "sharp" } },
-    { [-2]: { letter: "A", accidental: "flat" }, [-1]: { letter: "A", accidental: "natural" }, [0]: { letter: "A", accidental: "sharp" }, [1]: { letter: "A", accidental: "double-sharp" }, [2]: { letter: "B", accidental: "sharp" } },
-    { [-2]: { letter: "B", accidental: "double-flat" }, [-1]: { letter: "B", accidental: "flat" }, [0]: { letter: "B", accidental: undefined }, [1]: { letter: "B", accidental: "sharp" }, [2]: { letter: "B", accidental: "double-sharp" } },
-    { [-2]: { letter: "C", accidental: "flat" }, [-1]: { letter: "C", accidental: "natural" }, [0]: { letter: "C", accidental: "sharp" }, [1]: { letter: "C", accidental: "double-sharp" }, [2]: { letter: "D", accidental: "sharp" } },
-    { [-2]: { letter: "D", accidental: "flat" }, [-1]: { letter: "D", accidental: "natural" }, [0]: { letter: "D", accidental: "sharp" }, [1]: { letter: "D", accidental: "double-sharp" }, [2]: { letter: "E", accidental: "sharp" } },
-    { [-2]: { letter: "E", accidental: "flat" }, [-1]: { letter: "E", accidental: "natural" }, [0]: { letter: "E", accidental: "sharp" }, [1]: { letter: "E", accidental: "double-sharp" }, [2]: { letter: "F", accidental: "double-sharp" } },
+    {
+      [-2]: { letter: "F", accidental: "flat" },
+      [-1]: { letter: "F", accidental: "natural" },
+      [0]: { letter: "F", accidental: "sharp" },
+      [1]: { letter: "F", accidental: "double-sharp" },
+      [2]: { letter: "G", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "G", accidental: "flat" },
+      [-1]: { letter: "G", accidental: "natural" },
+      [0]: { letter: "G", accidental: "sharp" },
+      [1]: { letter: "G", accidental: "double-sharp" },
+      [2]: { letter: "A", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "A", accidental: "flat" },
+      [-1]: { letter: "A", accidental: "natural" },
+      [0]: { letter: "A", accidental: "sharp" },
+      [1]: { letter: "A", accidental: "double-sharp" },
+      [2]: { letter: "B", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "B", accidental: "double-flat" },
+      [-1]: { letter: "B", accidental: "flat" },
+      [0]: { letter: "B", accidental: undefined },
+      [1]: { letter: "B", accidental: "sharp" },
+      [2]: { letter: "B", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "C", accidental: "flat" },
+      [-1]: { letter: "C", accidental: "natural" },
+      [0]: { letter: "C", accidental: "sharp" },
+      [1]: { letter: "C", accidental: "double-sharp" },
+      [2]: { letter: "D", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "D", accidental: "flat" },
+      [-1]: { letter: "D", accidental: "natural" },
+      [0]: { letter: "D", accidental: "sharp" },
+      [1]: { letter: "D", accidental: "double-sharp" },
+      [2]: { letter: "E", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "E", accidental: "flat" },
+      [-1]: { letter: "E", accidental: "natural" },
+      [0]: { letter: "E", accidental: "sharp" },
+      [1]: { letter: "E", accidental: "double-sharp" },
+      [2]: { letter: "F", accidental: "double-sharp" },
+    },
   ],
   // C# Major (7 sharps)
   [7]: [
-    { [-2]: { letter: "C", accidental: "flat" }, [-1]: { letter: "C", accidental: "natural" }, [0]: { letter: "C", accidental: "sharp" }, [1]: { letter: "C", accidental: "double-sharp" }, [2]: { letter: "D", accidental: "sharp" } },
-    { [-2]: { letter: "D", accidental: "flat" }, [-1]: { letter: "D", accidental: "natural" }, [0]: { letter: "D", accidental: "sharp" }, [1]: { letter: "D", accidental: "double-sharp" }, [2]: { letter: "E", accidental: "sharp" } },
-    { [-2]: { letter: "E", accidental: "flat" }, [-1]: { letter: "E", accidental: "natural" }, [0]: { letter: "E", accidental: "sharp" }, [1]: { letter: "E", accidental: "double-sharp" }, [2]: { letter: "F", accidental: "double-sharp" } },
-    { [-2]: { letter: "F", accidental: "flat" }, [-1]: { letter: "F", accidental: "natural" }, [0]: { letter: "F", accidental: "sharp" }, [1]: { letter: "F", accidental: "double-sharp" }, [2]: { letter: "G", accidental: "sharp" } },
-    { [-2]: { letter: "G", accidental: "flat" }, [-1]: { letter: "G", accidental: "natural" }, [0]: { letter: "G", accidental: "sharp" }, [1]: { letter: "G", accidental: "double-sharp" }, [2]: { letter: "A", accidental: "sharp" } },
-    { [-2]: { letter: "A", accidental: "flat" }, [-1]: { letter: "A", accidental: "natural" }, [0]: { letter: "A", accidental: "sharp" }, [1]: { letter: "A", accidental: "double-sharp" }, [2]: { letter: "B", accidental: "sharp" } },
-    { [-2]: { letter: "B", accidental: "flat" }, [-1]: { letter: "B", accidental: "natural" }, [0]: { letter: "B", accidental: "sharp" }, [1]: { letter: "B", accidental: "double-sharp" }, [2]: { letter: "C", accidental: "double-sharp" } },
+    {
+      [-2]: { letter: "C", accidental: "flat" },
+      [-1]: { letter: "C", accidental: "natural" },
+      [0]: { letter: "C", accidental: "sharp" },
+      [1]: { letter: "C", accidental: "double-sharp" },
+      [2]: { letter: "D", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "D", accidental: "flat" },
+      [-1]: { letter: "D", accidental: "natural" },
+      [0]: { letter: "D", accidental: "sharp" },
+      [1]: { letter: "D", accidental: "double-sharp" },
+      [2]: { letter: "E", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "E", accidental: "flat" },
+      [-1]: { letter: "E", accidental: "natural" },
+      [0]: { letter: "E", accidental: "sharp" },
+      [1]: { letter: "E", accidental: "double-sharp" },
+      [2]: { letter: "F", accidental: "double-sharp" },
+    },
+    {
+      [-2]: { letter: "F", accidental: "flat" },
+      [-1]: { letter: "F", accidental: "natural" },
+      [0]: { letter: "F", accidental: "sharp" },
+      [1]: { letter: "F", accidental: "double-sharp" },
+      [2]: { letter: "G", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "G", accidental: "flat" },
+      [-1]: { letter: "G", accidental: "natural" },
+      [0]: { letter: "G", accidental: "sharp" },
+      [1]: { letter: "G", accidental: "double-sharp" },
+      [2]: { letter: "A", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "A", accidental: "flat" },
+      [-1]: { letter: "A", accidental: "natural" },
+      [0]: { letter: "A", accidental: "sharp" },
+      [1]: { letter: "A", accidental: "double-sharp" },
+      [2]: { letter: "B", accidental: "sharp" },
+    },
+    {
+      [-2]: { letter: "B", accidental: "flat" },
+      [-1]: { letter: "B", accidental: "natural" },
+      [0]: { letter: "B", accidental: "sharp" },
+      [1]: { letter: "B", accidental: "double-sharp" },
+      [2]: { letter: "C", accidental: "double-sharp" },
+    },
   ],
 };
 
@@ -189,7 +819,9 @@ export function getSpellingFromMap(
   const keyMap = KEY_ALTERATION_MAP[keySignature];
   if (!keyMap || !keyMap[degree] || keyMap[degree][alteration] === undefined) {
     // Fallback for invalid input - shouldn't happen with valid data
-    throw new Error(`Invalid lookup: key=${keySignature}, degree=${degree}, alteration=${alteration}`);
+    throw new Error(
+      `Invalid lookup: key=${keySignature}, degree=${degree}, alteration=${alteration}`,
+    );
   }
   return keyMap[degree][alteration];
 }
@@ -414,11 +1046,13 @@ function getDiatonicScale(
   const letters: PitchName[] = ["C", "D", "E", "F", "G", "A", "B"];
 
   // Start with natural pitch classes
-  const result: Array<{ pitchClass: number; keyAccidental: Accidental | undefined }> = 
-    letters.map((letter) => ({
-      pitchClass: PITCH_TO_SEMITONE[letter],
-      keyAccidental: undefined,
-    }));
+  const result: Array<{
+    pitchClass: number;
+    keyAccidental: Accidental | undefined;
+  }> = letters.map((letter) => ({
+    pitchClass: PITCH_TO_SEMITONE[letter],
+    keyAccidental: undefined,
+  }));
 
   if (keySignature > 0) {
     // Apply sharps
@@ -485,32 +1119,56 @@ export function getSpellingForMidi(
   for (let i = 0; i < 7; i++) {
     const letterPitchClass = scale[i].pitchClass;
     const keyAcc = scale[i].keyAccidental;
-    const diff = ((pitchClass - letterPitchClass + 12) % 12);
+    const diff = (pitchClass - letterPitchClass + 12) % 12;
 
     // diff is how many semitones above the diatonic pitch
     if (diff === 1) {
       // One semitone above - need to raise
       if (keyAcc === "sharp") {
         // Already sharp in key, need double-sharp
-        candidates.push({ letter: letters[i], accidental: "double-sharp", priority: 3 });
+        candidates.push({
+          letter: letters[i],
+          accidental: "double-sharp",
+          priority: 3,
+        });
       } else if (keyAcc === "flat") {
         // Flat in key, natural cancels it (keeps same letter - best choice)
-        candidates.push({ letter: letters[i], accidental: "natural", priority: 0 });
+        candidates.push({
+          letter: letters[i],
+          accidental: "natural",
+          priority: 0,
+        });
       } else {
         // No key accidental, add sharp
-        candidates.push({ letter: letters[i], accidental: "sharp", priority: 1 });
+        candidates.push({
+          letter: letters[i],
+          accidental: "sharp",
+          priority: 1,
+        });
       }
     } else if (diff === 11) {
       // One semitone below (same as -1 mod 12) - need to lower
       if (keyAcc === "flat") {
         // Already flat in key, need double-flat
-        candidates.push({ letter: letters[i], accidental: "double-flat", priority: 3 });
+        candidates.push({
+          letter: letters[i],
+          accidental: "double-flat",
+          priority: 3,
+        });
       } else if (keyAcc === "sharp") {
         // Sharp in key, natural cancels it (keeps same letter - best choice)
-        candidates.push({ letter: letters[i], accidental: "natural", priority: 0 });
+        candidates.push({
+          letter: letters[i],
+          accidental: "natural",
+          priority: 0,
+        });
       } else {
         // No key accidental, add flat
-        candidates.push({ letter: letters[i], accidental: "flat", priority: 1 });
+        candidates.push({
+          letter: letters[i],
+          accidental: "flat",
+          priority: 1,
+        });
       }
     }
     // diff === 2 or diff === 10 would require triple sharps/flats - not supported
@@ -533,7 +1191,8 @@ export function getSpellingForMidi(
     if (a.priority !== b.priority) return a.priority - b.priority;
     // Then, prefer sharps in sharp keys, flats in flat keys
     if (keySignature >= 0) {
-      if (a.accidental === "sharp" || a.accidental === "double-sharp") return -1;
+      if (a.accidental === "sharp" || a.accidental === "double-sharp")
+        return -1;
       if (b.accidental === "sharp" || b.accidental === "double-sharp") return 1;
     } else {
       if (a.accidental === "flat" || a.accidental === "double-flat") return -1;
@@ -593,7 +1252,7 @@ export function needsNaturalSign(
  */
 function keyToSemitone(keySignature: KeySignature): number {
   // Circle of fifths: each sharp adds 7 semitones (mod 12)
-  return ((keySignature * 7) % 12 + 12) % 12;
+  return (((keySignature * 7) % 12) + 12) % 12;
 }
 
 /**
@@ -604,16 +1263,16 @@ function getScaleDegreePitches(keySignature: KeySignature): number[] {
   const tonic = keyToSemitone(keySignature);
   // Major scale intervals: W-W-H-W-W-W-H (0, 2, 4, 5, 7, 9, 11)
   const majorIntervals = [0, 2, 4, 5, 7, 9, 11];
-  return majorIntervals.map(interval => (tonic + interval) % 12);
+  return majorIntervals.map((interval) => (tonic + interval) % 12);
 }
 
 /**
  * Given a pitch class and key signature, find which scale degree it belongs to
  * and what the alteration is from the diatonic pitch.
- * 
+ *
  * Returns { degree: 0-6, alteration: -2 to +2 } or null if not found.
  * degree 0 = tonic, degree 1 = supertonic, etc.
- * 
+ *
  * IMPORTANT: Prefers diatonic (alteration=0) over altered interpretations,
  * then prefers smaller alterations. This ensures C in Bb major is recognized
  * as "degree 1, diatonic" not "degree 0, double-raised".
@@ -623,11 +1282,11 @@ function getScaleDegreeAndAlteration(
   keySignature: KeySignature,
 ): { degree: number; alteration: number } | null {
   const scalePitches = getScaleDegreePitches(keySignature);
-  
+
   // Check alterations in order of preference: 0, then ±1, then ±2
   // This ensures we prefer diatonic interpretations over altered ones
   const alterationOrder = [0, 1, -1, 2, -2];
-  
+
   for (const alt of alterationOrder) {
     for (let degree = 0; degree < 7; degree++) {
       const diatonicPitch = scalePitches[degree];
@@ -637,7 +1296,7 @@ function getScaleDegreeAndAlteration(
       }
     }
   }
-  
+
   return null;
 }
 
@@ -670,22 +1329,29 @@ export function transposeNoteByFunction(
 ): { midi: number; accidental: Accidental | undefined } {
   const pitchClass = midi % 12;
   const octave = midiToOctave(midi);
-  
+
   // Find the note's function in the source key
   const noteFunction = getScaleDegreeAndAlteration(pitchClass, sourceKey);
-  
+
   if (!noteFunction) {
     // Couldn't determine function - fall back to simple transposition
     const sourceRoot = keyToSemitone(sourceKey);
     const targetRoot = keyToSemitone(targetKey);
     const semitones = (targetRoot - sourceRoot + 12) % 12;
     const newMidi = midi + semitones;
-    return { midi: newMidi, accidental: getAccidentalForMidi(newMidi, targetKey) };
+    return {
+      midi: newMidi,
+      accidental: getAccidentalForMidi(newMidi, targetKey),
+    };
   }
-  
+
   // Use the strict lookup map to get the exact spelling in the target key
-  const targetSpelling = getSpellingFromMap(targetKey, noteFunction.degree, noteFunction.alteration);
-  
+  const targetSpelling = getSpellingFromMap(
+    targetKey,
+    noteFunction.degree,
+    noteFunction.alteration,
+  );
+
   // Calculate the MIDI pitch from the spelling
   const letterPitchClass = PITCH_TO_SEMITONE[targetSpelling.letter];
   let accidentalOffset = 0;
@@ -694,12 +1360,12 @@ export function transposeNoteByFunction(
   else if (targetSpelling.accidental === "flat") accidentalOffset = -1;
   else if (targetSpelling.accidental === "double-flat") accidentalOffset = -2;
   // "natural" means the note is natural (offset 0), used when key would normally alter it
-  
+
   const targetPitchClass = (letterPitchClass + accidentalOffset + 12) % 12;
-  
+
   // Calculate the new MIDI pitch, preserving the octave relationship
   let newMidi = (octave + 1) * 12 + targetPitchClass;
-  
+
   // Adjust for octave boundary crossings
   // If the pitch classes would suggest we crossed an octave boundary, compensate
   if (pitchClass > 9 && targetPitchClass < 3) {
@@ -709,6 +1375,6 @@ export function transposeNoteByFunction(
     // Source was low in octave, target wrapped to high (like C -> B)
     newMidi -= 12;
   }
-  
+
   return { midi: newMidi, accidental: targetSpelling.accidental };
 }

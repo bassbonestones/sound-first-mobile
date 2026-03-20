@@ -215,7 +215,11 @@ export function reverseAction(
                 ...m,
                 notes: m.notes.map((n) =>
                   n.id === action.noteId
-                    ? { ...n, accidental: action.previousAccidental, midi: action.previousMidi }
+                    ? {
+                        ...n,
+                        accidental: action.previousAccidental,
+                        midi: action.previousMidi,
+                      }
                     : n,
                 ),
               }
@@ -376,7 +380,11 @@ export function reapplyAction(
                 ...m,
                 notes: m.notes.map((n) =>
                   n.id === action.noteId
-                    ? { ...n, accidental: action.newAccidental, midi: action.newMidi }
+                    ? {
+                        ...n,
+                        accidental: action.newAccidental,
+                        midi: action.newMidi,
+                      }
                     : n,
                 ),
               }

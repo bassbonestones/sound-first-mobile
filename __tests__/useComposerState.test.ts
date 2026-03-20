@@ -398,7 +398,9 @@ describe("useComposerState", () => {
       });
 
       // C in Bb major should have no accidental
-      expect(result.current.score.measures[0].notes[0].accidental).toBeUndefined();
+      expect(
+        result.current.score.measures[0].notes[0].accidental,
+      ).toBeUndefined();
 
       const originalMidi = result.current.score.measures[0].notes[0].midi;
 
@@ -408,8 +410,12 @@ describe("useComposerState", () => {
       });
 
       // D in C major should have no accidental
-      expect(result.current.score.measures[0].notes[0].midi).toBe(originalMidi! + 2);
-      expect(result.current.score.measures[0].notes[0].accidental).toBeUndefined();
+      expect(result.current.score.measures[0].notes[0].midi).toBe(
+        originalMidi! + 2,
+      );
+      expect(
+        result.current.score.measures[0].notes[0].accidental,
+      ).toBeUndefined();
     });
 
     it("should preserve scale degree when transposing (function-preserving)", () => {
@@ -436,7 +442,9 @@ describe("useComposerState", () => {
       // B in G major is scale degree 2 (mediant), diatonic
       expect(result.current.score.measures[0].notes[0].midi).toBe(83); // B5
       // In G major, B is diatonic, so no accidental needed
-      expect(result.current.score.measures[0].notes[0].accidental).toBeUndefined();
+      expect(
+        result.current.score.measures[0].notes[0].accidental,
+      ).toBeUndefined();
     });
 
     it("should change time signature", () => {
