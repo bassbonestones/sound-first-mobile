@@ -6,14 +6,19 @@
  * Uses Bravura font for professional music notation symbols.
  */
 
-import React, { memo, useCallback } from "react";
+import React, { memo, useCallback, useState } from "react";
 import {
   View,
   TouchableOpacity,
   Text,
   StyleSheet,
   AccessibilityRole,
+  ScrollView,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  LayoutChangeEvent,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { colors, spacing } from "../../../constants";
 import { DURATION, type DurationValue, type DurationName } from "../types";
@@ -133,6 +138,31 @@ function DurationSelectorComponent({
   disabled = false,
   testID,
 }: DurationSelectorProps): React.ReactElement {
+  const [scrollState, setScrollState] = useState({
+    scrollX: 0,
+    containerWidth: 0,
+  });
+
+  // Calculate minimum content width: 8 buttons (7 durations + 1 dot) * 44px + 7 gaps * 2px + marginLeft on dot
+  const MIN_CONTENT_WIDTH = 8 * 44 + 7 * 2 + spacing.xs; // ~370px
+
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      setScrollState((prev) => ({
+        ...prev,
+        scrollX: event.nativeEvent.contentOffset.x,
+      }));
+    },
+    [],
+  );
+
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    setScrollState((prev) => ({
+      ...prev,
+      containerWidth: event.nativeEvent.layout.width,
+    }));
+  }, []);
+
   const handlePress = useCallback(
     (duration: DurationValue) => {
       if (!disabled) {
@@ -153,113 +183,162 @@ function DurationSelectorComponent({
   // Disable dotted mode toggle when in triplet group
   const dotDisabled = disabled || inTripletGroup;
 
+  // Calculate fade visibility
+  const canScrollLeft = scrollState.scrollX > 2;
+  const canScrollRight =
+    MIN_CONTENT_WIDTH > scrollState.containerWidth &&
+    scrollState.scrollX < MIN_CONTENT_WIDTH - scrollState.containerWidth - 2;
+
+  // Check if there's extra space - buttons should stretch to fill
+  const hasExtraSpace = scrollState.containerWidth > MIN_CONTENT_WIDTH;
+
   return (
     <View style={styles.container} testID={testID}>
-      <View style={styles.buttonRow}>
-        {DURATION_OPTIONS.map((option) => {
-          const isSelected = selectedDuration === option.value;
+      <View style={styles.scrollContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.scrollContent,
+            hasExtraSpace && styles.scrollContentFlex,
+          ]}
+          onScroll={handleScroll}
+          onLayout={handleLayout}
+          scrollEventThrottle={16}
+        >
+          {DURATION_OPTIONS.map((option) => {
+            const isSelected = selectedDuration === option.value;
 
-          // Determine if this button should be disabled
-          let isButtonDisabled = disabled;
+            // Determine if this button should be disabled
+            let isButtonDisabled = disabled;
 
-          // Disable sixteenth and triplet when dotted mode is active
-          if (
-            dottedMode &&
-            (option.value === DURATION.SIXTEENTH || option.isTriplet)
-          ) {
-            isButtonDisabled = true;
-          }
-
-          // When in triplet group, only triplet durations are allowed
-          if (inTripletGroup && !option.isTriplet) {
-            isButtonDisabled = true;
-          }
-
-          // In triplet groups, restrict based on group type:
-          // - 'eighth': only eighth triplets allowed
-          // - 'quarter': only quarter triplets allowed
-          // - 'mixed': both allowed
-          if (inTripletGroup && option.isTriplet) {
-            const isQuarterTriplet = option.value === DURATION.TRIPLET_QUARTER;
-            if (tripletGroupType === "eighth" && isQuarterTriplet) {
+            // Disable sixteenth and triplet when dotted mode is active
+            if (
+              dottedMode &&
+              (option.value === DURATION.SIXTEENTH || option.isTriplet)
+            ) {
               isButtonDisabled = true;
             }
-            if (tripletGroupType === "quarter" && !isQuarterTriplet) {
+
+            // When in triplet group, only triplet durations are allowed
+            if (inTripletGroup && !option.isTriplet) {
               isButtonDisabled = true;
             }
-            // "mixed" allows both, so no additional restriction
-          }
 
-          return (
-            <TouchableOpacity
-              key={option.name}
-              style={[
-                styles.button,
-                isSelected && styles.buttonSelected,
-                isButtonDisabled && styles.buttonDisabled,
-              ]}
-              onPress={() => handlePress(option.value)}
-              disabled={isButtonDisabled}
-              accessibilityRole={"button" as AccessibilityRole}
-              accessibilityLabel={`${option.label} note`}
-              accessibilityState={{
-                selected: isSelected,
-                disabled: isButtonDisabled,
-              }}
-              testID={`duration-${option.name}`}
-            >
-              <View style={styles.symbolContainer}>
-                <Text
-                  style={[
-                    styles.symbol,
-                    isSelected && styles.symbolSelected,
-                    isButtonDisabled && styles.symbolDisabled,
-                    { marginTop: option.topOffset },
-                  ]}
-                >
-                  {option.symbol}
-                </Text>
-                {option.overlayText && (
+            // In triplet groups, restrict based on group type:
+            // - 'eighth': only eighth triplets allowed
+            // - 'quarter': only quarter triplets allowed
+            // - 'mixed': both allowed
+            if (inTripletGroup && option.isTriplet) {
+              const isQuarterTriplet =
+                option.value === DURATION.TRIPLET_QUARTER;
+              if (tripletGroupType === "eighth" && isQuarterTriplet) {
+                isButtonDisabled = true;
+              }
+              if (tripletGroupType === "quarter" && !isQuarterTriplet) {
+                isButtonDisabled = true;
+              }
+              // "mixed" allows both, so no additional restriction
+            }
+
+            return (
+              <TouchableOpacity
+                key={option.name}
+                style={[
+                  styles.button,
+                  hasExtraSpace && styles.buttonFlex,
+                  isSelected && styles.buttonSelected,
+                  isButtonDisabled && styles.buttonDisabled,
+                ]}
+                onPress={() => handlePress(option.value)}
+                disabled={isButtonDisabled}
+                accessibilityRole={"button" as AccessibilityRole}
+                accessibilityLabel={`${option.label} note`}
+                accessibilityState={{
+                  selected: isSelected,
+                  disabled: isButtonDisabled,
+                }}
+                testID={`duration-${option.name}`}
+              >
+                <View style={styles.symbolContainer}>
                   <Text
                     style={[
-                      styles.tripletOverlay,
-                      isSelected && styles.tripletOverlaySelected,
-                      isButtonDisabled && styles.tripletOverlayDisabled,
+                      styles.symbol,
+                      isSelected && styles.symbolSelected,
+                      isButtonDisabled && styles.symbolDisabled,
+                      { marginTop: option.topOffset },
                     ]}
                   >
-                    {option.overlayText}
+                    {option.symbol}
                   </Text>
-                )}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-        {/* Dot toggle button */}
-        {onToggleDotted && (
-          <TouchableOpacity
-            style={[
-              styles.dotButton,
-              dottedMode && styles.dotButtonActive,
-              dotDisabled && styles.buttonDisabled,
-            ]}
-            onPress={handleDotToggle}
-            disabled={dotDisabled}
-            accessibilityRole={"button" as AccessibilityRole}
-            accessibilityLabel="Dotted note"
-            accessibilityState={{ selected: dottedMode, disabled: dotDisabled }}
-            accessibilityHint="Toggle dotted mode to add 50% duration"
-            testID="duration-dot"
-          >
-            <Text
+                  {option.overlayText && (
+                    <Text
+                      style={[
+                        styles.tripletOverlay,
+                        isSelected && styles.tripletOverlaySelected,
+                        isButtonDisabled && styles.tripletOverlayDisabled,
+                      ]}
+                    >
+                      {option.overlayText}
+                    </Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+          {/* Dot toggle button */}
+          {onToggleDotted && (
+            <TouchableOpacity
               style={[
-                styles.dotSymbol,
-                dottedMode && styles.dotSymbolActive,
-                dotDisabled && styles.symbolDisabled,
+                styles.dotButton,
+                hasExtraSpace && styles.dotButtonFlex,
+                dottedMode && styles.dotButtonActive,
+                dotDisabled && styles.buttonDisabled,
               ]}
+              onPress={handleDotToggle}
+              disabled={dotDisabled}
+              accessibilityRole={"button" as AccessibilityRole}
+              accessibilityLabel="Dotted note"
+              accessibilityState={{
+                selected: dottedMode,
+                disabled: dotDisabled,
+              }}
+              accessibilityHint="Toggle dotted mode to add 50% duration"
+              testID="duration-dot"
             >
-              •
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[
+                  styles.dotSymbol,
+                  dottedMode && styles.dotSymbolActive,
+                  dotDisabled && styles.symbolDisabled,
+                ]}
+              >
+                •
+              </Text>
+            </TouchableOpacity>
+          )}
+        </ScrollView>
+
+        {/* Left fade */}
+        {canScrollLeft && (
+          <LinearGradient
+            colors={[colors.primaryLight, `${colors.primaryLight}00`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.fadeLeft}
+            pointerEvents="none"
+          />
+        )}
+
+        {/* Right fade */}
+        {canScrollRight && (
+          <LinearGradient
+            colors={[`${colors.primaryLight}00`, colors.primaryLight]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.fadeRight}
+            pointerEvents="none"
+          />
         )}
       </View>
     </View>
@@ -273,6 +352,34 @@ function DurationSelectorComponent({
 const styles = StyleSheet.create({
   container: {
     paddingVertical: 0,
+    flexDirection: "row",
+  },
+  scrollContainer: {
+    flex: 1,
+    position: "relative",
+  },
+  scrollContent: {
+    flexDirection: "row",
+    gap: 2,
+  },
+  scrollContentFlex: {
+    flexGrow: 1,
+  },
+  fadeLeft: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 32,
+    borderRadius: 4,
+  },
+  fadeRight: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 32,
+    borderRadius: 4,
   },
   label: {
     fontSize: 12,
@@ -283,13 +390,8 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 2,
-  },
   button: {
-    flex: 1,
+    width: 44,
     minWidth: 44,
     alignItems: "center",
     justifyContent: "center",
@@ -300,6 +402,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     height: 44,
+  },
+  buttonFlex: {
+    flex: 1,
+    width: undefined,
   },
   buttonSelected: {
     backgroundColor: colors.primaryLight,
@@ -365,6 +471,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     height: 44,
     marginLeft: spacing.xs,
+  },
+  dotButtonFlex: {
+    flex: 1,
+    width: undefined,
   },
   dotButtonActive: {
     backgroundColor: colors.primaryLight,

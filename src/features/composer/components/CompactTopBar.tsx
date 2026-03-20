@@ -23,12 +23,7 @@ import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../constants";
 import TimeSignaturePickerModal from "../../../components/Metronome/TimeSignaturePickerModal";
-import type {
-  Clef,
-  TimeSignature,
-  KeySignature,
-  MeasureValidation,
-} from "../types";
+import type { Clef, TimeSignature, KeySignature } from "../types";
 
 // =============================================================================
 // Types
@@ -61,8 +56,6 @@ export interface CompactTopBarProps {
   zoom: number;
   /** Called when zoom changes */
   onZoomChange: (zoom: number) => void;
-  /** Validation state of current measure */
-  measureValidation?: MeasureValidation;
   /** Called when back is pressed */
   onBack?: () => void;
   /** Whether controls are disabled */
@@ -111,7 +104,6 @@ function CompactTopBarComponent({
   onTempoChange,
   zoom,
   onZoomChange,
-  measureValidation,
   onBack,
   disabled = false,
   testID,
@@ -121,32 +113,6 @@ function CompactTopBarComponent({
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [tempoInput, setTempoInput] = useState(tempo.toString());
-
-  // Validation status handler
-  const handleValidationPress = useCallback(() => {
-    if (!measureValidation) return;
-
-    let alertTitle: string;
-    let message: string;
-
-    if (measureValidation.isComplete) {
-      alertTitle = "Measure Complete";
-      message = "This measure has the correct number of beats.";
-    } else if (measureValidation.difference > 0) {
-      alertTitle = "Measure Overflowed";
-      message = "This measure has too many beats. Remove some notes or rests.";
-    } else {
-      const beatsLeft = Math.abs(measureValidation.difference);
-      alertTitle = "Measure Incomplete";
-      message = `This measure needs ${beatsLeft} more beat${beatsLeft !== 1 ? "s" : ""}.`;
-    }
-
-    if (Platform.OS === "web") {
-      window.alert(`${alertTitle}\n\n${message}`);
-    } else {
-      Alert.alert(alertTitle, message);
-    }
-  }, [measureValidation]);
 
   // Handlers
   const handleClefToggle = useCallback(() => {
@@ -225,31 +191,8 @@ function CompactTopBarComponent({
         </TouchableOpacity>
       )}
 
-      {/* Title with validation indicator */}
+      {/* Title */}
       <View style={styles.titleContainer}>
-        {measureValidation && (
-          <TouchableOpacity
-            style={styles.validationButton}
-            onPress={handleValidationPress}
-            accessibilityLabel={
-              measureValidation.isComplete
-                ? "Measure complete"
-                : "Measure incomplete"
-            }
-            accessibilityRole="button"
-            testID="topbar-validation"
-          >
-            <Feather
-              name={
-                measureValidation.isComplete ? "check-circle" : "alert-circle"
-              }
-              size={18}
-              color={
-                measureValidation.isComplete ? colors.success : colors.warning
-              }
-            />
-          </TouchableOpacity>
-        )}
         <Text style={styles.title} numberOfLines={1}>
           Composer
         </Text>
@@ -534,9 +477,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: colors.textPrimary,
-  },
-  validationButton: {
-    padding: 2,
   },
   settingsButton: {
     padding: spacing.xs,

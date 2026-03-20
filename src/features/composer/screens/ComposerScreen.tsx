@@ -594,7 +594,6 @@ function ComposerScreenContent({
           onTempoChange={handleTempoChange}
           zoom={zoom}
           onZoomChange={setZoom}
-          measureValidation={measureValidation}
           onBack={handleBack}
           disabled={isPlaying}
           testID="composer-topbar"
