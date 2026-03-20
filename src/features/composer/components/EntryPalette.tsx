@@ -42,6 +42,8 @@ export interface EntryPaletteProps {
   onToggleTie: () => void;
   /** Whether the palette is disabled (e.g., during playback) */
   disabled?: boolean;
+  /** Extra vertical padding per row for responsive layouts */
+  extraRowPadding?: number;
   /** Test ID for testing */
   testID?: string;
 }
@@ -62,44 +64,55 @@ function EntryPaletteComponent({
   onInsertRest,
   onToggleTie,
   disabled = false,
+  extraRowPadding = 0,
   testID,
 }: EntryPaletteProps): React.ReactElement {
   const hasSelection = selectedNote !== null;
   const activeAccidental = selectedNote?.accidental;
   const tieActive = selectedNote?.tieStart ?? false;
 
+  // Per-row vertical padding (split top/bottom)
+  const rowPaddingStyle =
+    extraRowPadding > 0 ? { paddingVertical: extraRowPadding / 2 } : undefined;
+
   return (
     <View style={styles.container} testID={testID}>
       {/* Duration row */}
-      <DurationSelector
-        selectedDuration={selectedDuration}
-        onSelectDuration={onDurationSelect}
-        dottedMode={dottedMode}
-        onToggleDotted={onToggleDotted}
-        disabled={disabled}
-        testID="duration-selector"
-      />
+      <View style={rowPaddingStyle}>
+        <DurationSelector
+          selectedDuration={selectedDuration}
+          onSelectDuration={onDurationSelect}
+          dottedMode={dottedMode}
+          onToggleDotted={onToggleDotted}
+          disabled={disabled}
+          testID="duration-selector"
+        />
+      </View>
 
       {/* Pitch row (includes rest at beginning) */}
-      <PitchSelector
-        onSelectPitch={onPitchTap}
-        onInsertRest={onInsertRest}
-        selectedDuration={selectedDuration}
-        disabled={disabled}
-        testID="pitch-selector"
-      />
+      <View style={rowPaddingStyle}>
+        <PitchSelector
+          onSelectPitch={onPitchTap}
+          onInsertRest={onInsertRest}
+          selectedDuration={selectedDuration}
+          disabled={disabled}
+          testID="pitch-selector"
+        />
+      </View>
 
       {/* Modifier row */}
-      <ModifierRow
-        onAccidental={onAccidental}
-        onTie={onToggleTie}
-        onOctaveChange={onOctaveChange}
-        activeAccidental={activeAccidental}
-        tieActive={tieActive}
-        hasSelection={hasSelection}
-        disabled={disabled}
-        testID="modifier-row"
-      />
+      <View style={rowPaddingStyle}>
+        <ModifierRow
+          onAccidental={onAccidental}
+          onTie={onToggleTie}
+          onOctaveChange={onOctaveChange}
+          activeAccidental={activeAccidental}
+          tieActive={tieActive}
+          hasSelection={hasSelection}
+          disabled={disabled}
+          testID="modifier-row"
+        />
+      </View>
     </View>
   );
 }

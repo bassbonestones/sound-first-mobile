@@ -29,6 +29,7 @@ import {
   PanResponder,
   GestureResponderEvent,
   PanResponderGestureState,
+  useWindowDimensions,
 } from "react-native";
 import {
   useNavigation,
@@ -499,6 +500,29 @@ function ComposerScreenContent({
   ]);
 
   // ==========================================================================
+  // Responsive Height Calculation
+  // ==========================================================================
+
+  const { height: windowHeight } = useWindowDimensions();
+
+  // Base heights for smallest supported screen (568px)
+  const BASE_SCREEN_HEIGHT = 568;
+  const BASE_VIEWPORT_HEIGHT = 154;
+
+  // Calculate extra vertical space beyond minimum
+  const extraHeight = useMemo(() => {
+    const extraSpace = Math.max(0, windowHeight - BASE_SCREEN_HEIGHT);
+    return extraSpace;
+  }, [windowHeight]);
+
+  // 70% of extra height goes to viewport, 30% distributed to control rows
+  const viewportHeight = BASE_VIEWPORT_HEIGHT + extraHeight * 0.7;
+  const extraPadding = extraHeight * 0.3;
+
+  // 5 rows total: DurationSelector, PitchSelector, ModifierRow, compactControlsRow, playbackPanel
+  const rowExtraPadding = extraPadding / 5;
+
+  // ==========================================================================
   // Swipe Gesture Handling
   // ==========================================================================
 
@@ -573,7 +597,10 @@ function ComposerScreenContent({
         />
 
         {/* Score Viewport with swipe gestures */}
-        <View style={styles.viewportWrapper} {...panResponder.panHandlers}>
+        <View
+          style={[styles.viewportWrapper, { height: viewportHeight }]}
+          {...panResponder.panHandlers}
+        >
           <ComposerScoreViewport
             score={composerState.score}
             cursor={composerState.cursor}
@@ -591,13 +618,8 @@ function ComposerScreenContent({
           />
         </View>
 
-        <ScrollView
-          style={styles.scrollContent}
-          contentContainerStyle={styles.scrollContentContainer}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Entry Palette */}
+        <View style={styles.controlsContainer}>
+          {/* Entry Palette - 3 rows get extraRowPadding each */}
           <EntryPalette
             selectedDuration={composerState.state.selectedDuration}
             selectedNote={composerState.selectedNote}
@@ -610,11 +632,17 @@ function ComposerScreenContent({
             onInsertRest={handleRestEnter}
             onToggleTie={composerState.toggleTie}
             disabled={isPlaying}
+            extraRowPadding={rowExtraPadding}
             testID="composer-palette"
           />
 
           {/* Compact Controls Row */}
-          <View style={styles.compactControlsRow}>
+          <View
+            style={[
+              styles.compactControlsRow,
+              { paddingVertical: 4 + rowExtraPadding / 2 },
+            ]}
+          >
             {/* Pitch up/down buttons */}
             <View style={styles.pitchButtons}>
               <TouchableOpacity
@@ -716,7 +744,12 @@ function ComposerScreenContent({
           </View>
 
           {/* Playback Panel */}
-          <View style={styles.playbackPanel}>
+          <View
+            style={[
+              styles.playbackPanel,
+              { paddingVertical: spacing.sm + rowExtraPadding / 2 },
+            ]}
+          >
             <TouchableOpacity
               style={[
                 styles.transportButton,
@@ -786,10 +819,10 @@ function ComposerScreenContent({
               />
             </TouchableOpacity>
           </View>
-        </ScrollView>
+        </View>
 
-        {/* Action Buttons - pinned to bottom */}
-        <View style={styles.actionRow}>
+        {/* Action Buttons - pinned to bottom with fixed 7px below */}
+        <View style={[styles.actionRow, { paddingBottom: 7 }]}>
           <TouchableOpacity
             style={[
               styles.saveButton,
@@ -1029,11 +1062,8 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  scrollContent: {
-    flex: 1,
-  },
-  scrollContentContainer: {
-    flexGrow: 1,
+  controlsContainer: {
+    // No flex - stacks components at their natural heights
   },
   loadingContainer: {
     flex: 1,
@@ -1043,7 +1073,6 @@ const styles = StyleSheet.create({
   },
   // Viewport
   viewportWrapper: {
-    height: 154,
     minHeight: 120,
     position: "relative",
   },
