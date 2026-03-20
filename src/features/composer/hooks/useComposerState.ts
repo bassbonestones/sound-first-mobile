@@ -29,6 +29,8 @@ import {
   STAFF_CENTER_MIDI,
   getBeatsPerMeasure,
   getMeasureDuration,
+  getNoteDuration,
+  generateRestsForDuration,
   validateMeasure,
   wouldOverflow,
   replaceNoteAtIndex,
@@ -104,6 +106,10 @@ export interface UseComposerStateReturn {
   // Duration
   setDuration: (duration: DurationValue) => void;
   changeDurationOfSelected: (duration: DurationValue) => void;
+  /** Whether dotted mode is active (next inserted note will be dotted) */
+  dottedMode: boolean;
+  /** Toggle dotted mode on/off */
+  toggleDottedMode: () => void;
 
   // Navigation
   moveCursor: (direction: "left" | "right" | "start" | "end") => void;
@@ -255,6 +261,7 @@ export function useComposerState(
 
       const note = createNote(midi, state.selectedDuration, {
         accidental,
+        dotted: state.dottedMode || undefined,
       });
 
       if (isReplaceMode) {
@@ -333,6 +340,7 @@ export function useComposerState(
             measure,
             state.selectedDuration,
             state.score.timeSignature,
+            state.dottedMode,
           )
         ) {
           return false;
@@ -377,7 +385,13 @@ export function useComposerState(
         return true;
       }
     },
-    [state.score, state.selectedDuration, state.selectedOctave, undoManager],
+    [
+      state.score,
+      state.selectedDuration,
+      state.dottedMode,
+      state.selectedOctave,
+      undoManager,
+    ],
   );
 
   const insertRest = useCallback((): boolean => {
@@ -389,7 +403,10 @@ export function useComposerState(
     // Determine if we're in replace mode (cursor is on an existing note)
     const isReplaceMode = currentCursor.noteIndex < measure.notes.length;
 
-    const rest = createRest(state.selectedDuration);
+    const rest = createRest(
+      state.selectedDuration,
+      state.dottedMode || undefined,
+    );
 
     if (isReplaceMode) {
       // Replace mode: replace note at cursor position
@@ -457,6 +474,7 @@ export function useComposerState(
           measure,
           state.selectedDuration,
           state.score.timeSignature,
+          state.dottedMode,
         )
       ) {
         return false;
@@ -504,7 +522,7 @@ export function useComposerState(
 
       return true;
     }
-  }, [state.score, state.selectedDuration, undoManager]);
+  }, [state.score, state.selectedDuration, state.dottedMode, undoManager]);
 
   const deleteNote = useCallback((): boolean => {
     // Helper to find previous note/rest (any element) before a position
@@ -579,7 +597,8 @@ export function useComposerState(
 
     // Get the measure and calculate where to insert replacement rests
     const measure = state.score.measures[currentPosition.measureIndex];
-    const deletedDuration = currentNote.duration;
+    // Use getNoteDuration to account for dotted notes
+    const deletedDuration = getNoteDuration(currentNote);
     const beatPosition = getBeatPositionAt(measure, currentPosition.noteIndex);
 
     // Generate rests to replace the deleted note (respecting half-measure boundary)
@@ -885,6 +904,10 @@ export function useComposerState(
 
   const setDuration = useCallback((duration: DurationValue) => {
     setState((prev) => ({ ...prev, selectedDuration: duration }));
+  }, []);
+
+  const toggleDottedMode = useCallback(() => {
+    setState((prev) => ({ ...prev, dottedMode: !prev.dottedMode }));
   }, []);
 
   const changeDurationOfSelected = useCallback(
@@ -1437,6 +1460,8 @@ export function useComposerState(
     // Duration
     setDuration,
     changeDurationOfSelected,
+    dottedMode: state.dottedMode,
+    toggleDottedMode,
 
     // Navigation
     moveCursor,

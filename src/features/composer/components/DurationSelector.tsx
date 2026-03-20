@@ -27,6 +27,10 @@ export interface DurationSelectorProps {
   selectedDuration: DurationValue;
   /** Called when a duration is selected */
   onSelectDuration: (duration: DurationValue) => void;
+  /** Whether dotted mode is active */
+  dottedMode?: boolean;
+  /** Called when dotted mode is toggled */
+  onToggleDotted?: () => void;
   /** Whether the selector is disabled */
   disabled?: boolean;
   /** Test ID for testing */
@@ -96,6 +100,8 @@ const DURATION_OPTIONS: DurationOption[] = [
 function DurationSelectorComponent({
   selectedDuration,
   onSelectDuration,
+  dottedMode = false,
+  onToggleDotted,
   disabled = false,
   testID,
 }: DurationSelectorProps): React.ReactElement {
@@ -107,6 +113,12 @@ function DurationSelectorComponent({
     },
     [disabled, onSelectDuration],
   );
+
+  const handleDotToggle = useCallback(() => {
+    if (!disabled && onToggleDotted) {
+      onToggleDotted();
+    }
+  }, [disabled, onToggleDotted]);
 
   return (
     <View style={styles.container} testID={testID}>
@@ -141,6 +153,33 @@ function DurationSelectorComponent({
             </TouchableOpacity>
           );
         })}
+        {/* Dot toggle button */}
+        {onToggleDotted && (
+          <TouchableOpacity
+            style={[
+              styles.dotButton,
+              dottedMode && styles.dotButtonActive,
+              disabled && styles.buttonDisabled,
+            ]}
+            onPress={handleDotToggle}
+            disabled={disabled}
+            accessibilityRole={"button" as AccessibilityRole}
+            accessibilityLabel="Dotted note"
+            accessibilityState={{ selected: dottedMode, disabled }}
+            accessibilityHint="Toggle dotted mode to add 50% duration"
+            testID="duration-dot"
+          >
+            <Text
+              style={[
+                styles.dotSymbol,
+                dottedMode && styles.dotSymbolActive,
+                disabled && styles.symbolDisabled,
+              ]}
+            >
+              •
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -212,6 +251,31 @@ const styles = StyleSheet.create({
   },
   labelDisabled: {
     color: colors.textSecondary,
+  },
+  dotButton: {
+    width: 44,
+    minWidth: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    borderRadius: 4,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    height: 44,
+    marginLeft: spacing.xs,
+  },
+  dotButtonActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  dotSymbol: {
+    fontSize: 24,
+    color: colors.textPrimary,
+    fontWeight: "bold",
+  },
+  dotSymbolActive: {
+    color: colors.primary,
   },
 });
 

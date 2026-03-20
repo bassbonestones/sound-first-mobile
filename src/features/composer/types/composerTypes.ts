@@ -175,12 +175,22 @@ export interface Note {
   midi: number | null;
   /** Duration in quarter note units */
   duration: DurationValue;
+  /** Whether this note is dotted (adds 50% to duration) */
+  dotted?: boolean;
   /** Explicit accidental (overrides key signature) */
   accidental?: Accidental;
   /** Whether this note starts a tie */
   tieStart?: boolean;
   /** Whether this note ends a tie */
   tieEnd?: boolean;
+}
+
+/**
+ * Get the actual duration of a note in beats, accounting for dots.
+ * A dotted note has 1.5x duration.
+ */
+export function getNoteDuration(note: Note): number {
+  return note.dotted ? note.duration * 1.5 : note.duration;
 }
 
 /** Check if a note is a rest */
@@ -192,7 +202,9 @@ export function isRest(note: Note): boolean {
 export function createNote(
   midi: number | null,
   duration: DurationValue,
-  options?: Partial<Pick<Note, "accidental" | "tieStart" | "tieEnd">>,
+  options?: Partial<
+    Pick<Note, "accidental" | "dotted" | "tieStart" | "tieEnd">
+  >,
 ): Note {
   return {
     id: generateId(),
@@ -203,8 +215,8 @@ export function createNote(
 }
 
 /** Create a rest */
-export function createRest(duration: DurationValue): Note {
-  return createNote(null, duration);
+export function createRest(duration: DurationValue, dotted?: boolean): Note {
+  return createNote(null, duration, dotted ? { dotted } : undefined);
 }
 
 // =============================================================================
@@ -278,7 +290,7 @@ export function createMeasure(timeSig?: TimeSignature): Measure {
 
 /** Calculate total duration of notes in a measure */
 export function getMeasureDuration(measure: Measure): number {
-  return measure.notes.reduce((sum, note) => sum + note.duration, 0);
+  return measure.notes.reduce((sum, note) => sum + getNoteDuration(note), 0);
 }
 
 // =============================================================================
@@ -363,6 +375,8 @@ export interface ComposerState {
   cursor: CursorPosition;
   /** Currently selected duration for new notes */
   selectedDuration: DurationValue;
+  /** Whether dotted mode is active (adds 50% to duration) */
+  dottedMode: boolean;
   /** Currently selected octave (MIDI note for C) */
   selectedOctave: number;
   /** Currently selected note (null if none selected) */
@@ -382,6 +396,7 @@ export function createInitialState(score?: ComposerScore): ComposerState {
     score: actualScore,
     cursor: { ...DEFAULT_CURSOR },
     selectedDuration: DURATION.QUARTER,
+    dottedMode: false,
     selectedOctave: DEFAULT_OCTAVE_MIDI[actualScore.clef],
     selectedNoteId: null,
     isPlaying: false,
@@ -425,10 +440,12 @@ export function wouldOverflow(
   measure: Measure,
   duration: DurationValue,
   timeSignature: TimeSignature,
+  dotted?: boolean,
 ): boolean {
   const expected = getBeatsPerMeasure(timeSignature);
   const currentDuration = getMeasureDuration(measure);
-  return currentDuration + duration > expected + 0.001; // Float tolerance
+  const newDuration = dotted ? duration * 1.5 : duration;
+  return currentDuration + newDuration > expected + 0.001; // Float tolerance
 }
 
 /**
@@ -438,7 +455,7 @@ export function wouldOverflow(
 export function getBeatPositionAt(measure: Measure, noteIndex: number): number {
   let position = 0;
   for (let i = 0; i < noteIndex && i < measure.notes.length; i++) {
-    position += measure.notes[i].duration;
+    position += getNoteDuration(measure.notes[i]);
   }
   return position;
 }
@@ -468,7 +485,8 @@ export function replaceNoteAtIndex(
 ): ReplaceResult {
   const measureDuration = getBeatsPerMeasure(timeSignature);
   const startBeat = getBeatPositionAt(measure, noteIndex);
-  const endBeat = startBeat + newNote.duration;
+  const newNoteDuration = getNoteDuration(newNote);
+  const endBeat = startBeat + newNoteDuration;
 
   // Notes before the insertion point stay unchanged
   const notesBefore = measure.notes.slice(0, noteIndex);
@@ -478,7 +496,7 @@ export function replaceNoteAtIndex(
   let consumeEndIndex = noteIndex;
 
   while (consumeEndIndex < measure.notes.length && currentBeat < endBeat) {
-    currentBeat += measure.notes[consumeEndIndex].duration;
+    currentBeat += getNoteDuration(measure.notes[consumeEndIndex]);
     consumeEndIndex++;
   }
 
@@ -494,21 +512,38 @@ export function replaceNoteAtIndex(
   // Build the new notes array
   const newNotes: Note[] = [...notesBefore];
 
-  // Adjust note duration if it would overflow the measure
-  const effectiveDuration = Math.min(
-    newNote.duration,
-    measureDuration - startBeat,
-  );
-  if (effectiveDuration > 0) {
-    newNotes.push({
-      ...newNote,
-      duration: effectiveDuration as DurationValue,
-    });
+  // Check if note would overflow the measure
+  const availableDuration = measureDuration - startBeat;
+  if (newNoteDuration <= availableDuration) {
+    // Note fits - add it as-is
+    newNotes.push(newNote);
+  } else if (availableDuration > 0) {
+    // Note would overflow - truncate by removing dotted flag or reducing duration
+    // For simplicity, we remove the dotted flag first if present
+    if (newNote.dotted && newNote.duration <= availableDuration) {
+      newNotes.push({ ...newNote, dotted: undefined });
+    } else {
+      // Fall back to undotted note that fits
+      const fittingDuration = [
+        DURATION.WHOLE,
+        DURATION.HALF,
+        DURATION.QUARTER,
+        DURATION.EIGHTH,
+        DURATION.SIXTEENTH,
+      ].find((d) => d <= availableDuration) as DurationValue;
+      if (fittingDuration) {
+        newNotes.push({
+          ...newNote,
+          duration: fittingDuration,
+          dotted: undefined,
+        });
+      }
+    }
   }
 
   // Fill remainder with rests if we consumed more than the new note needs
   if (remainderDuration > 0 && overflowDuration === 0) {
-    const remainderStartBeat = startBeat + newNote.duration;
+    const remainderStartBeat = startBeat + newNoteDuration;
     const remainderRests = generateRestsForDurationAtPosition(
       remainderDuration,
       remainderStartBeat,

@@ -602,6 +602,8 @@ function ComposerScreenContent({
             selectedDuration={composerState.state.selectedDuration}
             selectedNote={composerState.selectedNote}
             onDurationSelect={composerState.setDuration}
+            dottedMode={composerState.dottedMode}
+            onToggleDotted={composerState.toggleDottedMode}
             onPitchTap={handlePitchEnter}
             onOctaveChange={composerState.changeOctave}
             onAccidental={composerState.applyAccidental}

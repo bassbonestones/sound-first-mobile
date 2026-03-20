@@ -175,18 +175,23 @@ function generateNoteXml(
   preferFlats: boolean,
   options: MusicXmlGeneratorOptions,
 ): string {
-  const duration = DURATION_TO_DIVISIONS[note.duration];
+  // Calculate duration accounting for dots (dotted = 1.5x)
+  const baseDuration = DURATION_TO_DIVISIONS[note.duration];
+  const duration = note.dotted ? baseDuration * 1.5 : baseDuration;
   const type = DURATION_TO_TYPE[note.duration];
   const isSelected = options.selectedNoteId === note.id;
 
   // Add color attribute if selected
   const noteAttrs = isSelected ? ' color="#0066CC"' : "";
 
+  // Dot element for dotted notes
+  const dotXml = note.dotted ? "\n        <dot/>" : "";
+
   if (isRest(note)) {
     return `      <note${noteAttrs}>
         <rest/>
         <duration>${duration}</duration>
-        <type>${type}</type>
+        <type>${type}</type>${dotXml}
       </note>`;
   }
 
@@ -244,7 +249,7 @@ function generateNoteXml(
   return `      <note${noteAttrs}>${tieXml}
 ${pitchXml}
         <duration>${duration}</duration>
-        <type>${type}</type>${accidentalXml ? `\n        <accidental>${accidentalXml}</accidental>` : ""}${tiedXml}
+        <type>${type}</type>${dotXml}${accidentalXml ? `\n        <accidental>${accidentalXml}</accidental>` : ""}${tiedXml}
       </note>`;
 }
 

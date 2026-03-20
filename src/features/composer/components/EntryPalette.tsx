@@ -26,6 +26,10 @@ export interface EntryPaletteProps {
   selectedNote: Note | null;
   /** Called when duration is selected */
   onDurationSelect: (duration: DurationValue) => void;
+  /** Whether dotted mode is active */
+  dottedMode?: boolean;
+  /** Called when dotted mode is toggled */
+  onToggleDotted?: () => void;
   /** Called when a pitch is tapped to insert a note */
   onPitchTap: (pitch: PitchName) => void;
   /** Called when octave changes */
@@ -50,6 +54,8 @@ function EntryPaletteComponent({
   selectedDuration,
   selectedNote,
   onDurationSelect,
+  dottedMode = false,
+  onToggleDotted,
   onPitchTap,
   onOctaveChange,
   onAccidental,
@@ -68,6 +74,8 @@ function EntryPaletteComponent({
       <DurationSelector
         selectedDuration={selectedDuration}
         onSelectDuration={onDurationSelect}
+        dottedMode={dottedMode}
+        onToggleDotted={onToggleDotted}
         disabled={disabled}
         testID="duration-selector"
       />
