@@ -153,6 +153,41 @@ export function getNoteBefore(
   return null;
 }
 
+/**
+ * Get the last pitched note before the cursor (skipping rests).
+ * Useful for smart octave when there are rests between notes.
+ * @returns The last note with a non-null midi value, or null if none found.
+ */
+export function getLastPitchedNoteBefore(
+  cursor: CursorPosition,
+  score: ComposerScore,
+): Note | null {
+  let measureIndex = cursor.measureIndex;
+  let noteIndex = cursor.noteIndex - 1;
+
+  while (measureIndex >= 0) {
+    const measure = score.measures[measureIndex];
+    if (!measure) break;
+
+    while (noteIndex >= 0) {
+      const note = measure.notes[noteIndex];
+      if (note?.midi !== null) {
+        return note;
+      }
+      noteIndex--;
+    }
+
+    // Move to previous measure
+    measureIndex--;
+    if (measureIndex >= 0) {
+      const prevMeasure = score.measures[measureIndex];
+      noteIndex = (prevMeasure?.notes.length ?? 0) - 1;
+    }
+  }
+
+  return null;
+}
+
 /** Check if cursor is at the start of the score */
 export function isAtStart(cursor: CursorPosition): boolean {
   return cursor.measureIndex === 0 && cursor.noteIndex === 0;

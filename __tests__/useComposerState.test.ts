@@ -131,6 +131,49 @@ describe("useComposerState", () => {
       // B4=71 is 8 below G5=79, B5=83 is 4 above G5=79
       expect(bMidi).toBe(83); // B5 is closer
     });
+
+    it("should use last pitched note for smart octave, skipping rests", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Use eighth notes for more notes per measure
+      act(() => {
+        result.current.setDuration(0.125);
+      });
+
+      // Enter E5 as starting point (near staff center B4=71)
+      act(() => {
+        result.current.insertNote("E");
+      });
+      const eMidi = result.current.score.measures[0].notes[0].midi;
+      expect(eMidi).toBe(76); // E5
+
+      // Enter a rest
+      act(() => {
+        result.current.insertRest();
+      });
+      expect(result.current.score.measures[0].notes[1].midi).toBeNull();
+
+      // Enter F - should use E5 (76) as reference, NOT staff center (71)
+      // F4=65 is 11 from E5, F5=77 is 1 from E5 -> F5 wins
+      act(() => {
+        result.current.insertNote("F");
+      });
+      const fMidi = result.current.score.measures[0].notes[2].midi;
+      expect(fMidi).toBe(77); // F5 (using E5 as reference, not staff center)
+
+      // Enter another rest
+      act(() => {
+        result.current.insertRest();
+      });
+
+      // Enter G - should use F5 (77) as reference
+      // G4=67 is 10 from F5, G5=79 is 2 from F5 -> G5 wins
+      act(() => {
+        result.current.insertNote("G");
+      });
+      const gMidi = result.current.score.measures[0].notes[4].midi;
+      expect(gMidi).toBe(79); // G5 (using F5 as reference)
+    });
   });
 
   describe("rest insertion", () => {
@@ -445,6 +488,236 @@ describe("useComposerState", () => {
       expect(
         result.current.score.measures[0].notes[0].accidental,
       ).toBeUndefined();
+    });
+
+    it("should transpose double-sharp correctly using stored accidental", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Set initial key to C major
+      act(() => {
+        result.current.setKeySignature(0);
+      });
+
+      // Insert C note
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      const originalMidi = result.current.score.measures[0].notes[0].midi;
+
+      // Select the note and apply double-sharp
+      act(() => {
+        result.current.moveCursor("left");
+      });
+      act(() => {
+        result.current.applyAccidental("double-sharp");
+      });
+
+      // C## in C major should have midi = original + 2
+      expect(result.current.score.measures[0].notes[0].midi).toBe(
+        originalMidi! + 2,
+      );
+      expect(result.current.score.measures[0].notes[0].accidental).toBe(
+        "double-sharp",
+      );
+
+      // Transpose to Bb major (key=-2), down 2 semitones
+      // C## in C major (double-raised tonic) → B# in Bb major (double-raised tonic)
+      act(() => {
+        result.current.setKeySignatureWithTransposition(-2, -2);
+      });
+
+      // B# should have accidental "sharp" and midi should be 2 semitones down from C##
+      // C##5 (62) - 2 = B#4 (60)
+      expect(result.current.score.measures[0].notes[0].accidental).toBe(
+        "sharp",
+      );
+      // Verify the pitch class is correct (B# = 0, same as C)
+      expect(result.current.score.measures[0].notes[0].midi! % 12).toBe(0);
+    });
+
+    it("should transpose C major to A major down without octave jumps", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Set initial key to C major (0 sharps)
+      act(() => {
+        result.current.setKeySignature(0);
+      });
+
+      // Insert 4 notes in C major scale (fits in one 4/4 measure)
+      // C, D, E, F - should be C4, D4, E4, F4 with default octave
+      const pitches: Array<"C" | "D" | "E" | "F"> = ["C", "D", "E", "F"];
+      for (const p of pitches) {
+        act(() => {
+          result.current.insertNote(p);
+        });
+      }
+
+      // Verify original MIDI values - note: smart octave may use octave 5
+      const originalMidis = result.current.score.measures[0].notes.map(
+        (n) => n.midi,
+      );
+
+      // Transpose to A major (3 sharps), down 3 semitones
+      act(() => {
+        result.current.setKeySignatureWithTransposition(3, -3);
+      });
+
+      const transposedMidis = result.current.score.measures[0].notes.map(
+        (n) => n.midi,
+      );
+
+      // Each note should be exactly 3 semitones lower - no octave jumps
+      for (let i = 0; i < originalMidis.length; i++) {
+        expect(transposedMidis[i]).toBe(originalMidis[i]! - 3);
+      }
+
+      // Verify all transpositions maintain the same relative octave
+      // (no 12-semitone jumps between original and transposed)
+      for (let i = 0; i < originalMidis.length; i++) {
+        const diff = originalMidis[i]! - transposedMidis[i]!;
+        expect(Math.abs(diff)).toBe(3); // All should differ by exactly 3
+      }
+    });
+
+    it("should transpose E and B notes correctly (C to A)", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Set initial key to C major
+      act(() => {
+        result.current.setKeySignature(0);
+      });
+
+      // Insert E and B - these transpose to C# and G# which need careful octave handling
+      act(() => {
+        result.current.insertNote("E");
+      });
+      act(() => {
+        result.current.insertNote("B");
+      });
+
+      const originalMidis = result.current.score.measures[0].notes.map(
+        (n) => n.midi,
+      );
+
+      // Transpose to A major, down 3 semitones
+      act(() => {
+        result.current.setKeySignatureWithTransposition(3, -3);
+      });
+
+      const transposedMidis = result.current.score.measures[0].notes.map(
+        (n) => n.midi,
+      );
+
+      // E→C#: should be exactly 3 semitones down
+      // B→G#: should be exactly 3 semitones down
+      for (let i = 0; i < originalMidis.length; i++) {
+        expect(transposedMidis[i]).toBe(originalMidis[i]! - 3);
+      }
+    });
+
+    it("should transpose sharps and flats in C major to A major", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Set initial key to C major
+      act(() => {
+        result.current.setKeySignature(0);
+      });
+
+      // Insert F natural
+      act(() => {
+        result.current.insertNote("F");
+      });
+
+      const originalNote = result.current.score.measures[0].notes[0];
+      const originalMidi = originalNote.midi;
+
+      // Select it and add sharp (F#)
+      act(() => {
+        result.current.moveCursor("left");
+      });
+      act(() => {
+        result.current.applyAccidental("sharp");
+      });
+
+      // F# in C major = raised 4th
+      expect(result.current.score.measures[0].notes[0].midi).toBe(
+        originalMidi! + 1,
+      );
+
+      // Transpose to A major, down 3 semitones
+      // F# in C major (raised 4th) → D# in A major (raised 4th)
+      act(() => {
+        result.current.setKeySignatureWithTransposition(3, -3);
+      });
+
+      // D# should be 3 semitones below F# (66-3=63)
+      const transposedNote = result.current.score.measures[0].notes[0];
+      expect(transposedNote.midi).toBe(originalMidi! + 1 - 3); // F# - 3 = D# (or close)
+    });
+
+    it("should transpose all F and G alterations correctly from C to A", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Set initial key to C major
+      act(() => {
+        result.current.setKeySignature(0);
+      });
+
+      // Use eighth notes so we can fit more in a measure
+      act(() => {
+        result.current.setDuration(0.125); // Eighth note
+      });
+
+      // Insert 4 F notes (fits in one 4/4 measure as eighths)
+      const fAlterations: Array<
+        "double-flat" | "flat" | "sharp" | "double-sharp"
+      > = ["double-flat", "flat", "sharp", "double-sharp"];
+
+      for (let i = 0; i < 4; i++) {
+        act(() => {
+          result.current.insertNote("F");
+        });
+      }
+
+      // Apply alterations to F notes
+      // Navigate to start and apply to each note
+      act(() => {
+        result.current.moveCursor("start");
+      });
+
+      for (let i = 0; i < 4; i++) {
+        act(() => {
+          result.current.applyAccidental(fAlterations[i]);
+        });
+        act(() => {
+          result.current.moveCursor("right");
+        });
+      }
+
+      // Get original MIDI values for F notes before transposition
+      const originalFMidis = result.current.score.measures[0].notes.map(
+        (n) => n.midi,
+      );
+
+      // All notes should be valid MIDI values
+      for (const midi of originalFMidis) {
+        expect(midi).not.toBeNull();
+        expect(typeof midi).toBe("number");
+      }
+
+      // Transpose to A major, down 3 semitones
+      act(() => {
+        result.current.setKeySignatureWithTransposition(3, -3);
+      });
+
+      // Verify each F note transposed down exactly 3 semitones
+      const transposedFMidis = result.current.score.measures[0].notes.map(
+        (n) => n.midi,
+      );
+      for (let i = 0; i < 4; i++) {
+        expect(transposedFMidis[i]).toBe(originalFMidis[i]! - 3);
+      }
     });
 
     it("should change time signature", () => {

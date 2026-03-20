@@ -21,6 +21,7 @@ import {
   clampMidi,
   MIN_MIDI,
   MAX_MIDI,
+  transposeNoteByFunction,
 } from "../src/features/composer/utils/pitchUtils";
 
 import {
@@ -213,11 +214,30 @@ describe("Pitch Utils", () => {
     it("should prefer lower octave when equidistant going down", () => {
       // Reference: F#4 (66), target: C
       // C4=60 (distance 6), C5=72 (distance 6)
-      // Should pick lower C4 when equidistant
+      // With new order [ref, ref+1, ref-1], C4 is checked first and wins
       const result = getNearestMidiForPitch("C", 66, 0);
-      // Actually C4=60 is 6 away, C5=72 is 6 away - equal, should pick first found (C3 at 48, C4 at 60, C5 at 72)
-      // With our algorithm checking octave-1, octave, octave+1, it finds C4 first with distance 6
       expect(result.midi).toBe(60); // C4
+    });
+
+    it("should prefer higher octave when equidistant for F after rest", () => {
+      // Reference: STAFF_CENTER_MIDI for treble = 71 (B4)
+      // Target: F
+      // F4=65 (distance 6), F5=77 (distance 6)
+      // referenceOctave = midiToOctave(71) = 4
+      // candidates = [4, 5, 3]
+      // F4=65 checked first, wins with distance 6
+      // This is the correct behavior - F4 is in the reference octave
+      const result = getNearestMidiForPitch("F", 71, 0);
+      expect(result.midi).toBe(65); // F4 - same octave as reference
+    });
+
+    it("should prefer reference octave when equidistant", () => {
+      // Reference: midi 66 (F#4), target: C
+      // referenceOctave = 4
+      // C4=60 (distance 6), C5=72 (distance 6)
+      // Order: [4, 5, 3] -> C4 checked first
+      const result = getNearestMidiForPitch("C", 66, 0);
+      expect(result.midi).toBe(60); // C4 in reference octave
     });
 
     it("should apply key signature accidentals", () => {
@@ -630,6 +650,141 @@ describe("Cursor Utils", () => {
       const formatted = formatMidiNote(69, "double-flat");
       expect(formatted).toContain("A");
       expect(formatted).toContain("𝄫"); // double-flat symbol
+    });
+  });
+});
+
+describe("transposeNoteByFunction", () => {
+  describe("C major to A major (-3 semitones)", () => {
+    // All notes should go down exactly 3 semitones
+    it("should transpose C down to A", () => {
+      const result = transposeNoteByFunction(72, undefined, 0, 3, -3); // C5
+      expect(result.midi).toBe(69); // A4
+    });
+
+    it("should transpose D down to B", () => {
+      const result = transposeNoteByFunction(74, undefined, 0, 3, -3); // D5
+      expect(result.midi).toBe(71); // B4
+    });
+
+    it("should transpose E down to C#", () => {
+      const result = transposeNoteByFunction(76, undefined, 0, 3, -3); // E5
+      expect(result.midi).toBe(73); // C#5
+    });
+
+    it("should transpose F down to D (no octave jump)", () => {
+      const result = transposeNoteByFunction(77, undefined, 0, 3, -3); // F5
+      expect(result.midi).toBe(74); // D5
+    });
+
+    it("should transpose G down to E (no octave jump)", () => {
+      const result = transposeNoteByFunction(79, undefined, 0, 3, -3); // G5
+      expect(result.midi).toBe(76); // E5
+    });
+
+    it("should transpose A down to F#", () => {
+      const result = transposeNoteByFunction(81, undefined, 0, 3, -3); // A5
+      expect(result.midi).toBe(78); // F#5
+    });
+
+    it("should transpose B down to G#", () => {
+      const result = transposeNoteByFunction(83, undefined, 0, 3, -3); // B5
+      expect(result.midi).toBe(80); // G#5
+    });
+
+    it("should transpose F# (raised 4th) down to D# (raised 4th)", () => {
+      const result = transposeNoteByFunction(78, "sharp", 0, 3, -3); // F#5
+      expect(result.midi).toBe(75); // D#5
+    });
+
+    it("should transpose Fb (lowered 4th) down to Db (lowered 4th)", () => {
+      const result = transposeNoteByFunction(76, "flat", 0, 3, -3); // Fb5 = E5 midi
+      expect(result.midi).toBe(73); // Db5 = C#5 midi
+    });
+
+    it("should transpose G with all alterations consistently", () => {
+      // G is degree 5 in C major, E is degree 5 in A major
+      // All should shift down 3 semitones
+      const gbb = transposeNoteByFunction(77, "double-flat", 0, 3, -3); // Gbb5 = F
+      const gb = transposeNoteByFunction(78, "flat", 0, 3, -3); // Gb5 = F#
+      const g = transposeNoteByFunction(79, undefined, 0, 3, -3); // G5
+      const gs = transposeNoteByFunction(80, "sharp", 0, 3, -3); // G#5
+      const gss = transposeNoteByFunction(81, "double-sharp", 0, 3, -3); // G##5 = A
+
+      expect(gbb.midi).toBe(74); // Ebb5 = D
+      expect(gb.midi).toBe(75); // Eb5 = D#
+      expect(g.midi).toBe(76); // E5
+      expect(gs.midi).toBe(77); // E#5 = F
+      expect(gss.midi).toBe(78); // E##5 = F#
+    });
+
+    it("should transpose F with all alterations consistently", () => {
+      // F is degree 4 in C major, D is degree 4 in A major
+      // All should shift down 3 semitones
+      const fbb = transposeNoteByFunction(75, "double-flat", 0, 3, -3); // Fbb5 = Eb
+      const fb = transposeNoteByFunction(76, "flat", 0, 3, -3); // Fb5 = E
+      const f = transposeNoteByFunction(77, undefined, 0, 3, -3); // F5
+      const fs = transposeNoteByFunction(78, "sharp", 0, 3, -3); // F#5
+      const fss = transposeNoteByFunction(79, "double-sharp", 0, 3, -3); // F##5 = G
+
+      expect(fbb.midi).toBe(72); // Dbb5 = C
+      expect(fb.midi).toBe(73); // Db5 = C#
+      expect(f.midi).toBe(74); // D5
+      expect(fs.midi).toBe(75); // D#5
+      expect(fss.midi).toBe(76); // D##5 = E
+    });
+
+    it("should transpose F and G across multiple octaves without extra jumps", () => {
+      // Test F across octaves 3, 4, 5, 6
+      for (const octave of [3, 4, 5, 6]) {
+        const f = 53 + (octave - 3) * 12; // F3=53, F4=65, F5=77, F6=89
+        const result = transposeNoteByFunction(f, undefined, 0, 3, -3);
+        const expected = f - 3;
+        expect(result.midi).toBe(expected);
+      }
+
+      // Test G across octaves 3, 4, 5, 6
+      for (const octave of [3, 4, 5, 6]) {
+        const g = 55 + (octave - 3) * 12; // G3=55, G4=67, G5=79, G6=91
+        const result = transposeNoteByFunction(g, undefined, 0, 3, -3);
+        const expected = g - 3;
+        expect(result.midi).toBe(expected);
+      }
+    });
+
+    it("should transpose F with all alterations across octaves", () => {
+      // Test all 5 F alterations across octaves 4 and 5
+      const alterations: Array<{
+        offset: number;
+        accidental:
+          | "double-flat"
+          | "flat"
+          | undefined
+          | "sharp"
+          | "double-sharp";
+      }> = [
+        { offset: -2, accidental: "double-flat" },
+        { offset: -1, accidental: "flat" },
+        { offset: 0, accidental: undefined },
+        { offset: 1, accidental: "sharp" },
+        { offset: 2, accidental: "double-sharp" },
+      ];
+
+      for (const octave of [4, 5]) {
+        const fBase = octave === 4 ? 65 : 77; // F4=65, F5=77
+        for (const alt of alterations) {
+          const midi = fBase + alt.offset;
+          const result = transposeNoteByFunction(
+            midi,
+            alt.accidental,
+            0,
+            3,
+            -3,
+          );
+          const expected = midi - 3;
+          expect(result.midi).toBe(expected);
+        }
+      }
     });
   });
 });

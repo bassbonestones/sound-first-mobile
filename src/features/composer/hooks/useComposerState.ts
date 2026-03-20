@@ -45,6 +45,7 @@ import {
   findNotePosition,
   getNoteAtCursor,
   getNoteBefore,
+  getLastPitchedNoteBefore,
   moveCursorLeft,
   moveCursorRight,
   moveCursorToEnd,
@@ -252,14 +253,19 @@ export function useComposerState(
         return false;
       }
 
-      // Get MIDI pitch - use smart octave based on previous note or staff center
+      // Get MIDI pitch - use smart octave based on last pitched note or staff center
+      // We use getLastPitchedNoteBefore to skip rests - this ensures continuous
+      // melodic lines don't get disrupted when rests are inserted between notes
       const targetCursor = {
         measureIndex: targetMeasureIndex,
         noteIndex: targetNoteIndex,
       };
-      const previousNote = getNoteBefore(targetCursor, state.score);
+      const previousPitchedNote = getLastPitchedNoteBefore(
+        targetCursor,
+        state.score,
+      );
       const referenceMidi =
-        previousNote?.midi ?? STAFF_CENTER_MIDI[state.score.clef];
+        previousPitchedNote?.midi ?? STAFF_CENTER_MIDI[state.score.clef];
 
       const { midi, accidental } = getNearestMidiForPitch(
         pitchName,
@@ -1057,6 +1063,7 @@ export function useComposerState(
               note.accidental,
               prev.score.keySignature,
               key,
+              transposeSemitones,
             );
 
             // Clamp to valid MIDI range (0-127)

@@ -1002,11 +1002,15 @@ export function getNearestMidiForPitch(
 ): { midi: number; accidental?: Accidental } {
   const referenceOctave = midiToOctave(referenceMidi);
 
-  // Try the same octave, one above, and one below
+  // Try the same octave first, then one above, then one below
+  // This order ensures that when distances are equal, we prefer:
+  // 1. Reference octave (same as previous note's octave)
+  // 2. Higher octave (natural direction when ascending through scale)
+  // 3. Lower octave
   const candidates = [
-    referenceOctave - 1,
     referenceOctave,
     referenceOctave + 1,
+    referenceOctave - 1,
   ];
 
   let bestMidi = 0;
@@ -1277,6 +1281,109 @@ function getScaleDegreePitches(keySignature: KeySignature): number[] {
  * then prefers smaller alterations. This ensures C in Bb major is recognized
  * as "degree 1, diatonic" not "degree 0, double-raised".
  */
+/**
+ * Given the stored accidental, calculate the alteration offset in semitones.
+ */
+function accidentalToOffset(accidental: Accidental | undefined): number {
+  if (accidental === "double-sharp") return 2;
+  if (accidental === "sharp") return 1;
+  if (accidental === "flat") return -1;
+  if (accidental === "double-flat") return -2;
+  // "natural" or undefined = 0
+  return 0;
+}
+
+/**
+ * Given a MIDI pitch and its stored accidental, find the scale degree and alteration
+ * in the given key signature.
+ *
+ * This uses the accidental to determine the intended letter name, then finds
+ * which scale degree that letter corresponds to in the key.
+ *
+ * For example:
+ * - C## (midi 62, accidental "double-sharp") in C major:
+ *   - Base midi = 62 - 2 = 60 (C)
+ *   - C is degree 0 in C major
+ *   - Alteration = +2 (double-raised)
+ *
+ * - D (midi 62, no accidental) in C major:
+ *   - Base midi = 62 (D)
+ *   - D is degree 1 in C major
+ *   - Alteration = 0 (diatonic)
+ */
+function getScaleDegreeAndAlterationFromNote(
+  midi: number,
+  accidental: Accidental | undefined,
+  keySignature: KeySignature,
+): { degree: number; alteration: number } | null {
+  // Calculate the base MIDI (the letter name without accidental)
+  const accOffset = accidentalToOffset(accidental);
+  const baseMidi = midi - accOffset;
+  const basePitchClass = baseMidi % 12;
+
+  // Find which scale degree this letter corresponds to in the key
+  const scalePitches = getScaleDegreePitches(keySignature);
+
+  // The base pitch class should match one of the 7 letter names
+  // Map pitch class to letter index: C=0, D=2, E=4, F=5, G=7, A=9, B=11
+  const letterToPitchClass: Record<PitchName, number> = {
+    C: 0,
+    D: 2,
+    E: 4,
+    F: 5,
+    G: 7,
+    A: 9,
+    B: 11,
+  };
+  const pitchClassToLetter: Record<number, PitchName> = {
+    0: "C",
+    2: "D",
+    4: "E",
+    5: "F",
+    7: "G",
+    9: "A",
+    11: "B",
+  };
+
+  // Get the letter name from the base pitch class
+  const letterName = pitchClassToLetter[basePitchClass];
+
+  if (!letterName) {
+    // Base pitch class is chromatic (1, 3, 6, 8, 10) which shouldn't happen
+    // with a properly stored accidental - fall back to pitch-class-only method
+    return getScaleDegreeAndAlteration(midi % 12, keySignature);
+  }
+
+  // Find which degree this letter is in the key
+  // We need to find degree where the KEY's letter for that degree matches letterName
+  const keyMap = KEY_ALTERATION_MAP[keySignature];
+  if (!keyMap) return null;
+
+  for (let degree = 0; degree < 7; degree++) {
+    // Get the diatonic spelling for this degree (alteration = 0)
+    const diatonicSpelling = keyMap[degree][0];
+    if (diatonicSpelling.letter === letterName) {
+      // Found the degree - now calculate the alteration
+      // The diatonic pitch class for this degree
+      const diatonicPitchClass = scalePitches[degree];
+      // The actual pitch class of our note
+      const actualPitchClass = midi % 12;
+      // Alteration is the difference
+      let alteration = actualPitchClass - diatonicPitchClass;
+      // Normalize to -2 to +2
+      if (alteration > 6) alteration -= 12;
+      if (alteration < -6) alteration += 12;
+
+      if (alteration >= -2 && alteration <= 2) {
+        return { degree, alteration };
+      }
+    }
+  }
+
+  // Fallback: use pitch-class-only method
+  return getScaleDegreeAndAlteration(midi % 12, keySignature);
+}
+
 function getScaleDegreeAndAlteration(
   pitchClass: number,
   keySignature: KeySignature,
@@ -1312,13 +1419,15 @@ function getScaleDegreeAndAlteration(
  * - B♮ in Bb major (raised tonic) → C# in C major (raised tonic)
  * - C in Bb major (2nd degree) → D in C major (2nd degree)
  * - F# in G major (diatonic 7th) → C# in D major (diatonic 7th)
+ * - C## in C major (double-raised tonic) → B# in Bb major (double-raised tonic)
  *
  * Uses the verified KEY_ALTERATION_MAP for exact spellings.
  *
  * @param midi - The original MIDI pitch
- * @param accidental - The original accidental (used for disambiguation)
+ * @param accidental - The original accidental (REQUIRED for correct disambiguation)
  * @param sourceKey - The key the note was written in
  * @param targetKey - The key to transpose to
+ * @param semitones - Optional: the intended transposition direction/amount
  * @returns The new MIDI pitch and accidental
  */
 export function transposeNoteByFunction(
@@ -1326,19 +1435,23 @@ export function transposeNoteByFunction(
   accidental: Accidental | undefined,
   sourceKey: KeySignature,
   targetKey: KeySignature,
+  semitones?: number,
 ): { midi: number; accidental: Accidental | undefined } {
-  const pitchClass = midi % 12;
   const octave = midiToOctave(midi);
 
-  // Find the note's function in the source key
-  const noteFunction = getScaleDegreeAndAlteration(pitchClass, sourceKey);
+  // Find the note's function in the source key using the stored accidental
+  const noteFunction = getScaleDegreeAndAlterationFromNote(
+    midi,
+    accidental,
+    sourceKey,
+  );
 
   if (!noteFunction) {
     // Couldn't determine function - fall back to simple transposition
     const sourceRoot = keyToSemitone(sourceKey);
     const targetRoot = keyToSemitone(targetKey);
-    const semitones = (targetRoot - sourceRoot + 12) % 12;
-    const newMidi = midi + semitones;
+    const shift = semitones ?? (targetRoot - sourceRoot + 12) % 12;
+    const newMidi = midi + shift;
     return {
       midi: newMidi,
       accidental: getAccidentalForMidi(newMidi, targetKey),
@@ -1363,17 +1476,33 @@ export function transposeNoteByFunction(
 
   const targetPitchClass = (letterPitchClass + accidentalOffset + 12) % 12;
 
-  // Calculate the new MIDI pitch, preserving the octave relationship
+  // Calculate the expected transposition
+  // If semitones is provided, use it; otherwise calculate from key roots
+  let semitoneShift: number;
+  if (semitones !== undefined) {
+    semitoneShift = semitones;
+  } else {
+    const sourceRoot = keyToSemitone(sourceKey);
+    const targetRoot = keyToSemitone(targetKey);
+    semitoneShift = targetRoot - sourceRoot;
+    // Normalize to -6 to +6 if direction is unknown
+    if (semitoneShift > 6) semitoneShift -= 12;
+    if (semitoneShift < -6) semitoneShift += 12;
+  }
+
+  // Expected new MIDI based on simple transposition
+  const expectedMidi = midi + semitoneShift;
+
+  // Calculate the new MIDI, starting with the same octave as original
   let newMidi = (octave + 1) * 12 + targetPitchClass;
 
-  // Adjust for octave boundary crossings
-  // If the pitch classes would suggest we crossed an octave boundary, compensate
-  if (pitchClass > 9 && targetPitchClass < 3) {
-    // Source was high in octave, target wrapped to low (like B -> C)
-    newMidi += 12;
-  } else if (pitchClass < 3 && targetPitchClass > 9) {
-    // Source was low in octave, target wrapped to high (like C -> B)
+  // Adjust octave to be closest to the expected MIDI
+  // This handles all cases correctly regardless of transposition direction
+  while (newMidi - expectedMidi > 6) {
     newMidi -= 12;
+  }
+  while (expectedMidi - newMidi > 6) {
+    newMidi += 12;
   }
 
   return { midi: newMidi, accidental: targetSpelling.accidental };
