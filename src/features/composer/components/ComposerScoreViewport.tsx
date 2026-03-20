@@ -66,6 +66,10 @@ export interface ComposerScoreViewportProps {
   showZoomControls?: boolean;
   /** Initial zoom level */
   initialZoom?: number;
+  /** Controlled zoom level (overrides internal state) */
+  zoom?: number;
+  /** Called when zoom changes (for controlled mode) */
+  onZoomChange?: (zoom: number) => void;
   /** Minimum zoom */
   minZoom?: number;
   /** Maximum zoom */
@@ -102,6 +106,8 @@ function ComposerScoreViewportComponent({
   onError,
   showZoomControls = true,
   initialZoom = 1.0,
+  zoom: controlledZoom,
+  onZoomChange,
   minZoom = 0.5,
   maxZoom = 2.5,
   playbackState = "stopped",
@@ -116,7 +122,11 @@ function ComposerScoreViewportComponent({
   const [isLoading, setIsLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(initialZoom);
+  const [internalZoom, setInternalZoom] = useState(initialZoom);
+  
+  // Use controlled zoom if provided, otherwise internal state
+  const zoom = controlledZoom ?? internalZoom;
+  const setZoom = onZoomChange ?? setInternalZoom;
 
   // Generate MusicXML from score
   const musicXml = useMemo(() => {
@@ -173,6 +183,13 @@ function ComposerScoreViewportComponent({
     playbackMeasureIndex,
     executeScript,
   ]);
+
+  // Apply zoom when controlled zoom changes
+  useEffect(() => {
+    if (isReady && controlledZoom !== undefined) {
+      executeScript(`window.setZoom(${controlledZoom})`);
+    }
+  }, [isReady, controlledZoom, executeScript]);
 
   // Handle messages from WebView
   const handleMessage = useCallback(

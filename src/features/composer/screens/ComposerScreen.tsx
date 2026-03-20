@@ -124,6 +124,9 @@ function ComposerScreenContent({
   // Autosave handler
   const autosaveRef = useRef(createAutosaveHandler(30000));
 
+  // Zoom state
+  const [zoom, setZoom] = useState(1.0);
+
   // Clef change modal state (needed for web where Alert.alert doesn't work)
   const [clefChangeModal, setClefChangeModal] = useState<{
     visible: boolean;
@@ -547,6 +550,8 @@ function ComposerScreenContent({
           onKeySignatureChange={handleKeySignatureChange}
           tempo={composerState.score.tempo}
           onTempoChange={handleTempoChange}
+          zoom={zoom}
+          onZoomChange={setZoom}
           measureValidation={measureValidation}
           onBack={handleBack}
           disabled={isPlaying}
@@ -565,6 +570,8 @@ function ComposerScreenContent({
             onPlay={handlePlay}
             onPause={handlePause}
             onStop={handleStop}
+            zoom={zoom}
+            onZoomChange={setZoom}
             showZoomControls={false}
             testID="composer-viewport"
           />

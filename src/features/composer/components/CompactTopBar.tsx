@@ -55,6 +55,10 @@ export interface CompactTopBarProps {
   tempo: number;
   /** Called when tempo changes */
   onTempoChange: (tempo: number) => void;
+  /** Current zoom level (0.5-2.5) */
+  zoom: number;
+  /** Called when zoom changes */
+  onZoomChange: (zoom: number) => void;
   /** Validation state of current measure */
   measureValidation?: MeasureValidation;
   /** Called when back is pressed */
@@ -102,6 +106,8 @@ function CompactTopBarComponent({
   onKeySignatureChange,
   tempo,
   onTempoChange,
+  zoom,
+  onZoomChange,
   measureValidation,
   onBack,
   disabled = false,
@@ -183,6 +189,20 @@ function CompactTopBarComponent({
       setTempoInput(tempo.toString());
     }
   }, [tempoInput, tempo, onTempoChange]);
+
+  const handleZoomIn = useCallback(() => {
+    const newZoom = Math.min(zoom + 0.25, 2.5);
+    onZoomChange(newZoom);
+  }, [zoom, onZoomChange]);
+
+  const handleZoomOut = useCallback(() => {
+    const newZoom = Math.max(zoom - 0.25, 0.5);
+    onZoomChange(newZoom);
+  }, [zoom, onZoomChange]);
+
+  const handleZoomReset = useCallback(() => {
+    onZoomChange(1.0);
+  }, [onZoomChange]);
 
   const tsDisplay = `${timeSignature.beats}/${timeSignature.beatUnit}`;
   const keyName = KEY_NAMES[String(keySignature)] || "C Major";
@@ -361,6 +381,44 @@ function CompactTopBarComponent({
                     <Feather name="plus" size={18} color={colors.textPrimary} />
                   </TouchableOpacity>
                   <Text style={styles.bpmLabel}>BPM</Text>
+                </View>
+              </View>
+
+              {/* Zoom */}
+              <View style={styles.settingRow}>
+                <Text style={styles.settingLabel}>Zoom</Text>
+                <View style={styles.tempoControls}>
+                  <TouchableOpacity
+                    style={styles.tempoButton}
+                    onPress={handleZoomOut}
+                    disabled={zoom <= 0.5}
+                    testID="settings-zoom-out"
+                  >
+                    <Feather
+                      name="minus"
+                      size={18}
+                      color={zoom <= 0.5 ? colors.textSecondary : colors.textPrimary}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.zoomDisplay}
+                    onPress={handleZoomReset}
+                    testID="settings-zoom-reset"
+                  >
+                    <Text style={styles.zoomText}>{Math.round(zoom * 100)}%</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.tempoButton}
+                    onPress={handleZoomIn}
+                    disabled={zoom >= 2.5}
+                    testID="settings-zoom-in"
+                  >
+                    <Feather
+                      name="plus"
+                      size={18}
+                      color={zoom >= 2.5 ? colors.textSecondary : colors.textPrimary}
+                    />
+                  </TouchableOpacity>
                 </View>
               </View>
             </ScrollView>
@@ -549,6 +607,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     marginLeft: 2,
+  },
+  zoomDisplay: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: colors.background,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    minWidth: 56,
+    alignItems: "center",
+  },
+  zoomText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.textPrimary,
   },
   // Key Modal
   modalOverlay: {
