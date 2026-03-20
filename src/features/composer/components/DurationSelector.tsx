@@ -153,7 +153,7 @@ function DurationSelectorComponent({
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: spacing.sm,
+    paddingVertical: 0,
   },
   label: {
     fontSize: 12,
@@ -167,20 +167,19 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: spacing.xs,
+    gap: 2,
   },
   button: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.xs,
-    paddingTop: 12, // Extra top padding to center stemmed notes visually
-    borderRadius: 8,
+    paddingTop: 8,
+    paddingBottom: 0,
+    borderRadius: 4,
     backgroundColor: colors.surface,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.border,
-    minHeight: 48,
+    height: 36,
   },
   buttonSelected: {
     backgroundColor: colors.primaryLight,
@@ -194,7 +193,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: colors.textPrimary,
     textAlign: "center",
-    marginBottom: 4,
+    marginBottom: -4,
   },
   symbolSelected: {
     color: colors.primary,
