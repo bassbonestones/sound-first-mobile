@@ -83,29 +83,10 @@ function MeasureControlsComponent({
         </Text>
       </View>
 
-      {/* Validation status */}
-      <View style={styles.validationContainer}>
-        {showIncompleteWarning ? (
-          <View style={styles.warningBadge}>
-            <Feather name="alert-circle" size={14} color={colors.warning} />
-            <Text style={styles.warningText}>
-              {beatsRemaining > 0
-                ? `${beatsRemaining} beats left`
-                : "Overflowed"}
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.completeBadge}>
-            <Feather name="check-circle" size={14} color={colors.success} />
-            <Text style={styles.completeText}>Complete</Text>
-          </View>
-        )}
-      </View>
-
       {/* Action buttons */}
       <View style={styles.buttonRow}>
         {/* Fill with rests */}
-        {showIncompleteWarning && beatsRemaining > 0 && (
+        {showIncompleteWarning && beatsRemaining < 0 && (
           <TouchableOpacity
             style={[
               styles.button,

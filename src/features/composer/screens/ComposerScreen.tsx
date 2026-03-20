@@ -508,6 +508,7 @@ function ComposerScreenContent({
           onKeySignatureChange={handleKeySignatureChange}
           tempo={composerState.score.tempo}
           onTempoChange={handleTempoChange}
+          measureValidation={measureValidation}
           onBack={handleBack}
           disabled={isPlaying}
           testID="composer-topbar"

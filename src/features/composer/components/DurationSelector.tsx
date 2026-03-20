@@ -110,7 +110,6 @@ function DurationSelectorComponent({
 
   return (
     <View style={styles.container} testID={testID}>
-      <Text style={styles.label}>Duration</Text>
       <View style={styles.buttonRow}>
         {DURATION_OPTIONS.map((option) => {
           const isSelected = selectedDuration === option.value;

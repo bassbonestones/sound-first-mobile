@@ -258,7 +258,7 @@ export interface ComposerScore {
 
 /** Default values for a new score */
 export const DEFAULT_SCORE_VALUES = {
-  title: "Untitled",
+  title: "Composer",
   clef: "treble" as Clef,
   keySignature: 0 as KeySignature,
   timeSignature: { beats: 4, beatUnit: 4 } as TimeSignature,

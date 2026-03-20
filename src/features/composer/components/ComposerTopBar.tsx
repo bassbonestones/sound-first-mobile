@@ -15,12 +15,19 @@ import {
   Modal,
   ScrollView,
   AccessibilityRole,
+  Alert,
+  Platform,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../constants";
 import TimeSignaturePickerModal from "../../../components/Metronome/TimeSignaturePickerModal";
-import type { Clef, TimeSignature, KeySignature } from "../types";
+import type {
+  Clef,
+  TimeSignature,
+  KeySignature,
+  MeasureValidation,
+} from "../types";
 
 // =============================================================================
 // Types
@@ -47,6 +54,8 @@ export interface ComposerTopBarProps {
   tempo: number;
   /** Called when tempo changes */
   onTempoChange: (tempo: number) => void;
+  /** Validation state of current measure */
+  measureValidation?: MeasureValidation;
   /** Called when back is pressed */
   onBack?: () => void;
   /** Whether controls are disabled */
@@ -75,6 +84,25 @@ const KEY_NAMES: Record<number, string> = {
   "5": "B Major",
   "6": "F♯ Major",
   "7": "C♯ Major",
+};
+
+/** Short key names for compact dropdown display */
+const KEY_NAMES_SHORT: Record<number, string> = {
+  "-7": "C♭",
+  "-6": "G♭",
+  "-5": "D♭",
+  "-4": "A♭",
+  "-3": "E♭",
+  "-2": "B♭",
+  "-1": "F",
+  "0": "C",
+  "1": "G",
+  "2": "D",
+  "3": "A",
+  "4": "E",
+  "5": "B",
+  "6": "F♯",
+  "7": "C♯",
 };
 
 // =============================================================================
@@ -106,7 +134,6 @@ function Dropdown<T>({
       accessibilityHint={`Tap to change ${label.toLowerCase()}`}
       testID={testID}
     >
-      <Text style={styles.dropdownLabel}>{label}</Text>
       <View style={styles.dropdownValueRow}>
         <Text style={styles.dropdownValue}>{value}</Text>
         <Feather name="chevron-down" size={14} color={colors.textSecondary} />
@@ -130,6 +157,7 @@ function ComposerTopBarComponent({
   onKeySignatureChange,
   tempo,
   onTempoChange,
+  measureValidation,
   onBack,
   disabled = false,
   testID,
@@ -141,11 +169,37 @@ function ComposerTopBarComponent({
   const [showTempoModal, setShowTempoModal] = useState(false);
   const [tempoInput, setTempoInput] = useState(tempo.toString());
 
+  // Validation status handler
+  const handleValidationPress = useCallback(() => {
+    if (!measureValidation) return;
+
+    let title: string;
+    let message: string;
+
+    if (measureValidation.isComplete) {
+      title = "Measure Complete";
+      message = "This measure has the correct number of beats.";
+    } else if (measureValidation.difference > 0) {
+      title = "Measure Overflowed";
+      message = "This measure has too many beats. Remove some notes or rests.";
+    } else {
+      const beatsLeft = Math.abs(measureValidation.difference);
+      title = "Measure Incomplete";
+      message = `This measure needs ${beatsLeft} more beat${beatsLeft !== 1 ? "s" : ""}.`;
+    }
+
+    if (Platform.OS === "web") {
+      window.alert(`${title}\n\n${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  }, [measureValidation]);
+
   // Format time signature
   const tsDisplay = `${timeSignature.beats}/${timeSignature.beatUnit}`;
 
-  // Format key signature
-  const keyDisplay = KEY_NAMES[keySignature.toString()] || "C Major";
+  // Format key signature (short for dropdown, full for modal)
+  const keyDisplayShort = KEY_NAMES_SHORT[keySignature.toString()] || "C";
 
   // Format clef
   const clefDisplay = clef === "treble" ? "Treble" : "Bass";
@@ -212,17 +266,43 @@ function ComposerTopBarComponent({
       )}
 
       {/* Title input */}
-      <TextInput
-        style={styles.titleInput}
-        value={title}
-        onChangeText={onTitleChange}
-        placeholder="Untitled"
-        placeholderTextColor={colors.textSecondary}
-        editable={!disabled}
-        accessibilityLabel="Score title"
-        accessibilityHint="Enter a name for your score"
-        testID="topbar-title"
-      />
+      {/* Title row with validation indicator */}
+      <View style={styles.titleRow}>
+        <TextInput
+          style={styles.titleInput}
+          value={title}
+          onChangeText={onTitleChange}
+          placeholder="Composer"
+          placeholderTextColor={colors.textSecondary}
+          editable={!disabled}
+          accessibilityLabel="Score title"
+          accessibilityHint="Enter a name for your score"
+          testID="topbar-title"
+        />
+        {measureValidation && (
+          <TouchableOpacity
+            style={styles.validationButton}
+            onPress={handleValidationPress}
+            accessibilityLabel={
+              measureValidation.isComplete
+                ? "Measure complete"
+                : "Measure incomplete"
+            }
+            accessibilityRole="button"
+            testID="topbar-validation"
+          >
+            <Feather
+              name={
+                measureValidation.isComplete ? "check-circle" : "alert-circle"
+              }
+              size={20}
+              color={
+                measureValidation.isComplete ? colors.success : colors.warning
+              }
+            />
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* Settings row */}
       <View style={styles.settingsRow}>
@@ -244,7 +324,7 @@ function ComposerTopBarComponent({
 
         <Dropdown
           label="Key"
-          value={keyDisplay}
+          value={keyDisplayShort}
           onPress={() => setShowKeyModal(true)}
           disabled={disabled}
           testID="topbar-key"
@@ -420,6 +500,11 @@ const styles = StyleSheet.create({
     padding: spacing.xs,
     zIndex: 1,
   },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   titleInput: {
     fontSize: 18,
     fontWeight: "600",
@@ -427,19 +512,24 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.lg,
+    flex: 1,
+  },
+  validationButton: {
+    padding: 4,
+    marginLeft: -spacing.md,
   },
   settingsRow: {
     flexDirection: "row",
     justifyContent: "space-around",
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
     gap: spacing.xs,
   },
   dropdown: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: spacing.xs,
+    paddingVertical: 4,
     paddingHorizontal: spacing.sm,
-    borderRadius: 8,
+    borderRadius: 6,
     backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,

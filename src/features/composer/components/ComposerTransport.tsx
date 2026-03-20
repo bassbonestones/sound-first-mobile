@@ -225,11 +225,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   stopButton: {
-    width: 44,
-    height: 44,
+    width: 56,
+    height: 56,
     backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: 28,
   },
   playButton: {
     width: 56,

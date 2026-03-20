@@ -487,11 +487,14 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   playbackButton: {
-    padding: spacing.xs,
-    borderRadius: 6,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
   playbackButtonDisabled: {
     opacity: 0.4,
