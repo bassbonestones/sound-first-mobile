@@ -268,14 +268,12 @@ function ComposerScreenContent({
 
   // Calculate transpose intervals for key change
   const getKeyTransposeIntervals = useCallback(
-    (
-      newKey: KeySignature,
-    ): { down: number; up: number } => {
+    (newKey: KeySignature): { down: number; up: number } => {
       const currentSemitones = keyToSemitones(composerState.score.keySignature);
       const newSemitones = keyToSemitones(newKey);
 
       // Calculate the interval (can be 0-11)
-      const rawInterval = ((newSemitones - currentSemitones) % 12 + 12) % 12;
+      const rawInterval = (((newSemitones - currentSemitones) % 12) + 12) % 12;
 
       // Down interval is negative, up interval is positive
       // e.g., C to Bb: rawInterval = 10, so down = -2, up = +10
