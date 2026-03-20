@@ -397,7 +397,9 @@ function CompactTopBarComponent({
                     <Feather
                       name="minus"
                       size={18}
-                      color={zoom <= 0.5 ? colors.textSecondary : colors.textPrimary}
+                      color={
+                        zoom <= 0.5 ? colors.textSecondary : colors.textPrimary
+                      }
                     />
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -405,7 +407,9 @@ function CompactTopBarComponent({
                     onPress={handleZoomReset}
                     testID="settings-zoom-reset"
                   >
-                    <Text style={styles.zoomText}>{Math.round(zoom * 100)}%</Text>
+                    <Text style={styles.zoomText}>
+                      {Math.round(zoom * 100)}%
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.tempoButton}
@@ -416,7 +420,9 @@ function CompactTopBarComponent({
                     <Feather
                       name="plus"
                       size={18}
-                      color={zoom >= 2.5 ? colors.textSecondary : colors.textPrimary}
+                      color={
+                        zoom >= 2.5 ? colors.textSecondary : colors.textPrimary
+                      }
                     />
                   </TouchableOpacity>
                 </View>

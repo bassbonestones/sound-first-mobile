@@ -117,13 +117,14 @@ function ComposerScoreViewportComponent({
   onStop,
   testID,
 }: ComposerScoreViewportProps): React.ReactElement {
-  const webViewRef = useRef<InstanceType<typeof WebView> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const webViewRef = useRef<any>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [internalZoom, setInternalZoom] = useState(initialZoom);
-  
+
   // Use controlled zoom if provided, otherwise internal state
   const zoom = controlledZoom ?? internalZoom;
   const setZoom = onZoomChange ?? setInternalZoom;
@@ -236,7 +237,7 @@ function ComposerScoreViewportComponent({
             setZoom(data.payload as number);
             break;
 
-          case "consoleLog":
+          case "consoleLog": {
             // Debug logging from WebView
             const log = data.payload as { level: string; message: string };
             if (__DEV__) {
@@ -247,6 +248,7 @@ function ComposerScoreViewportComponent({
               }
             }
             break;
+          }
         }
       } catch (e) {
         // Ignore parse errors
