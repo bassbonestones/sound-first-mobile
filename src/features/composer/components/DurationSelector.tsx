@@ -31,6 +31,8 @@ export interface DurationSelectorProps {
   dottedMode?: boolean;
   /** Called when dotted mode is toggled */
   onToggleDotted?: () => void;
+  /** Current triplet position (1, 2, or 3) - when on 2 or 3, only triplet durations allowed */
+  tripletPosition?: 1 | 2 | 3;
   /** Whether the selector is disabled */
   disabled?: boolean;
   /** Test ID for testing */
@@ -43,8 +45,12 @@ interface DurationOption {
   label: string;
   /** SMuFL codepoint for Bravura font */
   symbol: string;
+  /** Optional overlay text (e.g., "3" for triplet) */
+  overlayText?: string;
   /** Vertical offset to align note symbols (whole notes sit higher) */
   topOffset: number;
+  /** Whether this is a triplet duration */
+  isTriplet?: boolean;
 }
 
 // =============================================================================
@@ -85,6 +91,24 @@ const DURATION_OPTIONS: DurationOption[] = [
     topOffset: 0,
   },
   {
+    value: DURATION.TRIPLET_QUARTER,
+    name: "triplet-quarter",
+    label: "Triplet Qtr",
+    symbol: "\uE1D5", // noteQuarterUp (same as quarter, with overlay)
+    overlayText: "3",
+    topOffset: 0,
+    isTriplet: true,
+  },
+  {
+    value: DURATION.TRIPLET_EIGHTH,
+    name: "triplet-eighth",
+    label: "Triplet 8th",
+    symbol: "\uE1D7", // note8thUp (same symbol, with overlay)
+    overlayText: "3",
+    topOffset: 0,
+    isTriplet: true,
+  },
+  {
     value: DURATION.SIXTEENTH,
     name: "sixteenth",
     label: "16th",
@@ -102,6 +126,7 @@ function DurationSelectorComponent({
   onSelectDuration,
   dottedMode = false,
   onToggleDotted,
+  tripletPosition,
   disabled = false,
   testID,
 }: DurationSelectorProps): React.ReactElement {
@@ -120,15 +145,41 @@ function DurationSelectorComponent({
     }
   }, [disabled, onToggleDotted]);
 
+  // When on any triplet position, only triplet durations are allowed
+  const inTripletGroup = tripletPosition !== undefined;
+  // Disable dotted mode toggle when in triplet group
+  const dotDisabled = disabled || inTripletGroup;
+
   return (
     <View style={styles.container} testID={testID}>
       <View style={styles.buttonRow}>
         {DURATION_OPTIONS.map((option) => {
           const isSelected = selectedDuration === option.value;
-          // Disable sixteenth note when dotted mode is active (since we don't support 32nd notes)
-          const isSixteenthDisabledByDot =
-            dottedMode && option.value === DURATION.SIXTEENTH;
-          const isButtonDisabled = disabled || isSixteenthDisabledByDot;
+
+          // Determine if this button should be disabled
+          let isButtonDisabled = disabled;
+
+          // Disable sixteenth and triplet when dotted mode is active
+          if (
+            dottedMode &&
+            (option.value === DURATION.SIXTEENTH || option.isTriplet)
+          ) {
+            isButtonDisabled = true;
+          }
+
+          // When in triplet group, only triplet durations are allowed
+          if (inTripletGroup && !option.isTriplet) {
+            isButtonDisabled = true;
+          }
+
+          // At position 3, triplet quarter is not allowed (needs 2 positions)
+          if (
+            tripletPosition === 3 &&
+            option.value === DURATION.TRIPLET_QUARTER
+          ) {
+            isButtonDisabled = true;
+          }
+
           return (
             <TouchableOpacity
               key={option.name}
@@ -147,16 +198,29 @@ function DurationSelectorComponent({
               }}
               testID={`duration-${option.name}`}
             >
-              <Text
-                style={[
-                  styles.symbol,
-                  isSelected && styles.symbolSelected,
-                  isButtonDisabled && styles.symbolDisabled,
-                  { marginTop: option.topOffset },
-                ]}
-              >
-                {option.symbol}
-              </Text>
+              <View style={styles.symbolContainer}>
+                <Text
+                  style={[
+                    styles.symbol,
+                    isSelected && styles.symbolSelected,
+                    isButtonDisabled && styles.symbolDisabled,
+                    { marginTop: option.topOffset },
+                  ]}
+                >
+                  {option.symbol}
+                </Text>
+                {option.overlayText && (
+                  <Text
+                    style={[
+                      styles.tripletOverlay,
+                      isSelected && styles.tripletOverlaySelected,
+                      isButtonDisabled && styles.tripletOverlayDisabled,
+                    ]}
+                  >
+                    {option.overlayText}
+                  </Text>
+                )}
+              </View>
             </TouchableOpacity>
           );
         })}
@@ -166,13 +230,13 @@ function DurationSelectorComponent({
             style={[
               styles.dotButton,
               dottedMode && styles.dotButtonActive,
-              disabled && styles.buttonDisabled,
+              dotDisabled && styles.buttonDisabled,
             ]}
             onPress={handleDotToggle}
-            disabled={disabled}
+            disabled={dotDisabled}
             accessibilityRole={"button" as AccessibilityRole}
             accessibilityLabel="Dotted note"
-            accessibilityState={{ selected: dottedMode, disabled }}
+            accessibilityState={{ selected: dottedMode, disabled: dotDisabled }}
             accessibilityHint="Toggle dotted mode to add 50% duration"
             testID="duration-dot"
           >
@@ -180,7 +244,7 @@ function DurationSelectorComponent({
               style={[
                 styles.dotSymbol,
                 dottedMode && styles.dotSymbolActive,
-                disabled && styles.symbolDisabled,
+                dotDisabled && styles.symbolDisabled,
               ]}
             >
               •
@@ -234,6 +298,11 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.5,
   },
+  symbolContainer: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   symbol: {
     fontFamily: "Bravura",
     fontSize: 22,
@@ -245,6 +314,20 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   symbolDisabled: {
+    color: colors.textSecondary,
+  },
+  tripletOverlay: {
+    position: "absolute",
+    top: -8,
+    right: -6,
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.textPrimary,
+  },
+  tripletOverlaySelected: {
+    color: colors.primary,
+  },
+  tripletOverlayDisabled: {
     color: colors.textSecondary,
   },
   buttonLabel: {

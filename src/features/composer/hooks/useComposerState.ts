@@ -25,7 +25,10 @@ import {
   createNote,
   createRest,
   createScore,
+  createTripletNote,
+  createTripletRest,
   DEFAULT_OCTAVE_MIDI,
+  DURATION,
   STAFF_CENTER_MIDI,
   getBeatsPerMeasure,
   getMeasureDuration,
@@ -36,6 +39,7 @@ import {
   replaceNoteAtIndex,
   generateRestsForDurationAtPosition,
   getBeatPositionAt,
+  generateId,
   createInsertNoteAction,
   createDeleteNoteAction,
   createChangePitchAction,
@@ -110,6 +114,8 @@ export interface UseComposerStateReturn {
   dottedMode: boolean;
   /** Toggle dotted mode on/off */
   toggleDottedMode: () => void;
+  /** Current triplet position (1, 2, or 3) if on a triplet note, undefined otherwise */
+  tripletPosition: 1 | 2 | 3 | undefined;
 
   // Navigation
   moveCursor: (direction: "left" | "right" | "start" | "end") => void;
@@ -194,6 +200,13 @@ export function useComposerState(
     return null;
   }, [score.measures, state.selectedNoteId]);
 
+  // Note at the current cursor position (for triplet detection)
+  const noteAtCursor = useMemo((): Note | null => {
+    const measure = score.measures[cursor.measureIndex];
+    if (!measure) return null;
+    return measure.notes[cursor.noteIndex] ?? null;
+  }, [score.measures, cursor.measureIndex, cursor.noteIndex]);
+
   const currentMeasureValidation = useMemo((): MeasureValidation => {
     const measure = score.measures[cursor.measureIndex];
     if (!measure) {
@@ -232,6 +245,107 @@ export function useComposerState(
   // Note Operations
   // ==========================================================================
 
+  /**
+   * Helper to insert a triplet group when starting from a non-triplet note.
+   * Supports both triplet eighth (creates 3 slots) and triplet quarter (creates quarter + 1 eighth rest).
+   */
+  const insertTripletGroup = useCallback(
+    (
+      measureNotes: Note[],
+      noteIndex: number,
+      midi: number | null,
+      accidental: Accidental | undefined,
+      tripletDuration:
+        | typeof DURATION.TRIPLET_EIGHTH
+        | typeof DURATION.TRIPLET_QUARTER,
+    ): {
+      notes: Note[];
+      insertedIndex: number;
+      tripletGroupId: string;
+      cursorAdvance: number;
+    } | null => {
+      const currentNote = measureNotes[noteIndex];
+      if (!currentNote) return null;
+
+      // Generate a unique ID for this triplet group
+      const tripletGroupId = generateId();
+
+      // We need to replace enough duration to fit 1 beat (the triplet group)
+      const tripletGroupDuration = 1; // 3 x 1/3 = 1 beat
+
+      // Collect notes to replace, starting from current position
+      let durationConsumed = 0;
+      let endIndex = noteIndex;
+      while (
+        endIndex < measureNotes.length &&
+        durationConsumed < tripletGroupDuration - 0.001
+      ) {
+        durationConsumed += getNoteDuration(measureNotes[endIndex]);
+        endIndex++;
+      }
+
+      // If we couldn't consume enough duration, don't insert
+      if (durationConsumed < tripletGroupDuration - 0.001) {
+        return null;
+      }
+
+      // Build the triplet notes based on duration
+      let tripletNotes: Note[];
+      let cursorAdvance: number;
+
+      if (tripletDuration === DURATION.TRIPLET_QUARTER) {
+        // Triplet quarter (2/3 beat) + triplet eighth rest (1/3 beat)
+        const tripletQuarter = createTripletNote(
+          midi,
+          DURATION.TRIPLET_QUARTER,
+          1,
+          tripletGroupId,
+          { accidental },
+        );
+        const tripletRest = createTripletRest(3, tripletGroupId);
+        tripletNotes = [tripletQuarter, tripletRest];
+        cursorAdvance = 1; // Move to the rest
+      } else {
+        // Triplet eighth: create 3 slots (entered note + 2 rests)
+        const triplet1 = createTripletNote(
+          midi,
+          DURATION.TRIPLET_EIGHTH,
+          1,
+          tripletGroupId,
+          { accidental },
+        );
+        const triplet2 = createTripletRest(2, tripletGroupId);
+        const triplet3 = createTripletRest(3, tripletGroupId);
+        tripletNotes = [triplet1, triplet2, triplet3];
+        cursorAdvance = 1; // Move to position 2
+      }
+
+      // Build new notes array
+      const newNotes: Note[] = [
+        ...measureNotes.slice(0, noteIndex),
+        ...tripletNotes,
+      ];
+
+      // If we consumed more than exactly 1 beat, add rests for the remainder
+      const remainder = durationConsumed - tripletGroupDuration;
+      if (remainder > 0.001) {
+        const remainderRests = generateRestsForDuration(remainder);
+        newNotes.push(...remainderRests);
+      }
+
+      // Add remaining notes after the consumed portion
+      newNotes.push(...measureNotes.slice(endIndex));
+
+      return {
+        notes: newNotes,
+        insertedIndex: noteIndex,
+        tripletGroupId,
+        cursorAdvance,
+      };
+    },
+    [],
+  );
+
   const insertNote = useCallback(
     (pitchName: PitchName): boolean => {
       // Get current cursor position
@@ -260,6 +374,202 @@ export function useComposerState(
         state.score.keySignature,
       );
 
+      // Check if we're inserting a triplet duration
+      const isTripletEighth =
+        state.selectedDuration === DURATION.TRIPLET_EIGHTH;
+      const isTripletQuarter =
+        state.selectedDuration === DURATION.TRIPLET_QUARTER;
+      const isTripletDuration = isTripletEighth || isTripletQuarter;
+      const currentNote = measure.notes[currentCursor.noteIndex];
+      const isCurrentNoteTriplet = currentNote?.tripletPosition !== undefined;
+
+      // Handle triplet insertion
+      if (isTripletDuration) {
+        if (isCurrentNoteTriplet) {
+          // Replacing within an existing triplet group
+          const currentPosition = currentNote.tripletPosition!;
+          const tripletGroupId = currentNote.tripletGroupId!;
+
+          if (isTripletQuarter) {
+            // Triplet quarter takes 2 positions
+            if (currentPosition === 3) {
+              // Can't fit a triplet quarter at position 3
+              return false;
+            }
+
+            // Create triplet quarter at current position
+            const newTripletNote = createTripletNote(
+              midi,
+              DURATION.TRIPLET_QUARTER,
+              currentPosition,
+              tripletGroupId,
+              { accidental },
+            );
+
+            // Find and remove the next triplet note in the group (if exists)
+            // Triplet quarter consumes current position + next one
+            const newNotes = measure.notes.filter((n, ni) => {
+              if (ni === currentCursor.noteIndex) return false; // Will be replaced
+              // Remove the next note if it's part of the same triplet group and is position currentPosition + 1
+              if (n.tripletGroupId === tripletGroupId) {
+                if (currentPosition === 1 && n.tripletPosition === 2)
+                  return false;
+                if (currentPosition === 2 && n.tripletPosition === 3)
+                  return false;
+              }
+              return true;
+            });
+
+            // Insert the new triplet quarter at the right position
+            const insertPosition = currentCursor.noteIndex;
+            newNotes.splice(insertPosition, 0, newTripletNote);
+
+            const action = createInsertNoteAction(targetCursor, newTripletNote);
+            undoManager.pushAction(action);
+
+            // Move cursor to next note after the triplet quarter
+            const newNoteIndex = insertPosition + 1;
+            let newCursor: CursorPosition;
+            if (newNoteIndex >= newNotes.length) {
+              const nextMeasureIndex = currentCursor.measureIndex + 1;
+              if (nextMeasureIndex < state.score.measures.length) {
+                newCursor = { measureIndex: nextMeasureIndex, noteIndex: 0 };
+              } else {
+                newCursor = {
+                  measureIndex: currentCursor.measureIndex,
+                  noteIndex: newNotes.length - 1,
+                };
+              }
+            } else {
+              newCursor = {
+                measureIndex: currentCursor.measureIndex,
+                noteIndex: newNoteIndex,
+              };
+            }
+            cursorRef.current = newCursor;
+
+            setState((prev) => ({
+              ...prev,
+              score: {
+                ...prev.score,
+                measures: prev.score.measures.map((m, i) =>
+                  i === currentCursor.measureIndex
+                    ? { ...m, notes: newNotes }
+                    : m,
+                ),
+                updatedAt: new Date().toISOString(),
+              },
+              cursor: newCursor,
+              selectedNoteId: newTripletNote.id,
+              isDirty: true,
+            }));
+
+            return true;
+          } else {
+            // Triplet eighth - simple replacement preserving group info
+            const newTripletNote = createTripletNote(
+              midi,
+              DURATION.TRIPLET_EIGHTH,
+              currentPosition,
+              tripletGroupId,
+              { accidental },
+            );
+
+            const action = createInsertNoteAction(targetCursor, newTripletNote);
+            undoManager.pushAction(action);
+
+            // Move to next position
+            const newNoteIndex = currentCursor.noteIndex + 1;
+            let newCursor: CursorPosition;
+            if (newNoteIndex >= measure.notes.length) {
+              const nextMeasureIndex = currentCursor.measureIndex + 1;
+              if (nextMeasureIndex < state.score.measures.length) {
+                newCursor = { measureIndex: nextMeasureIndex, noteIndex: 0 };
+              } else {
+                newCursor = {
+                  measureIndex: currentCursor.measureIndex,
+                  noteIndex: measure.notes.length - 1,
+                };
+              }
+            } else {
+              newCursor = {
+                measureIndex: currentCursor.measureIndex,
+                noteIndex: newNoteIndex,
+              };
+            }
+            cursorRef.current = newCursor;
+
+            setState((prev) => ({
+              ...prev,
+              score: {
+                ...prev.score,
+                measures: prev.score.measures.map((m, i) =>
+                  i === currentCursor.measureIndex
+                    ? {
+                        ...m,
+                        notes: m.notes.map((n, ni) =>
+                          ni === currentCursor.noteIndex ? newTripletNote : n,
+                        ),
+                      }
+                    : m,
+                ),
+                updatedAt: new Date().toISOString(),
+              },
+              cursor: newCursor,
+              selectedNoteId: newTripletNote.id,
+              isDirty: true,
+            }));
+
+            return true;
+          }
+        } else {
+          // Creating new triplet group on non-triplet note
+          const tripletDuration = isTripletQuarter
+            ? DURATION.TRIPLET_QUARTER
+            : DURATION.TRIPLET_EIGHTH;
+          const result = insertTripletGroup(
+            measure.notes,
+            currentCursor.noteIndex,
+            midi,
+            accidental,
+            tripletDuration,
+          );
+          if (!result) return false;
+
+          const action = createInsertNoteAction(
+            targetCursor,
+            result.notes[result.insertedIndex],
+          );
+          undoManager.pushAction(action);
+
+          // Move cursor appropriately
+          const newCursor: CursorPosition = {
+            measureIndex: currentCursor.measureIndex,
+            noteIndex: result.insertedIndex + result.cursorAdvance,
+          };
+          cursorRef.current = newCursor;
+
+          setState((prev) => ({
+            ...prev,
+            score: {
+              ...prev.score,
+              measures: prev.score.measures.map((m, i) =>
+                i === currentCursor.measureIndex
+                  ? { ...m, notes: result.notes }
+                  : m,
+              ),
+              updatedAt: new Date().toISOString(),
+            },
+            cursor: newCursor,
+            selectedNoteId: result.notes[result.insertedIndex].id,
+            isDirty: true,
+          }));
+
+          return true;
+        }
+      }
+
+      // Regular (non-triplet) note insertion
       const note = createNote(midi, state.selectedDuration, {
         accidental,
         dotted: state.dottedMode || undefined,
@@ -404,6 +714,195 @@ export function useComposerState(
     // Determine if we're in replace mode (cursor is on an existing note)
     const isReplaceMode = currentCursor.noteIndex < measure.notes.length;
 
+    const targetCursor = {
+      measureIndex: currentCursor.measureIndex,
+      noteIndex: currentCursor.noteIndex,
+    };
+
+    // Check if we're inserting a triplet rest
+    const isTripletEighth = state.selectedDuration === DURATION.TRIPLET_EIGHTH;
+    const isTripletQuarter =
+      state.selectedDuration === DURATION.TRIPLET_QUARTER;
+    const isTripletDuration = isTripletEighth || isTripletQuarter;
+    const currentNote = measure.notes[currentCursor.noteIndex];
+    const isCurrentNoteTriplet = currentNote?.tripletPosition !== undefined;
+
+    // Handle triplet rest insertion
+    if (isTripletDuration) {
+      if (isCurrentNoteTriplet) {
+        const currentPosition = currentNote.tripletPosition!;
+        const tripletGroupId = currentNote.tripletGroupId!;
+
+        if (isTripletQuarter) {
+          // Triplet quarter rest takes 2 positions
+          if (currentPosition === 3) {
+            // Can't fit triplet quarter at position 3
+            return false;
+          }
+
+          // Create triplet quarter rest at current position
+          const newTripletRest = createTripletNote(
+            null,
+            DURATION.TRIPLET_QUARTER,
+            currentPosition,
+            tripletGroupId,
+          );
+
+          // Find and remove the next triplet note in the group
+          const newNotes = measure.notes.filter((n, ni) => {
+            if (ni === currentCursor.noteIndex) return false;
+            if (n.tripletGroupId === tripletGroupId) {
+              if (currentPosition === 1 && n.tripletPosition === 2)
+                return false;
+              if (currentPosition === 2 && n.tripletPosition === 3)
+                return false;
+            }
+            return true;
+          });
+
+          const insertPosition = currentCursor.noteIndex;
+          newNotes.splice(insertPosition, 0, newTripletRest);
+
+          const action = createInsertNoteAction(targetCursor, newTripletRest);
+          undoManager.pushAction(action);
+
+          const newNoteIndex = insertPosition + 1;
+          let newCursor: CursorPosition;
+          if (newNoteIndex >= newNotes.length) {
+            const nextMeasureIndex = currentCursor.measureIndex + 1;
+            if (nextMeasureIndex < state.score.measures.length) {
+              newCursor = { measureIndex: nextMeasureIndex, noteIndex: 0 };
+            } else {
+              newCursor = {
+                measureIndex: currentCursor.measureIndex,
+                noteIndex: newNotes.length - 1,
+              };
+            }
+          } else {
+            newCursor = {
+              measureIndex: currentCursor.measureIndex,
+              noteIndex: newNoteIndex,
+            };
+          }
+          cursorRef.current = newCursor;
+
+          setState((prev) => ({
+            ...prev,
+            score: {
+              ...prev.score,
+              measures: prev.score.measures.map((m, i) =>
+                i === currentCursor.measureIndex
+                  ? { ...m, notes: newNotes }
+                  : m,
+              ),
+              updatedAt: new Date().toISOString(),
+            },
+            cursor: newCursor,
+            selectedNoteId: newTripletRest.id,
+            isDirty: true,
+          }));
+
+          return true;
+        } else {
+          // Triplet eighth rest - simple replacement
+          const newTripletRest = createTripletRest(
+            currentPosition,
+            tripletGroupId,
+          );
+
+          const action = createInsertNoteAction(targetCursor, newTripletRest);
+          undoManager.pushAction(action);
+
+          const newNoteIndex = currentCursor.noteIndex + 1;
+          let newCursor: CursorPosition;
+          if (newNoteIndex >= measure.notes.length) {
+            const nextMeasureIndex = currentCursor.measureIndex + 1;
+            if (nextMeasureIndex < state.score.measures.length) {
+              newCursor = { measureIndex: nextMeasureIndex, noteIndex: 0 };
+            } else {
+              newCursor = {
+                measureIndex: currentCursor.measureIndex,
+                noteIndex: measure.notes.length - 1,
+              };
+            }
+          } else {
+            newCursor = {
+              measureIndex: currentCursor.measureIndex,
+              noteIndex: newNoteIndex,
+            };
+          }
+          cursorRef.current = newCursor;
+
+          setState((prev) => ({
+            ...prev,
+            score: {
+              ...prev.score,
+              measures: prev.score.measures.map((m, i) =>
+                i === currentCursor.measureIndex
+                  ? {
+                      ...m,
+                      notes: m.notes.map((n, ni) =>
+                        ni === currentCursor.noteIndex ? newTripletRest : n,
+                      ),
+                    }
+                  : m,
+              ),
+              updatedAt: new Date().toISOString(),
+            },
+            cursor: newCursor,
+            selectedNoteId: newTripletRest.id,
+            isDirty: true,
+          }));
+
+          return true;
+        }
+      } else {
+        // Creating new triplet group with rest as first note
+        const tripletDuration = isTripletQuarter
+          ? DURATION.TRIPLET_QUARTER
+          : DURATION.TRIPLET_EIGHTH;
+        const result = insertTripletGroup(
+          measure.notes,
+          currentCursor.noteIndex,
+          null,
+          undefined,
+          tripletDuration,
+        );
+        if (!result) return false;
+
+        const action = createInsertNoteAction(
+          targetCursor,
+          result.notes[result.insertedIndex],
+        );
+        undoManager.pushAction(action);
+
+        const newCursor: CursorPosition = {
+          measureIndex: currentCursor.measureIndex,
+          noteIndex: result.insertedIndex + result.cursorAdvance,
+        };
+        cursorRef.current = newCursor;
+
+        setState((prev) => ({
+          ...prev,
+          score: {
+            ...prev.score,
+            measures: prev.score.measures.map((m, i) =>
+              i === currentCursor.measureIndex
+                ? { ...m, notes: result.notes }
+                : m,
+            ),
+            updatedAt: new Date().toISOString(),
+          },
+          cursor: newCursor,
+          selectedNoteId: result.notes[result.insertedIndex].id,
+          isDirty: true,
+        }));
+
+        return true;
+      }
+    }
+
+    // Regular (non-triplet) rest insertion
     const rest = createRest(
       state.selectedDuration,
       state.dottedMode || undefined,
@@ -418,10 +917,6 @@ export function useComposerState(
         state.score.timeSignature,
       );
 
-      const targetCursor = {
-        measureIndex: currentCursor.measureIndex,
-        noteIndex: currentCursor.noteIndex,
-      };
       const action = createInsertNoteAction(targetCursor, rest);
       undoManager.pushAction(action);
 
@@ -550,6 +1045,59 @@ export function useComposerState(
       return null;
     };
 
+    // Helper to merge adjacent rests that can be combined
+    const mergeAdjacentRests = (
+      notes: Note[],
+      timeSignature: TimeSignature,
+    ): Note[] => {
+      if (notes.length < 2) return notes;
+
+      const result: Note[] = [];
+      let i = 0;
+      let currentBeat = 0;
+
+      while (i < notes.length) {
+        const note = notes[i];
+
+        // Skip non-rests and triplet rests (don't merge triplets)
+        if (note.midi !== null || note.tripletPosition !== undefined) {
+          result.push(note);
+          currentBeat += getNoteDuration(note);
+          i++;
+          continue;
+        }
+
+        // This is a regular rest - try to merge with following rests
+        let totalRestDuration = getNoteDuration(note);
+        let mergeCount = 1;
+
+        while (i + mergeCount < notes.length) {
+          const nextNote = notes[i + mergeCount];
+          // Stop if not a rest or is a triplet rest
+          if (
+            nextNote.midi !== null ||
+            nextNote.tripletPosition !== undefined
+          ) {
+            break;
+          }
+          totalRestDuration += getNoteDuration(nextNote);
+          mergeCount++;
+        }
+
+        // Generate optimal rests for the combined duration
+        const mergedRests = generateRestsForDurationAtPosition(
+          totalRestDuration,
+          currentBeat,
+          timeSignature,
+        );
+        result.push(...mergedRests);
+        currentBeat += totalRestDuration;
+        i += mergeCount;
+      }
+
+      return result;
+    };
+
     // Determine the current note (from selection or cursor)
     let currentPosition: CursorPosition = state.cursor;
     let currentNote: Note | null = null;
@@ -596,8 +1144,126 @@ export function useComposerState(
     const action = createDeleteNoteAction(currentPosition, currentNote);
     undoManager.pushAction(action);
 
-    // Get the measure and calculate where to insert replacement rests
+    // Suppress the "add measure" prompt since we're deleting, not adding
+    suppressAddMeasurePromptRef.current = true;
+
     const measure = state.score.measures[currentPosition.measureIndex];
+
+    // Handle triplet note deletion specially
+    if (
+      currentNote.tripletPosition !== undefined &&
+      currentNote.tripletGroupId
+    ) {
+      const tripletGroupId = currentNote.tripletGroupId;
+
+      // Find all notes in this triplet group
+      const tripletGroupNotes = measure.notes.filter(
+        (n) => n.tripletGroupId === tripletGroupId,
+      );
+      const tripletGroupIndices = measure.notes
+        .map((n, idx) => (n.tripletGroupId === tripletGroupId ? idx : -1))
+        .filter((idx) => idx !== -1);
+
+      // Check if after deletion, all remaining notes in group would be rests
+      const allRestsAfterDeletion = tripletGroupNotes.every(
+        (n) => n.id === currentNote!.id || n.midi === null,
+      );
+
+      if (allRestsAfterDeletion) {
+        // Calculate total duration of the triplet group (1 beat for 3x eighth, 1 for quarter+eighth)
+        const totalTripletDuration = tripletGroupNotes.reduce(
+          (sum, n) => sum + getNoteDuration(n),
+          0,
+        );
+
+        // Get beat position of the first note in the triplet group
+        const firstTripletIndex = Math.min(...tripletGroupIndices);
+        const beatPosition = getBeatPositionAt(measure, firstTripletIndex);
+
+        // Generate regular rests to replace the entire triplet group
+        const replacementRests = generateRestsForDurationAtPosition(
+          totalTripletDuration,
+          beatPosition,
+          state.score.timeSignature,
+        );
+
+        // Build new notes array: keep notes before triplet, add replacement rests, keep notes after triplet
+        const lastTripletIndex = Math.max(...tripletGroupIndices);
+        let newNotes = [
+          ...measure.notes.slice(0, firstTripletIndex),
+          ...replacementRests,
+          ...measure.notes.slice(lastTripletIndex + 1),
+        ];
+
+        // Merge adjacent rests in the measure
+        newNotes = mergeAdjacentRests(newNotes, state.score.timeSignature);
+
+        // Find the new cursor position (should point to the replacement rest)
+        const newCursorIndex = Math.min(firstTripletIndex, newNotes.length - 1);
+        const newCursor = {
+          measureIndex: currentPosition.measureIndex,
+          noteIndex: newCursorIndex,
+        };
+        const newSelectedId = newNotes[newCursorIndex]?.id || null;
+
+        cursorRef.current = newCursor;
+
+        setState((prevState) => ({
+          ...prevState,
+          score: {
+            ...prevState.score,
+            measures: prevState.score.measures.map((m, i) =>
+              i === currentPosition.measureIndex
+                ? { ...m, notes: newNotes }
+                : m,
+            ),
+            updatedAt: new Date().toISOString(),
+          },
+          cursor: newCursor,
+          selectedNoteId: newSelectedId,
+          isDirty: true,
+        }));
+
+        return true;
+      } else {
+        // Some notes in triplet group are still pitched - just replace with triplet rest
+        const tripletRest = createTripletRest(
+          currentNote.tripletPosition,
+          tripletGroupId,
+        );
+
+        const newNotes = [
+          ...measure.notes.slice(0, currentPosition.noteIndex),
+          tripletRest,
+          ...measure.notes.slice(currentPosition.noteIndex + 1),
+        ];
+
+        const newCursor = currentPosition;
+        const newSelectedId = tripletRest.id;
+
+        cursorRef.current = newCursor;
+
+        setState((prevState) => ({
+          ...prevState,
+          score: {
+            ...prevState.score,
+            measures: prevState.score.measures.map((m, i) =>
+              i === currentPosition.measureIndex
+                ? { ...m, notes: newNotes }
+                : m,
+            ),
+            updatedAt: new Date().toISOString(),
+          },
+          cursor: newCursor,
+          selectedNoteId: newSelectedId,
+          isDirty: true,
+        }));
+
+        return true;
+      }
+    }
+
+    // Regular (non-triplet) note deletion
     // Use getNoteDuration to account for dotted notes
     const deletedDuration = getNoteDuration(currentNote);
     const beatPosition = getBeatPositionAt(measure, currentPosition.noteIndex);
@@ -1514,6 +2180,7 @@ export function useComposerState(
     changeDurationOfSelected,
     dottedMode: state.dottedMode,
     toggleDottedMode,
+    tripletPosition: noteAtCursor?.tripletPosition,
 
     // Navigation
     moveCursor,

@@ -76,7 +76,7 @@ describe("MusicXML Generator", () => {
       const xml = generateMusicXml(score);
 
       expect(xml).toContain('<measure number="1">');
-      expect(xml).toContain("<divisions>4</divisions>");
+      expect(xml).toContain("<divisions>12</divisions>");
       expect(xml).toContain("<fifths>2</fifths>");
       expect(xml).toContain("<beats>3</beats>");
       expect(xml).toContain("<beat-type>4</beat-type>");
@@ -127,7 +127,7 @@ describe("MusicXML Generator", () => {
 
       expect(xml).toContain("<step>C</step>");
       expect(xml).toContain("<octave>4</octave>");
-      expect(xml).toContain("<duration>4</duration>");
+      expect(xml).toContain("<duration>12</duration>");
       expect(xml).toContain("<type>quarter</type>");
     });
 
@@ -136,7 +136,7 @@ describe("MusicXML Generator", () => {
       const score = createScoreWithNotes([note]);
       const xml = generateMusicXml(score);
 
-      expect(xml).toContain("<duration>16</duration>");
+      expect(xml).toContain("<duration>48</duration>");
       expect(xml).toContain("<type>whole</type>");
     });
 
@@ -145,7 +145,7 @@ describe("MusicXML Generator", () => {
       const score = createScoreWithNotes([note]);
       const xml = generateMusicXml(score);
 
-      expect(xml).toContain("<duration>8</duration>");
+      expect(xml).toContain("<duration>24</duration>");
       expect(xml).toContain("<type>half</type>");
     });
 
@@ -154,7 +154,7 @@ describe("MusicXML Generator", () => {
       const score = createScoreWithNotes([note]);
       const xml = generateMusicXml(score);
 
-      expect(xml).toContain("<duration>2</duration>");
+      expect(xml).toContain("<duration>6</duration>");
       expect(xml).toContain("<type>eighth</type>");
     });
 
@@ -163,7 +163,7 @@ describe("MusicXML Generator", () => {
       const score = createScoreWithNotes([note]);
       const xml = generateMusicXml(score);
 
-      expect(xml).toContain("<duration>1</duration>");
+      expect(xml).toContain("<duration>3</duration>");
       expect(xml).toContain("<type>16th</type>");
     });
 
@@ -173,7 +173,7 @@ describe("MusicXML Generator", () => {
       const xml = generateMusicXml(score);
 
       expect(xml).toContain("<rest/>");
-      expect(xml).toContain("<duration>4</duration>");
+      expect(xml).toContain("<duration>12</duration>");
       expect(xml).toContain("<type>quarter</type>");
       expect(xml).not.toContain("<pitch>");
     });

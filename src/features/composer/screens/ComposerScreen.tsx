@@ -630,6 +630,7 @@ function ComposerScreenContent({
             onDurationSelect={composerState.setDuration}
             dottedMode={composerState.dottedMode}
             onToggleDotted={composerState.toggleDottedMode}
+            tripletPosition={composerState.tripletPosition}
             onPitchTap={handlePitchEnter}
             onOctaveChange={composerState.changeOctave}
             onAccidental={composerState.applyAccidental}

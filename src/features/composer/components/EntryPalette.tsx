@@ -30,6 +30,8 @@ export interface EntryPaletteProps {
   dottedMode?: boolean;
   /** Called when dotted mode is toggled */
   onToggleDotted?: () => void;
+  /** Current triplet position (1, 2, or 3) if on a triplet note */
+  tripletPosition?: 1 | 2 | 3;
   /** Called when a pitch is tapped to insert a note */
   onPitchTap: (pitch: PitchName) => void;
   /** Called when octave changes */
@@ -58,6 +60,7 @@ function EntryPaletteComponent({
   onDurationSelect,
   dottedMode = false,
   onToggleDotted,
+  tripletPosition,
   onPitchTap,
   onOctaveChange,
   onAccidental,
@@ -84,6 +87,7 @@ function EntryPaletteComponent({
           onSelectDuration={onDurationSelect}
           dottedMode={dottedMode}
           onToggleDotted={onToggleDotted}
+          tripletPosition={tripletPosition}
           disabled={disabled}
           testID="duration-selector"
         />

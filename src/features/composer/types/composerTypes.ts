@@ -15,6 +15,8 @@ export const DURATION = {
   HALF: 2,
   QUARTER: 1,
   EIGHTH: 0.5,
+  TRIPLET_QUARTER: 2 / 3, // Two triplet eighths = 2/3 beat
+  TRIPLET_EIGHTH: 1 / 3, // Three triplet eighths = one beat
   SIXTEENTH: 0.25,
 } as const;
 
@@ -26,6 +28,8 @@ export type DurationName =
   | "half"
   | "quarter"
   | "eighth"
+  | "triplet-quarter"
+  | "triplet-eighth"
   | "sixteenth";
 
 /** Map from duration name to value */
@@ -34,6 +38,8 @@ export const DURATION_NAME_TO_VALUE: Record<DurationName, DurationValue> = {
   half: DURATION.HALF,
   quarter: DURATION.QUARTER,
   eighth: DURATION.EIGHTH,
+  "triplet-quarter": DURATION.TRIPLET_QUARTER,
+  "triplet-eighth": DURATION.TRIPLET_EIGHTH,
   sixteenth: DURATION.SIXTEENTH,
 };
 
@@ -43,6 +49,8 @@ export const DURATION_VALUE_TO_NAME: Record<DurationValue, DurationName> = {
   [DURATION.HALF]: "half",
   [DURATION.QUARTER]: "quarter",
   [DURATION.EIGHTH]: "eighth",
+  [DURATION.TRIPLET_QUARTER]: "triplet-quarter",
+  [DURATION.TRIPLET_EIGHTH]: "triplet-eighth",
   [DURATION.SIXTEENTH]: "sixteenth",
 };
 
@@ -183,6 +191,10 @@ export interface Note {
   tieStart?: boolean;
   /** Whether this note ends a tie */
   tieEnd?: boolean;
+  /** Position within a triplet group (1, 2, or 3) */
+  tripletPosition?: 1 | 2 | 3;
+  /** Unique ID linking notes in the same triplet group */
+  tripletGroupId?: string;
 }
 
 /**
@@ -203,7 +215,15 @@ export function createNote(
   midi: number | null,
   duration: DurationValue,
   options?: Partial<
-    Pick<Note, "accidental" | "dotted" | "tieStart" | "tieEnd">
+    Pick<
+      Note,
+      | "accidental"
+      | "dotted"
+      | "tieStart"
+      | "tieEnd"
+      | "tripletPosition"
+      | "tripletGroupId"
+    >
   >,
 ): Note {
   return {
@@ -212,6 +232,47 @@ export function createNote(
     duration,
     ...options,
   };
+}
+
+/** Check if a note is part of a triplet */
+export function isTriplet(note: Note): boolean {
+  return note.tripletPosition !== undefined;
+}
+
+/** Check if a duration is a triplet duration */
+export function isTripletDuration(duration: DurationValue): boolean {
+  return (
+    duration === DURATION.TRIPLET_EIGHTH ||
+    duration === DURATION.TRIPLET_QUARTER
+  );
+}
+
+/** Create a triplet note (eighth or quarter) */
+export function createTripletNote(
+  midi: number | null,
+  duration: typeof DURATION.TRIPLET_EIGHTH | typeof DURATION.TRIPLET_QUARTER,
+  position: 1 | 2 | 3,
+  tripletGroupId: string,
+  options?: Partial<Pick<Note, "accidental">>,
+): Note {
+  return createNote(midi, duration, {
+    ...options,
+    tripletPosition: position,
+    tripletGroupId,
+  });
+}
+
+/** Create a triplet eighth rest */
+export function createTripletRest(
+  position: 1 | 2 | 3,
+  tripletGroupId: string,
+): Note {
+  return createTripletNote(
+    null,
+    DURATION.TRIPLET_EIGHTH,
+    position,
+    tripletGroupId,
+  );
 }
 
 /** Create a rest */
@@ -654,8 +715,11 @@ export function generateRestsForDurationAtPosition(
       if (d > remaining + tolerance) continue;
 
       // Check if this duration would cross the boundary inappropriately
+      // Use tolerance when checking if we're at or past the boundary
+      // (handles floating point issues with triplet durations like 1/3 + 1/3 + 1/3)
+      const atOrPastBoundary = currentBeat >= boundary - tolerance;
       const wouldCrossBoundary =
-        currentBeat < boundary && currentBeat + d > boundary + tolerance;
+        !atOrPastBoundary && currentBeat + d > boundary + tolerance;
 
       if (wouldCrossBoundary) {
         // Can't use this duration - try smaller ones

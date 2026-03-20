@@ -35,7 +35,7 @@ export interface MusicXmlGeneratorOptions {
 // =============================================================================
 
 /** MusicXML divisions per quarter note */
-const DIVISIONS = 4;
+const DIVISIONS = 12; // Changed to 12 to support triplets (divisible by 3)
 
 /** Duration value to MusicXML type name */
 const DURATION_TO_TYPE: Record<DurationValue, string> = {
@@ -43,16 +43,20 @@ const DURATION_TO_TYPE: Record<DurationValue, string> = {
   [DURATION.HALF]: "half",
   [DURATION.QUARTER]: "quarter",
   [DURATION.EIGHTH]: "eighth",
+  [DURATION.TRIPLET_QUARTER]: "quarter", // Same as quarter, but with time-modification
+  [DURATION.TRIPLET_EIGHTH]: "eighth", // Same type, but with time-modification
   [DURATION.SIXTEENTH]: "16th",
 };
 
-/** Duration value to MusicXML duration (based on divisions=4) */
+/** Duration value to MusicXML duration (based on divisions=12) */
 const DURATION_TO_DIVISIONS: Record<DurationValue, number> = {
-  [DURATION.WHOLE]: 16,
-  [DURATION.HALF]: 8,
-  [DURATION.QUARTER]: 4,
-  [DURATION.EIGHTH]: 2,
-  [DURATION.SIXTEENTH]: 1,
+  [DURATION.WHOLE]: 48,
+  [DURATION.HALF]: 24,
+  [DURATION.QUARTER]: 12,
+  [DURATION.EIGHTH]: 6,
+  [DURATION.TRIPLET_QUARTER]: 8, // 2/3 beat = 8 divisions
+  [DURATION.TRIPLET_EIGHTH]: 4, // 12/3 = 4 divisions for triplet eighth
+  [DURATION.SIXTEENTH]: 3,
 };
 
 /** Clef to MusicXML sign and line */
@@ -180,6 +184,7 @@ function generateNoteXml(
   const duration = note.dotted ? baseDuration * 1.5 : baseDuration;
   const type = DURATION_TO_TYPE[note.duration];
   const isSelected = options.selectedNoteId === note.id;
+  const isTriplet = note.tripletPosition !== undefined;
 
   // Add color attribute if selected
   const noteAttrs = isSelected ? ' color="#0066CC"' : "";
@@ -187,11 +192,41 @@ function generateNoteXml(
   // Dot element for dotted notes
   const dotXml = note.dotted ? "\n        <dot/>" : "";
 
+  // Time modification for triplets (3 in the time of 2)
+  const timeModXml = isTriplet
+    ? `\n        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>`
+    : "";
+
+  // Tuplet notation for triplets (start on position 1, stop on position 3 or triplet quarter at position 2)
+  // A triplet quarter at position 2 consumes positions 2-3, so it ends the bracket
+  const isTripletQuarter = note.duration === DURATION.TRIPLET_QUARTER;
+  let notationsContent = "";
+  if (isTriplet) {
+    if (note.tripletPosition === 1) {
+      notationsContent += '<tuplet type="start" bracket="yes" number="1"/>';
+    }
+    // Stop on position 3, OR on triplet quarter at position 2 (spans 2-3)
+    if (
+      note.tripletPosition === 3 ||
+      (isTripletQuarter && note.tripletPosition === 2)
+    ) {
+      notationsContent += '<tuplet type="stop" number="1"/>';
+    }
+  }
+
   if (isRest(note)) {
+    // Build notations for triplet rests
+    const restNotationsXml = notationsContent
+      ? `\n        <notations>${notationsContent}</notations>`
+      : "";
+
     return `      <note${noteAttrs}>
         <rest/>
         <duration>${duration}</duration>
-        <type>${type}</type>${dotXml}
+        <type>${type}</type>${dotXml}${timeModXml}${restNotationsXml}
       </note>`;
   }
 
@@ -231,7 +266,6 @@ function generateNoteXml(
 
   // Build tie elements
   let tieXml = "";
-  let tiedXml = "";
 
   if (note.tieStart) {
     tieXml += '\n        <tie type="start"/>';
@@ -239,17 +273,23 @@ function generateNoteXml(
   if (note.tieEnd) {
     tieXml += '\n        <tie type="stop"/>';
   }
+
+  // Add tied notations to notationsContent
   if (note.tieStart) {
-    tiedXml += '\n        <notations><tied type="start"/></notations>';
+    notationsContent += '<tied type="start"/>';
   }
   if (note.tieEnd) {
-    tiedXml += '\n        <notations><tied type="stop"/></notations>';
+    notationsContent += '<tied type="stop"/>';
   }
+
+  const notationsXml = notationsContent
+    ? `\n        <notations>${notationsContent}</notations>`
+    : "";
 
   return `      <note${noteAttrs}>${tieXml}
 ${pitchXml}
         <duration>${duration}</duration>
-        <type>${type}</type>${dotXml}${accidentalXml ? `\n        <accidental>${accidentalXml}</accidental>` : ""}${tiedXml}
+        <type>${type}</type>${dotXml}${timeModXml}${accidentalXml ? `\n        <accidental>${accidentalXml}</accidental>` : ""}${notationsXml}
       </note>`;
 }
 

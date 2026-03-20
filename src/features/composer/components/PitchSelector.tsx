@@ -37,6 +37,8 @@ const REST_SYMBOLS: Record<DurationValue, string> = {
   [DURATION.HALF]: "\uE4E4",
   [DURATION.QUARTER]: "\uE4E5",
   [DURATION.EIGHTH]: "\uE4E6",
+  [DURATION.TRIPLET_QUARTER]: "\uE4E5", // Same as quarter rest
+  [DURATION.TRIPLET_EIGHTH]: "\uE4E6", // Same as eighth rest
   [DURATION.SIXTEENTH]: "\uE4E7",
 };
 

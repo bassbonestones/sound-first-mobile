@@ -11,8 +11,20 @@ import { DURATION, DURATION_NAME_TO_VALUE, DurationName } from "../types";
 // Duration Selection
 // =============================================================================
 
-/** All available durations in order (longest to shortest) */
+/** All available durations in order (longest to shortest, triplets at end) */
 export const DURATION_OPTIONS: readonly DurationValue[] = [
+  DURATION.WHOLE,
+  DURATION.HALF,
+  DURATION.QUARTER,
+  DURATION.EIGHTH,
+  DURATION.SIXTEENTH,
+  // Triplet durations at end (not part of standard navigation)
+  DURATION.TRIPLET_QUARTER,
+  DURATION.TRIPLET_EIGHTH,
+] as const;
+
+/** Standard durations for navigation (excludes triplets) */
+const STANDARD_DURATION_OPTIONS: readonly DurationValue[] = [
   DURATION.WHOLE,
   DURATION.HALF,
   DURATION.QUARTER,
@@ -20,26 +32,26 @@ export const DURATION_OPTIONS: readonly DurationValue[] = [
   DURATION.SIXTEENTH,
 ] as const;
 
-/** Get the next shorter duration */
+/** Get the next shorter duration (standard durations only) */
 export function getShorterDuration(
   current: DurationValue,
 ): DurationValue | null {
-  const index = DURATION_OPTIONS.indexOf(current);
-  if (index === -1 || index === DURATION_OPTIONS.length - 1) {
+  const index = STANDARD_DURATION_OPTIONS.indexOf(current);
+  if (index === -1 || index === STANDARD_DURATION_OPTIONS.length - 1) {
     return null;
   }
-  return DURATION_OPTIONS[index + 1];
+  return STANDARD_DURATION_OPTIONS[index + 1];
 }
 
-/** Get the next longer duration */
+/** Get the next longer duration (standard durations only) */
 export function getLongerDuration(
   current: DurationValue,
 ): DurationValue | null {
-  const index = DURATION_OPTIONS.indexOf(current);
+  const index = STANDARD_DURATION_OPTIONS.indexOf(current);
   if (index === -1 || index === 0) {
     return null;
   }
-  return DURATION_OPTIONS[index - 1];
+  return STANDARD_DURATION_OPTIONS[index - 1];
 }
 
 // =============================================================================
@@ -60,6 +72,8 @@ export function getDurationDisplayName(duration: DurationValue): string {
     [DURATION.HALF]: "Half",
     [DURATION.QUARTER]: "Quarter",
     [DURATION.EIGHTH]: "8th",
+    [DURATION.TRIPLET_QUARTER]: "Triplet Qtr",
+    [DURATION.TRIPLET_EIGHTH]: "Triplet 8th",
     [DURATION.SIXTEENTH]: "16th",
   };
   return names[duration] || `${duration}`;
@@ -72,6 +86,8 @@ export function getDurationSymbol(duration: DurationValue): string {
     [DURATION.HALF]: "𝅗𝅥",
     [DURATION.QUARTER]: "♩",
     [DURATION.EIGHTH]: "♪",
+    [DURATION.TRIPLET_QUARTER]: "♩³",
+    [DURATION.TRIPLET_EIGHTH]: "♪³",
     [DURATION.SIXTEENTH]: "𝅘𝅥𝅯",
   };
   return symbols[duration] || "?";
