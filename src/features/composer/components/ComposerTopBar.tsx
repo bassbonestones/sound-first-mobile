@@ -19,6 +19,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../constants";
+import TimeSignaturePickerModal from "../../../components/Metronome/TimeSignaturePickerModal";
 import type { Clef, TimeSignature, KeySignature } from "../types";
 
 // =============================================================================
@@ -57,17 +58,6 @@ export interface ComposerTopBarProps {
 // =============================================================================
 // Constants
 // =============================================================================
-
-const TIME_SIGNATURES: TimeSignature[] = [
-  { beats: 4, beatUnit: 4 },
-  { beats: 3, beatUnit: 4 },
-  { beats: 2, beatUnit: 4 },
-  { beats: 6, beatUnit: 8 },
-  { beats: 2, beatUnit: 2 },
-  { beats: 3, beatUnit: 8 },
-  { beats: 9, beatUnit: 8 },
-  { beats: 12, beatUnit: 8 },
-];
 
 const KEY_NAMES: Record<number, string> = {
   "-7": "C♭ Major",
@@ -169,12 +159,18 @@ function ComposerTopBarComponent({
     [onClefChange],
   );
 
-  const handleTimeSelect = useCallback(
-    (ts: TimeSignature) => {
-      onTimeSignatureChange(ts);
-      setShowTimeModal(false);
+  const handleBeatsChange = useCallback(
+    (beats: number) => {
+      onTimeSignatureChange({ beats, beatUnit: timeSignature.beatUnit });
     },
-    [onTimeSignatureChange],
+    [onTimeSignatureChange, timeSignature.beatUnit],
+  );
+
+  const handleNoteValueChange = useCallback(
+    (beatUnit: number) => {
+      onTimeSignatureChange({ beats: timeSignature.beats, beatUnit });
+    },
+    [onTimeSignatureChange, timeSignature.beats],
   );
 
   const handleKeySelect = useCallback(
@@ -307,45 +303,14 @@ function ComposerTopBarComponent({
       </Modal>
 
       {/* Time Signature Modal */}
-      <Modal
+      <TimeSignaturePickerModal
         visible={showTimeModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowTimeModal(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowTimeModal(false)}
-        >
-          <View
-            style={styles.modalContent}
-            onStartShouldSetResponder={() => true}
-          >
-            <Text style={styles.modalTitle}>Select Time Signature</Text>
-            <ScrollView style={styles.optionScroll}>
-              {TIME_SIGNATURES.map((ts) => {
-                const isSelected =
-                  ts.beats === timeSignature.beats &&
-                  ts.beatUnit === timeSignature.beatUnit;
-                const tsKey = `${ts.beats}/${ts.beatUnit}`;
-                return (
-                  <TouchableOpacity
-                    key={tsKey}
-                    style={[styles.option, isSelected && styles.optionSelected]}
-                    onPress={() => handleTimeSelect(ts)}
-                    testID={`time-${tsKey}`}
-                  >
-                    <Text style={styles.optionText}>{tsKey}</Text>
-                    {isSelected && (
-                      <Feather name="check" size={18} color={colors.primary} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </Pressable>
-      </Modal>
+        onClose={() => setShowTimeModal(false)}
+        beatsPerMeasure={timeSignature.beats}
+        noteValue={timeSignature.beatUnit}
+        onBeatsChange={handleBeatsChange}
+        onNoteValueChange={handleNoteValueChange}
+      />
 
       {/* Key Signature Modal */}
       <Modal

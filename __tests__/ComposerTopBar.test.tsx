@@ -132,29 +132,33 @@ describe("ComposerTopBar", () => {
       expect(getByText("3/4")).toBeTruthy();
     });
 
-    it("should open time modal on press", () => {
+    it("should open time picker modal on press", () => {
       const { getByTestId, getByText } = render(
         <ComposerTopBar {...defaultProps} />,
       );
 
       fireEvent.press(getByTestId("topbar-time"));
-      expect(getByText("Select Time Signature")).toBeTruthy();
+      // TimeSignaturePickerModal uses "Time Signature" as title
+      expect(getByText("Time Signature")).toBeTruthy();
     });
 
-    it("should call onTimeSignatureChange when time selected", () => {
+    it("should call onTimeSignatureChange when beats changed", () => {
       const onTimeSignatureChange = jest.fn();
-      const { getByTestId } = render(
+      const { getByTestId, getByText } = render(
         <ComposerTopBar
           {...defaultProps}
+          timeSignature={{ beats: 4, beatUnit: 4 }}
           onTimeSignatureChange={onTimeSignatureChange}
         />,
       );
 
       fireEvent.press(getByTestId("topbar-time"));
-      fireEvent.press(getByTestId("time-3/4"));
+      // The modal has stepper buttons - find the + button for beats
+      const plusButtons = getByText("+");
+      fireEvent.press(plusButtons);
 
       expect(onTimeSignatureChange).toHaveBeenCalledWith({
-        beats: 3,
+        beats: 5,
         beatUnit: 4,
       });
     });
