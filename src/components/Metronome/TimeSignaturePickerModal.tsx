@@ -71,7 +71,7 @@ const TimeSignaturePickerModal: React.FC<TimeSignaturePickerModalProps> = ({
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       transparent={false}
       onRequestClose={onClose}
     >

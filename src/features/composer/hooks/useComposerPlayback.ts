@@ -46,6 +46,8 @@ export interface ComposerPlaybackState {
   isAtStart: boolean;
   /** Whether we're at the end of the score */
   isAtEnd: boolean;
+  /** Whether repeat/loop mode is enabled */
+  repeat: boolean;
 }
 
 export interface ComposerPlaybackActions {
@@ -63,6 +65,8 @@ export interface ComposerPlaybackActions {
   playMeasure: (measureIndex: number) => void;
   /** Set tempo */
   setTempo: (bpm: number) => void;
+  /** Toggle repeat mode */
+  toggleRepeat: () => void;
 }
 
 export interface UseComposerPlaybackResult {
@@ -96,6 +100,7 @@ export function useComposerPlayback(
   const [position, setPosition] = useState<PlaybackPosition>(INITIAL_POSITION);
   const [tempo, setTempo] = useState(score.tempo);
   const [currentEvent, setCurrentEvent] = useState<PlaybackEvent | null>(null);
+  const [repeat, setRepeat] = useState(false);
 
   // Refs for playback loop
   const animationFrameRef = useRef<number | null>(null);
@@ -106,6 +111,12 @@ export function useComposerPlayback(
     endMeasure: number;
   } | null>(null);
   const lastPlayedPositionRef = useRef<string | null>(null);
+  const repeatRef = useRef(false);
+
+  // Keep repeat ref in sync with state
+  useEffect(() => {
+    repeatRef.current = repeat;
+  }, [repeat]);
 
   // Sync tempo from score
   useEffect(() => {
@@ -248,6 +259,18 @@ export function useComposerPlayback(
             composerSynth.playNote(nextNote.midi, nextDuration * 1000);
             lastPlayedPositionRef.current = `${nextPos.measureIndex}-${nextPos.noteIndex}`;
           }
+        } else if (repeatRef.current) {
+          // Loop back to beginning if repeat is enabled
+          setPosition(INITIAL_POSITION);
+          accumulatedTimeRef.current = 0;
+
+          // Play the first note
+          const firstNote = getNoteAtPosition(INITIAL_POSITION);
+          if (firstNote) {
+            const firstDuration = firstNote.duration * secondsPerBeat;
+            composerSynth.playNote(firstNote.midi, firstDuration * 1000);
+            lastPlayedPositionRef.current = `0-0`;
+          }
         } else {
           // End of playback
           setState("stopped");
@@ -370,6 +393,10 @@ export function useComposerPlayback(
     setTempo(clamped);
   }, []);
 
+  const toggleRepeat = useCallback(() => {
+    setRepeat((prev) => !prev);
+  }, []);
+
   return {
     playback: {
       state,
@@ -377,6 +404,7 @@ export function useComposerPlayback(
       tempo,
       isAtStart,
       isAtEnd,
+      repeat,
     },
     actions: {
       play,
@@ -386,6 +414,7 @@ export function useComposerPlayback(
       playFromCursor,
       playMeasure,
       setTempo: handleSetTempo,
+      toggleRepeat,
     },
     currentEvent,
   };

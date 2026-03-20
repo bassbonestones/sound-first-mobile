@@ -104,10 +104,11 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.background,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingTop: 7,
+    paddingBottom: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    gap: spacing.sm,
+    gap: 7,
   },
 });
 

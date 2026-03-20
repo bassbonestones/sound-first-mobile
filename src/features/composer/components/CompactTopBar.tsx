@@ -252,7 +252,7 @@ function CompactTopBarComponent({
       <Modal
         visible={showSettingsModal}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowSettingsModal(false)}
       >
         <View style={styles.settingsModalContainer}>
@@ -463,13 +463,13 @@ const styles = StyleSheet.create({
   // Settings Modal
   settingsModalContainer: {
     flex: 1,
-    justifyContent: "flex-end",
+    justifyContent: "flex-start",
     backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   settingsModalContent: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
     maxHeight: "70%",
   },
   settingsHeader: {

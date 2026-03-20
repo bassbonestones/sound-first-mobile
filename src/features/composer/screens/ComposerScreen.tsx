@@ -568,43 +568,6 @@ function ComposerScreenContent({
             showZoomControls={false}
             testID="composer-viewport"
           />
-
-          {/* Floating Playback Controls */}
-          <View style={styles.floatingPlayback}>
-            <TouchableOpacity
-              style={[
-                styles.floatingButton,
-                styles.stopButton,
-                playback.state === "stopped" && styles.buttonDisabled,
-              ]}
-              onPress={handleStop}
-              disabled={playback.state === "stopped"}
-              accessibilityLabel="Stop"
-              accessibilityRole="button"
-            >
-              <Feather
-                name="square"
-                size={16}
-                color={
-                  playback.state !== "stopped"
-                    ? colors.error
-                    : colors.textSecondary
-                }
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.floatingButton, styles.playButton]}
-              onPress={isPlaying ? handlePause : handlePlay}
-              accessibilityLabel={isPlaying ? "Pause" : "Play"}
-              accessibilityRole="button"
-            >
-              <Feather
-                name={isPlaying ? "pause" : "play"}
-                size={20}
-                color={colors.white}
-              />
-            </TouchableOpacity>
-          </View>
         </View>
 
         <ScrollView
@@ -727,6 +690,78 @@ function ComposerScreenContent({
                 />
               </TouchableOpacity>
             </View>
+          </View>
+
+          {/* Playback Panel */}
+          <View style={styles.playbackPanel}>
+            <TouchableOpacity
+              style={[
+                styles.transportButton,
+                playback.state === "stopped" && styles.buttonDisabled,
+              ]}
+              onPress={handleStop}
+              disabled={playback.state === "stopped"}
+              accessibilityLabel="Stop"
+              accessibilityRole="button"
+            >
+              <Feather
+                name="square"
+                size={18}
+                color={
+                  playback.state !== "stopped"
+                    ? colors.error
+                    : colors.textSecondary
+                }
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.transportButton,
+                playback.state !== "playing" && styles.buttonDisabled,
+              ]}
+              onPress={handlePause}
+              disabled={playback.state !== "playing"}
+              accessibilityLabel="Pause"
+              accessibilityRole="button"
+            >
+              <Feather
+                name="pause"
+                size={18}
+                color={
+                  playback.state === "playing"
+                    ? colors.textPrimary
+                    : colors.textSecondary
+                }
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.transportButton, styles.playTransportButton]}
+              onPress={handlePlay}
+              disabled={isPlaying}
+              accessibilityLabel="Play"
+              accessibilityRole="button"
+            >
+              <Feather
+                name="play"
+                size={20}
+                color={isPlaying ? colors.textSecondary : colors.white}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.transportButton,
+                playback.repeat && styles.repeatActive,
+              ]}
+              onPress={playbackActions.toggleRepeat}
+              accessibilityLabel={playback.repeat ? "Repeat on" : "Repeat off"}
+              accessibilityRole="button"
+            >
+              <Feather
+                name="repeat"
+                size={18}
+                color={playback.repeat ? colors.primary : colors.textSecondary}
+              />
+            </TouchableOpacity>
           </View>
         </ScrollView>
 
@@ -942,37 +977,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.background,
   },
-  // Viewport with floating playback
+  // Viewport
   viewportWrapper: {
-    height: 160,
+    height: 154,
     minHeight: 120,
     position: "relative",
-  },
-  floatingPlayback: {
-    position: "absolute",
-    bottom: 8,
-    right: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    zIndex: 10,
-  },
-  floatingButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 22,
-  },
-  stopButton: {
-    width: 44,
-    height: 44,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  playButton: {
-    width: 44,
-    height: 44,
-    backgroundColor: colors.primary,
   },
   buttonDisabled: {
     opacity: 0.4,
@@ -1015,6 +1024,36 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  // Playback panel
+  playbackPanel: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: 12,
+  },
+  transportButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  playTransportButton: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  repeatActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
   },
   // Action buttons - pinned to bottom
   actionRow: {
