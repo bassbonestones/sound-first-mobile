@@ -997,7 +997,10 @@ describe("useComposerState", () => {
       // Try to change time signature - should fail
       let changeResult = false;
       act(() => {
-        changeResult = result.current.setTimeSignature({ beats: 3, beatUnit: 4 });
+        changeResult = result.current.setTimeSignature({
+          beats: 3,
+          beatUnit: 4,
+        });
       });
 
       expect(changeResult).toBe(false);

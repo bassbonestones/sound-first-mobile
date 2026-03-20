@@ -319,7 +319,8 @@ function CompactTopBarComponent({
                   onPress={() => {
                     if (timeSignatureLocked) {
                       const title = "Time Signature Locked";
-                      const message = "Time signature cannot be changed when notes are present. For complex pieces with time signature changes, use a full-featured score editor like MuseScore.";
+                      const message =
+                        "Time signature cannot be changed when notes are present. For complex pieces with time signature changes, use a full-featured score editor like MuseScore.";
                       if (Platform.OS === "web") {
                         window.alert(`${title}\n\n${message}`);
                       } else {
@@ -333,7 +334,8 @@ function CompactTopBarComponent({
                   testID="settings-time"
                 >
                   <Text style={styles.settingValue}>
-                    {tsDisplay}{timeSignatureLocked ? " 🔒" : ""}
+                    {tsDisplay}
+                    {timeSignatureLocked ? " 🔒" : ""}
                   </Text>
                   <Feather
                     name={timeSignatureLocked ? "lock" : "chevron-right"}
