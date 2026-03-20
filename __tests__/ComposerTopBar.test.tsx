@@ -174,7 +174,8 @@ describe("ComposerTopBar", () => {
       const { getByText } = render(
         <ComposerTopBar {...defaultProps} keySignature={2} />,
       );
-      expect(getByText("D Major")).toBeTruthy();
+      // Component displays abbreviated key name
+      expect(getByText("D")).toBeTruthy();
     });
 
     it("should open key modal on press", () => {

@@ -254,4 +254,82 @@ describe("Composer Types", () => {
       expect(formatTimeSignature({ beats: 6, beatUnit: 8 })).toBe("6/8");
     });
   });
+
+  describe("half-measure boundary", () => {
+    // Import the functions we need to test
+    const {
+      generateRestsForDurationAtPosition,
+      getHalfMeasureBoundary,
+      replaceNoteAtIndex,
+    } = require("../src/features/composer/types/composerTypes");
+
+    describe("getHalfMeasureBoundary", () => {
+      it("should return 2 for 4/4 time", () => {
+        expect(getHalfMeasureBoundary({ beats: 4, beatUnit: 4 })).toBe(2);
+      });
+
+      it("should return 1 for 2/4 time", () => {
+        expect(getHalfMeasureBoundary({ beats: 2, beatUnit: 4 })).toBe(1);
+      });
+
+      it("should return null for 3/4 time (odd beats)", () => {
+        expect(getHalfMeasureBoundary({ beats: 3, beatUnit: 4 })).toBe(null);
+      });
+
+      it("should return 2 for 2/2 time (cut time)", () => {
+        expect(getHalfMeasureBoundary({ beats: 2, beatUnit: 2 })).toBe(2);
+      });
+    });
+
+    describe("generateRestsForDurationAtPosition", () => {
+      const timeSig44 = { beats: 4, beatUnit: 4 };
+
+      it("should use largest rests when starting at beat 0", () => {
+        // Starting at beat 0, no boundary restriction
+        const rests = generateRestsForDurationAtPosition(3, 0, timeSig44);
+        // Should be [half, quarter] since starting at beat 0 allows crossing
+        expect(rests).toHaveLength(2);
+        expect(rests[0].duration).toBe(DURATION.HALF);
+        expect(rests[1].duration).toBe(DURATION.QUARTER);
+      });
+
+      it("should not cross boundary when starting after beat 0", () => {
+        // Starting at beat 1 (after quarter note), need to fill 3 beats
+        // Boundary is at beat 2, so half rest from beat 1-3 would cross it
+        const rests = generateRestsForDurationAtPosition(3, 1, timeSig44);
+        // Should be [quarter, quarter, quarter] to avoid crossing
+        // Actually: quarter (1-2), then at beat 2 we can use half (2-4)
+        expect(rests).toHaveLength(2);
+        expect(rests[0].duration).toBe(DURATION.QUARTER); // beats 1-2
+        expect(rests[1].duration).toBe(DURATION.HALF); // beats 2-4
+      });
+
+      it("should allow half rest starting exactly at boundary", () => {
+        // Starting at beat 2 (the boundary), can use half rest
+        const rests = generateRestsForDurationAtPosition(2, 2, timeSig44);
+        expect(rests).toHaveLength(1);
+        expect(rests[0].duration).toBe(DURATION.HALF);
+      });
+    });
+
+    describe("replaceNoteAtIndex (boundary behavior)", () => {
+      it("should fill rests respecting half-measure boundary", () => {
+        const timeSig = { beats: 4, beatUnit: 4 };
+        const measure = createMeasure(timeSig);
+        // Initial measure has a whole rest
+
+        const note = createNote(60, DURATION.QUARTER);
+        const result = replaceNoteAtIndex(measure, 0, note, timeSig);
+
+        // After inserting quarter at beat 0:
+        // - Note at beat 0-1
+        // - Remainder: 3 beats starting at beat 1
+        // - With boundary at 2: quarter rest (1-2), half rest (2-4)
+        expect(result.notes).toHaveLength(3);
+        expect(result.notes[0].midi).toBe(60); // the note
+        expect(result.notes[1].duration).toBe(DURATION.QUARTER); // rest beat 1-2
+        expect(result.notes[2].duration).toBe(DURATION.HALF); // rest beats 2-4
+      });
+    });
+  });
 });

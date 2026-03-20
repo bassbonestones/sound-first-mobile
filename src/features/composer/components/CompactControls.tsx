@@ -73,8 +73,9 @@ function CompactControlsComponent({
   const showMeasureInfo = width >= 400;
 
   const handleDelete = useCallback(() => {
-    if (!disabled && hasSelection) onDelete();
-  }, [disabled, hasSelection, onDelete]);
+    // Delete doesn't require selection - it can find previous pitched note
+    if (!disabled) onDelete();
+  }, [disabled, onDelete]);
 
   const handleAddMeasure = useCallback(() => {
     if (!disabled) {
@@ -115,21 +116,19 @@ function CompactControlsComponent({
         style={[
           styles.iconButton,
           styles.deleteButton,
-          (!hasSelection || disabled) && styles.buttonDisabled,
+          disabled && styles.buttonDisabled,
         ]}
         onPress={handleDelete}
-        disabled={!hasSelection || disabled}
+        disabled={disabled}
         accessibilityRole={"button" as AccessibilityRole}
         accessibilityLabel="Delete note"
-        accessibilityState={{ disabled: !hasSelection || disabled }}
+        accessibilityState={{ disabled }}
         testID="compact-delete"
       >
         <Feather
           name="trash-2"
           size={18}
-          color={
-            hasSelection && !disabled ? colors.error : colors.textSecondary
-          }
+          color={!disabled ? colors.error : colors.textSecondary}
         />
       </TouchableOpacity>
 
@@ -183,7 +182,7 @@ function CompactControlsComponent({
               testID="menu-add"
             >
               <Feather name="plus-square" size={18} color={colors.success} />
-              <Text style={styles.menuItemText}>Add Measure</Text>
+              <Text style={styles.menuItemText}>Add Measure at End</Text>
             </TouchableOpacity>
 
             {/* Delete measure */}
@@ -207,7 +206,7 @@ function CompactControlsComponent({
                   !canDeleteMeasure && styles.menuItemTextDisabled,
                 ]}
               >
-                Delete Measure
+                Delete Current Measure
               </Text>
             </TouchableOpacity>
 

@@ -218,11 +218,61 @@ export interface Measure {
   notes: Note[];
 }
 
+/**
+ * Generate rests to fill a measure based on time signature.
+ * Uses the most natural rest type: single rest if possible, otherwise beat-unit rests.
+ */
+export function generateMeasureRests(timeSig: TimeSignature): Note[] {
+  const totalBeats = getBeatsPerMeasure(timeSig);
+
+  // Standard duration values we can use
+  const standardDurations: DurationValue[] = [
+    DURATION.WHOLE, // 4
+    DURATION.HALF, // 2
+    DURATION.QUARTER, // 1
+    DURATION.EIGHTH, // 0.5
+    DURATION.SIXTEENTH, // 0.25
+  ];
+
+  // If total beats matches a standard duration, use single rest
+  if (standardDurations.includes(totalBeats as DurationValue)) {
+    return [createRest(totalBeats as DurationValue)];
+  }
+
+  // Otherwise, fill with beat-unit rests
+  // Convert beat unit to duration value (4 = quarter = 1, 8 = eighth = 0.5, etc.)
+  const beatUnitDuration = 4 / timeSig.beatUnit;
+
+  // Check if beat unit is a valid duration
+  if (standardDurations.includes(beatUnitDuration as DurationValue)) {
+    const rests: Note[] = [];
+    for (let i = 0; i < timeSig.beats; i++) {
+      rests.push(createRest(beatUnitDuration as DurationValue));
+    }
+    return rests;
+  }
+
+  // Fallback: fill with quarter rests
+  const rests: Note[] = [];
+  let remaining = totalBeats;
+  while (remaining > 0) {
+    const duration =
+      remaining >= 1
+        ? DURATION.QUARTER
+        : remaining >= 0.5
+          ? DURATION.EIGHTH
+          : DURATION.SIXTEENTH;
+    rests.push(createRest(duration));
+    remaining -= duration;
+  }
+  return rests;
+}
+
 /** Create an empty measure */
-export function createMeasure(): Measure {
+export function createMeasure(timeSig?: TimeSignature): Measure {
   return {
     id: generateId(),
-    notes: [],
+    notes: timeSig ? generateMeasureRests(timeSig) : [],
   };
 }
 
@@ -268,14 +318,17 @@ export const DEFAULT_SCORE_VALUES = {
 /** Create a new empty score */
 export function createScore(options?: Partial<ComposerScore>): ComposerScore {
   const now = new Date().toISOString();
+  const timeSig = options?.timeSignature ?? {
+    ...DEFAULT_SCORE_VALUES.timeSignature,
+  };
   return {
     id: generateId(),
     title: DEFAULT_SCORE_VALUES.title,
     clef: DEFAULT_SCORE_VALUES.clef,
     keySignature: DEFAULT_SCORE_VALUES.keySignature,
-    timeSignature: { ...DEFAULT_SCORE_VALUES.timeSignature },
+    timeSignature: timeSig,
     tempo: DEFAULT_SCORE_VALUES.tempo,
-    measures: [createMeasure()], // Start with one empty measure
+    measures: [createMeasure(timeSig)], // Start with rest-filled measure
     createdAt: now,
     updatedAt: now,
     ...options,
@@ -376,6 +429,219 @@ export function wouldOverflow(
   const expected = getBeatsPerMeasure(timeSignature);
   const currentDuration = getMeasureDuration(measure);
   return currentDuration + duration > expected + 0.001; // Float tolerance
+}
+
+/**
+ * Get the beat position at a specific note index within a measure.
+ * Returns the cumulative duration of all notes before this index.
+ */
+export function getBeatPositionAt(measure: Measure, noteIndex: number): number {
+  let position = 0;
+  for (let i = 0; i < noteIndex && i < measure.notes.length; i++) {
+    position += measure.notes[i].duration;
+  }
+  return position;
+}
+
+/**
+ * Result of a replace operation
+ */
+export interface ReplaceResult {
+  /** New notes array for the measure */
+  notes: Note[];
+  /** Index of the newly inserted note */
+  insertedIndex: number;
+  /** Any overflow duration that couldn't fit (for cross-measure replacement) */
+  overflowDuration: number;
+}
+
+/**
+ * Replace notes starting at a given index with a new note.
+ * Handles consuming subsequent notes if new duration is longer,
+ * and fills any remainder with rests.
+ */
+export function replaceNoteAtIndex(
+  measure: Measure,
+  noteIndex: number,
+  newNote: Note,
+  timeSignature: TimeSignature,
+): ReplaceResult {
+  const measureDuration = getBeatsPerMeasure(timeSignature);
+  const startBeat = getBeatPositionAt(measure, noteIndex);
+  const endBeat = startBeat + newNote.duration;
+
+  // Notes before the insertion point stay unchanged
+  const notesBefore = measure.notes.slice(0, noteIndex);
+
+  // Find notes that need to be removed (those that overlap with new note's range)
+  let currentBeat = startBeat;
+  let consumeEndIndex = noteIndex;
+
+  while (consumeEndIndex < measure.notes.length && currentBeat < endBeat) {
+    currentBeat += measure.notes[consumeEndIndex].duration;
+    consumeEndIndex++;
+  }
+
+  // Notes after the consumed range (may need adjustment)
+  const notesAfter = measure.notes.slice(consumeEndIndex);
+
+  // Calculate any overflow that extends past the measure
+  const overflowDuration = Math.max(0, endBeat - measureDuration);
+
+  // Calculate remainder if we consumed more than we needed
+  const remainderDuration = currentBeat - endBeat;
+
+  // Build the new notes array
+  const newNotes: Note[] = [...notesBefore];
+
+  // Adjust note duration if it would overflow the measure
+  const effectiveDuration = Math.min(
+    newNote.duration,
+    measureDuration - startBeat,
+  );
+  if (effectiveDuration > 0) {
+    newNotes.push({
+      ...newNote,
+      duration: effectiveDuration as DurationValue,
+    });
+  }
+
+  // Fill remainder with rests if we consumed more than the new note needs
+  if (remainderDuration > 0 && overflowDuration === 0) {
+    const remainderStartBeat = startBeat + newNote.duration;
+    const remainderRests = generateRestsForDurationAtPosition(
+      remainderDuration,
+      remainderStartBeat,
+      timeSignature,
+    );
+    newNotes.push(...remainderRests);
+  }
+
+  // Add back any notes after the consumed range
+  newNotes.push(...notesAfter);
+
+  return {
+    notes: newNotes,
+    insertedIndex: noteIndex,
+    overflowDuration,
+  };
+}
+
+/**
+ * Generate rests to fill a specific duration.
+ * Uses largest possible rests first.
+ * NOTE: Use generateRestsForDurationAtPosition when beat position matters.
+ */
+export function generateRestsForDuration(duration: number): Note[] {
+  const rests: Note[] = [];
+  let remaining = duration;
+
+  // Standard durations in descending order
+  const durations: DurationValue[] = [
+    DURATION.WHOLE,
+    DURATION.HALF,
+    DURATION.QUARTER,
+    DURATION.EIGHTH,
+    DURATION.SIXTEENTH,
+  ];
+
+  const tolerance = 0.001;
+
+  for (const d of durations) {
+    while (remaining >= d - tolerance) {
+      rests.push(createRest(d));
+      remaining -= d;
+    }
+  }
+
+  return rests;
+}
+
+/**
+ * Get the half-measure boundary in quarter-note beats.
+ * For even-beat simple meters (2/4, 4/4, etc.), returns the midpoint.
+ * For odd-beat meters or compound meters, returns null (no boundary).
+ */
+export function getHalfMeasureBoundary(
+  timeSignature: TimeSignature,
+): number | null {
+  const { beats, beatUnit } = timeSignature;
+  const quarterNotesPerBeat = 4 / beatUnit;
+  const totalQuarterNotes = beats * quarterNotesPerBeat;
+
+  // Only apply to even-beat simple meters (beats divisible by 2)
+  // Common examples: 2/4, 4/4, 2/2
+  if (beats % 2 === 0 && beatUnit <= 4) {
+    return totalQuarterNotes / 2;
+  }
+
+  // For compound meters (6/8, 9/8, 12/8), could add different grouping logic
+  // For now, return null to use simple largest-rest-first approach
+  return null;
+}
+
+/**
+ * Generate rests to fill a duration, respecting the half-measure boundary.
+ * In even-beat meters like 4/4, rests should not cross from beat 2 to beat 3
+ * unless they start at beat 1.
+ */
+export function generateRestsForDurationAtPosition(
+  duration: number,
+  startBeat: number,
+  timeSignature: TimeSignature,
+): Note[] {
+  const tolerance = 0.001;
+  const boundary = getHalfMeasureBoundary(timeSignature);
+
+  // If no boundary constraint or starting at beat 0, use simple approach
+  if (boundary === null || startBeat < tolerance) {
+    return generateRestsForDuration(duration);
+  }
+
+  const rests: Note[] = [];
+  let currentBeat = startBeat;
+  let remaining = duration;
+
+  // Standard durations in descending order
+  const durations: DurationValue[] = [
+    DURATION.WHOLE,
+    DURATION.HALF,
+    DURATION.QUARTER,
+    DURATION.EIGHTH,
+    DURATION.SIXTEENTH,
+  ];
+
+  while (remaining > tolerance) {
+    // Find the largest duration that fits and doesn't cross boundary
+    let bestDuration: DurationValue | null = null;
+
+    for (const d of durations) {
+      if (d > remaining + tolerance) continue;
+
+      // Check if this duration would cross the boundary inappropriately
+      const wouldCrossBoundary =
+        currentBeat < boundary && currentBeat + d > boundary + tolerance;
+
+      if (wouldCrossBoundary) {
+        // Can't use this duration - try smaller ones
+        continue;
+      }
+
+      bestDuration = d;
+      break;
+    }
+
+    if (bestDuration === null) {
+      // Shouldn't happen, but fall back to smallest duration
+      bestDuration = DURATION.SIXTEENTH;
+    }
+
+    rests.push(createRest(bestDuration));
+    remaining -= bestDuration;
+    currentBeat += bestDuration;
+  }
+
+  return rests;
 }
 
 // =============================================================================

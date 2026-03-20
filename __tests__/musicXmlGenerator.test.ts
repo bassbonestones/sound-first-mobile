@@ -102,12 +102,14 @@ describe("MusicXML Generator", () => {
       expect(xml).toContain('<sound tempo="80"/>');
     });
 
-    it("should skip tempo direction when score is empty", () => {
+    it("should include tempo direction even for rest-only measures", () => {
+      // With pre-filled measures, new scores have rests, not empty measures
+      // Tempo should still be included
       const score = createScore({ tempo: 120 });
       const xml = generateMusicXml(score);
 
-      expect(xml).not.toContain("<per-minute>");
-      expect(xml).not.toContain("<metronome");
+      expect(xml).toContain("<per-minute>120</per-minute>");
+      expect(xml).toContain('<sound tempo="120"/>');
     });
   });
 

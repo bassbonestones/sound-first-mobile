@@ -77,8 +77,9 @@ function NavigationControlsComponent({
   }, [disabled, hasSelection, onDown]);
 
   const handleDelete = useCallback(() => {
-    if (!disabled && hasSelection) onDelete();
-  }, [disabled, hasSelection, onDelete]);
+    // Delete doesn't require selection - it can find previous pitched note
+    if (!disabled) onDelete();
+  }, [disabled, onDelete]);
 
   return (
     <View style={styles.container} testID={testID}>
@@ -139,21 +140,19 @@ function NavigationControlsComponent({
           style={[
             styles.button,
             styles.deleteButton,
-            (!hasSelection || disabled) && styles.buttonDisabled,
+            disabled && styles.buttonDisabled,
           ]}
           onPress={handleDelete}
-          disabled={!hasSelection || disabled}
+          disabled={disabled}
           accessibilityRole={"button" as AccessibilityRole}
           accessibilityLabel="Delete note"
-          accessibilityState={{ disabled: !hasSelection || disabled }}
+          accessibilityState={{ disabled }}
           testID="nav-delete"
         >
           <Feather
             name="trash-2"
             size={20}
-            color={
-              hasSelection && !disabled ? colors.error : colors.textSecondary
-            }
+            color={!disabled ? colors.error : colors.textSecondary}
           />
         </TouchableOpacity>
 

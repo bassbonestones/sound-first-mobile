@@ -116,7 +116,7 @@ function MeasureControlsComponent({
           onPress={handleAdd}
           disabled={disabled}
           accessibilityRole={"button" as AccessibilityRole}
-          accessibilityLabel="Add measure"
+          accessibilityLabel="Add measure at end"
           accessibilityState={{ disabled }}
           testID="measure-add"
         >
@@ -133,7 +133,7 @@ function MeasureControlsComponent({
           onPress={handleDelete}
           disabled={!canDelete || disabled}
           accessibilityRole={"button" as AccessibilityRole}
-          accessibilityLabel="Delete measure"
+          accessibilityLabel="Delete current measure"
           accessibilityState={{ disabled: !canDelete || disabled }}
           testID="measure-delete"
         >

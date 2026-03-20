@@ -139,6 +139,10 @@ function ComposerScreenContent({
     targetKey: KeySignature;
   }>({ visible: false, targetKey: 0 });
 
+  // Add measure prompt modal state
+  const [showAddMeasureModal, setShowAddMeasureModal] = useState(false);
+  const prevIsAtLastMeasureEnd = useRef(false);
+
   // Load existing score or check for autosave recovery
   useEffect(() => {
     const loadScore = async () => {
@@ -193,6 +197,15 @@ function ComposerScreenContent({
       handler.cancelAutosave();
     };
   }, []);
+
+  // Show add measure modal when user reaches end of last measure
+  useEffect(() => {
+    // Only show modal when transitioning from false to true
+    if (composerState.isAtLastMeasureEnd && !prevIsAtLastMeasureEnd.current) {
+      setShowAddMeasureModal(true);
+    }
+    prevIsAtLastMeasureEnd.current = composerState.isAtLastMeasureEnd;
+  }, [composerState.isAtLastMeasureEnd]);
 
   // ==========================================================================
   // Handlers
@@ -939,6 +952,47 @@ function ComposerScreenContent({
                 onPress={handleKeyChangeCancel}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Modal>
+
+        {/* Add Measure Prompt Modal */}
+        <Modal
+          visible={showAddMeasureModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowAddMeasureModal(false)}
+        >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setShowAddMeasureModal(false)}
+          >
+            <View
+              style={styles.modalContent}
+              onStartShouldSetResponder={() => true}
+            >
+              <Text style={styles.modalTitle}>Add New Measure?</Text>
+              <Text style={styles.modalMessage}>
+                You've reached the end of the last measure. Would you like to
+                add another measure?
+              </Text>
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={() => {
+                  composerState.addMeasure();
+                  setShowAddMeasureModal(false);
+                }}
+                testID="add-measure-confirm"
+              >
+                <Text style={styles.modalOptionText}>Add Measure at End</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setShowAddMeasureModal(false)}
+                testID="add-measure-cancel"
+              >
+                <Text style={styles.modalCancelText}>No Thanks</Text>
               </TouchableOpacity>
             </View>
           </Pressable>

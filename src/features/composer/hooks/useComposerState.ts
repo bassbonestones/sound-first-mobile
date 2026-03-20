@@ -31,6 +31,9 @@ import {
   getMeasureDuration,
   validateMeasure,
   wouldOverflow,
+  replaceNoteAtIndex,
+  generateRestsForDurationAtPosition,
+  getBeatPositionAt,
   createInsertNoteAction,
   createDeleteNoteAction,
   createChangePitchAction,
@@ -84,6 +87,10 @@ export interface UseComposerStateReturn {
   // Validation
   currentMeasureValidation: MeasureValidation;
   allMeasuresValid: boolean;
+
+  // Cursor Position
+  /** True when cursor is at last position of last measure (user may want to add measure) */
+  isAtLastMeasureEnd: boolean;
 
   // Note Operations
   insertNote: (pitchName: PitchName) => boolean;
@@ -155,6 +162,9 @@ export function useComposerState(
   // This is updated synchronously so multiple inserts in the same render cycle work correctly
   const cursorRef = useRef(state.cursor);
 
+  // Ref to suppress the "add measure" prompt after deleteMeasure
+  const suppressAddMeasurePromptRef = useRef(false);
+
   // Keep ref in sync with state
   useEffect(() => {
     cursorRef.current = state.cursor;
@@ -216,49 +226,18 @@ export function useComposerState(
 
   const insertNote = useCallback(
     (pitchName: PitchName): boolean => {
-      // Use ref for cursor position to handle rapid consecutive inserts
+      // Get current cursor position
       const currentCursor = cursorRef.current;
+      const measure = state.score.measures[currentCursor.measureIndex];
+      if (!measure) return false;
 
-      // Find the first measure with space for this note, starting from cursor
-      let targetMeasureIndex = currentCursor.measureIndex;
-      let targetNoteIndex = currentCursor.noteIndex;
-
-      while (targetMeasureIndex < state.score.measures.length) {
-        const measure = state.score.measures[targetMeasureIndex];
-        if (!measure) return false;
-
-        // If we moved to a new measure, start at position 0
-        if (targetMeasureIndex > currentCursor.measureIndex) {
-          targetNoteIndex = measure.notes.length; // Append at end
-        }
-
-        // Check if note fits in this measure
-        if (
-          !wouldOverflow(
-            measure,
-            state.selectedDuration,
-            state.score.timeSignature,
-          )
-        ) {
-          break; // Found a measure with space
-        }
-
-        // Move to next measure
-        targetMeasureIndex++;
-        targetNoteIndex = 0;
-      }
-
-      // No measure found with space
-      if (targetMeasureIndex >= state.score.measures.length) {
-        return false;
-      }
+      // Determine if we're in replace mode (cursor is on an existing note)
+      const isReplaceMode = currentCursor.noteIndex < measure.notes.length;
 
       // Get MIDI pitch - use smart octave based on last pitched note or staff center
-      // We use getLastPitchedNoteBefore to skip rests - this ensures continuous
-      // melodic lines don't get disrupted when rests are inserted between notes
       const targetCursor = {
-        measureIndex: targetMeasureIndex,
-        noteIndex: targetNoteIndex,
+        measureIndex: currentCursor.measureIndex,
+        noteIndex: currentCursor.noteIndex,
       };
       const previousPitchedNote = getLastPitchedNoteBefore(
         targetCursor,
@@ -277,26 +256,233 @@ export function useComposerState(
         accidental,
       });
 
-      // Record action for undo
-      const action = createInsertNoteAction(targetCursor, note);
+      if (isReplaceMode) {
+        // Replace mode: replace note at cursor position
+        const replaceResult = replaceNoteAtIndex(
+          measure,
+          currentCursor.noteIndex,
+          note,
+          state.score.timeSignature,
+        );
+
+        // TODO: Handle overflow (note extends past measure) - could prompt for new measure
+
+        // Record action for undo (using insert action for now, could create replace action)
+        const action = createInsertNoteAction(targetCursor, note);
+        undoManager.pushAction(action);
+
+        // Move cursor to next note position after the inserted note
+        const newNoteIndex = replaceResult.insertedIndex + 1;
+        let newCursor: CursorPosition;
+
+        if (newNoteIndex >= replaceResult.notes.length) {
+          // Filled this measure - move to next measure if it exists
+          const nextMeasureIndex = currentCursor.measureIndex + 1;
+          if (nextMeasureIndex < state.score.measures.length) {
+            newCursor = {
+              measureIndex: nextMeasureIndex,
+              noteIndex: 0,
+            };
+          } else {
+            // No next measure - stay at end of current measure
+            newCursor = {
+              measureIndex: currentCursor.measureIndex,
+              noteIndex: replaceResult.notes.length - 1,
+            };
+          }
+        } else {
+          // Still room in this measure
+          newCursor = {
+            measureIndex: currentCursor.measureIndex,
+            noteIndex: newNoteIndex,
+          };
+        }
+        cursorRef.current = newCursor;
+
+        setState((prev) => {
+          const newMeasures = prev.score.measures.map((m, i) =>
+            i === currentCursor.measureIndex
+              ? { ...m, notes: replaceResult.notes }
+              : m,
+          );
+
+          return {
+            ...prev,
+            score: {
+              ...prev.score,
+              measures: newMeasures,
+              updatedAt: new Date().toISOString(),
+            },
+            cursor: newCursor,
+            // Select the inserted note (for delete to work on it)
+            // Cursor is past it for next insertion
+            selectedNoteId: note.id,
+            isDirty: true,
+          };
+        });
+
+        return true;
+      } else {
+        // Legacy insert mode (cursor past end of notes) - shouldn't happen with pre-filled measures
+        // but keep for backward compatibility
+
+        // Check if note fits in this measure
+        if (
+          wouldOverflow(
+            measure,
+            state.selectedDuration,
+            state.score.timeSignature,
+          )
+        ) {
+          return false;
+        }
+
+        const action = createInsertNoteAction(targetCursor, note);
+        undoManager.pushAction(action);
+
+        const newCursor = {
+          measureIndex: currentCursor.measureIndex,
+          noteIndex: currentCursor.noteIndex + 1,
+        };
+        cursorRef.current = newCursor;
+
+        setState((prev) => {
+          const newMeasures = prev.score.measures.map((m, i) =>
+            i === currentCursor.measureIndex
+              ? {
+                  ...m,
+                  notes: [
+                    ...m.notes.slice(0, currentCursor.noteIndex),
+                    note,
+                    ...m.notes.slice(currentCursor.noteIndex),
+                  ],
+                }
+              : m,
+          );
+
+          return {
+            ...prev,
+            score: {
+              ...prev.score,
+              measures: newMeasures,
+              updatedAt: new Date().toISOString(),
+            },
+            cursor: newCursor,
+            selectedNoteId: note.id,
+            isDirty: true,
+          };
+        });
+
+        return true;
+      }
+    },
+    [state.score, state.selectedDuration, state.selectedOctave, undoManager],
+  );
+
+  const insertRest = useCallback((): boolean => {
+    // Get current cursor position
+    const currentCursor = cursorRef.current;
+    const measure = state.score.measures[currentCursor.measureIndex];
+    if (!measure) return false;
+
+    // Determine if we're in replace mode (cursor is on an existing note)
+    const isReplaceMode = currentCursor.noteIndex < measure.notes.length;
+
+    const rest = createRest(state.selectedDuration);
+
+    if (isReplaceMode) {
+      // Replace mode: replace note at cursor position
+      const replaceResult = replaceNoteAtIndex(
+        measure,
+        currentCursor.noteIndex,
+        rest,
+        state.score.timeSignature,
+      );
+
+      const targetCursor = {
+        measureIndex: currentCursor.measureIndex,
+        noteIndex: currentCursor.noteIndex,
+      };
+      const action = createInsertNoteAction(targetCursor, rest);
       undoManager.pushAction(action);
 
-      // Update cursor ref immediately for consecutive inserts
+      // Move cursor to next note position after the inserted rest
+      const newNoteIndex = replaceResult.insertedIndex + 1;
+      let newCursor: CursorPosition;
+      if (newNoteIndex >= replaceResult.notes.length) {
+        // Rest filled remaining duration - move to next measure if it exists
+        const nextMeasureIndex = currentCursor.measureIndex + 1;
+        if (nextMeasureIndex < state.score.measures.length) {
+          newCursor = { measureIndex: nextMeasureIndex, noteIndex: 0 };
+        } else {
+          newCursor = {
+            measureIndex: currentCursor.measureIndex,
+            noteIndex: replaceResult.notes.length - 1,
+          };
+        }
+      } else {
+        newCursor = {
+          measureIndex: currentCursor.measureIndex,
+          noteIndex: newNoteIndex,
+        };
+      }
+      cursorRef.current = newCursor;
+
+      setState((prev) => {
+        const newMeasures = prev.score.measures.map((m, i) =>
+          i === currentCursor.measureIndex
+            ? { ...m, notes: replaceResult.notes }
+            : m,
+        );
+
+        return {
+          ...prev,
+          score: {
+            ...prev.score,
+            measures: newMeasures,
+            updatedAt: new Date().toISOString(),
+          },
+          cursor: newCursor,
+          selectedNoteId: rest.id,
+          isDirty: true,
+        };
+      });
+
+      return true;
+    } else {
+      // Legacy insert mode - shouldn't happen with pre-filled measures
+      if (
+        wouldOverflow(
+          measure,
+          state.selectedDuration,
+          state.score.timeSignature,
+        )
+      ) {
+        return false;
+      }
+
+      const targetCursor = {
+        measureIndex: currentCursor.measureIndex,
+        noteIndex: currentCursor.noteIndex,
+      };
+      const action = createInsertNoteAction(targetCursor, rest);
+      undoManager.pushAction(action);
+
       const newCursor = {
-        measureIndex: targetMeasureIndex,
-        noteIndex: targetNoteIndex + 1,
+        measureIndex: currentCursor.measureIndex,
+        noteIndex: currentCursor.noteIndex + 1,
       };
       cursorRef.current = newCursor;
 
       setState((prev) => {
         const newMeasures = prev.score.measures.map((m, i) =>
-          i === targetMeasureIndex
+          i === currentCursor.measureIndex
             ? {
                 ...m,
                 notes: [
-                  ...m.notes.slice(0, targetNoteIndex),
-                  note,
-                  ...m.notes.slice(targetNoteIndex),
+                  ...m.notes.slice(0, currentCursor.noteIndex),
+                  rest,
+                  ...m.notes.slice(currentCursor.noteIndex),
                 ],
               }
             : m,
@@ -310,196 +496,136 @@ export function useComposerState(
             updatedAt: new Date().toISOString(),
           },
           cursor: newCursor,
-          selectedNoteId: note.id,
+          selectedNoteId: rest.id,
           isDirty: true,
         };
       });
 
       return true;
-    },
-    [state.score, state.selectedDuration, state.selectedOctave, undoManager],
-  );
-
-  const insertRest = useCallback((): boolean => {
-    // Use ref for cursor position to handle rapid consecutive inserts
-    const currentCursor = cursorRef.current;
-
-    // Find the first measure with space for this rest, starting from cursor
-    let targetMeasureIndex = currentCursor.measureIndex;
-    let targetNoteIndex = currentCursor.noteIndex;
-
-    while (targetMeasureIndex < state.score.measures.length) {
-      const measure = state.score.measures[targetMeasureIndex];
-      if (!measure) return false;
-
-      // If we moved to a new measure, append at end
-      if (targetMeasureIndex > currentCursor.measureIndex) {
-        targetNoteIndex = measure.notes.length;
-      }
-
-      // Check if rest fits in this measure
-      if (
-        !wouldOverflow(
-          measure,
-          state.selectedDuration,
-          state.score.timeSignature,
-        )
-      ) {
-        break; // Found a measure with space
-      }
-
-      // Move to next measure
-      targetMeasureIndex++;
-      targetNoteIndex = 0;
     }
-
-    // No measure found with space
-    if (targetMeasureIndex >= state.score.measures.length) {
-      return false;
-    }
-
-    const rest = createRest(state.selectedDuration);
-    const targetCursor = {
-      measureIndex: targetMeasureIndex,
-      noteIndex: targetNoteIndex,
-    };
-    const action = createInsertNoteAction(targetCursor, rest);
-    undoManager.pushAction(action);
-
-    // Update cursor ref immediately for consecutive inserts
-    const newCursor = {
-      measureIndex: targetMeasureIndex,
-      noteIndex: targetNoteIndex + 1,
-    };
-    cursorRef.current = newCursor;
-
-    setState((prev) => {
-      const newMeasures = prev.score.measures.map((m, i) =>
-        i === targetMeasureIndex
-          ? {
-              ...m,
-              notes: [
-                ...m.notes.slice(0, targetNoteIndex),
-                rest,
-                ...m.notes.slice(targetNoteIndex),
-              ],
-            }
-          : m,
-      );
-
-      return {
-        ...prev,
-        score: {
-          ...prev.score,
-          measures: newMeasures,
-          updatedAt: new Date().toISOString(),
-        },
-        cursor: newCursor,
-        selectedNoteId: rest.id,
-        isDirty: true,
-      };
-    });
-
-    return true;
   }, [state.score, state.selectedDuration, undoManager]);
 
   const deleteNote = useCallback((): boolean => {
-    // Try to get note at cursor position
-    let note = getNoteAtCursor(state.cursor, state.score);
-    let deleteFromCursor = state.cursor;
+    // Helper to find previous note/rest (any element) before a position
+    const findPreviousNote = (
+      startMeasure: number,
+      startNote: number,
+    ): { note: Note; position: CursorPosition } | null => {
+      let mi = startMeasure;
+      let ni = startNote - 1;
 
-    // If no note at cursor (cursor is at end), delete the note before cursor
-    if (!note) {
-      note = getNoteBefore(state.cursor, state.score);
-      if (!note) return false;
+      while (mi >= 0) {
+        const measure = state.score.measures[mi];
+        if (ni >= 0 && measure.notes[ni]) {
+          return {
+            note: measure.notes[ni],
+            position: { measureIndex: mi, noteIndex: ni },
+          };
+        }
+        mi--;
+        if (mi >= 0) {
+          ni = state.score.measures[mi].notes.length - 1;
+        }
+      }
+      return null;
+    };
 
-      // Find the position of the note before
-      if (state.cursor.noteIndex > 0) {
-        deleteFromCursor = {
-          ...state.cursor,
-          noteIndex: state.cursor.noteIndex - 1,
-        };
-      } else if (state.cursor.measureIndex > 0) {
-        const prevMeasure = state.score.measures[state.cursor.measureIndex - 1];
-        deleteFromCursor = {
-          measureIndex: state.cursor.measureIndex - 1,
-          noteIndex: prevMeasure.notes.length - 1,
-        };
-      } else {
-        return false; // At absolute start, nothing to delete
+    // Determine the current note (from selection or cursor)
+    let currentPosition: CursorPosition = state.cursor;
+    let currentNote: Note | null = null;
+
+    if (state.selectedNoteId) {
+      const position = findNotePosition(state.selectedNoteId, state.score);
+      if (position) {
+        currentPosition = position;
+        currentNote =
+          state.score.measures[position.measureIndex]?.notes[
+            position.noteIndex
+          ] || null;
       }
     }
 
-    const action = createDeleteNoteAction(deleteFromCursor, note);
+    if (!currentNote) {
+      currentNote = getNoteAtCursor(state.cursor, state.score);
+      currentPosition = state.cursor;
+    }
+
+    if (!currentNote) {
+      return false; // Nothing at cursor
+    }
+
+    // If current note is a REST: just move selection left (like left arrow)
+    if (currentNote.midi === null) {
+      const prev = findPreviousNote(
+        currentPosition.measureIndex,
+        currentPosition.noteIndex,
+      );
+      if (prev) {
+        setState((prevState) => ({
+          ...prevState,
+          cursor: prev.position,
+          selectedNoteId: prev.note.id,
+        }));
+        cursorRef.current = prev.position;
+        return true;
+      }
+      return false; // At beginning, nothing to do
+    }
+
+    // Current note is PITCHED: delete it, replace with rests, select previous
+    const action = createDeleteNoteAction(currentPosition, currentNote);
     undoManager.pushAction(action);
 
-    setState((prev) => {
-      const newMeasures = prev.score.measures.map((m, i) =>
-        i === deleteFromCursor.measureIndex
-          ? {
-              ...m,
-              notes: m.notes.filter((n) => n.id !== note.id),
-            }
-          : m,
-      );
+    // Get the measure and calculate where to insert replacement rests
+    const measure = state.score.measures[currentPosition.measureIndex];
+    const deletedDuration = currentNote.duration;
+    const beatPosition = getBeatPositionAt(measure, currentPosition.noteIndex);
 
-      // Calculate new cursor position (move to previous note position)
-      let newCursor = deleteFromCursor;
-      let newSelectedNoteId: string | null = null;
+    // Generate rests to replace the deleted note (respecting half-measure boundary)
+    const replacementRests = generateRestsForDurationAtPosition(
+      deletedDuration,
+      beatPosition,
+      state.score.timeSignature,
+    );
 
-      // After deletion, the cursor should stay at the same index,
-      // but we want to select the note that's now at the previous position
-      const newMeasure = newMeasures[deleteFromCursor.measureIndex];
-      const previousNoteIndex = deleteFromCursor.noteIndex - 1;
+    // After deletion:
+    // - Cursor stays at the deleted position (now a rest) so next insert fills that spot
+    // - Selection is the replacement rest - this aligns cursor and selection
+    //   so what user sees selected matches where insert will happen
+    const newCursor = currentPosition;
+    const newSelectedId = replacementRests[0]?.id || null;
 
-      if (previousNoteIndex >= 0 && newMeasure.notes[previousNoteIndex]) {
-        // Select the note before the deleted one
-        newCursor = {
-          measureIndex: deleteFromCursor.measureIndex,
-          noteIndex: previousNoteIndex,
-        };
-        newSelectedNoteId = newMeasure.notes[previousNoteIndex].id;
-      } else if (deleteFromCursor.measureIndex > 0) {
-        // Move to last note of previous measure
-        const prevMeasure = newMeasures[deleteFromCursor.measureIndex - 1];
-        if (prevMeasure.notes.length > 0) {
-          newCursor = {
-            measureIndex: deleteFromCursor.measureIndex - 1,
-            noteIndex: prevMeasure.notes.length - 1,
-          };
-          newSelectedNoteId =
-            prevMeasure.notes[prevMeasure.notes.length - 1].id;
-        } else {
-          // Previous measure is empty, go to start of it
-          newCursor = {
-            measureIndex: deleteFromCursor.measureIndex - 1,
-            noteIndex: 0,
-          };
-        }
-      } else {
-        // At start of first measure, cursor stays at 0
-        newCursor = { measureIndex: 0, noteIndex: 0 };
-        // Select first note if exists
-        if (newMeasure.notes.length > 0) {
-          newSelectedNoteId = newMeasure.notes[0].id;
-        }
-      }
+    // Update cursorRef BEFORE setState to avoid race conditions
+    cursorRef.current = newCursor;
+
+    setState((prevState) => {
+      const newMeasures = prevState.score.measures.map((m, i) => {
+        if (i !== currentPosition.measureIndex) return m;
+
+        // Replace the deleted note with rests
+        const newNotes = [
+          ...m.notes.slice(0, currentPosition.noteIndex),
+          ...replacementRests,
+          ...m.notes.slice(currentPosition.noteIndex + 1),
+        ];
+        return { ...m, notes: newNotes };
+      });
 
       return {
-        ...prev,
+        ...prevState,
         score: {
-          ...prev.score,
+          ...prevState.score,
           measures: newMeasures,
           updatedAt: new Date().toISOString(),
         },
         cursor: newCursor,
-        selectedNoteId: newSelectedNoteId,
+        selectedNoteId: newSelectedId,
         isDirty: true,
       };
     });
 
     return true;
-  }, [state.cursor, state.score, undoManager]);
+  }, [state.cursor, state.score, state.selectedNoteId, undoManager]);
 
   const changePitch = useCallback(
     (direction: "up" | "down") => {
@@ -815,6 +941,22 @@ export function useComposerState(
         switch (direction) {
           case "left":
             newCursor = moveCursorLeft(prev.cursor, prev.score);
+            // If we were past the selected note and moving left lands on it,
+            // the user expects to go to the PREVIOUS note since the current
+            // note was already visually selected
+            {
+              const currentNote = getNoteAtCursor(prev.cursor, prev.score);
+              const noteAtNewCursor = getNoteAtCursor(newCursor, prev.score);
+              // Only skip if: (1) cursor was past all notes (no note at cursor),
+              // (2) we had a selection, and (3) moving left lands on that selection
+              if (
+                !currentNote &&
+                noteAtNewCursor &&
+                noteAtNewCursor.id === prev.selectedNoteId
+              ) {
+                newCursor = moveCursorLeft(newCursor, prev.score);
+              }
+            }
             break;
           case "right":
             newCursor = moveCursorRight(prev.cursor, prev.score);
@@ -860,26 +1002,29 @@ export function useComposerState(
   // ==========================================================================
 
   const addMeasure = useCallback(() => {
-    const newMeasure = createMeasure();
-    const insertIndex = state.cursor.measureIndex + 1;
+    const newMeasure = createMeasure(state.score.timeSignature);
+    // Always add at the END of the score
+    const insertIndex = state.score.measures.length;
 
     const action = createAddMeasureAction(insertIndex, newMeasure);
     undoManager.pushAction(action);
+
+    // Move cursor to the first note of the new measure
+    const newCursor = { measureIndex: insertIndex, noteIndex: 0 };
+    cursorRef.current = newCursor;
 
     setState((prev) => ({
       ...prev,
       score: {
         ...prev.score,
-        measures: [
-          ...prev.score.measures.slice(0, insertIndex),
-          newMeasure,
-          ...prev.score.measures.slice(insertIndex),
-        ],
+        measures: [...prev.score.measures, newMeasure],
         updatedAt: new Date().toISOString(),
       },
+      cursor: newCursor,
+      selectedNoteId: newMeasure.notes[0]?.id ?? null,
       isDirty: true,
     }));
-  }, [state.cursor.measureIndex, undoManager]);
+  }, [state.score.measures.length, state.score.timeSignature, undoManager]);
 
   const deleteMeasure = useCallback(() => {
     // Can't delete the last measure
@@ -891,11 +1036,26 @@ export function useComposerState(
     const action = createDeleteMeasureAction(measureIndex, deletedMeasure);
     undoManager.pushAction(action);
 
+    // Suppress the "add measure" prompt since we just deleted
+    suppressAddMeasurePromptRef.current = true;
+
     setState((prev) => {
       const newMeasures = prev.score.measures.filter(
         (_, i) => i !== measureIndex,
       );
-      const newMeasureIndex = Math.min(measureIndex, newMeasures.length - 1);
+
+      // After deletion, go to the LAST note/rest of the previous measure
+      // (or the first measure if we deleted measure 0)
+      const targetMeasureIndex = measureIndex > 0 ? measureIndex - 1 : 0;
+      const targetMeasure = newMeasures[targetMeasureIndex];
+      const lastNoteIndex = targetMeasure.notes.length - 1;
+      const lastNote = targetMeasure.notes[lastNoteIndex];
+
+      const newCursor = {
+        measureIndex: targetMeasureIndex,
+        noteIndex: Math.max(0, lastNoteIndex),
+      };
+      cursorRef.current = newCursor;
 
       return {
         ...prev,
@@ -904,11 +1064,8 @@ export function useComposerState(
           measures: newMeasures,
           updatedAt: new Date().toISOString(),
         },
-        cursor: clampCursor(
-          { measureIndex: newMeasureIndex, noteIndex: 0 },
-          { ...prev.score, measures: newMeasures },
-        ),
-        selectedNoteId: null,
+        cursor: newCursor,
+        selectedNoteId: lastNote?.id || null,
         isDirty: true,
       };
     });
@@ -1191,6 +1348,34 @@ export function useComposerState(
   }, []);
 
   // ==========================================================================
+  // Computed: isAtLastMeasureEnd
+  // ==========================================================================
+
+  const isAtLastMeasureEnd = useMemo(() => {
+    // Check if we should suppress the prompt (e.g., after deleteMeasure)
+    if (suppressAddMeasurePromptRef.current) {
+      suppressAddMeasurePromptRef.current = false; // Clear for next time
+      return false;
+    }
+
+    const lastMeasureIndex = state.score.measures.length - 1;
+    if (state.cursor.measureIndex !== lastMeasureIndex) return false;
+    const lastMeasure = state.score.measures[lastMeasureIndex];
+    if (!lastMeasure || lastMeasure.notes.length === 0) return false;
+
+    // The selected note must be the last note in the measure
+    // This means the user explicitly placed something at the end (not just auto-filled rests)
+    const lastNote = lastMeasure.notes[lastMeasure.notes.length - 1];
+    const selectedIsLastNote = state.selectedNoteId === lastNote.id;
+
+    // Also require that the measure has at least one pitched note
+    // (don't prompt for new measure if it's all rests)
+    const hasPitchedNote = lastMeasure.notes.some((n) => n.midi !== null);
+
+    return selectedIsLastNote && hasPitchedNote;
+  }, [state.cursor, state.score.measures, state.selectedNoteId]);
+
+  // ==========================================================================
   // Return
   // ==========================================================================
 
@@ -1204,6 +1389,9 @@ export function useComposerState(
     // Validation
     currentMeasureValidation,
     allMeasuresValid,
+
+    // Cursor Position
+    isAtLastMeasureEnd,
 
     // Note Operations
     insertNote,

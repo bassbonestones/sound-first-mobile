@@ -14,7 +14,7 @@ describe("useComposerState", () => {
       const { result } = renderHook(() => useComposerState());
 
       expect(result.current.score).toBeDefined();
-      expect(result.current.score.title).toBe("Untitled");
+      expect(result.current.score.title).toBe("Composer");
       expect(result.current.score.clef).toBe("treble");
       expect(result.current.score.measures).toHaveLength(1);
       expect(result.current.cursor).toEqual({ measureIndex: 0, noteIndex: 0 });
@@ -36,14 +36,21 @@ describe("useComposerState", () => {
   });
 
   describe("note insertion", () => {
-    it("should insert a note at cursor position", () => {
+    it("should insert a note at cursor position (replacing rest)", () => {
       const { result } = renderHook(() => useComposerState());
+
+      // Measure starts with whole rest (4 beats)
+      expect(result.current.score.measures[0].notes).toHaveLength(1);
+      expect(result.current.score.measures[0].notes[0].midi).toBeNull(); // rest
 
       act(() => {
         result.current.insertNote("C");
       });
 
-      expect(result.current.score.measures[0].notes).toHaveLength(1);
+      // After inserting quarter C, measure has: C + remainder rests (3 beats = half + quarter)
+      expect(
+        result.current.score.measures[0].notes.length,
+      ).toBeGreaterThanOrEqual(1);
       expect(result.current.score.measures[0].notes[0].midi).toBeDefined();
       expect(result.current.score.measures[0].notes[0].duration).toBe(
         DURATION.QUARTER,
@@ -59,7 +66,9 @@ describe("useComposerState", () => {
         result.current.insertNote("C");
       });
 
-      expect(result.current.cursor).toEqual({ measureIndex: 0, noteIndex: 1 });
+      // Cursor moves to next note position (which could be a rest or past end)
+      expect(result.current.cursor.measureIndex).toBe(0);
+      expect(result.current.cursor.noteIndex).toBeGreaterThanOrEqual(1);
     });
 
     it("should use selected duration", () => {
@@ -78,23 +87,25 @@ describe("useComposerState", () => {
       );
     });
 
-    it("should reject insertion that would overflow measure", () => {
+    it("should fill measure with whole note", () => {
       const { result } = renderHook(() => useComposerState());
 
-      // Fill the measure
+      // Set duration first
       act(() => {
         result.current.setDuration(DURATION.WHOLE);
+      });
+
+      // Insert whole note - replaces the initial whole rest
+      act(() => {
         result.current.insertNote("C");
       });
 
-      // Try to insert another note
-      let insertResult: boolean = false;
-      act(() => {
-        insertResult = result.current.insertNote("D");
-      });
-
-      expect(insertResult).toBe(false);
+      // Measure should have just the whole note
       expect(result.current.score.measures[0].notes).toHaveLength(1);
+      expect(result.current.score.measures[0].notes[0].midi).toBeDefined();
+      expect(result.current.score.measures[0].notes[0].duration).toBe(
+        DURATION.WHOLE,
+      );
     });
 
     it("should use smart octave - choose nearest octave to staff center", () => {
@@ -195,30 +206,243 @@ describe("useComposerState", () => {
     it("should delete selected note", () => {
       const { result } = renderHook(() => useComposerState());
 
+      // Insert a note (replaces initial whole rest)
       act(() => {
         result.current.insertNote("C");
       });
 
+      // Select the note we just inserted (go back to it)
       act(() => {
         result.current.moveCursor("left");
       });
+
+      const firstNoteMidi = result.current.score.measures[0].notes[0].midi;
+      expect(firstNoteMidi).toBeDefined(); // It's a note, not a rest
 
       act(() => {
         result.current.deleteNote();
       });
 
-      expect(result.current.score.measures[0].notes).toHaveLength(0);
+      // The pitched note should be replaced with a rest
+      // (measure still fills to correct duration)
+      const firstNoteAfter = result.current.score.measures[0].notes[0];
+      expect(firstNoteAfter.midi).toBeNull(); // Now it's a rest
     });
 
-    it("should return false when no note to delete", () => {
+    it("should handle delete on measure with only rests", () => {
       const { result } = renderHook(() => useComposerState());
 
+      // Measure starts with rest(s) - deleting should return false
+      // (nothing meaningful to delete when only rests exist)
       let deleteResult: boolean = false;
       act(() => {
         deleteResult = result.current.deleteNote();
       });
 
+      // No pitched notes to delete, should return false
       expect(deleteResult).toBe(false);
+      expect(result.current.score.measures[0]).toBeDefined();
+    });
+
+    it("should move selection left when deleting on a rest", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Insert a note, then move right to the rest after it
+      act(() => {
+        result.current.insertNote("C");
+      });
+      act(() => {
+        result.current.moveCursor("right");
+      });
+
+      // Now on a rest, cursor should be at position 2
+      const cursorBefore = result.current.cursor;
+      expect(cursorBefore.noteIndex).toBe(2);
+
+      // Delete while on a rest should act like left arrow
+      act(() => {
+        result.current.deleteNote();
+      });
+
+      // Should have moved left, note C should still exist
+      const cursorAfter = result.current.cursor;
+      expect(cursorAfter.noteIndex).toBeLessThan(cursorBefore.noteIndex);
+
+      const pitchedNotes = result.current.score.measures[0].notes.filter(
+        (n) => n.midi !== null,
+      );
+      expect(pitchedNotes).toHaveLength(1);
+      expect(pitchedNotes[0].midi).toBe(72); // C still exists
+    });
+
+    it("should select replacement rest after delete, cursor stays for insert", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Insert two notes
+      act(() => {
+        result.current.insertNote("C");
+      });
+      act(() => {
+        result.current.insertNote("D");
+      });
+
+      // After inserting D, D should be selected even though cursor is past it
+      const dNote = result.current.score.measures[0].notes.find(
+        (n) => n.midi === 74, // D
+      );
+      expect(result.current.state.selectedNoteId).toBe(dNote?.id);
+
+      // Delete - should delete D, select the replacement rest (not C)
+      act(() => {
+        result.current.deleteNote();
+      });
+
+      // The rest where D was should be at position 1 and selected
+      const restAtPos1 = result.current.score.measures[0].notes[1];
+      expect(restAtPos1.midi).toBeNull();
+      expect(result.current.state.selectedNoteId).toBe(restAtPos1.id);
+
+      // Cursor should still be at position 1 (the rest), so insert goes there
+      expect(result.current.cursor.noteIndex).toBe(1);
+
+      // Insert E - should overwrite the rest where D was (no moveCursor needed)
+      act(() => {
+        result.current.insertNote("E");
+      });
+
+      // Now should have C and E
+      const pitchedNotes = result.current.score.measures[0].notes.filter(
+        (n) => n.midi !== null,
+      );
+      expect(pitchedNotes).toHaveLength(2);
+      expect(pitchedNotes.map((n) => n.midi)).toContain(72); // C
+      expect(pitchedNotes.map((n) => n.midi)).toContain(76); // E
+    });
+
+    it("should allow consecutive deletes going backwards", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Insert two notes
+      act(() => {
+        result.current.insertNote("C");
+      });
+      act(() => {
+        result.current.insertNote("D");
+      });
+
+      // Both notes should be present
+      const pitchedBefore = result.current.score.measures[0].notes.filter(
+        (n) => n.midi !== null,
+      );
+      expect(pitchedBefore).toHaveLength(2);
+
+      // After inserting D, D should be selected (even though cursor is past it)
+      const dNote = pitchedBefore.find((n) => n.midi === 74);
+      expect(result.current.state.selectedNoteId).toBe(dNote?.id);
+
+      // First delete - should delete D, select the replacement rest
+      act(() => {
+        result.current.deleteNote();
+      });
+
+      const pitchedAfterFirst = result.current.score.measures[0].notes.filter(
+        (n) => n.midi !== null,
+      );
+      expect(pitchedAfterFirst).toHaveLength(1);
+      expect(pitchedAfterFirst[0].midi).toBe(72); // C
+
+      // Replacement rest should now be selected
+      const restAfterFirst = result.current.score.measures[0].notes[1];
+      expect(restAfterFirst.midi).toBeNull();
+      expect(result.current.state.selectedNoteId).toBe(restAfterFirst.id);
+
+      // Second delete - on a rest, acts like left arrow, moves to C
+      act(() => {
+        result.current.deleteNote();
+      });
+
+      // C should now be selected
+      expect(result.current.state.selectedNoteId).toBe(pitchedAfterFirst[0].id);
+
+      // Third delete - should delete C
+      act(() => {
+        result.current.deleteNote();
+      });
+
+      const pitchedAfterThird = result.current.score.measures[0].notes.filter(
+        (n) => n.midi !== null,
+      );
+      expect(pitchedAfterThird).toHaveLength(0);
+    });
+
+    it("should allow insert after delete to fill the deleted spot", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Insert a note
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      // Delete it
+      act(() => {
+        result.current.deleteNote();
+      });
+
+      // Insert a new note - should fill the deleted spot
+      act(() => {
+        result.current.insertNote("E");
+      });
+
+      // Should have one pitched note (E)
+      const pitchedNotes = result.current.score.measures[0].notes.filter(
+        (n) => n.midi !== null,
+      );
+      expect(pitchedNotes).toHaveLength(1);
+    });
+
+    it("should insert at deleted position even when previous is a rest", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Setup: Insert two notes to get [C, D, rest, rest]
+      act(() => {
+        result.current.insertNote("C");
+      });
+      act(() => {
+        result.current.insertNote("D");
+      });
+
+      // Delete C (first note) to create a rest before D: [rest, D, rest, rest]
+      act(() => {
+        result.current.moveCursor("left"); // now on D
+        result.current.moveCursor("left"); // now on C
+      });
+      act(() => {
+        result.current.deleteNote();
+      });
+
+      // Now we have [rest, D, ...] with rest at position 0, D at position 1
+      expect(result.current.score.measures[0].notes[0].midi).toBeNull(); // rest at 0
+      expect(result.current.score.measures[0].notes[1].midi).toBe(74); // D at 1
+
+      // Move to D and delete it - previous is the rest at position 0
+      act(() => {
+        result.current.moveCursor("right");
+      });
+      act(() => {
+        result.current.deleteNote();
+      });
+
+      // Cursor should still be at position 1 (where D was, now a rest)
+      expect(result.current.cursor.noteIndex).toBe(1);
+
+      // Insert E - should go at cursor position 1, not selection position 0
+      act(() => {
+        result.current.insertNote("E");
+      });
+
+      // Rest should still be at 0, E should be at 1
+      expect(result.current.score.measures[0].notes[0].midi).toBeNull(); // rest at 0
+      expect(result.current.score.measures[0].notes[1].midi).toBe(76); // E at 1
     });
   });
 
@@ -228,21 +452,31 @@ describe("useComposerState", () => {
 
       act(() => {
         result.current.insertNote("C");
+      });
+      act(() => {
         result.current.insertNote("D");
       });
 
+      // After two quarter note insertions in 4/4:
+      // [C quarter, D quarter, quarter rest, quarter rest] - 4 notes
+      // Cursor is at index 2 (first rest after D)
       expect(result.current.cursor.noteIndex).toBe(2);
+      // Selection is on D (the last inserted note)
+      expect(result.current.selectedNote?.midi).toBeDefined();
 
+      // Moving left goes to the previous note (index 1 = D)
       act(() => {
         result.current.moveCursor("left");
       });
       expect(result.current.cursor.noteIndex).toBe(1);
 
+      // Moving left again goes to C (index 0)
       act(() => {
         result.current.moveCursor("left");
       });
       expect(result.current.cursor.noteIndex).toBe(0);
 
+      // Moving right goes to D (index 1)
       act(() => {
         result.current.moveCursor("right");
       });
@@ -254,7 +488,11 @@ describe("useComposerState", () => {
 
       act(() => {
         result.current.insertNote("C");
+      });
+      act(() => {
         result.current.insertNote("D");
+      });
+      act(() => {
         result.current.moveCursor("start");
       });
 
@@ -264,7 +502,9 @@ describe("useComposerState", () => {
         result.current.moveCursor("end");
       });
 
-      expect(result.current.cursor.noteIndex).toBe(2);
+      // End is past all notes - with boundary-aware rest filling:
+      // [C quarter, D quarter, half rest] = 3 notes, cursor at 3
+      expect(result.current.cursor.noteIndex).toBe(3);
     });
   });
 
@@ -282,20 +522,26 @@ describe("useComposerState", () => {
     it("should change duration of selected note", () => {
       const { result } = renderHook(() => useComposerState());
 
+      // Insert a half note first
+      act(() => {
+        result.current.setDuration(DURATION.HALF);
+      });
       act(() => {
         result.current.insertNote("C");
       });
 
+      // Navigate to select the note
       act(() => {
         result.current.moveCursor("left");
       });
 
+      // Change to quarter (shrinking is always allowed)
       act(() => {
-        result.current.changeDurationOfSelected(DURATION.HALF);
+        result.current.changeDurationOfSelected(DURATION.QUARTER);
       });
 
       expect(result.current.score.measures[0].notes[0].duration).toBe(
-        DURATION.HALF,
+        DURATION.QUARTER,
       );
     });
   });
@@ -311,8 +557,11 @@ describe("useComposerState", () => {
       });
 
       expect(result.current.score.measures).toHaveLength(2);
-      // Cursor should stay where it was (not move to new measure)
-      expect(result.current.cursor.measureIndex).toBe(0);
+      // Cursor should move to the new measure
+      expect(result.current.cursor.measureIndex).toBe(1);
+      expect(result.current.cursor.noteIndex).toBe(0);
+      // Selection should be on first note of new measure
+      expect(result.current.selectedNote).toBeDefined();
     });
 
     it("should delete current measure", () => {
@@ -341,11 +590,12 @@ describe("useComposerState", () => {
   });
 
   describe("measure validation", () => {
-    it("should validate incomplete measure", () => {
+    it("should validate pre-filled measure as complete", () => {
       const { result } = renderHook(() => useComposerState());
 
-      expect(result.current.currentMeasureValidation.isComplete).toBe(false);
-      expect(result.current.currentMeasureValidation.actualDuration).toBe(0);
+      // Measures start pre-filled with rests, so they're always complete duration-wise
+      expect(result.current.currentMeasureValidation.isComplete).toBe(true);
+      expect(result.current.currentMeasureValidation.actualDuration).toBe(4);
       expect(result.current.currentMeasureValidation.expectedDuration).toBe(4);
     });
 
@@ -596,18 +846,19 @@ describe("useComposerState", () => {
         result.current.insertNote("B");
       });
 
-      const originalMidis = result.current.score.measures[0].notes.map(
-        (n) => n.midi,
-      );
+      // Get only pitched notes (filter out rests)
+      const originalMidis = result.current.score.measures[0].notes
+        .filter((n) => n.midi !== null)
+        .map((n) => n.midi);
 
       // Transpose to A major, down 3 semitones
       act(() => {
         result.current.setKeySignatureWithTransposition(3, -3);
       });
 
-      const transposedMidis = result.current.score.measures[0].notes.map(
-        (n) => n.midi,
-      );
+      const transposedMidis = result.current.score.measures[0].notes
+        .filter((n) => n.midi !== null)
+        .map((n) => n.midi);
 
       // E→C#: should be exactly 3 semitones down
       // B→G#: should be exactly 3 semitones down
@@ -664,12 +915,12 @@ describe("useComposerState", () => {
         result.current.setKeySignature(0);
       });
 
-      // Use eighth notes so we can fit more in a measure
+      // Use eighth notes so we can fit more in a measure (0.5 = eighth note)
       act(() => {
-        result.current.setDuration(0.125); // Eighth note
+        result.current.setDuration(0.5); // Eighth note
       });
 
-      // Insert 4 F notes (fits in one 4/4 measure as eighths)
+      // Insert 4 F notes (fits in one 4/4 measure as eighths = 2 beats)
       const fAlterations: Array<
         "double-flat" | "flat" | "sharp" | "double-sharp"
       > = ["double-flat", "flat", "sharp", "double-sharp"];
@@ -695,12 +946,13 @@ describe("useComposerState", () => {
         });
       }
 
-      // Get original MIDI values for F notes before transposition
-      const originalFMidis = result.current.score.measures[0].notes.map(
-        (n) => n.midi,
-      );
+      // Get original MIDI values for F notes (pitched notes only)
+      const originalFMidis = result.current.score.measures[0].notes
+        .filter((n) => n.midi !== null)
+        .map((n) => n.midi);
 
       // All notes should be valid MIDI values
+      expect(originalFMidis.length).toBe(4);
       for (const midi of originalFMidis) {
         expect(midi).not.toBeNull();
         expect(typeof midi).toBe("number");
@@ -712,9 +964,10 @@ describe("useComposerState", () => {
       });
 
       // Verify each F note transposed down exactly 3 semitones
-      const transposedFMidis = result.current.score.measures[0].notes.map(
-        (n) => n.midi,
-      );
+      const transposedFMidis = result.current.score.measures[0].notes
+        .filter((n) => n.midi !== null)
+        .map((n) => n.midi);
+
       for (let i = 0; i < 4; i++) {
         expect(transposedFMidis[i]).toBe(originalFMidis[i]! - 3);
       }
@@ -762,14 +1015,21 @@ describe("useComposerState", () => {
         result.current.insertNote("C");
       });
 
-      expect(result.current.score.measures[0].notes).toHaveLength(1);
+      // After insert: [C, rest(s)] - should have 1 pitched note
+      const pitchedNotes = result.current.score.measures[0].notes.filter(
+        (n) => n.midi !== null,
+      );
+      expect(pitchedNotes).toHaveLength(1);
       expect(result.current.canUndo).toBe(true);
 
       act(() => {
         result.current.undo();
       });
 
-      expect(result.current.score.measures[0].notes).toHaveLength(0);
+      // After undo: back to initial whole rest (no pitched notes)
+      const pitchedNotesAfterUndo =
+        result.current.score.measures[0].notes.filter((n) => n.midi !== null);
+      expect(pitchedNotesAfterUndo).toHaveLength(0);
       expect(result.current.canRedo).toBe(true);
     });
 
@@ -788,7 +1048,10 @@ describe("useComposerState", () => {
         result.current.redo();
       });
 
-      expect(result.current.score.measures[0].notes).toHaveLength(1);
+      const pitchedNotes = result.current.score.measures[0].notes.filter(
+        (n) => n.midi !== null,
+      );
+      expect(pitchedNotes).toHaveLength(1);
     });
 
     it("should clear redo stack on new action", () => {
@@ -810,6 +1073,103 @@ describe("useComposerState", () => {
     });
   });
 
+  describe("isAtLastMeasureEnd detection", () => {
+    it("should be false when measure has only rests", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Fresh score with whole rest - not at end
+      expect(result.current.isAtLastMeasureEnd).toBe(false);
+    });
+
+    it("should be true when last note of last measure is filled with pitched note", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Fill entire measure with a whole note
+      act(() => {
+        result.current.setDuration(DURATION.WHOLE);
+      });
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      // After whole note, cursor is at last position (index 0 = only note)
+      expect(result.current.isAtLastMeasureEnd).toBe(true);
+    });
+
+    it("should be false when on non-last measure", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Add a second measure
+      act(() => {
+        result.current.addMeasure();
+      });
+
+      // Go back to first measure and fill it
+      act(() => {
+        result.current.moveCursor("start");
+        result.current.setDuration(DURATION.WHOLE);
+      });
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      // Even though first measure is filled, we're not on the last measure
+      expect(result.current.isAtLastMeasureEnd).toBe(false);
+    });
+
+    it("should be true when user explicitly fills to end with a rest", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Insert two quarter notes
+      act(() => {
+        result.current.insertNote("C");
+      });
+      act(() => {
+        result.current.insertNote("D");
+      });
+
+      // Now explicitly insert a half rest to fill the measure
+      act(() => {
+        result.current.setDuration(2); // half note duration
+      });
+      act(() => {
+        result.current.insertRest();
+      });
+
+      // User explicitly filled to end with a rest - should prompt
+      expect(result.current.isAtLastMeasureEnd).toBe(true);
+    });
+
+    it("should be false when auto-filled rests remain at end", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Insert quarter note at beat 1 (leaves auto-filled rests at end)
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      // Move to end - but the rest there was auto-filled, not explicitly placed
+      act(() => {
+        result.current.moveCursor("end");
+      });
+
+      // Should NOT prompt - user didn't explicitly fill to the end
+      expect(result.current.isAtLastMeasureEnd).toBe(false);
+    });
+
+    it("should be false when measure has only rests", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Just move to end without adding any pitched notes
+      act(() => {
+        result.current.moveCursor("end");
+      });
+
+      // No pitched notes - should not prompt
+      expect(result.current.isAtLastMeasureEnd).toBe(false);
+    });
+  });
+
   describe("score management", () => {
     it("should create new score", () => {
       const { result } = renderHook(() => useComposerState());
@@ -825,7 +1185,11 @@ describe("useComposerState", () => {
       });
 
       expect(result.current.score.id).not.toBe(originalId);
-      expect(result.current.score.measures[0].notes).toHaveLength(0);
+      // New score starts with pre-filled rests, no pitched notes
+      const pitchedNotes = result.current.score.measures[0].notes.filter(
+        (n) => n.midi !== null,
+      );
+      expect(pitchedNotes).toHaveLength(0);
       expect(result.current.isDirty).toBe(false);
     });
 

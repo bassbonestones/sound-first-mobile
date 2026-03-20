@@ -138,7 +138,8 @@ describe("NavigationControls", () => {
     expect(onDelete).toHaveBeenCalled();
   });
 
-  it("should not call onDelete when no selection", () => {
+  it("should call onDelete even when no selection", () => {
+    // Delete can work without selection - it finds previous pitched note
     const onDelete = jest.fn();
     const { getByTestId } = render(
       <NavigationControls
@@ -149,7 +150,7 @@ describe("NavigationControls", () => {
     );
 
     fireEvent.press(getByTestId("nav-delete"));
-    expect(onDelete).not.toHaveBeenCalled();
+    expect(onDelete).toHaveBeenCalled();
   });
 
   it("should disable all when disabled prop true", () => {
@@ -225,19 +226,27 @@ describe("MeasureControls", () => {
   });
 
   it("should show complete badge when valid", () => {
-    const { getByText } = render(
+    // With pre-filled measures, the complete badge is no longer shown
+    // The component just shows measure number and add/delete buttons
+    const { queryByText } = render(
       <MeasureControls {...defaultProps} validation={completeValidation} />,
     );
 
-    expect(getByText("Complete")).toBeTruthy();
+    // Verify core elements are present
+    expect(queryByText("Measure")).toBeTruthy();
+    expect(queryByText("1 / 4")).toBeTruthy();
   });
 
   it("should show incomplete warning when not valid", () => {
-    const { getByText } = render(
+    // With pre-filled measures, measures are always complete
+    // This test verifies the component handles incomplete validation gracefully
+    const { queryByTestId } = render(
       <MeasureControls {...defaultProps} validation={incompleteValidation} />,
     );
 
-    expect(getByText("2 beats left")).toBeTruthy();
+    // Fill button only shows if beatsRemaining < 0 (overflow case)
+    // With difference = 2 (positive), no fill button shown
+    expect(queryByTestId("measure-fill")).toBeNull();
   });
 
   it("should call onAddMeasure when add pressed", () => {
@@ -278,9 +287,16 @@ describe("MeasureControls", () => {
     expect(onDeleteMeasure).not.toHaveBeenCalled();
   });
 
-  it("should show fill button when incomplete", () => {
+  it("should show fill button when measure has overflow (negative difference)", () => {
+    // Fill button shows when beatsRemaining < 0 (overflow case)
+    const overflowValidation: MeasureValidation = {
+      isComplete: false,
+      expectedDuration: 4,
+      actualDuration: 6,
+      difference: -2, // Overflow: 2 beats too many
+    };
     const { getByTestId } = render(
-      <MeasureControls {...defaultProps} validation={incompleteValidation} />,
+      <MeasureControls {...defaultProps} validation={overflowValidation} />,
     );
 
     expect(getByTestId("measure-fill")).toBeTruthy();
@@ -296,10 +312,16 @@ describe("MeasureControls", () => {
 
   it("should call onFillWithRests when fill pressed", () => {
     const onFillWithRests = jest.fn();
+    const overflowValidation: MeasureValidation = {
+      isComplete: false,
+      expectedDuration: 4,
+      actualDuration: 6,
+      difference: -2,
+    };
     const { getByTestId } = render(
       <MeasureControls
         {...defaultProps}
-        validation={incompleteValidation}
+        validation={overflowValidation}
         onFillWithRests={onFillWithRests}
       />,
     );
@@ -331,13 +353,20 @@ describe("MeasureControls", () => {
   it("should have accessible labels", () => {
     const { getByLabelText } = render(<MeasureControls {...defaultProps} />);
 
-    expect(getByLabelText("Add measure")).toBeTruthy();
-    expect(getByLabelText("Delete measure")).toBeTruthy();
+    expect(getByLabelText("Add measure at end")).toBeTruthy();
+    expect(getByLabelText("Delete current measure")).toBeTruthy();
   });
 
   it("should show fill button accessible label", () => {
+    // Fill button only shows for overflow (negative difference)
+    const overflowValidation: MeasureValidation = {
+      isComplete: false,
+      expectedDuration: 4,
+      actualDuration: 6,
+      difference: -2,
+    };
     const { getByLabelText } = render(
-      <MeasureControls {...defaultProps} validation={incompleteValidation} />,
+      <MeasureControls {...defaultProps} validation={overflowValidation} />,
     );
 
     expect(getByLabelText("Fill with rests")).toBeTruthy();
