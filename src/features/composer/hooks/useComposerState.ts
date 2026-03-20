@@ -119,6 +119,7 @@ export interface UseComposerStateReturn {
   // Measure Operations
   addMeasure: () => void;
   deleteMeasure: () => void;
+  deleteLastMeasure: () => void;
   fillMeasureWithRests: () => void;
 
   // Score Settings
@@ -1095,6 +1096,57 @@ export function useComposerState(
     });
   }, [state.score.measures.length, state.cursor.measureIndex, undoManager]);
 
+  const deleteLastMeasure = useCallback(() => {
+    // Can't delete the last measure
+    if (state.score.measures.length <= 1) return;
+
+    const measureIndex = state.score.measures.length - 1;
+    const deletedMeasure = state.score.measures[measureIndex];
+
+    const action = createDeleteMeasureAction(measureIndex, deletedMeasure);
+    undoManager.pushAction(action);
+
+    // Suppress the "add measure" prompt since we just deleted
+    suppressAddMeasurePromptRef.current = true;
+
+    setState((prev) => {
+      const newMeasures = prev.score.measures.filter(
+        (_, i) => i !== measureIndex,
+      );
+
+      // If cursor was on the deleted measure, move it to the new last measure
+      const wasOnDeletedMeasure = prev.cursor.measureIndex === measureIndex;
+      const targetMeasureIndex = wasOnDeletedMeasure
+        ? measureIndex - 1
+        : prev.cursor.measureIndex;
+      const targetMeasure = newMeasures[targetMeasureIndex];
+
+      // Keep the same note index if possible, otherwise go to last note
+      const noteIndex = wasOnDeletedMeasure
+        ? Math.max(0, targetMeasure.notes.length - 1)
+        : Math.min(prev.cursor.noteIndex, targetMeasure.notes.length - 1);
+      const targetNote = targetMeasure.notes[noteIndex];
+
+      const newCursor = {
+        measureIndex: targetMeasureIndex,
+        noteIndex,
+      };
+      cursorRef.current = newCursor;
+
+      return {
+        ...prev,
+        score: {
+          ...prev.score,
+          measures: newMeasures,
+          updatedAt: new Date().toISOString(),
+        },
+        cursor: newCursor,
+        selectedNoteId: targetNote?.id || null,
+        isDirty: true,
+      };
+    });
+  }, [state.score.measures.length, state.cursor.measureIndex, undoManager]);
+
   const fillMeasureWithRests = useCallback(() => {
     const measure = state.score.measures[state.cursor.measureIndex];
     if (!measure) return;
@@ -1471,6 +1523,7 @@ export function useComposerState(
     // Measure Operations
     addMeasure,
     deleteMeasure,
+    deleteLastMeasure,
     fillMeasureWithRests,
 
     // Score Settings

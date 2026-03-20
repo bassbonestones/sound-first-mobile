@@ -375,6 +375,10 @@ function ComposerScreenContent({
     composerState.deleteMeasure();
   }, [composerState]);
 
+  const handleDeleteLastMeasure = useCallback(() => {
+    composerState.deleteLastMeasure();
+  }, [composerState]);
+
   const handleFillWithRests = useCallback(() => {
     composerState.fillMeasureWithRests();
   }, [composerState]);
@@ -693,6 +697,7 @@ function ComposerScreenContent({
               onDelete={handleDelete}
               onAddMeasure={handleAddMeasure}
               onDeleteMeasure={handleDeleteMeasure}
+              onDeleteLastMeasure={handleDeleteLastMeasure}
               onFillWithRests={handleFillWithRests}
               hasSelection={hasSelection}
               canDeleteMeasure={canDeleteMeasure}

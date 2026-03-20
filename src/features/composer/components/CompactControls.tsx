@@ -39,6 +39,8 @@ export interface CompactControlsProps {
   onAddMeasure: () => void;
   /** Called when delete measure is pressed */
   onDeleteMeasure: () => void;
+  /** Called when delete last measure is pressed */
+  onDeleteLastMeasure: () => void;
   /** Called when fill with rests is pressed */
   onFillWithRests: () => void;
   /** Whether there's a selected note (for delete) */
@@ -62,6 +64,7 @@ function CompactControlsComponent({
   onDelete,
   onAddMeasure,
   onDeleteMeasure,
+  onDeleteLastMeasure,
   onFillWithRests,
   hasSelection = false,
   canDeleteMeasure = true,
@@ -185,7 +188,35 @@ function CompactControlsComponent({
               <Text style={styles.menuItemText}>Add Measure at End</Text>
             </TouchableOpacity>
 
-            {/* Delete measure */}
+            {/* Delete last measure */}
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                !canDeleteMeasure && styles.menuItemDisabled,
+              ]}
+              onPress={() => {
+                onDeleteLastMeasure();
+                setShowMenu(false);
+              }}
+              disabled={!canDeleteMeasure}
+              testID="menu-delete-last-measure"
+            >
+              <Feather
+                name="minus-square"
+                size={18}
+                color={canDeleteMeasure ? colors.warning : colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.menuItemText,
+                  !canDeleteMeasure && styles.menuItemTextDisabled,
+                ]}
+              >
+                Delete Last Measure
+              </Text>
+            </TouchableOpacity>
+
+            {/* Delete current measure */}
             <TouchableOpacity
               style={[
                 styles.menuItem,
