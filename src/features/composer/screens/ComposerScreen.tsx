@@ -631,6 +631,7 @@ function ComposerScreenContent({
             onToggleDotted={composerState.toggleDottedMode}
             tripletPosition={composerState.tripletPosition}
             tripletGroupType={composerState.tripletGroupType}
+            tripletsAllowed={composerState.score.timeSignature.beatUnit === 4}
             onPitchTap={handlePitchEnter}
             onOctaveChange={composerState.changeOctave}
             onAccidental={composerState.applyAccidental}

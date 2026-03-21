@@ -34,6 +34,8 @@ export interface EntryPaletteProps {
   tripletPosition?: 1 | 2 | 3;
   /** Current triplet group type: 'eighth' (only eighths), 'quarter' (only quarters), 'mixed' (both allowed) */
   tripletGroupType?: "eighth" | "quarter" | "mixed";
+  /** Whether triplets are allowed (only true when beat unit is quarter note) */
+  tripletsAllowed?: boolean;
   /** Called when a pitch is tapped to insert a note */
   onPitchTap: (pitch: PitchName) => void;
   /** Called when octave changes */
@@ -64,6 +66,7 @@ function EntryPaletteComponent({
   onToggleDotted,
   tripletPosition,
   tripletGroupType,
+  tripletsAllowed = true,
   onPitchTap,
   onOctaveChange,
   onAccidental,
@@ -92,6 +95,7 @@ function EntryPaletteComponent({
           onToggleDotted={onToggleDotted}
           tripletPosition={tripletPosition}
           tripletGroupType={tripletGroupType}
+          tripletsAllowed={tripletsAllowed}
           disabled={disabled}
           testID="duration-selector"
         />

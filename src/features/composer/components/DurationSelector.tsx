@@ -40,6 +40,8 @@ export interface DurationSelectorProps {
   tripletPosition?: 1 | 2 | 3;
   /** Current triplet group type: 'eighth' (only eighths), 'quarter' (only quarters), 'mixed' (both allowed) */
   tripletGroupType?: "eighth" | "quarter" | "mixed";
+  /** Whether triplets are allowed (only true when beat unit is quarter note) */
+  tripletsAllowed?: boolean;
   /** Whether the selector is disabled */
   disabled?: boolean;
   /** Test ID for testing */
@@ -135,6 +137,7 @@ function DurationSelectorComponent({
   onToggleDotted,
   tripletPosition,
   tripletGroupType,
+  tripletsAllowed = true,
   disabled = false,
   testID,
 }: DurationSelectorProps): React.ReactElement {
@@ -143,8 +146,15 @@ function DurationSelectorComponent({
     containerWidth: 0,
   });
 
-  // Calculate minimum content width: 8 buttons (7 durations + 1 dot) * 44px + 7 gaps * 2px + marginLeft on dot
-  const MIN_CONTENT_WIDTH = 8 * 44 + 7 * 2 + spacing.xs; // ~370px
+  // Filter out triplet options when triplets aren't allowed
+  const visibleOptions = tripletsAllowed
+    ? DURATION_OPTIONS
+    : DURATION_OPTIONS.filter((opt) => !opt.isTriplet);
+
+  // Calculate minimum content width based on visible buttons
+  // (visible duration buttons + 1 dot) * 44px + gaps * 2px + marginLeft on dot
+  const buttonCount = visibleOptions.length + 1; // +1 for dot button
+  const MIN_CONTENT_WIDTH = buttonCount * 44 + (buttonCount - 1) * 2 + spacing.xs;
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -206,7 +216,7 @@ function DurationSelectorComponent({
           onLayout={handleLayout}
           scrollEventThrottle={16}
         >
-          {DURATION_OPTIONS.map((option) => {
+          {visibleOptions.map((option) => {
             const isSelected = selectedDuration === option.value;
 
             // Determine if this button should be disabled

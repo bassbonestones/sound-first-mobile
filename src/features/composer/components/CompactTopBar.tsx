@@ -271,8 +271,7 @@ function CompactTopBarComponent({
                       }
                       return;
                     }
-                    setShowSettingsModal(false);
-                    setTimeout(() => setShowTimeModal(true), 300);
+                    setShowTimeModal(true);
                   }}
                   testID="settings-time"
                 >
@@ -294,8 +293,7 @@ function CompactTopBarComponent({
                 <TouchableOpacity
                   style={styles.settingButton}
                   onPress={() => {
-                    setShowSettingsModal(false);
-                    setTimeout(() => setShowKeyModal(true), 300);
+                    setShowKeyModal(true);
                   }}
                   testID="settings-key"
                 >
