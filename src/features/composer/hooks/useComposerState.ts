@@ -158,6 +158,7 @@ export interface UseComposerStateReturn {
   newScore: () => void;
   loadScore: (score: ComposerScore) => void;
   getScore: () => ComposerScore;
+  clearScore: () => void;
   isDirty: boolean;
   markClean: () => void;
 }
@@ -699,6 +700,172 @@ export function useComposerState(
               selectedNoteId:
                 newNotes[firstGroupNoteIdx + (currentPosition === 1 ? 0 : 1)]
                   .id,
+              isDirty: true,
+            }));
+
+            return true;
+          }
+
+          // Check if we're trying to add a quarter to a mixed group (which would expand to 2 beats)
+          // Mixed group: 2 notes, 1 beat total (quarter 2/3 + eighth 1/3)
+          const isMixedGroup =
+            groupNotes.length === 2 &&
+            Math.abs(totalGroupDuration - 1) < tolerance;
+          const isAddingQuarterToMixedGroup =
+            isMixedGroup && isTripletQuarter && currentNote.midi === null;
+
+          if (isAddingQuarterToMixedGroup) {
+            // Adding a quarter to the eighth rest slot of a mixed group
+            // This would create 2 quarters (4/3 beats) - need room to expand to proper 2-beat group
+            const firstGroupNoteIdx = measure.notes.findIndex(
+              (n) => n.tripletGroupId === tripletGroupId,
+            );
+            const lastGroupNoteIdx = measure.notes.findIndex(
+              (n) =>
+                n.tripletGroupId === tripletGroupId &&
+                n === groupNotes[groupNotes.length - 1],
+            );
+
+            // Check if there's space for an additional 1 beat after this group (need 2 beats total)
+            let durationAvailable = 0;
+            let endIdx = lastGroupNoteIdx + 1;
+            while (
+              endIdx < measure.notes.length &&
+              durationAvailable < 1 - 0.001
+            ) {
+              durationAvailable += getNoteDuration(measure.notes[endIdx]);
+              endIdx++;
+            }
+
+            if (durationAvailable < 1 - 0.001) {
+              // Not enough space to expand to 2-beat group - block this action
+              return false;
+            }
+
+            // Expand to proper 2-beat group: quarter(2/3) + quarter(2/3) + quarter rest(2/3) = 2 beats
+            const pos1Note = groupNotes.find((n) => n.tripletPosition === 1)!;
+
+            const newQuarter = createTripletNote(
+              midi,
+              DURATION.TRIPLET_QUARTER,
+              2,
+              tripletGroupId,
+              { accidental },
+            );
+            const quarterRest = createTripletRest(
+              3,
+              tripletGroupId,
+              DURATION.TRIPLET_QUARTER,
+            );
+
+            // Build new notes array
+            const newNotes: Note[] = [
+              ...measure.notes.slice(0, firstGroupNoteIdx),
+              pos1Note, // Keep position 1 quarter
+              newQuarter, // New quarter at position 2
+              quarterRest, // Quarter rest at position 3
+            ];
+
+            // Handle remainder if we consumed more than 1 additional beat
+            const consumed = measure.notes
+              .slice(lastGroupNoteIdx + 1, endIdx)
+              .reduce((sum, n) => sum + getNoteDuration(n), 0);
+            const remainder = consumed - 1;
+            if (remainder > 0.001) {
+              const remainderRests = generateRestsForDuration(remainder);
+              newNotes.push(...remainderRests);
+            }
+
+            // Add remaining notes after the consumed portion
+            newNotes.push(...measure.notes.slice(endIdx));
+
+            const action = createInsertNoteAction(targetCursor, newQuarter);
+            undoManager.pushAction(action);
+
+            const newCursor: CursorPosition = {
+              measureIndex: currentCursor.measureIndex,
+              noteIndex: firstGroupNoteIdx + 2, // Move to the quarter rest at position 3
+            };
+            cursorRef.current = newCursor;
+
+            setState((prev) => ({
+              ...prev,
+              score: {
+                ...prev.score,
+                measures: prev.score.measures.map((m, i) =>
+                  i === currentCursor.measureIndex
+                    ? { ...m, notes: newNotes }
+                    : m,
+                ),
+                updatedAt: new Date().toISOString(),
+              },
+              cursor: newCursor,
+              selectedNoteId: newQuarter.id,
+              isDirty: true,
+            }));
+
+            return true;
+          }
+
+          // Check if we're replacing a quarter (or quarter-rest) with an eighth
+          // This needs to split the quarter slot into two eighth slots
+          const isReplacingQuarterWithEighth =
+            Math.abs(currentNote.duration - DURATION.TRIPLET_QUARTER) <
+              tolerance && isTripletEighth;
+
+          if (isReplacingQuarterWithEighth) {
+            // Find where this note is in the measure
+            const noteIdx = currentCursor.noteIndex;
+            const currentPos = currentNote.tripletPosition!;
+
+            // Create the new eighth at current position
+            const newEighth = createTripletNote(
+              midi,
+              DURATION.TRIPLET_EIGHTH,
+              currentPos,
+              tripletGroupId,
+              { accidental },
+            );
+
+            // Create an eighth rest at the next position
+            const nextPos = (currentPos + 1) as 1 | 2 | 3 | 4 | 5 | 6;
+            const eighthRest = createTripletRest(
+              nextPos,
+              tripletGroupId,
+              DURATION.TRIPLET_EIGHTH,
+            );
+
+            // Build new notes array: replace the quarter with eighth + eighth-rest
+            const newNotes = [
+              ...measure.notes.slice(0, noteIdx),
+              newEighth,
+              eighthRest,
+              ...measure.notes.slice(noteIdx + 1),
+            ];
+
+            const action = createInsertNoteAction(targetCursor, newEighth);
+            undoManager.pushAction(action);
+
+            // Move cursor to the new eighth rest
+            const newCursor: CursorPosition = {
+              measureIndex: currentCursor.measureIndex,
+              noteIndex: noteIdx + 1,
+            };
+            cursorRef.current = newCursor;
+
+            setState((prev) => ({
+              ...prev,
+              score: {
+                ...prev.score,
+                measures: prev.score.measures.map((m, i) =>
+                  i === currentCursor.measureIndex
+                    ? { ...m, notes: newNotes }
+                    : m,
+                ),
+                updatedAt: new Date().toISOString(),
+              },
+              cursor: newCursor,
+              selectedNoteId: newEighth.id,
               isDirty: true,
             }));
 
@@ -2344,6 +2511,22 @@ export function useComposerState(
     undoManager.clearHistory();
   }, [undoManager]);
 
+  const clearScore = useCallback(() => {
+    // Keep settings (clef, time sig, key, tempo, title) but reset all measures to empty
+    setState((prev) => {
+      const emptyMeasure = createMeasure(prev.score.timeSignature);
+      return {
+        ...createInitialState({
+          ...prev.score,
+          measures: [emptyMeasure],
+          updatedAt: new Date().toISOString(),
+        }),
+        isDirty: true,
+      };
+    });
+    undoManager.clearHistory();
+  }, [undoManager]);
+
   const loadScore = useCallback(
     (score: ComposerScore) => {
       setState(createInitialState(score));
@@ -2452,6 +2635,7 @@ export function useComposerState(
     newScore,
     loadScore,
     getScore,
+    clearScore,
     isDirty: state.isDirty,
     markClean,
   };

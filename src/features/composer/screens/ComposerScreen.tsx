@@ -594,6 +594,7 @@ function ComposerScreenContent({
           onTempoChange={handleTempoChange}
           zoom={zoom}
           onZoomChange={setZoom}
+          onClearScore={composerState.clearScore}
           onBack={handleBack}
           disabled={isPlaying}
           testID="composer-topbar"

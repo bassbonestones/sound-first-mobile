@@ -56,6 +56,8 @@ export interface CompactTopBarProps {
   zoom: number;
   /** Called when zoom changes */
   onZoomChange: (zoom: number) => void;
+  /** Called when clear score is pressed */
+  onClearScore?: () => void;
   /** Called when back is pressed */
   onBack?: () => void;
   /** Whether controls are disabled */
@@ -104,6 +106,7 @@ function CompactTopBarComponent({
   onTempoChange,
   zoom,
   onZoomChange,
+  onClearScore,
   onBack,
   disabled = false,
   testID,
@@ -385,6 +388,43 @@ function CompactTopBarComponent({
                   </TouchableOpacity>
                 </View>
               </View>
+
+              {/* Clear Score */}
+              {onClearScore && (
+                <View style={styles.settingRow}>
+                  <Text style={styles.settingLabel}>Clear</Text>
+                  <TouchableOpacity
+                    style={styles.clearButton}
+                    onPress={() => {
+                      const title = "Clear Score?";
+                      const message =
+                        "This will remove all notes and reset to empty measures. This cannot be undone.";
+                      if (Platform.OS === "web") {
+                        if (window.confirm(`${title}\n\n${message}`)) {
+                          onClearScore();
+                          setShowSettingsModal(false);
+                        }
+                      } else {
+                        Alert.alert(title, message, [
+                          { text: "Cancel", style: "cancel" },
+                          {
+                            text: "Clear",
+                            style: "destructive",
+                            onPress: () => {
+                              onClearScore();
+                              setShowSettingsModal(false);
+                            },
+                          },
+                        ]);
+                      }
+                    }}
+                    testID="settings-clear-score"
+                  >
+                    <Text style={styles.clearButtonText}>Clear Score</Text>
+                    <Feather name="trash-2" size={18} color={colors.error} />
+                  </TouchableOpacity>
+                </View>
+              )}
             </ScrollView>
           </View>
         </View>
@@ -624,6 +664,22 @@ const styles = StyleSheet.create({
   keyOptionText: {
     fontSize: 16,
     color: colors.textPrimary,
+  },
+  clearButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  clearButtonText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: colors.error,
   },
 });
 
