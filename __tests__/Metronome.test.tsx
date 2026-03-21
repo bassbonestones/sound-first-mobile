@@ -911,6 +911,135 @@ describe("Metronome", () => {
       expect(queryByText(/^Subdivision$/)).toBeNull();
     });
   });
+
+  describe("Tap Tempo extended", () => {
+    it("clears tap history after 2 seconds of inactivity", () => {
+      const onBpmChange = jest.fn();
+      const { getByText } = render(
+        <Metronome showTapTempo={true} onBpmChange={onBpmChange} />,
+      );
+
+      const tapButton = getByText("Tap");
+
+      // First tap
+      fireEvent.press(tapButton);
+      // Wait more than 2 seconds
+      jest.advanceTimersByTime(2100);
+
+      // Clear mock
+      onBpmChange.mockClear();
+
+      // One more tap after timeout
+      fireEvent.press(tapButton);
+
+      // Wait for timeout to clear the history
+      jest.advanceTimersByTime(100);
+
+      // Another tap - history was cleared so only 1 tap now
+      fireEvent.press(tapButton);
+      // Should calculate from just these 2 taps
+      expect(onBpmChange).toHaveBeenCalled();
+    });
+
+    it("averages multiple taps for more accurate BPM", () => {
+      const onBpmChange = jest.fn();
+      const { getByText } = render(
+        <Metronome showTapTempo={true} onBpmChange={onBpmChange} />,
+      );
+
+      const tapButton = getByText("Tap");
+
+      // 4 taps at ~100 BPM (600ms intervals)
+      fireEvent.press(tapButton);
+      jest.advanceTimersByTime(600);
+      fireEvent.press(tapButton);
+      jest.advanceTimersByTime(600);
+      fireEvent.press(tapButton);
+      jest.advanceTimersByTime(600);
+      fireEvent.press(tapButton);
+
+      // Should calculate average BPM of 100
+      expect(onBpmChange).toHaveBeenLastCalledWith(100);
+    });
+
+    it("keeps only last 4 taps for averaging", () => {
+      const onBpmChange = jest.fn();
+      const { getByText } = render(
+        <Metronome showTapTempo={true} onBpmChange={onBpmChange} />,
+      );
+
+      const tapButton = getByText("Tap");
+
+      // First 4 taps at 60 BPM (1000ms intervals)
+      fireEvent.press(tapButton);
+      jest.advanceTimersByTime(1000);
+      fireEvent.press(tapButton);
+      jest.advanceTimersByTime(1000);
+      fireEvent.press(tapButton);
+      jest.advanceTimersByTime(1000);
+      fireEvent.press(tapButton);
+
+      // Last call should be 60 BPM
+      expect(onBpmChange).toHaveBeenLastCalledWith(60);
+
+      onBpmChange.mockClear();
+
+      // 5th tap at faster interval (500ms = 120 BPM)
+      jest.advanceTimersByTime(500);
+      fireEvent.press(tapButton);
+
+      // Should use last 4 intervals now
+      expect(onBpmChange).toHaveBeenCalled();
+    });
+
+    it("calculates BPM from just 2 taps", () => {
+      const onBpmChange = jest.fn();
+      const { getByText } = render(
+        <Metronome showTapTempo={true} onBpmChange={onBpmChange} />,
+      );
+
+      const tapButton = getByText("Tap");
+
+      // First tap
+      fireEvent.press(tapButton);
+
+      // Second tap at 750ms = 80 BPM
+      jest.advanceTimersByTime(750);
+      fireEvent.press(tapButton);
+
+      expect(onBpmChange).toHaveBeenCalledWith(80);
+    });
+  });
+
+  describe("Mute button interactions", () => {
+    it("calls onMuteChange when mute is toggled via label", () => {
+      const onMuteChange = jest.fn();
+      const { getByLabelText, getByText } = render(
+        <Metronome
+          autoStart={true}
+          muted={false}
+          onMuteChange={onMuteChange}
+        />,
+      );
+
+      const muteButton = getByLabelText(/mute metronome/i);
+      fireEvent.press(muteButton);
+
+      expect(onMuteChange).toHaveBeenCalledWith(true);
+    });
+
+    it("calls onMuteChange with false when unmuting", () => {
+      const onMuteChange = jest.fn();
+      const { getByLabelText } = render(
+        <Metronome autoStart={true} muted={true} onMuteChange={onMuteChange} />,
+      );
+
+      const muteButton = getByLabelText(/unmute metronome/i);
+      fireEvent.press(muteButton);
+
+      expect(onMuteChange).toHaveBeenCalledWith(false);
+    });
+  });
 });
 
 describe("CompactMetronome", () => {

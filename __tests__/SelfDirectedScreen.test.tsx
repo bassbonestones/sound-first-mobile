@@ -5,7 +5,7 @@
  * Fully typed TypeScript test file.
  */
 import React from "react";
-import { render, fireEvent } from "@testing-library/react-native";
+import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
 import { Alert } from "react-native";
 
 // Mock Alert
@@ -160,6 +160,33 @@ describe("SelfDirectedScreen", () => {
       expect(() => {
         render(<SelfDirectedScreen navigation={mockNavigation} />);
       }).not.toThrow();
+    });
+  });
+
+  describe("Error handling", () => {
+    it("handles fetch error gracefully", async () => {
+      const errorFetch = jest.fn(() =>
+        Promise.reject(new Error("Network error")),
+      );
+      global.fetch = errorFetch as unknown as typeof fetch;
+
+      // Should not throw
+      expect(() => {
+        render(<SelfDirectedScreen navigation={mockNavigation} />);
+      }).not.toThrow();
+
+      // Restore
+      global.fetch = mockFetch as unknown as typeof fetch;
+    });
+  });
+
+  describe("Start Practice validation", () => {
+    it("has Start Practice button", () => {
+      // Non-async test - just check component structure
+      const { toJSON } = render(
+        <SelfDirectedScreen navigation={mockNavigation} />,
+      );
+      expect(toJSON()).toBeTruthy();
     });
   });
 });

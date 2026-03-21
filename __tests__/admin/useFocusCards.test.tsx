@@ -323,4 +323,156 @@ describe("useFocusCards", () => {
       expect(global.fetch).toHaveBeenCalledTimes(2);
     });
   });
+
+  // ==========================================================================
+  // ERROR HANDLING
+  // ==========================================================================
+  describe("Error Handling", () => {
+    it("handles createFocusCard API error", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockFocusCards),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          json: () => Promise.resolve({ detail: "Create failed" }),
+        });
+
+      const { result } = renderHook(() => useFocusCards());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.createFocusCard({ name: "New Card" });
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Create failed");
+    });
+
+    it("handles createFocusCard network error", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockFocusCards),
+        })
+        .mockRejectedValueOnce(new Error("Network error"));
+
+      const { result } = renderHook(() => useFocusCards());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.createFocusCard({ name: "New Card" });
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Network error");
+    });
+
+    it("handles updateFocusCard API error", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockFocusCards),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          json: () => Promise.resolve({ detail: "Update failed" }),
+        });
+
+      const { result } = renderHook(() => useFocusCards());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.updateFocusCard(1, { name: "Updated" });
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Update failed");
+    });
+
+    it("handles updateFocusCard network error", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockFocusCards),
+        })
+        .mockRejectedValueOnce(new Error("Connection lost"));
+
+      const { result } = renderHook(() => useFocusCards());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.updateFocusCard(1, { name: "Updated" });
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Connection lost");
+    });
+
+    it("handles deleteFocusCard API error", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockFocusCards),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          json: () => Promise.resolve({ detail: "Delete failed" }),
+        });
+
+      const { result } = renderHook(() => useFocusCards());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.deleteFocusCard(1);
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Delete failed");
+    });
+
+    it("handles deleteFocusCard network error", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockFocusCards),
+        })
+        .mockRejectedValueOnce(new Error("Server unavailable"));
+
+      const { result } = renderHook(() => useFocusCards());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.deleteFocusCard(1);
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Server unavailable");
+    });
+  });
 });

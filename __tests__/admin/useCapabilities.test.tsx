@@ -469,4 +469,290 @@ describe("useCapabilities", () => {
       expect(result.current.exportStatus).toBeNull();
     });
   });
+
+  // ==========================================================================
+  // CAPABILITY OPERATIONS
+  // ==========================================================================
+  describe("Archive Capability", () => {
+    it("archives capability successfully", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: true });
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.archiveCapability({
+          id: 1,
+          name: "Test",
+        });
+      });
+
+      expect(response.success).toBe(true);
+    });
+
+    it("handles archive failure", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Failed"));
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.archiveCapability({
+          id: 1,
+          name: "Test",
+        });
+      });
+
+      expect(response.success).toBe(false);
+    });
+  });
+
+  describe("Restore Capability", () => {
+    it("restores capability successfully", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: true });
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.restoreCapability({
+          id: 1,
+          name: "Test",
+          is_active: false,
+        });
+      });
+
+      expect(response.success).toBe(true);
+    });
+
+    it("handles restore failure", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Failed"));
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.restoreCapability({
+          id: 1,
+          name: "Test",
+          is_active: false,
+        });
+      });
+
+      expect(response.success).toBe(false);
+    });
+  });
+
+  describe("Delete Capability", () => {
+    it("deletes capability successfully", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({ ok: true })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ all: [] }),
+        });
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.deleteCapability({
+          id: 1,
+          name: "Test",
+        });
+      });
+
+      expect(response.success).toBe(true);
+    });
+
+    it("handles delete failure", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Failed"));
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.deleteCapability({
+          id: 1,
+          name: "Test",
+        });
+      });
+
+      expect(response.success).toBe(false);
+    });
+  });
+
+  describe("Create Capability", () => {
+    it("creates capability successfully", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ all: [] }),
+        });
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.createCapability({ name: "New Cap" });
+      });
+
+      expect(response.success).toBe(true);
+    });
+
+    it("handles create API error", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ detail: "Already exists" }),
+      });
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.createCapability({ name: "New Cap" });
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Already exists");
+    });
+
+    it("handles create network error", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Network"));
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.createCapability({ name: "New Cap" });
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Network error");
+    });
+  });
+
+  describe("Update Capability", () => {
+    it("updates capability successfully", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ all: [] }),
+        });
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.updateCapability(1, {
+          name: "Updated",
+        });
+      });
+
+      expect(response.success).toBe(true);
+    });
+
+    it("handles update API error", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ detail: "Invalid data" }),
+      });
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.updateCapability(1, {
+          name: "Updated",
+        });
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Invalid data");
+    });
+
+    it("handles update network error", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Timeout"));
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.updateCapability(1, {
+          name: "Updated",
+        });
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Network error");
+    });
+  });
 });

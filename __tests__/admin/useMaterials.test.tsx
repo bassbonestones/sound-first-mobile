@@ -357,4 +357,326 @@ describe("useMaterials", () => {
       expect(result.current.exporting).toBe(false);
     });
   });
+
+  // ==========================================================================
+  // TRIGGER ANALYSIS
+  // ==========================================================================
+  describe("Trigger Analysis", () => {
+    it("calls reanalyze endpoint", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ materials: mockMaterials }),
+        })
+        .mockResolvedValueOnce({ ok: true })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ materials: mockMaterials }),
+        });
+
+      const { result } = renderHook(() => useMaterials());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.triggerAnalysis(1);
+      });
+
+      expect(success).toBe(true);
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/materials/1/reanalyze"),
+        { method: "POST" },
+      );
+    });
+
+    it("returns false on analysis failure", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ materials: mockMaterials }),
+        })
+        .mockResolvedValueOnce({ ok: false });
+
+      const { result } = renderHook(() => useMaterials());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.triggerAnalysis(1);
+      });
+
+      expect(success).toBe(false);
+    });
+
+    it("handles analysis network error", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ materials: mockMaterials }),
+        })
+        .mockRejectedValueOnce(new Error("Network error"));
+
+      const { result } = renderHook(() => useMaterials());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.triggerAnalysis(1);
+      });
+
+      expect(success).toBe(false);
+    });
+  });
+
+  // ==========================================================================
+  // BATCH INGEST
+  // ==========================================================================
+  describe("Batch Ingest", () => {
+    it("calls ingest-batch endpoint", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ materials: mockMaterials }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ new_count: 2, updated_count: 1 }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ materials: mockMaterials }),
+        });
+
+      const { result } = renderHook(() => useMaterials());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.handleBatchIngest(false);
+      });
+
+      expect(response.success).toBe(true);
+      expect(response.new_count).toBe(2);
+    });
+
+    it("handles ingest failure", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ materials: mockMaterials }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          text: () => Promise.resolve("Ingest error"),
+        });
+
+      const { result } = renderHook(() => useMaterials());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.handleBatchIngest(true);
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Ingest error");
+    });
+
+    it("handles ingest network error", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ materials: mockMaterials }),
+        })
+        .mockRejectedValueOnce(new Error("Connection failed"));
+
+      const { result } = renderHook(() => useMaterials());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.handleBatchIngest(false);
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Connection failed");
+    });
+  });
+
+  // ==========================================================================
+  // EXPORT TO JSON
+  // ==========================================================================
+  describe("Export to JSON", () => {
+    it("calls export endpoint", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ materials: mockMaterials }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ filepath: "/path/to/export.json" }),
+        });
+
+      const { result } = renderHook(() => useMaterials());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.handleExportToJson();
+      });
+
+      expect(response.success).toBe(true);
+      expect(response.filepath).toBe("/path/to/export.json");
+    });
+
+    it("handles export failure", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ materials: mockMaterials }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          json: () => Promise.resolve({ detail: "Export failed" }),
+        });
+
+      const { result } = renderHook(() => useMaterials());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.handleExportToJson();
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Export failed");
+    });
+
+    it("handles export network error", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ materials: mockMaterials }),
+        })
+        .mockRejectedValueOnce(new Error("Timeout"));
+
+      const { result } = renderHook(() => useMaterials());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.handleExportToJson();
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Timeout");
+    });
+  });
+
+  // ==========================================================================
+  // DELETE MATERIAL
+  // ==========================================================================
+  describe("Delete Material", () => {
+    it("calls delete endpoint", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ materials: mockMaterials }),
+        })
+        .mockResolvedValueOnce({ ok: true })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ materials: [] }),
+        });
+
+      const { result } = renderHook(() => useMaterials());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.deleteMaterial(1);
+      });
+
+      expect(success).toBe(true);
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/admin/materials/1"),
+        { method: "DELETE" },
+      );
+    });
+
+    it("returns false on delete failure", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ materials: mockMaterials }),
+        })
+        .mockResolvedValueOnce({ ok: false });
+
+      const { result } = renderHook(() => useMaterials());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.deleteMaterial(1);
+      });
+
+      expect(success).toBe(false);
+    });
+
+    it("handles delete network error", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ materials: mockMaterials }),
+        })
+        .mockRejectedValueOnce(new Error("Server error"));
+
+      const { result } = renderHook(() => useMaterials());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.deleteMaterial(1);
+      });
+
+      expect(success).toBe(false);
+    });
+  });
 });

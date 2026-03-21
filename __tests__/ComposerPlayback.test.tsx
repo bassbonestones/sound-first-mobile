@@ -199,6 +199,144 @@ describe("useComposerPlayback", () => {
       expect(result.current.playback.tempo).toBe(300);
     });
   });
+
+  describe("Repeat Mode", () => {
+    it("should start with repeat disabled", () => {
+      const score = createTestScore();
+      const { result } = renderHook(() => useComposerPlayback(score));
+
+      expect(result.current.playback.repeat).toBe(false);
+    });
+
+    it("should toggle repeat mode", () => {
+      const score = createTestScore();
+      const { result } = renderHook(() => useComposerPlayback(score));
+
+      act(() => {
+        result.current.actions.toggleRepeat();
+      });
+
+      expect(result.current.playback.repeat).toBe(true);
+
+      act(() => {
+        result.current.actions.toggleRepeat();
+      });
+
+      expect(result.current.playback.repeat).toBe(false);
+    });
+  });
+
+  describe("Play Measure", () => {
+    it("should start from specified measure", async () => {
+      const score = createTestScore(4);
+      const { result } = renderHook(() => useComposerPlayback(score));
+
+      await act(async () => {
+        await result.current.actions.playMeasure(2);
+      });
+
+      expect(result.current.playback.state).toBe("playing");
+      expect(result.current.playback.position.measureIndex).toBe(2);
+      expect(result.current.playback.position.noteIndex).toBe(0);
+    });
+  });
+
+  describe("isAtEnd Computation", () => {
+    it("should be true at last note of last measure", async () => {
+      const score = createTestScore(1); // Single measure with 3 notes
+      const { result } = renderHook(() => useComposerPlayback(score));
+
+      // Move to position at end
+      await act(async () => {
+        await result.current.actions.playFromCursor(0, 2); // Last note (index 2)
+      });
+      act(() => {
+        result.current.actions.pause();
+      });
+
+      expect(result.current.playback.isAtEnd).toBe(true);
+    });
+
+    it("should be false when not at end", () => {
+      const score = createTestScore(2);
+      const { result } = renderHook(() => useComposerPlayback(score));
+
+      expect(result.current.playback.isAtEnd).toBe(false);
+    });
+  });
+
+  describe("Current Event", () => {
+    it("should be null initially", () => {
+      const score = createTestScore();
+      const { result } = renderHook(() => useComposerPlayback(score));
+
+      expect(result.current.currentEvent).toBeNull();
+    });
+
+    it("should be null after stop", async () => {
+      const score = createTestScore();
+      const { result } = renderHook(() => useComposerPlayback(score));
+
+      await act(async () => {
+        await result.current.actions.play();
+      });
+      act(() => {
+        result.current.actions.stop();
+      });
+
+      expect(result.current.currentEvent).toBeNull();
+    });
+
+    it("should be null after stopAt", async () => {
+      const score = createTestScore();
+      const { result } = renderHook(() => useComposerPlayback(score));
+
+      await act(async () => {
+        await result.current.actions.play();
+      });
+      act(() => {
+        result.current.actions.stopAt({
+          measureIndex: 1,
+          beat: 0,
+          noteIndex: 0,
+        });
+      });
+
+      expect(result.current.currentEvent).toBeNull();
+    });
+  });
+
+  describe("Score Tempo Sync", () => {
+    it("should sync tempo when score tempo changes", () => {
+      const score = createTestScore();
+      score.tempo = 100;
+      const { result, rerender } = renderHook(
+        ({ s }) => useComposerPlayback(s),
+        { initialProps: { s: score } },
+      );
+
+      expect(result.current.playback.tempo).toBe(100);
+
+      // Update score tempo
+      const newScore = { ...score, tempo: 140 };
+      rerender({ s: newScore });
+
+      expect(result.current.playback.tempo).toBe(140);
+    });
+  });
+
+  describe("Empty Score Handling", () => {
+    it("should handle score with empty measures", () => {
+      const score = createScore({
+        measures: [createMeasure([])],
+        tempo: 120,
+      });
+      const { result } = renderHook(() => useComposerPlayback(score));
+
+      // Should not crash
+      expect(result.current.playback.state).toBe("stopped");
+    });
+  });
 });
 
 // =============================================================================

@@ -7,6 +7,7 @@
 import type { ComposerScore, Note as ComposerNote, Measure } from "../types";
 import { isRest, DURATION } from "../types";
 import { midiToNoteName, midiToOctave, formatMidiNote } from "./pitchUtils";
+import { KEY_SIGNATURES } from "../constants";
 import type {
   ImportedScore,
   ImportedPart,
@@ -22,28 +23,6 @@ import type {
   DurationType,
   ScoreConfidence,
 } from "../../../types/import";
-
-// =============================================================================
-// Key Names
-// =============================================================================
-
-const KEY_NAMES: Record<number, { major: string; minor: string }> = {
-  [-7]: { major: "Cb Major", minor: "Ab Minor" },
-  [-6]: { major: "Gb Major", minor: "Eb Minor" },
-  [-5]: { major: "Db Major", minor: "Bb Minor" },
-  [-4]: { major: "Ab Major", minor: "F Minor" },
-  [-3]: { major: "Eb Major", minor: "C Minor" },
-  [-2]: { major: "Bb Major", minor: "G Minor" },
-  [-1]: { major: "F Major", minor: "D Minor" },
-  [0]: { major: "C Major", minor: "A Minor" },
-  [1]: { major: "G Major", minor: "E Minor" },
-  [2]: { major: "D Major", minor: "B Minor" },
-  [3]: { major: "A Major", minor: "F# Minor" },
-  [4]: { major: "E Major", minor: "C# Minor" },
-  [5]: { major: "B Major", minor: "G# Minor" },
-  [6]: { major: "F# Major", minor: "D# Minor" },
-  [7]: { major: "C# Major", minor: "A# Minor" },
-};
 
 // =============================================================================
 // Duration Conversion
@@ -107,7 +86,7 @@ export function composerScoreToImportedScore(
   const keySignature: KeySignatureInfo = {
     fifths: composerScore.keySignature,
     mode: "major",
-    displayName: KEY_NAMES[composerScore.keySignature]?.major ?? "C Major",
+    displayName: KEY_SIGNATURES[composerScore.keySignature]?.major ?? "C Major",
   };
 
   // Build time signature info
@@ -207,7 +186,7 @@ function convertMeasure(
         ? {
             fifths: score.keySignature,
             mode: "major",
-            displayName: KEY_NAMES[score.keySignature]?.major ?? "C Major",
+            displayName: KEY_SIGNATURES[score.keySignature]?.major ?? "C Major",
           }
         : null,
     confidence: 1.0,

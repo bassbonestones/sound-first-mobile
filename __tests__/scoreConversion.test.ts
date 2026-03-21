@@ -43,7 +43,7 @@ describe("composerScoreToImportedScore", () => {
 
     it("converts key signatures correctly", () => {
       const keys = [
-        { keySignature: -3, expected: "Eb Major" },
+        { keySignature: -3, expected: "E♭ Major" },
         { keySignature: 2, expected: "D Major" },
         { keySignature: 5, expected: "B Major" },
       ] as const;
@@ -176,6 +176,20 @@ describe("composerScoreToImportedScore", () => {
 
         expect(event.durationType).toBe(type);
       });
+    });
+
+    it("defaults to quarter for unrecognized durations", () => {
+      // Create a note with an invalid/unknown duration value
+      const note = createNote(60, 999 as unknown as number);
+      const measure = createMeasure();
+      measure.notes = [note];
+      const score = createScore();
+      score.measures = [measure];
+
+      const imported = composerScoreToImportedScore(score);
+      const event = imported.parts[0].measures[0].events[0];
+
+      expect(event.durationType).toBe("quarter");
     });
   });
 

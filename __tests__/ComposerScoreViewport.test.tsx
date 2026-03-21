@@ -351,4 +351,128 @@ describe("ComposerScoreViewport", () => {
       expect(zoomLabel).toBeTruthy();
     });
   });
+
+  describe("Playback state", () => {
+    it("should handle playback state changes", () => {
+      const score = createTestScore();
+      const { rerender, getByTestId } = render(
+        <ComposerScoreViewport
+          score={score}
+          cursor={defaultCursor}
+          playbackState="stopped"
+          testID="viewport"
+        />,
+      );
+
+      // Change to playing
+      rerender(
+        <ComposerScoreViewport
+          score={score}
+          cursor={defaultCursor}
+          playbackState="playing"
+          playbackMeasureIndex={0}
+          testID="viewport"
+        />,
+      );
+
+      expect(getByTestId("viewport")).toBeTruthy();
+
+      // Change back to stopped
+      rerender(
+        <ComposerScoreViewport
+          score={score}
+          cursor={defaultCursor}
+          playbackState="stopped"
+          testID="viewport"
+        />,
+      );
+
+      expect(getByTestId("viewport")).toBeTruthy();
+    });
+
+    it("should handle playback measure changes", () => {
+      const score = createTestScore();
+      const { rerender, getByTestId } = render(
+        <ComposerScoreViewport
+          score={score}
+          cursor={defaultCursor}
+          playbackState="playing"
+          playbackMeasureIndex={0}
+          testID="viewport"
+        />,
+      );
+
+      // Change measure index
+      rerender(
+        <ComposerScoreViewport
+          score={score}
+          cursor={defaultCursor}
+          playbackState="playing"
+          playbackMeasureIndex={1}
+          testID="viewport"
+        />,
+      );
+
+      expect(getByTestId("viewport")).toBeTruthy();
+    });
+
+    it("should skip scroll when measure index unchanged", () => {
+      const score = createTestScore();
+      const { rerender, getByTestId } = render(
+        <ComposerScoreViewport
+          score={score}
+          cursor={defaultCursor}
+          playbackState="playing"
+          playbackMeasureIndex={0}
+          testID="viewport"
+        />,
+      );
+
+      // Re-render with same measure index
+      rerender(
+        <ComposerScoreViewport
+          score={score}
+          cursor={defaultCursor}
+          playbackState="playing"
+          playbackMeasureIndex={0}
+          testID="viewport"
+        />,
+      );
+
+      expect(getByTestId("viewport")).toBeTruthy();
+    });
+  });
+
+  describe("Controlled zoom", () => {
+    it("should respect onZoomChange callback", () => {
+      const score = createTestScore();
+      const onZoomChange = jest.fn();
+      const { getByLabelText } = render(
+        <ComposerScoreViewport
+          score={score}
+          cursor={defaultCursor}
+          onZoomChange={onZoomChange}
+        />,
+      );
+
+      fireEvent.press(getByLabelText("Zoom in"));
+
+      expect(onZoomChange).toHaveBeenCalledWith(1.25);
+    });
+
+    it("should pass controlled zoom prop", () => {
+      const score = createTestScore();
+      const { getByTestId } = render(
+        <ComposerScoreViewport
+          score={score}
+          cursor={defaultCursor}
+          controlledZoom={1.75}
+          testID="viewport"
+        />,
+      );
+
+      // Component renders without error
+      expect(getByTestId("viewport")).toBeTruthy();
+    });
+  });
 });

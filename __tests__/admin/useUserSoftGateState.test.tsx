@@ -295,4 +295,197 @@ describe("useUserSoftGateState", () => {
       });
     });
   });
+
+  // ==========================================================================
+  // RESET STATES
+  // ==========================================================================
+  describe("Reset States", () => {
+    it("resets states successfully", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockUsers),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockStates),
+        })
+        .mockResolvedValueOnce({ ok: true })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve([]),
+        });
+
+      const { result } = renderHook(() => useUserSoftGateState());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.resetStates();
+      });
+
+      expect(response.success).toBe(true);
+    });
+
+    it("handles reset API failure", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockUsers),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockStates),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          json: () => Promise.resolve({ detail: "Reset failed" }),
+        });
+
+      const { result } = renderHook(() => useUserSoftGateState());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.resetStates(["range_usage"]);
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Reset failed");
+    });
+
+    it("handles reset network error", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockUsers),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockStates),
+        })
+        .mockRejectedValueOnce(new Error("Connection lost"));
+
+      const { result } = renderHook(() => useUserSoftGateState());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.resetStates();
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Connection lost");
+    });
+  });
+
+  // ==========================================================================
+  // UPDATE STATE
+  // ==========================================================================
+  describe("Update State", () => {
+    it("updates state successfully", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockUsers),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockStates),
+        })
+        .mockResolvedValueOnce({ ok: true })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockStates),
+        });
+
+      const { result } = renderHook(() => useUserSoftGateState());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.updateState({
+          dimension_name: "range_usage",
+          current_level: 3,
+        });
+      });
+
+      expect(response.success).toBe(true);
+    });
+
+    it("handles update API failure", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockUsers),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockStates),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          json: () => Promise.resolve({ detail: "Invalid level" }),
+        });
+
+      const { result } = renderHook(() => useUserSoftGateState());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.updateState({
+          dimension_name: "range_usage",
+          current_level: -1,
+        });
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Invalid level");
+    });
+
+    it("handles update network error", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockUsers),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockStates),
+        })
+        .mockRejectedValueOnce(new Error("Server timeout"));
+
+      const { result } = renderHook(() => useUserSoftGateState());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.updateState({
+          dimension_name: "range_usage",
+          current_level: 2,
+        });
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Server timeout");
+    });
+  });
 });

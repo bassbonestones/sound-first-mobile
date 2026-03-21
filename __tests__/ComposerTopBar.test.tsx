@@ -314,4 +314,228 @@ describe("ComposerTopBar", () => {
       expect(getByLabelText(/Tempo/)).toBeTruthy();
     });
   });
+
+  describe("Measure Validation", () => {
+    it("should render validation indicator when measureValidation provided", () => {
+      const { getByTestId } = render(
+        <ComposerTopBar
+          {...defaultProps}
+          measureValidation={{
+            isComplete: true,
+            totalBeats: 4,
+            expectedBeats: 4,
+            difference: 0,
+          }}
+        />,
+      );
+      expect(getByTestId("topbar-validation")).toBeTruthy();
+    });
+
+    it("should not render validation indicator when measureValidation not provided", () => {
+      const { queryByTestId } = render(<ComposerTopBar {...defaultProps} />);
+      expect(queryByTestId("topbar-validation")).toBeNull();
+    });
+
+    it("should show complete message when measure is complete", () => {
+      const alertSpy = jest.spyOn(require("react-native").Alert, "alert");
+      const { getByTestId } = render(
+        <ComposerTopBar
+          {...defaultProps}
+          measureValidation={{
+            isComplete: true,
+            totalBeats: 4,
+            expectedBeats: 4,
+            difference: 0,
+          }}
+        />,
+      );
+
+      fireEvent.press(getByTestId("topbar-validation"));
+      expect(alertSpy).toHaveBeenCalledWith(
+        "Measure Complete",
+        "This measure has the correct number of beats.",
+      );
+    });
+
+    it("should show overflow message when measure has too many beats", () => {
+      const alertSpy = jest.spyOn(require("react-native").Alert, "alert");
+      const { getByTestId } = render(
+        <ComposerTopBar
+          {...defaultProps}
+          measureValidation={{
+            isComplete: false,
+            totalBeats: 5,
+            expectedBeats: 4,
+            difference: 1,
+          }}
+        />,
+      );
+
+      fireEvent.press(getByTestId("topbar-validation"));
+      expect(alertSpy).toHaveBeenCalledWith(
+        "Measure Overflowed",
+        "This measure has too many beats. Remove some notes or rests.",
+      );
+    });
+
+    it("should show incomplete message when measure needs more beats", () => {
+      const alertSpy = jest.spyOn(require("react-native").Alert, "alert");
+      const { getByTestId } = render(
+        <ComposerTopBar
+          {...defaultProps}
+          measureValidation={{
+            isComplete: false,
+            totalBeats: 2,
+            expectedBeats: 4,
+            difference: -2,
+          }}
+        />,
+      );
+
+      fireEvent.press(getByTestId("topbar-validation"));
+      expect(alertSpy).toHaveBeenCalledWith(
+        "Measure Incomplete",
+        "This measure needs 2 more beats.",
+      );
+    });
+
+    it("should show singular beat message when 1 beat remaining", () => {
+      const alertSpy = jest.spyOn(require("react-native").Alert, "alert");
+      const { getByTestId } = render(
+        <ComposerTopBar
+          {...defaultProps}
+          measureValidation={{
+            isComplete: false,
+            totalBeats: 3,
+            expectedBeats: 4,
+            difference: -1,
+          }}
+        />,
+      );
+
+      fireEvent.press(getByTestId("topbar-validation"));
+      expect(alertSpy).toHaveBeenCalledWith(
+        "Measure Incomplete",
+        "This measure needs 1 more beat.",
+      );
+    });
+
+    it("should have accessible label for complete validation", () => {
+      const { getByLabelText } = render(
+        <ComposerTopBar
+          {...defaultProps}
+          measureValidation={{
+            isComplete: true,
+            totalBeats: 4,
+            expectedBeats: 4,
+            difference: 0,
+          }}
+        />,
+      );
+      expect(getByLabelText("Measure complete")).toBeTruthy();
+    });
+
+    it("should have accessible label for incomplete validation", () => {
+      const { getByLabelText } = render(
+        <ComposerTopBar
+          {...defaultProps}
+          measureValidation={{
+            isComplete: false,
+            totalBeats: 2,
+            expectedBeats: 4,
+            difference: -2,
+          }}
+        />,
+      );
+      expect(getByLabelText("Measure incomplete")).toBeTruthy();
+    });
+  });
+
+  describe("Modal Close Actions", () => {
+    it("should close clef modal after selection", async () => {
+      const { getByTestId, queryByText, getByText } = render(
+        <ComposerTopBar {...defaultProps} />,
+      );
+
+      fireEvent.press(getByTestId("topbar-clef"));
+      expect(getByText("Select Clef")).toBeTruthy();
+
+      fireEvent.press(getByTestId("clef-treble"));
+      await waitFor(() => {
+        expect(queryByText("Select Clef")).toBeNull();
+      });
+    });
+
+    it("should close key modal after selection", async () => {
+      const { getByTestId, queryByText, getByText } = render(
+        <ComposerTopBar {...defaultProps} />,
+      );
+
+      fireEvent.press(getByTestId("topbar-key"));
+      expect(getByText("Select Key")).toBeTruthy();
+
+      fireEvent.press(getByTestId("key-0"));
+      await waitFor(() => {
+        expect(queryByText("Select Key")).toBeNull();
+      });
+    });
+
+    it("should reset tempo input to current value on cancel", () => {
+      const { getByTestId, getByDisplayValue } = render(
+        <ComposerTopBar {...defaultProps} tempo={120} />,
+      );
+
+      fireEvent.press(getByTestId("topbar-tempo"));
+      fireEvent.changeText(getByTestId("tempo-input"), "999");
+      fireEvent.press(getByTestId("tempo-cancel"));
+
+      // Open again and check it's back to original
+      fireEvent.press(getByTestId("topbar-tempo"));
+      expect(getByDisplayValue("120")).toBeTruthy();
+    });
+
+    it("should reset tempo input for invalid value on confirm", () => {
+      const onTempoChange = jest.fn();
+      const { getByTestId, getByDisplayValue } = render(
+        <ComposerTopBar
+          {...defaultProps}
+          tempo={120}
+          onTempoChange={onTempoChange}
+        />,
+      );
+
+      fireEvent.press(getByTestId("topbar-tempo"));
+      fireEvent.changeText(getByTestId("tempo-input"), "abc");
+      fireEvent.press(getByTestId("tempo-confirm"));
+
+      expect(onTempoChange).not.toHaveBeenCalled();
+
+      // Open again and check it's back to original
+      fireEvent.press(getByTestId("topbar-tempo"));
+      expect(getByDisplayValue("120")).toBeTruthy();
+    });
+  });
+
+  describe("Time Signature Modal", () => {
+    it("should call onTimeSignatureChange when note value changed", () => {
+      const onTimeSignatureChange = jest.fn();
+      const { getByTestId, getAllByText } = render(
+        <ComposerTopBar
+          {...defaultProps}
+          timeSignature={{ beats: 4, beatUnit: 4 }}
+          onTimeSignatureChange={onTimeSignatureChange}
+        />,
+      );
+
+      fireEvent.press(getByTestId("topbar-time"));
+      // The modal has stepper buttons - find the - button for beats to decrease
+      const minusButtons = getAllByText("−");
+      fireEvent.press(minusButtons[0]); // First minus is for beats
+
+      expect(onTimeSignatureChange).toHaveBeenCalledWith({
+        beats: 3,
+        beatUnit: 4,
+      });
+    });
+  });
 });

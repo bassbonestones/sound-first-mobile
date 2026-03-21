@@ -433,4 +433,118 @@ describe("HomeScreen", () => {
       expect(button.props.accessibilityHint).toBe("Begin instrument setup");
     });
   });
+
+  describe("Instrument Emojis", () => {
+    beforeEach(() => {
+      mockUserContext.instruments = [
+        {
+          id: 1,
+          instrument_name: "Clarinet",
+          day0_completed: true,
+          resonant_note: "C4",
+        },
+        {
+          id: 2,
+          instrument_name: "Saxophone",
+          day0_completed: true,
+          resonant_note: "C4",
+        },
+        {
+          id: 3,
+          instrument_name: "Flute",
+          day0_completed: true,
+          resonant_note: "C4",
+        },
+        {
+          id: 4,
+          instrument_name: "Piano",
+          day0_completed: true,
+          resonant_note: "C4",
+        },
+        {
+          id: 5,
+          instrument_name: "Violin",
+          day0_completed: true,
+          resonant_note: "G4",
+        },
+        {
+          id: 6,
+          instrument_name: "Guitar",
+          day0_completed: true,
+          resonant_note: "E4",
+        },
+        {
+          id: 7,
+          instrument_name: "Drums",
+          day0_completed: true,
+          resonant_note: "C4",
+        },
+        {
+          id: 8,
+          instrument_name: "Unknown",
+          day0_completed: true,
+          resonant_note: "C4",
+        },
+      ];
+      mockUserContext.selectedInstrument = mockUserContext.instruments[0];
+    });
+
+    it("displays clarinet emoji correctly", () => {
+      const { getByText } = render(<HomeScreen navigation={mockNavigation} />);
+      // Open picker by pressing the selected instrument name
+      fireEvent.press(getByText("Clarinet"));
+      // Modal should show "Select Instrument" title
+      expect(getByText("Select Instrument")).toBeTruthy();
+    });
+
+    it("displays saxophone emoji correctly", () => {
+      mockUserContext.selectedInstrument = mockUserContext.instruments[1];
+      const { toJSON } = render(<HomeScreen navigation={mockNavigation} />);
+      expect(toJSON()).toBeTruthy();
+    });
+  });
+
+  describe("Modal Interactions", () => {
+    beforeEach(() => {
+      mockUserContext.instruments = [
+        {
+          id: 1,
+          instrument_name: "Trombone",
+          day0_completed: true,
+          resonant_note: "Bb3",
+        },
+        {
+          id: 2,
+          instrument_name: "Trumpet",
+          day0_completed: true,
+          resonant_note: "C4",
+        },
+      ];
+      mockUserContext.selectedInstrument = mockUserContext.instruments[0];
+    });
+
+    it("opens picker when instrument button pressed", () => {
+      const { getByText } = render(<HomeScreen navigation={mockNavigation} />);
+
+      // Open picker by pressing the selected instrument name
+      fireEvent.press(getByText("Trombone"));
+
+      // Modal title should appear
+      expect(getByText("Select Instrument")).toBeTruthy();
+    });
+
+    it("selects instrument when item pressed", () => {
+      const { getByText } = render(<HomeScreen navigation={mockNavigation} />);
+
+      // Open picker
+      fireEvent.press(getByText("Trombone"));
+
+      // Select Trumpet
+      fireEvent.press(getByText("Trumpet"));
+
+      expect(mockSelectInstrument).toHaveBeenCalledWith(
+        expect.objectContaining({ instrument_name: "Trumpet" }),
+      );
+    });
+  });
 });

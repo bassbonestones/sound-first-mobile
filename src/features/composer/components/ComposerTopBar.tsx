@@ -22,6 +22,7 @@ import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../constants";
 import TimeSignaturePickerModal from "../../../components/Metronome/TimeSignaturePickerModal";
+import { getKeyName, getKeyNameShort, ALL_KEY_SIGNATURES } from "../constants";
 import type {
   Clef,
   TimeSignature,
@@ -65,47 +66,6 @@ export interface ComposerTopBarProps {
   /** Test ID for testing */
   testID?: string;
 }
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-const KEY_NAMES: Record<number, string> = {
-  "-7": "C♭ Major",
-  "-6": "G♭ Major",
-  "-5": "D♭ Major",
-  "-4": "A♭ Major",
-  "-3": "E♭ Major",
-  "-2": "B♭ Major",
-  "-1": "F Major",
-  "0": "C Major",
-  "1": "G Major",
-  "2": "D Major",
-  "3": "A Major",
-  "4": "E Major",
-  "5": "B Major",
-  "6": "F♯ Major",
-  "7": "C♯ Major",
-};
-
-/** Short key names for compact dropdown display */
-const KEY_NAMES_SHORT: Record<number, string> = {
-  "-7": "C♭",
-  "-6": "G♭",
-  "-5": "D♭",
-  "-4": "A♭",
-  "-3": "E♭",
-  "-2": "B♭",
-  "-1": "F",
-  "0": "C",
-  "1": "G",
-  "2": "D",
-  "3": "A",
-  "4": "E",
-  "5": "B",
-  "6": "F♯",
-  "7": "C♯",
-};
 
 // =============================================================================
 // Subcomponents
@@ -202,7 +162,7 @@ function ComposerTopBarComponent({
   const tsDisplay = `${timeSignature.beats}/${timeSignature.beatUnit}`;
 
   // Format key signature (short for dropdown, full for modal)
-  const keyDisplayShort = KEY_NAMES_SHORT[keySignature.toString()] || "C";
+  const keyDisplayShort = getKeyNameShort(keySignature);
 
   // Format clef
   const clefDisplay = clef === "treble" ? "Treble" : "Bass";
@@ -425,9 +385,9 @@ function ComposerTopBarComponent({
           >
             <Text style={styles.modalTitle}>Select Key</Text>
             <ScrollView style={styles.optionScroll}>
-              {Array.from({ length: 15 }, (_, i) => i - 7).map((k) => {
+              {ALL_KEY_SIGNATURES.map((k) => {
                 const isSelected = k === keySignature;
-                const keyName = KEY_NAMES[k.toString()] || "C Major";
+                const keyName = getKeyName(k);
                 return (
                   <TouchableOpacity
                     key={k}

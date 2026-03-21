@@ -1574,4 +1574,323 @@ describe("useComposerState", () => {
       expect(result.current.canStartTriplet).toBe(true);
     });
   });
+
+  describe("clearScore", () => {
+    it("should reset measures but keep settings", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Change some settings
+      act(() => {
+        result.current.setClef("bass");
+        result.current.setKeySignature(2);
+        result.current.setTempo(140);
+        result.current.setTitle("My Song");
+      });
+
+      // Insert notes
+      act(() => {
+        result.current.insertNote("C");
+        result.current.insertNote("D");
+      });
+
+      // Clear the score
+      act(() => {
+        result.current.clearScore();
+      });
+
+      // Settings should be preserved
+      expect(result.current.score.clef).toBe("bass");
+      expect(result.current.score.keySignature).toBe(2);
+      expect(result.current.score.tempo).toBe(140);
+      expect(result.current.score.title).toBe("My Song");
+
+      // But notes should be cleared (only rests)
+      const pitchedNotes = result.current.score.measures[0].notes.filter(
+        (n) => n.midi !== null,
+      );
+      expect(pitchedNotes).toHaveLength(0);
+      expect(result.current.score.measures).toHaveLength(1);
+    });
+
+    it("should mark score as dirty after clear", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      act(() => {
+        result.current.clearScore();
+      });
+
+      expect(result.current.isDirty).toBe(true);
+    });
+  });
+
+  describe("redo", () => {
+    it("should redo after undo", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Insert a note
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      const midiAfterInsert = result.current.score.measures[0].notes[0].midi;
+
+      // Undo the note insertion
+      act(() => {
+        result.current.undo();
+      });
+
+      // Note should be gone (replaced with rest)
+      expect(result.current.score.measures[0].notes[0].midi).toBeNull();
+
+      // Redo should bring it back
+      act(() => {
+        result.current.redo();
+      });
+
+      expect(result.current.score.measures[0].notes[0].midi).toBe(
+        midiAfterInsert,
+      );
+    });
+
+    it("should track canRedo state", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      expect(result.current.canRedo).toBe(false);
+
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      expect(result.current.canRedo).toBe(false);
+
+      act(() => {
+        result.current.undo();
+      });
+
+      expect(result.current.canRedo).toBe(true);
+
+      act(() => {
+        result.current.redo();
+      });
+
+      expect(result.current.canRedo).toBe(false);
+    });
+
+    it("should clear redo stack on new action", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      act(() => {
+        result.current.undo();
+      });
+
+      expect(result.current.canRedo).toBe(true);
+
+      // New action should clear redo stack
+      act(() => {
+        result.current.insertNote("D");
+      });
+
+      expect(result.current.canRedo).toBe(false);
+    });
+  });
+
+  describe("hasActualNotes", () => {
+    it("should return false for empty score", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      expect(result.current.hasActualNotes()).toBe(false);
+    });
+
+    it("should return true when notes exist", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      expect(result.current.hasActualNotes()).toBe(true);
+    });
+
+    it("should return false after all notes deleted", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      expect(result.current.hasActualNotes()).toBe(true);
+
+      act(() => {
+        result.current.moveCursor("left");
+        result.current.deleteNote();
+      });
+
+      expect(result.current.hasActualNotes()).toBe(false);
+    });
+  });
+
+  describe("setClefWithTransposition", () => {
+    it("should change clef and transpose notes", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Insert a note in treble clef
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      const originalMidi = result.current.score.measures[0].notes[0].midi!;
+
+      // Change to bass clef with -2 octave transposition (common for treble to bass)
+      act(() => {
+        result.current.setClefWithTransposition("bass", -2);
+      });
+
+      expect(result.current.score.clef).toBe("bass");
+      expect(result.current.score.measures[0].notes[0].midi).toBe(
+        originalMidi - 24,
+      );
+    });
+
+    it("should not transpose when octave shift is 0", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      const originalMidi = result.current.score.measures[0].notes[0].midi!;
+
+      act(() => {
+        result.current.setClefWithTransposition("bass", 0);
+      });
+
+      expect(result.current.score.clef).toBe("bass");
+      expect(result.current.score.measures[0].notes[0].midi).toBe(originalMidi);
+    });
+
+    it("should preserve rests during transposition", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Score starts with a whole rest
+      expect(result.current.score.measures[0].notes[0].midi).toBeNull();
+
+      act(() => {
+        result.current.setClefWithTransposition("bass", -1);
+      });
+
+      // Rest should still be a rest
+      expect(result.current.score.measures[0].notes[0].midi).toBeNull();
+    });
+
+    it("should clamp transposition to valid MIDI range", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Insert a low note
+      act(() => {
+        result.current.setClef("bass");
+      });
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      const originalMidi = result.current.score.measures[0].notes[0].midi!;
+
+      // Try extreme transposition that would go below 0
+      act(() => {
+        result.current.setClefWithTransposition("bass", -20);
+      });
+
+      // Note should keep original MIDI (clamped)
+      expect(result.current.score.measures[0].notes[0].midi).toBe(originalMidi);
+    });
+  });
+
+  describe("deleteLastMeasure", () => {
+    it("should delete the last measure", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Add a measure first
+      act(() => {
+        result.current.addMeasure();
+      });
+
+      expect(result.current.score.measures).toHaveLength(2);
+
+      act(() => {
+        result.current.deleteLastMeasure();
+      });
+
+      expect(result.current.score.measures).toHaveLength(1);
+    });
+
+    it("should not delete when only one measure exists", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      expect(result.current.score.measures).toHaveLength(1);
+
+      act(() => {
+        result.current.deleteLastMeasure();
+      });
+
+      expect(result.current.score.measures).toHaveLength(1);
+    });
+
+    it("should move cursor when deleting measure cursor was on", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // Add measure and move cursor to it
+      act(() => {
+        result.current.addMeasure();
+      });
+
+      act(() => {
+        result.current.moveCursor("right");
+        result.current.moveCursor("right");
+        result.current.moveCursor("right");
+        result.current.moveCursor("right");
+      });
+
+      // Make sure we're on measure 1
+      expect(result.current.cursor.measureIndex).toBe(1);
+
+      // Delete the last measure
+      act(() => {
+        result.current.deleteLastMeasure();
+      });
+
+      // Cursor should move back to measure 0
+      expect(result.current.cursor.measureIndex).toBe(0);
+      expect(result.current.score.measures).toHaveLength(1);
+    });
+
+    it("should be undoable", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      act(() => {
+        result.current.addMeasure();
+      });
+
+      expect(result.current.score.measures).toHaveLength(2);
+
+      act(() => {
+        result.current.deleteLastMeasure();
+      });
+
+      expect(result.current.score.measures).toHaveLength(1);
+
+      act(() => {
+        result.current.undo();
+      });
+
+      expect(result.current.score.measures).toHaveLength(2);
+    });
+  });
 });

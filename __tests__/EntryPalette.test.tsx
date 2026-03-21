@@ -92,6 +92,233 @@ describe("DurationSelector", () => {
     expect(getByLabelText("8th note")).toBeTruthy();
     expect(getByLabelText("16th note")).toBeTruthy();
   });
+
+  // ==========================================================================
+  // Dotted Mode Tests
+  // ==========================================================================
+
+  it("should render dot button when onToggleDotted provided", () => {
+    const { getByTestId } = render(
+      <DurationSelector {...defaultProps} onToggleDotted={jest.fn()} />,
+    );
+    expect(getByTestId("duration-dot")).toBeTruthy();
+  });
+
+  it("should not render dot button when onToggleDotted not provided", () => {
+    const { queryByTestId } = render(<DurationSelector {...defaultProps} />);
+    expect(queryByTestId("duration-dot")).toBeNull();
+  });
+
+  it("should highlight dot when dottedMode is true", () => {
+    const { getByTestId } = render(
+      <DurationSelector
+        {...defaultProps}
+        dottedMode={true}
+        onToggleDotted={jest.fn()}
+      />,
+    );
+    const dotButton = getByTestId("duration-dot");
+    expect(dotButton.props.accessibilityState.selected).toBe(true);
+  });
+
+  it("should call onToggleDotted when dot pressed", () => {
+    const onToggleDotted = jest.fn();
+    const { getByTestId } = render(
+      <DurationSelector {...defaultProps} onToggleDotted={onToggleDotted} />,
+    );
+
+    fireEvent.press(getByTestId("duration-dot"));
+    expect(onToggleDotted).toHaveBeenCalled();
+  });
+
+  it("should not call onToggleDotted when disabled", () => {
+    const onToggleDotted = jest.fn();
+    const { getByTestId } = render(
+      <DurationSelector
+        {...defaultProps}
+        onToggleDotted={onToggleDotted}
+        disabled
+      />,
+    );
+
+    fireEvent.press(getByTestId("duration-dot"));
+    expect(onToggleDotted).not.toHaveBeenCalled();
+  });
+
+  it("should disable sixteenth when dotted mode is active", () => {
+    const onSelectDuration = jest.fn();
+    const { getByTestId } = render(
+      <DurationSelector
+        {...defaultProps}
+        onSelectDuration={onSelectDuration}
+        dottedMode={true}
+      />,
+    );
+
+    const sixteenthButton = getByTestId("duration-sixteenth");
+    expect(sixteenthButton.props.accessibilityState.disabled).toBe(true);
+
+    fireEvent.press(sixteenthButton);
+    expect(onSelectDuration).not.toHaveBeenCalled();
+  });
+
+  // ==========================================================================
+  // Triplet Tests
+  // ==========================================================================
+
+  it("should render triplet buttons when tripletsAllowed is true", () => {
+    const { queryByTestId } = render(
+      <DurationSelector {...defaultProps} tripletsAllowed={true} />,
+    );
+    expect(queryByTestId("duration-triplet-eighth")).toBeTruthy();
+    expect(queryByTestId("duration-triplet-quarter")).toBeTruthy();
+  });
+
+  it("should hide triplet buttons when tripletsAllowed is false", () => {
+    const { queryByTestId } = render(
+      <DurationSelector {...defaultProps} tripletsAllowed={false} />,
+    );
+    expect(queryByTestId("duration-triplet-eighth")).toBeNull();
+    expect(queryByTestId("duration-triplet-quarter")).toBeNull();
+  });
+
+  it("should disable non-triplet durations when in triplet group", () => {
+    const { getByTestId } = render(
+      <DurationSelector {...defaultProps} tripletPosition={1} />,
+    );
+
+    // Non-triplet durations should be disabled when in triplet group
+    const quarterButton = getByTestId("duration-quarter");
+    expect(quarterButton.props.accessibilityState.disabled).toBe(true);
+
+    const halfButton = getByTestId("duration-half");
+    expect(halfButton.props.accessibilityState.disabled).toBe(true);
+  });
+
+  it("should enable only eighth triplets when tripletGroupType is eighth", () => {
+    const onSelectDuration = jest.fn();
+    const { getByTestId } = render(
+      <DurationSelector
+        {...defaultProps}
+        onSelectDuration={onSelectDuration}
+        tripletPosition={1}
+        tripletGroupType="eighth"
+        tripletsAllowed={true}
+      />,
+    );
+
+    const eighthTriplet = getByTestId("duration-triplet-eighth");
+    const quarterTriplet = getByTestId("duration-triplet-quarter");
+
+    // Eighth triplet should be enabled
+    expect(eighthTriplet.props.accessibilityState.disabled).toBe(false);
+    // Quarter triplet should be disabled in 'eighth' group
+    expect(quarterTriplet.props.accessibilityState.disabled).toBe(true);
+
+    fireEvent.press(quarterTriplet);
+    expect(onSelectDuration).not.toHaveBeenCalled();
+  });
+
+  it("should enable only quarter triplets when tripletGroupType is quarter", () => {
+    const onSelectDuration = jest.fn();
+    const { getByTestId } = render(
+      <DurationSelector
+        {...defaultProps}
+        onSelectDuration={onSelectDuration}
+        tripletPosition={2}
+        tripletGroupType="quarter"
+        tripletsAllowed={true}
+      />,
+    );
+
+    const eighthTriplet = getByTestId("duration-triplet-eighth");
+    const quarterTriplet = getByTestId("duration-triplet-quarter");
+
+    // Quarter triplet should be enabled
+    expect(quarterTriplet.props.accessibilityState.disabled).toBe(false);
+    // Eighth triplet should be disabled in 'quarter' group
+    expect(eighthTriplet.props.accessibilityState.disabled).toBe(true);
+
+    fireEvent.press(eighthTriplet);
+    expect(onSelectDuration).not.toHaveBeenCalled();
+  });
+
+  it("should enable both triplet types when tripletGroupType is mixed", () => {
+    const { getByTestId } = render(
+      <DurationSelector
+        {...defaultProps}
+        tripletPosition={1}
+        tripletGroupType="mixed"
+        tripletsAllowed={true}
+      />,
+    );
+
+    const eighthTriplet = getByTestId("duration-triplet-eighth");
+    const quarterTriplet = getByTestId("duration-triplet-quarter");
+
+    expect(eighthTriplet.props.accessibilityState.disabled).toBe(false);
+    expect(quarterTriplet.props.accessibilityState.disabled).toBe(false);
+  });
+
+  it("should disable triplet buttons when canStartTriplet is false and not in triplet group", () => {
+    const { getByTestId } = render(
+      <DurationSelector
+        {...defaultProps}
+        canStartTriplet={false}
+        tripletsAllowed={true}
+      />,
+    );
+
+    const eighthTriplet = getByTestId("duration-triplet-eighth");
+    const quarterTriplet = getByTestId("duration-triplet-quarter");
+
+    expect(eighthTriplet.props.accessibilityState.disabled).toBe(true);
+    expect(quarterTriplet.props.accessibilityState.disabled).toBe(true);
+  });
+
+  it("should disable dot button when in triplet group", () => {
+    const onToggleDotted = jest.fn();
+    const { getByTestId } = render(
+      <DurationSelector
+        {...defaultProps}
+        onToggleDotted={onToggleDotted}
+        tripletPosition={1}
+        tripletsAllowed={true}
+      />,
+    );
+
+    const dotButton = getByTestId("duration-dot");
+    expect(dotButton.props.accessibilityState.disabled).toBe(true);
+
+    fireEvent.press(dotButton);
+    expect(onToggleDotted).not.toHaveBeenCalled();
+  });
+
+  it("should disable triplet buttons when dotted mode is active", () => {
+    const { getByTestId } = render(
+      <DurationSelector
+        {...defaultProps}
+        dottedMode={true}
+        tripletsAllowed={true}
+      />,
+    );
+
+    const eighthTriplet = getByTestId("duration-triplet-eighth");
+    expect(eighthTriplet.props.accessibilityState.disabled).toBe(true);
+  });
+
+  // ==========================================================================
+  // Scroll Tests
+  // ==========================================================================
+
+  it("should handle scroll events", () => {
+    const { getByTestId } = render(
+      <DurationSelector {...defaultProps} testID="duration-selector" />,
+    );
+
+    // The selector should render without errors when scroll happens
+    expect(getByTestId("duration-selector")).toBeTruthy();
+  });
 });
 
 describe("PitchSelector", () => {

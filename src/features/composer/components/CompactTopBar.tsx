@@ -23,6 +23,7 @@ import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../constants";
 import TimeSignaturePickerModal from "../../../components/Metronome/TimeSignaturePickerModal";
+import { getKeyName, ALL_KEY_SIGNATURES } from "../constants";
 import type { Clef, TimeSignature, KeySignature } from "../types";
 
 // =============================================================================
@@ -65,28 +66,6 @@ export interface CompactTopBarProps {
   /** Test ID for testing */
   testID?: string;
 }
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-const KEY_NAMES: Record<string, string> = {
-  "-7": "C♭ Major",
-  "-6": "G♭ Major",
-  "-5": "D♭ Major",
-  "-4": "A♭ Major",
-  "-3": "E♭ Major",
-  "-2": "B♭ Major",
-  "-1": "F Major",
-  "0": "C Major",
-  "1": "G Major",
-  "2": "D Major",
-  "3": "A Major",
-  "4": "E Major",
-  "5": "B Major",
-  "6": "F♯ Major",
-  "7": "C♯ Major",
-};
 
 // =============================================================================
 // Component
@@ -177,7 +156,7 @@ function CompactTopBarComponent({
   }, [onZoomChange]);
 
   const tsDisplay = `${timeSignature.beats}/${timeSignature.beatUnit}`;
-  const keyName = KEY_NAMES[String(keySignature)] || "C Major";
+  const keyName = getKeyName(keySignature);
 
   return (
     <View style={styles.container} testID={testID}>
@@ -457,9 +436,9 @@ function CompactTopBarComponent({
           >
             <Text style={styles.keyModalTitle}>Select Key</Text>
             <ScrollView style={styles.keyScroll}>
-              {Array.from({ length: 15 }, (_, i) => i - 7).map((k) => {
+              {ALL_KEY_SIGNATURES.map((k) => {
                 const isSelected = k === keySignature;
-                const kName = KEY_NAMES[String(k)] || "C Major";
+                const kName = getKeyName(k);
                 return (
                   <TouchableOpacity
                     key={k}

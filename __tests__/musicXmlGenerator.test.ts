@@ -201,7 +201,31 @@ describe("MusicXML Generator", () => {
       const score = createScoreWithNotes([note]);
       const xml = generateMusicXml(score);
 
+      // Natural accidental doesn't add <alter> element (alter=0 is omitted)
+      expect(xml).not.toContain("<alter>");
       expect(xml).toContain("<accidental>natural</accidental>");
+    });
+
+    it("should generate double-sharp accidental", () => {
+      const note = createNote(62, DURATION.QUARTER, {
+        accidental: "double-sharp",
+      }); // C##4 (enharmonic to D4)
+      const score = createScoreWithNotes([note]);
+      const xml = generateMusicXml(score);
+
+      expect(xml).toContain("<alter>2</alter>");
+      expect(xml).toContain("<accidental>double-sharp</accidental>");
+    });
+
+    it("should generate double-flat accidental", () => {
+      const note = createNote(58, DURATION.QUARTER, {
+        accidental: "double-flat",
+      }); // Cbb4 (enharmonic to Bb3)
+      const score = createScoreWithNotes([note]);
+      const xml = generateMusicXml(score);
+
+      expect(xml).toContain("<alter>-2</alter>");
+      expect(xml).toContain("<accidental>flat-flat</accidental>");
     });
 
     it("should generate tie start", () => {
@@ -598,6 +622,251 @@ describe("MusicXML Generator", () => {
         .length;
       expect(beginCount).toBe(2);
       expect(endCount).toBe(2);
+    });
+  });
+
+  describe("Triplet notation", () => {
+    it("should generate time-modification for triplet notes", () => {
+      const groupId = "triplet-1";
+      const notes = [
+        createNote(60, DURATION.TRIPLET_QUARTER, {
+          tripletGroupId: groupId,
+          tripletPosition: 1,
+        }),
+      ];
+      const measure = createMeasure();
+      measure.notes = notes;
+      const score = createScore({ measures: [measure] });
+
+      const xml = generateMusicXml(score);
+
+      expect(xml).toContain("<time-modification>");
+      expect(xml).toContain("<actual-notes>3</actual-notes>");
+      expect(xml).toContain("<normal-notes>2</normal-notes>");
+    });
+
+    it("should generate tuplet start for first note in triplet", () => {
+      const groupId = "triplet-1";
+      const notes = [
+        createNote(60, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: groupId,
+          tripletPosition: 1,
+        }),
+        createNote(62, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: groupId,
+          tripletPosition: 2,
+        }),
+        createNote(64, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: groupId,
+          tripletPosition: 3,
+        }),
+      ];
+      const measure = createMeasure();
+      measure.notes = notes;
+      const score = createScore({ measures: [measure] });
+
+      const xml = generateMusicXml(score);
+
+      expect(xml).toContain('<tuplet type="start"');
+    });
+
+    it("should generate tuplet stop for last note in triplet group", () => {
+      const groupId = "triplet-1";
+      const notes = [
+        createNote(60, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: groupId,
+          tripletPosition: 1,
+        }),
+        createNote(62, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: groupId,
+          tripletPosition: 2,
+        }),
+        createNote(64, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: groupId,
+          tripletPosition: 3,
+        }),
+      ];
+      const measure = createMeasure();
+      measure.notes = notes;
+      const score = createScore({ measures: [measure] });
+
+      const xml = generateMusicXml(score);
+
+      expect(xml).toContain('<tuplet type="stop"');
+    });
+
+    it("should generate time-modification for triplet rests", () => {
+      const groupId = "triplet-1";
+      const notes = [
+        createNote(60, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: groupId,
+          tripletPosition: 1,
+        }),
+        createRest(DURATION.TRIPLET_EIGHTH),
+        createNote(64, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: groupId,
+          tripletPosition: 3,
+        }),
+      ];
+      // Add triplet info to rest
+      notes[1].tripletGroupId = groupId;
+      notes[1].tripletPosition = 2;
+
+      const measure = createMeasure();
+      measure.notes = notes;
+      const score = createScore({ measures: [measure] });
+
+      const xml = generateMusicXml(score);
+
+      // Should have 3 time-modification elements (one per triplet note/rest)
+      const timeModCount = (xml.match(/<time-modification>/g) || []).length;
+      expect(timeModCount).toBe(3);
+    });
+  });
+
+  describe("Tie generation", () => {
+    it("should generate both tie start and end on middle note", () => {
+      const notes = [
+        createNote(60, DURATION.HALF, { tieStart: true }),
+        createNote(60, DURATION.QUARTER, { tieStart: true, tieEnd: true }),
+        createNote(60, DURATION.QUARTER, { tieEnd: true }),
+      ];
+      const measure = createMeasure();
+      measure.notes = notes;
+      const score = createScore({ measures: [measure] });
+
+      const xml = generateMusicXml(score);
+
+      // Count tie starts and ends
+      const tieStartCount = (xml.match(/<tie type="start"\/>/g) || []).length;
+      const tieStopCount = (xml.match(/<tie type="stop"\/>/g) || []).length;
+      expect(tieStartCount).toBe(2);
+      expect(tieStopCount).toBe(2);
+    });
+  });
+
+  describe("Dotted notes", () => {
+    it("should generate dot element for dotted quarter", () => {
+      const note = createNote(60, DURATION.QUARTER, { dotted: true });
+      const measure = createMeasure();
+      measure.notes = [note];
+      const score = createScore({ measures: [measure] });
+
+      const xml = generateMusicXml(score);
+
+      expect(xml).toContain("<dot/>");
+      // Dotted quarter = 1.5 quarters = 18 divisions (12 * 1.5)
+      expect(xml).toContain("<duration>18</duration>");
+    });
+
+    it("should generate dot element for dotted half", () => {
+      const note = createNote(60, DURATION.HALF, { dotted: true });
+      const measure = createMeasure();
+      measure.notes = [note];
+      const score = createScore({ measures: [measure] });
+
+      const xml = generateMusicXml(score);
+
+      expect(xml).toContain("<dot/>");
+      // Dotted half = 1.5 halfs = 36 divisions (24 * 1.5)
+      expect(xml).toContain("<duration>36</duration>");
+    });
+
+    it("should not generate dot for non-dotted notes", () => {
+      const note = createNote(60, DURATION.QUARTER);
+      const measure = createMeasure();
+      measure.notes = [note];
+      const score = createScore({ measures: [measure] });
+
+      const xml = generateMusicXml(score);
+
+      expect(xml).not.toContain("<dot/>");
+    });
+  });
+
+  describe("Cursor position", () => {
+    it("should add cursor comment at specified measure", () => {
+      const notes = [createNote(60, DURATION.QUARTER)];
+      const measure = createMeasure();
+      measure.notes = notes;
+      const score = createScore({ measures: [measure, createMeasure()] });
+
+      const xml = generateMusicXml(score, {
+        cursorPosition: { measureIndex: 0, noteIndex: 2 },
+      });
+
+      expect(xml).toContain("<!-- cursor:2 -->");
+    });
+
+    it("should only add cursor to correct measure", () => {
+      const notes = [createNote(60, DURATION.QUARTER)];
+      const measure1 = createMeasure();
+      measure1.notes = notes;
+      const measure2 = createMeasure();
+      measure2.notes = [createNote(62, DURATION.QUARTER)];
+      const score = createScore({ measures: [measure1, measure2] });
+
+      const xml = generateMusicXml(score, {
+        cursorPosition: { measureIndex: 1, noteIndex: 0 },
+      });
+
+      // Should only appear once (in measure 2)
+      const cursorCount = (xml.match(/<!-- cursor:/g) || []).length;
+      expect(cursorCount).toBe(1);
+    });
+  });
+
+  describe("Final barline", () => {
+    it("should add light-heavy barline to last measure", () => {
+      const measure = createMeasure();
+      measure.notes = [createNote(60, DURATION.QUARTER)];
+      const score = createScore({ measures: [measure] });
+
+      const xml = generateMusicXml(score);
+
+      expect(xml).toContain('<barline location="right">');
+      expect(xml).toContain("<bar-style>light-heavy</bar-style>");
+    });
+
+    it("should only add barline to last measure", () => {
+      const score = createScore({
+        measures: [createMeasure(), createMeasure()],
+      });
+
+      const xml = generateMusicXml(score);
+
+      // Should only appear once
+      const barlineCount = (xml.match(/<barline/g) || []).length;
+      expect(barlineCount).toBe(1);
+    });
+  });
+
+  describe("Validation edge cases", () => {
+    it("should reject MIDI value above 127", () => {
+      const note = createNote(200, DURATION.QUARTER);
+      const measure = createMeasure();
+      measure.notes = [note];
+      const score = createScore({ measures: [measure] });
+
+      const result = validateScoreForExport(score);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors[0]).toContain("Invalid MIDI value 200");
+    });
+
+    it("should validate score with multiple measures", () => {
+      const validNote = createNote(60, DURATION.QUARTER);
+      const invalidNote = createNote(-5, DURATION.QUARTER);
+      const measure1 = createMeasure();
+      measure1.notes = [validNote];
+      const measure2 = createMeasure();
+      measure2.notes = [invalidNote];
+      const score = createScore({ measures: [measure1, measure2] });
+
+      const result = validateScoreForExport(score);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors[0]).toContain("measure 2");
     });
   });
 });
