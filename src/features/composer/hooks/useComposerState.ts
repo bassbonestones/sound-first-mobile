@@ -119,6 +119,8 @@ export interface UseComposerStateReturn {
   tripletPosition: 1 | 2 | 3 | undefined;
   /** Current triplet group type: 'eighth' (only eighths), 'quarter' (only quarters), 'mixed' (both allowed) */
   tripletGroupType: "eighth" | "quarter" | "mixed" | undefined;
+  /** Whether triplets can be started at the current cursor position (beat position divisible by 1/3) */
+  canStartTriplet: boolean;
 
   // Navigation
   moveCursor: (direction: "left" | "right" | "start" | "end") => void;
@@ -254,6 +256,23 @@ export function useComposerState(
     // Otherwise it's a mixed group (both types allowed)
     return { type: "mixed", totalDuration };
   }, [score.measures, cursor.measureIndex, noteAtCursor]);
+
+  // Check if triplets can be started at the current cursor position
+  // Triplets divide beats into thirds, so we can only start a triplet at
+  // positions divisible by 1/3 (i.e., beatPosition * 3 is an integer)
+  const canStartTriplet = useMemo((): boolean => {
+    // If already in a triplet group, triplets are always allowed (continuing the group)
+    if (noteAtCursor?.tripletGroupId) return true;
+
+    const measure = score.measures[cursor.measureIndex];
+    if (!measure) return true; // Empty measure, can start triplet
+
+    const beatPosition = getBeatPositionAt(measure, cursor.noteIndex);
+    // Check if beatPosition * 3 is close to an integer
+    const tolerance = 0.001;
+    const beatTimes3 = beatPosition * 3;
+    return Math.abs(beatTimes3 - Math.round(beatTimes3)) < tolerance;
+  }, [score.measures, cursor.measureIndex, cursor.noteIndex, noteAtCursor]);
 
   const currentMeasureValidation = useMemo((): MeasureValidation => {
     const measure = score.measures[cursor.measureIndex];
@@ -1824,6 +1843,10 @@ export function useComposerState(
         state.score.measures[position.measureIndex]?.notes[position.noteIndex];
       if (!note || note.midi === null) return;
 
+      // Toggle behavior: if clicking the same accidental, remove it
+      const targetAccidental =
+        note.accidental === accidental ? undefined : accidental;
+
       // Calculate the base MIDI (the pitch without any accidental)
       // by reversing the effect of the current accidental
       let baseMidi = note.midi;
@@ -1836,13 +1859,13 @@ export function useComposerState(
       // Calculate new MIDI by applying the new accidental to the base
       const noteName = midiToNoteName(baseMidi);
       const octave = midiToOctave(baseMidi);
-      const newMidi = noteToMidi(noteName, octave, accidental);
+      const newMidi = noteToMidi(noteName, octave, targetAccidental);
 
       const action = createApplyAccidentalAction(
         position,
         note.id,
         note.accidental,
-        accidental,
+        targetAccidental,
         note.midi,
         newMidi,
       );
@@ -1855,7 +1878,9 @@ export function useComposerState(
             ? {
                 ...m,
                 notes: m.notes.map((n) =>
-                  n.id === note.id ? { ...n, accidental, midi: newMidi } : n,
+                  n.id === note.id
+                    ? { ...n, accidental: targetAccidental, midi: newMidi }
+                    : n,
                 ),
               }
             : m,
@@ -2603,6 +2628,7 @@ export function useComposerState(
     toggleDottedMode,
     tripletPosition: noteAtCursor?.tripletPosition,
     tripletGroupType: tripletGroupInfo?.type,
+    canStartTriplet,
 
     // Navigation
     moveCursor,

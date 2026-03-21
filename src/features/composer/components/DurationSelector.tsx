@@ -42,6 +42,8 @@ export interface DurationSelectorProps {
   tripletGroupType?: "eighth" | "quarter" | "mixed";
   /** Whether triplets are allowed (only true when beat unit is quarter note) */
   tripletsAllowed?: boolean;
+  /** Whether triplets can be started at current position (beat position divisible by 1/3) */
+  canStartTriplet?: boolean;
   /** Whether the selector is disabled */
   disabled?: boolean;
   /** Test ID for testing */
@@ -138,6 +140,7 @@ function DurationSelectorComponent({
   tripletPosition,
   tripletGroupType,
   tripletsAllowed = true,
+  canStartTriplet = true,
   disabled = false,
   testID,
 }: DurationSelectorProps): React.ReactElement {
@@ -228,6 +231,11 @@ function DurationSelectorComponent({
               dottedMode &&
               (option.value === DURATION.SIXTEENTH || option.isTriplet)
             ) {
+              isButtonDisabled = true;
+            }
+
+            // When NOT in a triplet group, disable triplet buttons if position isn't triplet-compatible
+            if (!inTripletGroup && option.isTriplet && !canStartTriplet) {
               isButtonDisabled = true;
             }
 

@@ -1398,6 +1398,61 @@ describe("useComposerState", () => {
 
       expect(result.current.selectedNote?.accidental).toBeUndefined();
     });
+
+    it("should toggle accidental off when clicking same accidental", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      const originalMidi = result.current.score.measures[0].notes[0].midi;
+
+      act(() => {
+        result.current.moveCursor("left");
+      });
+
+      // Apply sharp
+      act(() => {
+        result.current.applyAccidental("sharp");
+      });
+      expect(result.current.selectedNote?.accidental).toBe("sharp");
+      expect(result.current.selectedNote?.midi).toBe(originalMidi! + 1);
+
+      // Click sharp again - should toggle it off
+      act(() => {
+        result.current.applyAccidental("sharp");
+      });
+      expect(result.current.selectedNote?.accidental).toBeUndefined();
+      expect(result.current.selectedNote?.midi).toBe(originalMidi);
+    });
+
+    it("should switch accidental when clicking different accidental", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      const originalMidi = result.current.score.measures[0].notes[0].midi;
+
+      act(() => {
+        result.current.moveCursor("left");
+      });
+
+      // Apply sharp
+      act(() => {
+        result.current.applyAccidental("sharp");
+      });
+      expect(result.current.selectedNote?.accidental).toBe("sharp");
+
+      // Click flat - should switch to flat (not toggle off)
+      act(() => {
+        result.current.applyAccidental("flat");
+      });
+      expect(result.current.selectedNote?.accidental).toBe("flat");
+      expect(result.current.selectedNote?.midi).toBe(originalMidi! - 1);
+    });
   });
 
   describe("ties", () => {
@@ -1423,6 +1478,100 @@ describe("useComposerState", () => {
       });
 
       expect(result.current.selectedNote?.tieStart).toBe(false);
+    });
+  });
+
+  describe("canStartTriplet", () => {
+    it("should be true at beat position 0", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      // At start of measure (beat 0), can start triplet
+      expect(result.current.canStartTriplet).toBe(true);
+    });
+
+    it("should be true after a quarter note (position 1)", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      act(() => {
+        result.current.insertNote("C"); // quarter note at beat 0
+      });
+
+      // Now at beat 1, which is divisible by 1/3
+      expect(result.current.canStartTriplet).toBe(true);
+    });
+
+    it("should be false after a 16th note (position 0.25)", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      act(() => {
+        result.current.setDuration(DURATION.SIXTEENTH);
+      });
+
+      act(() => {
+        result.current.insertNote("C"); // 16th note at beat 0
+      });
+
+      // Now at beat 0.25, which is NOT divisible by 1/3
+      expect(result.current.canStartTriplet).toBe(false);
+    });
+
+    it("should be false after an 8th note (position 0.5)", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      act(() => {
+        result.current.setDuration(DURATION.EIGHTH);
+      });
+
+      act(() => {
+        result.current.insertNote("C"); // 8th note at beat 0
+      });
+
+      // Now at beat 0.5, which is NOT divisible by 1/3
+      expect(result.current.canStartTriplet).toBe(false);
+    });
+
+    it("should be true after a triplet eighth (position 1/3)", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      act(() => {
+        result.current.setDuration(DURATION.TRIPLET_EIGHTH);
+      });
+
+      act(() => {
+        result.current.insertNote("C"); // triplet 8th at beat 0
+      });
+
+      // Now at beat 1/3, which is divisible by 1/3
+      // Also, we're in a triplet group so it should be true
+      expect(result.current.canStartTriplet).toBe(true);
+    });
+
+    it("should be true when inside a triplet group", () => {
+      const { result } = renderHook(() => useComposerState());
+
+      act(() => {
+        result.current.setDuration(DURATION.TRIPLET_EIGHTH);
+      });
+
+      act(() => {
+        result.current.insertNote("C");
+      });
+
+      act(() => {
+        result.current.insertNote("D");
+      });
+
+      // Move back to first triplet note
+      act(() => {
+        result.current.moveCursor("left");
+      });
+      act(() => {
+        result.current.moveCursor("left");
+      });
+
+      // Even though position might not be exactly on triplet grid,
+      // being in a triplet group should allow continuing
+      expect(result.current.canStartTriplet).toBe(true);
     });
   });
 });

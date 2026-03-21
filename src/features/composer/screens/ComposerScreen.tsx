@@ -633,6 +633,7 @@ function ComposerScreenContent({
             tripletPosition={composerState.tripletPosition}
             tripletGroupType={composerState.tripletGroupType}
             tripletsAllowed={composerState.score.timeSignature.beatUnit === 4}
+            canStartTriplet={composerState.canStartTriplet}
             onPitchTap={handlePitchEnter}
             onOctaveChange={composerState.changeOctave}
             onAccidental={composerState.applyAccidental}
