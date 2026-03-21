@@ -484,10 +484,11 @@ function ComposerScreenContent({
   const isPlaying = playback.state === "playing";
 
   // Compute which note should be highlighted
-  // When playing: highlight the note at playback position
+  // During playback: highlight the currently playing note
   // When not playing: highlight the selected note
   const highlightedNoteId = useMemo(() => {
     if (isPlaying) {
+      // During playback, highlight the currently playing note
       const { measureIndex, noteIndex } = playback.position;
       const measure = composerState.score.measures[measureIndex];
       if (measure && measure.notes[noteIndex]) {

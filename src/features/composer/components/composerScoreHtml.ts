@@ -67,19 +67,16 @@ export function generateComposerOsmdHtml(
     html, body {
       width: 100%;
       height: 100%;
-      overflow: hidden;
+      overflow: visible;
       background-color: ${backgroundColor};
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     
     #container {
-      width: 100%;
+      width: fit-content;
+      min-width: 100%;
       height: 100%;
-      overflow: auto;
-      overflow-x: auto;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      scroll-behavior: smooth;
+      overflow: visible;
     }
     
     #osmd-container {
@@ -155,6 +152,7 @@ export function generateComposerOsmdHtml(
     let pendingMusicXml = null;
     let noteElements = []; // Map of note IDs to SVG elements
     let lastSelectedNoteId = null;
+    let lastSmoothScrolledMeasure = -1; // Track last smooth-scrolled measure (for playback only)
 
     // Send message to React Native
     function sendMessage(type, payload) {
@@ -258,6 +256,7 @@ export function generateComposerOsmdHtml(
         setZoom(currentZoom);
         buildNoteMap();
         addNoteClickHandlers();
+        sendMeasurePositions();
         sendMessage('rendered');
       } catch (error) {
         console.error('Render error:', error);
@@ -265,6 +264,41 @@ export function generateComposerOsmdHtml(
         sendMessage('error', error.message);
       }
     };
+
+    // Send measure positions to parent for external scrolling
+    function sendMeasurePositions() {
+      if (!osmd || !osmd.graphic || !osmd.graphic.measureList) return;
+      
+      const measureList = osmd.graphic.measureList;
+      const positions = [];
+      
+      for (let i = 0; i < measureList.length; i++) {
+        const measure = measureList[i];
+        if (!measure || !measure[0]) continue;
+        
+        const staffMeasure = measure[0];
+        if (!staffMeasure.boundingBox) continue;
+        
+        const bbox = staffMeasure.boundingBox;
+        const posX = bbox.absolutePosition ? bbox.absolutePosition.x : bbox.x;
+        const width = bbox.width || 0;
+        
+        if (posX !== undefined && !isNaN(posX)) {
+          // Convert to pixels (OSMD units * 10 * zoom)
+          positions.push({
+            measureIndex: i,
+            x: posX * 10,
+            width: width * 10
+          });
+        }
+      }
+      
+      // Also get total content width
+      const container = document.getElementById('osmd-container');
+      const contentWidth = container ? container.scrollWidth : 0;
+      
+      sendMessage('measurePositions', { positions, contentWidth, zoom: currentZoom });
+    }
 
     // Build map of notes for click detection
     function buildNoteMap() {
@@ -358,7 +392,7 @@ export function generateComposerOsmdHtml(
       sendMessage('zoomChange', zoom);
     };
 
-    // Scroll to a specific measure
+    // Scroll to a specific measure (instant, for editing)
     window.scrollToMeasure = function(measureIndex) {
       if (!osmd || !osmd.graphic || !osmd.graphic.measureList) return;
       
@@ -371,23 +405,69 @@ export function generateComposerOsmdHtml(
       const staffMeasure = measure[0];
       if (!staffMeasure.boundingBox) return;
 
+      // OSMD bounding box uses absolutePosition for coordinates
       const bbox = staffMeasure.boundingBox;
-      const scrollX = (bbox.x * 10 * currentZoom) - 50; // Offset for visibility
+      const posX = bbox.absolutePosition ? bbox.absolutePosition.x : bbox.x;
+      if (posX === undefined || isNaN(posX)) return;
+      
+      const scrollX = (posX * 10 * currentZoom) - 50; // Offset for visibility
 
       const container = document.getElementById('container');
       if (container) {
         container.scrollTo({
           left: Math.max(0, scrollX),
-          behavior: 'smooth'
+          behavior: 'instant'
         });
       }
+    };
+
+    // Scroll to a specific measure with smooth animation (for playback)
+    window.scrollToMeasureSmooth = function(measureIndex) {
+      // Skip if already at this measure (avoid redundant scrolls during playback)
+      if (measureIndex === lastSmoothScrolledMeasure) return;
+      
+      if (!osmd || !osmd.graphic || !osmd.graphic.measureList) return;
+      
+      const measureList = osmd.graphic.measureList;
+      if (measureIndex >= measureList.length) return;
+
+      const measure = measureList[measureIndex];
+      if (!measure || !measure[0]) return;
+
+      const staffMeasure = measure[0];
+      if (!staffMeasure.boundingBox) return;
+
+      // OSMD bounding box uses absolutePosition for coordinates
+      const bbox = staffMeasure.boundingBox;
+      const posX = bbox.absolutePosition ? bbox.absolutePosition.x : bbox.x;
+      if (posX === undefined || isNaN(posX)) return;
+      
+      // Keep measure at ~15% from left edge for better visibility
+      const container = document.getElementById('container');
+      if (!container) return;
+      
+      const containerWidth = container.clientWidth;
+      const leadSpace = containerWidth * 0.15;
+      const scrollX = (posX * 10 * currentZoom) - leadSpace;
+
+      container.scrollTo({
+        left: Math.max(0, scrollX),
+        behavior: 'smooth'
+      });
+      
+      lastSmoothScrolledMeasure = measureIndex;
+    };
+    
+    // Reset smooth scroll tracking (call when playback stops)
+    window.resetSmoothScrollTracking = function() {
+      lastSmoothScrolledMeasure = -1;
     };
 
     // Show cursor at position
     window.showCursor = function(measureIndex, noteIndex) {
       // For now, just scroll to measure
       // Future: Show actual cursor indicator element
-      scrollToMeasure(measureIndex);
+      window.scrollToMeasure(measureIndex);
     };
 
     // Show error message

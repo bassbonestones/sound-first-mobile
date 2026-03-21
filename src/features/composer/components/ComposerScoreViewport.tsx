@@ -25,6 +25,7 @@ import {
   Text,
   TouchableOpacity,
   Platform,
+  ScrollView,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
@@ -120,10 +121,17 @@ function ComposerScoreViewportComponent({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const webViewRef = useRef<any>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [internalZoom, setInternalZoom] = useState(initialZoom);
+  const [measurePositions, setMeasurePositions] = useState<
+    { measureIndex: number; x: number; width: number }[]
+  >([]);
+  const [contentWidth, setContentWidth] = useState(2000);
+  const [osmdZoom, setOsmdZoom] = useState(1);
+  const lastScrolledMeasureRef = useRef(-1);
 
   // Use controlled zoom if provided, otherwise internal state
   const zoom = controlledZoom ?? internalZoom;
@@ -167,23 +175,45 @@ function ComposerScoreViewportComponent({
     }
   }, [isReady, musicXml, executeScript]);
 
-  // Scroll to cursor or playback position
+  // Scroll the parent ScrollView during playback
   useEffect(() => {
-    if (isReady) {
-      // During playback, scroll to playback position; otherwise cursor
-      const measureToShow =
-        playbackState === "playing" && playbackMeasureIndex !== undefined
-          ? playbackMeasureIndex
-          : cursor.measureIndex;
-      executeScript(`window.scrollToMeasure(${measureToShow})`);
+    if (playbackState === "playing" && playbackMeasureIndex !== undefined) {
+      // Skip if we've already scrolled to this measure
+      if (playbackMeasureIndex === lastScrolledMeasureRef.current) return;
+      lastScrolledMeasureRef.current = playbackMeasureIndex;
+
+      // Find the position for this measure
+      const measurePos = measurePositions.find(
+        (m) => m.measureIndex === playbackMeasureIndex,
+      );
+      if (measurePos && scrollViewRef.current) {
+        // Calculate scroll position - keep measure ~15% from left edge
+        const scrollX = measurePos.x * osmdZoom - 50;
+        scrollViewRef.current.scrollTo({
+          x: Math.max(0, scrollX),
+          animated: true,
+        });
+      }
+    } else if (playbackState === "stopped") {
+      lastScrolledMeasureRef.current = -1;
     }
-  }, [
-    isReady,
-    cursor.measureIndex,
-    playbackState,
-    playbackMeasureIndex,
-    executeScript,
-  ]);
+  }, [playbackState, playbackMeasureIndex, measurePositions, osmdZoom]);
+
+  // Scroll to cursor when not playing (for editing)
+  useEffect(() => {
+    if (playbackState === "playing") return;
+
+    const measurePos = measurePositions.find(
+      (m) => m.measureIndex === cursor.measureIndex,
+    );
+    if (measurePos && scrollViewRef.current) {
+      const scrollX = measurePos.x * osmdZoom - 50;
+      scrollViewRef.current.scrollTo({
+        x: Math.max(0, scrollX),
+        animated: false,
+      });
+    }
+  }, [cursor.measureIndex, playbackState, measurePositions, osmdZoom]);
 
   // Apply zoom when controlled zoom changes
   useEffect(() => {
@@ -217,6 +247,22 @@ function ComposerScoreViewportComponent({
             setIsLoading(false);
             onRenderComplete?.();
             break;
+
+          case "measurePositions": {
+            const {
+              positions,
+              contentWidth: width,
+              zoom: reportedZoom,
+            } = data.payload as {
+              positions: { measureIndex: number; x: number; width: number }[];
+              contentWidth: number;
+              zoom: number;
+            };
+            setMeasurePositions(positions);
+            setContentWidth(width);
+            setOsmdZoom(reportedZoom);
+            break;
+          }
 
           case "error":
             setError(data.payload as string);
@@ -254,7 +300,7 @@ function ComposerScoreViewportComponent({
         // Ignore parse errors
       }
     },
-    [onNoteTap, onRenderComplete, onError],
+    [onNoteTap, onRenderComplete, onError, executeScript],
   );
 
   // Web iframe message listener
@@ -311,42 +357,53 @@ function ComposerScoreViewportComponent({
 
   return (
     <View style={styles.container} testID={testID}>
-      {/* Score viewport */}
+      {/* Score viewport with parent scrolling */}
       <View style={styles.viewportContainer}>
-        {Platform.OS === "web" ? (
-          <iframe
-            ref={iframeRef as React.RefObject<HTMLIFrameElement>}
-            srcDoc={html}
-            style={{
-              width: "100%",
-              height: "100%",
-              border: "none",
-              backgroundColor: "white",
-            }}
-            sandbox="allow-scripts"
-          />
-        ) : WebView ? (
-          <WebView
-            ref={webViewRef as React.RefObject<InstanceType<typeof WebView>>}
-            source={{ html }}
-            style={styles.webView}
-            originWhitelist={["*"]}
-            javaScriptEnabled
-            domStorageEnabled
-            scrollEnabled={false} // Container handles scrolling
-            onMessage={handleMessage}
-            onError={(e) => {
-              setError("Failed to load renderer");
-              onError?.("Failed to load renderer");
-            }}
-          />
-        ) : (
-          <View style={styles.noWebView}>
-            <Text style={styles.noWebViewText}>
-              WebView not available on this platform
-            </Text>
-          </View>
-        )}
+        <ScrollView
+          ref={scrollViewRef}
+          horizontal
+          showsHorizontalScrollIndicator
+          style={styles.scrollView}
+          contentContainerStyle={{
+            width: contentWidth * osmdZoom,
+            height: "100%",
+          }}
+        >
+          {Platform.OS === "web" ? (
+            <iframe
+              ref={iframeRef as React.RefObject<HTMLIFrameElement>}
+              srcDoc={html}
+              style={{
+                width: contentWidth * osmdZoom,
+                height: "100%",
+                border: "none",
+                backgroundColor: "white",
+              }}
+              sandbox="allow-scripts"
+            />
+          ) : WebView ? (
+            <WebView
+              ref={webViewRef as React.RefObject<InstanceType<typeof WebView>>}
+              source={{ html }}
+              style={[styles.webView, { width: contentWidth * osmdZoom }]}
+              originWhitelist={["*"]}
+              javaScriptEnabled
+              domStorageEnabled
+              scrollEnabled={false}
+              onMessage={handleMessage}
+              onError={() => {
+                setError("Failed to load renderer");
+                onError?.("Failed to load renderer");
+              }}
+            />
+          ) : (
+            <View style={styles.noWebView}>
+              <Text style={styles.noWebViewText}>
+                WebView not available on this platform
+              </Text>
+            </View>
+          )}
+        </ScrollView>
 
         {/* Loading overlay */}
         {isLoading && (
@@ -451,6 +508,9 @@ const styles = StyleSheet.create({
   viewportContainer: {
     flex: 1,
     position: "relative",
+  },
+  scrollView: {
+    flex: 1,
   },
   webView: {
     flex: 1,
