@@ -154,7 +154,8 @@ function DurationSelectorComponent({
   // Calculate minimum content width based on visible buttons
   // (visible duration buttons + 1 dot) * 44px + gaps * 2px + marginLeft on dot
   const buttonCount = visibleOptions.length + 1; // +1 for dot button
-  const MIN_CONTENT_WIDTH = buttonCount * 44 + (buttonCount - 1) * 2 + spacing.xs;
+  const MIN_CONTENT_WIDTH =
+    buttonCount * 44 + (buttonCount - 1) * 2 + spacing.xs;
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
