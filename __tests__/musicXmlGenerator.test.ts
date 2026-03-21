@@ -452,4 +452,152 @@ describe("MusicXML Generator", () => {
       expect(xml).toContain("<octave>9</octave>"); // MIDI 127 = G9
     });
   });
+
+  describe("Triplet beaming", () => {
+    it("should beam three consecutive triplet eighths", () => {
+      const groupId = "triplet-1";
+      const notes = [
+        createNote(60, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: groupId,
+          tripletPosition: 1,
+        }),
+        createNote(62, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: groupId,
+          tripletPosition: 2,
+        }),
+        createNote(64, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: groupId,
+          tripletPosition: 3,
+        }),
+      ];
+      const measure = createMeasure();
+      measure.notes = notes;
+      const score = createScore({ measures: [measure] });
+
+      const xml = generateMusicXml(score);
+
+      expect(xml).toContain('<beam number="1">begin</beam>');
+      expect(xml).toContain('<beam number="1">continue</beam>');
+      expect(xml).toContain('<beam number="1">end</beam>');
+    });
+
+    it("should beam two consecutive triplet eighths", () => {
+      const groupId = "triplet-1";
+      const notes = [
+        createNote(60, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: groupId,
+          tripletPosition: 1,
+        }),
+        createNote(62, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: groupId,
+          tripletPosition: 2,
+        }),
+        createRest(DURATION.TRIPLET_EIGHTH), // Rest at position 3
+      ];
+      const measure = createMeasure();
+      measure.notes = notes;
+      // Rest needs triplet info too
+      measure.notes[2].tripletGroupId = groupId;
+      measure.notes[2].tripletPosition = 3;
+      const score = createScore({ measures: [measure] });
+
+      const xml = generateMusicXml(score);
+
+      expect(xml).toContain('<beam number="1">begin</beam>');
+      expect(xml).toContain('<beam number="1">end</beam>');
+      // Should NOT have continue (only 2 notes)
+      expect(xml).not.toContain('<beam number="1">continue</beam>');
+    });
+
+    it("should not beam triplet quarter notes", () => {
+      const groupId = "triplet-1";
+      const notes = [
+        createNote(60, DURATION.TRIPLET_QUARTER, {
+          tripletGroupId: groupId,
+          tripletPosition: 1,
+        }),
+        createNote(62, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: groupId,
+          tripletPosition: 3,
+        }),
+      ];
+      const measure = createMeasure();
+      measure.notes = notes;
+      const score = createScore({ measures: [measure] });
+
+      const xml = generateMusicXml(score);
+
+      // Single eighth shouldn't be beamed
+      expect(xml).not.toContain('<beam number="1">');
+    });
+
+    it("should not beam a single triplet eighth", () => {
+      const groupId = "triplet-1";
+      const notes = [
+        createNote(60, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: groupId,
+          tripletPosition: 1,
+        }),
+        createRest(DURATION.TRIPLET_EIGHTH),
+        createRest(DURATION.TRIPLET_EIGHTH),
+      ];
+      // Add triplet info to rests
+      notes[1].tripletGroupId = groupId;
+      notes[1].tripletPosition = 2;
+      notes[2].tripletGroupId = groupId;
+      notes[2].tripletPosition = 3;
+      const measure = createMeasure();
+      measure.notes = notes;
+      const score = createScore({ measures: [measure] });
+
+      const xml = generateMusicXml(score);
+
+      // Single eighth shouldn't be beamed
+      expect(xml).not.toContain('<beam number="1">');
+    });
+
+    it("should not beam triplet eighths in different groups", () => {
+      const group1 = "triplet-1";
+      const group2 = "triplet-2";
+      const notes = [
+        createNote(60, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: group1,
+          tripletPosition: 1,
+        }),
+        createNote(62, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: group1,
+          tripletPosition: 2,
+        }),
+        createNote(64, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: group1,
+          tripletPosition: 3,
+        }),
+        createNote(65, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: group2,
+          tripletPosition: 1,
+        }),
+        createNote(67, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: group2,
+          tripletPosition: 2,
+        }),
+        createNote(69, DURATION.TRIPLET_EIGHTH, {
+          tripletGroupId: group2,
+          tripletPosition: 3,
+        }),
+      ];
+      const measure = createMeasure();
+      measure.notes = notes;
+      const score = createScore({ measures: [measure] });
+
+      const xml = generateMusicXml(score);
+
+      // Should have two separate beam groups (2 begins, 2 ends)
+      const beginCount = (xml.match(/<beam number="1">begin<\/beam>/g) || [])
+        .length;
+      const endCount = (xml.match(/<beam number="1">end<\/beam>/g) || [])
+        .length;
+      expect(beginCount).toBe(2);
+      expect(endCount).toBe(2);
+    });
+  });
 });

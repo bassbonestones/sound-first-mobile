@@ -179,6 +179,7 @@ function generateNoteXml(
   preferFlats: boolean,
   options: MusicXmlGeneratorOptions,
   isLastInTripletGroup: boolean = false,
+  beamType: "begin" | "continue" | "end" | null = null,
 ): string {
   // Calculate duration accounting for dots (dotted = 1.5x)
   const baseDuration = DURATION_TO_DIVISIONS[note.duration];
@@ -277,6 +278,11 @@ function generateNoteXml(
     notationsContent += '<tied type="stop"/>';
   }
 
+  // Build beam element if specified (for triplet eighths)
+  const beamXml = beamType
+    ? `\n        <beam number="1">${beamType}</beam>`
+    : "";
+
   const notationsXml = notationsContent
     ? `\n        <notations>${notationsContent}</notations>`
     : "";
@@ -284,7 +290,7 @@ function generateNoteXml(
   return `      <note${noteAttrs}>${tieXml}
 ${pitchXml}
         <duration>${duration}</duration>
-        <type>${type}</type>${dotXml}${timeModXml}${accidentalXml ? `\n        <accidental>${accidentalXml}</accidental>` : ""}${notationsXml}
+        <type>${type}</type>${dotXml}${beamXml}${timeModXml}${accidentalXml ? `\n        <accidental>${accidentalXml}</accidental>` : ""}${notationsXml}
       </note>`;
 }
 
@@ -356,11 +362,58 @@ function generateMeasureXml(
     }
   }
 
+  // Pre-compute beam info for triplet eighths
+  // Beaming groups consecutive triplet eighths in the same group
+  const beamInfo = new Map<string, "begin" | "continue" | "end">();
+  const tolerance = 0.001;
+  for (let i = 0; i < measure.notes.length; i++) {
+    const note = measure.notes[i];
+    // Only beam triplet eighths that are pitched (not rests)
+    if (
+      !note.tripletGroupId ||
+      note.midi === null ||
+      Math.abs(note.duration - DURATION.TRIPLET_EIGHTH) > tolerance
+    ) {
+      continue;
+    }
+
+    const groupId = note.tripletGroupId;
+    const prevNote = measure.notes[i - 1];
+    const nextNote = measure.notes[i + 1];
+
+    // Check if previous note is a beamable eighth in same group
+    const prevIsBeamable =
+      prevNote &&
+      prevNote.tripletGroupId === groupId &&
+      prevNote.midi !== null &&
+      Math.abs(prevNote.duration - DURATION.TRIPLET_EIGHTH) < tolerance;
+
+    // Check if next note is a beamable eighth in same group
+    const nextIsBeamable =
+      nextNote &&
+      nextNote.tripletGroupId === groupId &&
+      nextNote.midi !== null &&
+      Math.abs(nextNote.duration - DURATION.TRIPLET_EIGHTH) < tolerance;
+
+    if (!prevIsBeamable && nextIsBeamable) {
+      // First in a beam group
+      beamInfo.set(note.id, "begin");
+    } else if (prevIsBeamable && nextIsBeamable) {
+      // Middle of a beam group
+      beamInfo.set(note.id, "continue");
+    } else if (prevIsBeamable && !nextIsBeamable) {
+      // Last in a beam group
+      beamInfo.set(note.id, "end");
+    }
+    // If neither adjacent is beamable, don't beam (single eighth)
+  }
+
   // Generate notes
   for (const note of measure.notes) {
     const isLastInTriplet = lastInTripletGroup.has(note.id);
+    const beam = beamInfo.get(note.id) || null;
     notesXml +=
-      "\n" + generateNoteXml(note, preferFlats, options, isLastInTriplet);
+      "\n" + generateNoteXml(note, preferFlats, options, isLastInTriplet, beam);
   }
 
   // Include attributes only in first measure
