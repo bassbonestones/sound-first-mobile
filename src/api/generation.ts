@@ -109,19 +109,29 @@ export type ScalePattern =
   // Pyramid
   | "pyramid_ascend"
   | "pyramid_descend"
-  // Intervals
+  // Intervals (diatonic through octave, extended for chromatic)
   | "in_3rds"
   | "in_4ths"
   | "in_5ths"
   | "in_6ths"
   | "in_7ths"
   | "in_octaves"
+  | "in_9ths"
+  | "in_10ths"
+  | "in_11ths"
+  | "in_12ths"
+  | "in_13ths"
   // Groups
   | "groups_of_3"
   | "groups_of_4"
   | "groups_of_5"
   | "groups_of_6"
   | "groups_of_7"
+  | "groups_of_8"
+  | "groups_of_9"
+  | "groups_of_10"
+  | "groups_of_11"
+  | "groups_of_12"
   // Weaving
   | "broken_thirds_neighbor"
   // Arpeggio-based

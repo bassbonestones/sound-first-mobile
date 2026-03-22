@@ -651,4 +651,19 @@ describe("generateDisplayTitle", () => {
 
     expect(title).toBe("Eb Blues Scale");
   });
+
+  it("uses chromatic-specific pattern names for chromatic scale", () => {
+    const title = generateDisplayTitle("scale", "chromatic", "C", "in_3rds");
+    expect(title).toBe("C Chromatic Scale - Chromatic Major 2nds");
+  });
+
+  it("shows Chromatic minor 3rds for in_4ths on chromatic scale", () => {
+    const title = generateDisplayTitle("scale", "chromatic", "B", "in_4ths");
+    expect(title).toBe("B Chromatic Scale - Chromatic minor 3rds");
+  });
+
+  it("shows normal pattern name for non-chromatic scales", () => {
+    const title = generateDisplayTitle("scale", "ionian", "G", "in_4ths");
+    expect(title).toBe("G Ionian (Major) Scale - In 4ths");
+  });
 });

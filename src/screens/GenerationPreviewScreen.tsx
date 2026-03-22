@@ -63,25 +63,112 @@ const GENERATION_TYPES: GenerationType[] = ["scale", "arpeggio", "lick"];
 // Pattern constraints - patterns with limits on octaves or scale compatibility
 interface PatternConstraints {
   maxOctaves?: number;
+  chromaticMaxOctaves?: number; // Override maxOctaves specifically for chromatic scale
   requiresSymmetric?: boolean; // If true, incompatible with asymmetric scales
+  blockedScaleTypes?: string[]; // Scale types that cannot use this pattern
+  onlyForScaleTypes?: string[]; // If set, pattern only available for these scales
+  chromaticDisplayName?: string; // Display name when applied to chromatic scale
 }
 
+// Scales with more than 7 notes per octave (can use extended patterns)
+const EXTENDED_SCALES: ScaleType[] = [
+  "chromatic", // 12 notes
+  "diminished_hw", // 8 notes
+  "diminished_wh", // 8 notes
+  "bebop_dominant", // 8 notes
+  "bebop_major", // 8 notes
+  "bebop_dorian", // 8 notes
+];
+
 const SCALE_PATTERN_CONSTRAINTS: Record<string, PatternConstraints> = {
-  // Interval patterns extending far past octave
-  in_5ths: { maxOctaves: 2 },
-  in_6ths: { maxOctaves: 2 },
-  in_7ths: { maxOctaves: 2 },
-  in_octaves: { maxOctaves: 2 },
-  // Large group patterns
-  groups_of_5: { maxOctaves: 2 },
-  groups_of_6: { maxOctaves: 2 },
-  groups_of_7: { maxOctaves: 2 },
-  // Diatonic chord patterns
-  diatonic_triads: { maxOctaves: 2 },
-  diatonic_7ths: { maxOctaves: 2 },
-  broken_chords: { maxOctaves: 2 },
+  // Interval patterns - show chromatic-specific names
+  // _in_interval(n) pairs notes at (pos, pos+n-1), so skip = n-1 notes
+  // In chromatic (12 notes/octave), skip N = N semitones
+  in_3rds: { chromaticDisplayName: "Chromatic Major 2nds" }, // skip 2 = 2 semitones
+  in_4ths: { chromaticDisplayName: "Chromatic minor 3rds" }, // skip 3 = 3 semitones
+  in_5ths: { maxOctaves: 2, chromaticDisplayName: "Chromatic Major 3rds" }, // skip 4 = 4 semitones
+  in_6ths: { maxOctaves: 2, chromaticDisplayName: "Chromatic Perfect 4ths" }, // skip 5 = 5 semitones
+  in_7ths: { maxOctaves: 2, chromaticDisplayName: "Chromatic Tritones" }, // skip 6 = 6 semitones
+  in_octaves: { chromaticDisplayName: "Chromatic Perfect 5ths" }, // skip 7 = 7 semitones
+  // Extended intervals - only for chromatic scale (need 8+ notes/octave)
+  in_9ths: {
+    onlyForScaleTypes: ["chromatic"],
+    chromaticDisplayName: "Chromatic minor 6ths",
+  },
+  in_10ths: {
+    onlyForScaleTypes: ["chromatic"],
+    chromaticDisplayName: "Chromatic Major 6ths",
+  },
+  in_11ths: {
+    onlyForScaleTypes: ["chromatic"],
+    chromaticDisplayName: "Chromatic minor 7ths",
+  },
+  in_12ths: {
+    onlyForScaleTypes: ["chromatic"],
+    chromaticDisplayName: "Chromatic Major 7ths",
+  },
+  in_13ths: {
+    onlyForScaleTypes: ["chromatic"],
+    chromaticDisplayName: "Chromatic Octaves",
+  },
+  // Large group patterns - chromatic needs fewer octaves due to note density
+  groups_of_3: { chromaticMaxOctaves: 2 },
+  groups_of_4: { chromaticMaxOctaves: 2 },
+  groups_of_5: { maxOctaves: 2, chromaticMaxOctaves: 1 },
+  groups_of_6: { maxOctaves: 2, chromaticMaxOctaves: 1 },
+  groups_of_7: { maxOctaves: 2, chromaticMaxOctaves: 1 },
+  // Extended groups - only for scales with 8+ notes
+  groups_of_8: {
+    maxOctaves: 2,
+    chromaticMaxOctaves: 1,
+    onlyForScaleTypes: [
+      "chromatic",
+      "diminished_hw",
+      "diminished_wh",
+      "bebop_dominant",
+      "bebop_major",
+      "bebop_dorian",
+    ],
+  },
+  groups_of_9: {
+    maxOctaves: 2,
+    chromaticMaxOctaves: 1,
+    onlyForScaleTypes: ["chromatic"],
+  },
+  groups_of_10: {
+    maxOctaves: 2,
+    chromaticMaxOctaves: 1,
+    onlyForScaleTypes: ["chromatic"],
+  },
+  groups_of_11: {
+    maxOctaves: 2,
+    chromaticMaxOctaves: 1,
+    onlyForScaleTypes: ["chromatic"],
+  },
+  groups_of_12: {
+    maxOctaves: 2,
+    chromaticMaxOctaves: 1,
+    onlyForScaleTypes: ["chromatic"],
+  },
+  // Diatonic chord patterns - don't make sense for chromatic/whole_tone
+  diatonic_triads: {
+    maxOctaves: 2,
+    blockedScaleTypes: ["chromatic", "whole_tone"],
+  },
+  diatonic_7ths: {
+    maxOctaves: 2,
+    blockedScaleTypes: ["chromatic", "whole_tone"],
+  },
+  broken_chords: {
+    maxOctaves: 2,
+    blockedScaleTypes: ["chromatic", "whole_tone"],
+  },
   // Special patterns
-  broken_thirds_neighbor: { maxOctaves: 1, requiresSymmetric: true },
+  broken_thirds_neighbor: {
+    maxOctaves: 1,
+    requiresSymmetric: true,
+    blockedScaleTypes: ["chromatic"],
+  },
   // Pyramid patterns grow quadratically (~n² notes)
   pyramid_ascend: { maxOctaves: 1 },
   pyramid_descend: { maxOctaves: 1 },
@@ -222,12 +309,22 @@ const SCALE_PATTERNS: ScalePattern[] = [
   "in_6ths",
   "in_7ths",
   "in_octaves",
+  "in_9ths",
+  "in_10ths",
+  "in_11ths",
+  "in_12ths",
+  "in_13ths",
   // Groups
   "groups_of_3",
   "groups_of_4",
   "groups_of_5",
   "groups_of_6",
   "groups_of_7",
+  "groups_of_8",
+  "groups_of_9",
+  "groups_of_10",
+  "groups_of_11",
+  "groups_of_12",
   // Weaving
   "broken_thirds_neighbor",
   // Arpeggio-based
@@ -236,8 +333,19 @@ const SCALE_PATTERNS: ScalePattern[] = [
   "broken_chords",
 ];
 
-/** Format scale pattern for display */
-function formatScalePatternLabel(pattern: ScalePattern): string {
+/** Format scale pattern for display, using chromatic-specific names when applicable */
+function formatScalePatternLabel(
+  pattern: ScalePattern,
+  scaleType?: ScaleType,
+): string {
+  // Check for chromatic-specific display name
+  if (scaleType === "chromatic") {
+    const constraints = SCALE_PATTERN_CONSTRAINTS[pattern];
+    if (constraints?.chromaticDisplayName) {
+      return constraints.chromaticDisplayName;
+    }
+  }
+
   const labels: Partial<Record<ScalePattern, string>> = {
     straight_up: "Straight Up",
     straight_down: "Straight Down",
@@ -251,11 +359,21 @@ function formatScalePatternLabel(pattern: ScalePattern): string {
     in_6ths: "In 6ths",
     in_7ths: "In 7ths",
     in_octaves: "In Octaves",
+    in_9ths: "In 9ths",
+    in_10ths: "In 10ths",
+    in_11ths: "In 11ths",
+    in_12ths: "In 12ths",
+    in_13ths: "In 13ths",
     groups_of_3: "Groups of 3",
     groups_of_4: "Groups of 4",
     groups_of_5: "Groups of 5",
     groups_of_6: "Groups of 6",
     groups_of_7: "Groups of 7",
+    groups_of_8: "Groups of 8",
+    groups_of_9: "Groups of 9",
+    groups_of_10: "Groups of 10",
+    groups_of_11: "Groups of 11",
+    groups_of_12: "Groups of 12",
     broken_thirds_neighbor: "Broken 3rds w/ Neighbor",
     diatonic_triads: "Diatonic Triads",
     diatonic_7ths: "Diatonic 7ths",
@@ -472,6 +590,14 @@ export default function GenerationPreviewScreen() {
       if (!constraints) return true;
       // Exclude patterns that require symmetric scales when an asymmetric scale is selected
       if (constraints.requiresSymmetric && isAsymmetric) return false;
+      // Exclude patterns blocked for this scale type
+      if (constraints.blockedScaleTypes?.includes(scaleType)) return false;
+      // Exclude patterns that are only for specific scale types
+      if (
+        constraints.onlyForScaleTypes &&
+        !constraints.onlyForScaleTypes.includes(scaleType)
+      )
+        return false;
       return true;
     });
   }, [scaleType, randomize.scaleType]);
@@ -480,17 +606,37 @@ export default function GenerationPreviewScreen() {
   const availableScaleTypes = useMemo(() => {
     if (randomize.scalePattern) return SCALE_TYPES;
     const constraints = SCALE_PATTERN_CONSTRAINTS[scalePattern];
-    if (!constraints?.requiresSymmetric) return SCALE_TYPES;
+    if (!constraints) return SCALE_TYPES;
+
+    let filtered = SCALE_TYPES;
+
+    // If pattern only works for specific scales, limit to those
+    if (constraints.onlyForScaleTypes) {
+      filtered = filtered.filter((type) =>
+        constraints.onlyForScaleTypes!.includes(type),
+      );
+    }
+
     // Exclude asymmetric scales when pattern requires symmetric
-    return SCALE_TYPES.filter((type) => !ASYMMETRIC_SCALES.includes(type));
+    if (constraints.requiresSymmetric) {
+      filtered = filtered.filter((type) => !ASYMMETRIC_SCALES.includes(type));
+    }
+
+    return filtered;
   }, [scalePattern, randomize.scalePattern]);
 
-  // Get max octaves for current pattern
+  // Get max octaves for current pattern (use chromaticMaxOctaves if chromatic)
   const maxOctaves = useMemo(() => {
     if (randomize.scalePattern) return 3;
     const constraints = SCALE_PATTERN_CONSTRAINTS[scalePattern];
+    if (
+      scaleType === "chromatic" &&
+      constraints?.chromaticMaxOctaves !== undefined
+    ) {
+      return constraints.chromaticMaxOctaves;
+    }
     return constraints?.maxOctaves ?? 3;
-  }, [scalePattern, randomize.scalePattern]);
+  }, [scalePattern, scaleType, randomize.scalePattern]);
 
   // Reset scale pattern if it becomes unavailable due to scale selection
   useEffect(() => {
@@ -580,6 +726,22 @@ export default function GenerationPreviewScreen() {
         if (keyPool.length > 0) {
           selectedKey = pickRandom(keyPool);
         }
+      }
+
+      // Compute effective max octaves based on final selected values
+      const selectedConstraints =
+        SCALE_PATTERN_CONSTRAINTS[selectedScalePattern];
+      let effectiveMaxOctaves = selectedConstraints?.maxOctaves ?? 3;
+      if (
+        selectedScaleType === "chromatic" &&
+        selectedConstraints?.chromaticMaxOctaves !== undefined
+      ) {
+        effectiveMaxOctaves = selectedConstraints.chromaticMaxOctaves;
+      }
+
+      // Clamp octaves to effective max for selected pattern/scale combo
+      if (selectedNumOctaves > effectiveMaxOctaves) {
+        selectedNumOctaves = effectiveMaxOctaves;
       }
 
       // Update dropdowns to show what was randomly selected
@@ -886,7 +1048,7 @@ export default function GenerationPreviewScreen() {
                 {availableScalePatterns.map((pattern) => (
                   <Picker.Item
                     key={pattern}
-                    label={formatScalePatternLabel(pattern)}
+                    label={formatScalePatternLabel(pattern, scaleType)}
                     value={pattern}
                   />
                 ))}

@@ -891,6 +891,22 @@ function escapeXml(str: string): string {
     .replace(/'/g, "&apos;");
 }
 
+// Chromatic-specific pattern display names
+// Maps pattern values to their chromatic interval names
+const CHROMATIC_PATTERN_NAMES: Record<string, string> = {
+  in_3rds: "Chromatic Major 2nds",
+  in_4ths: "Chromatic minor 3rds",
+  in_5ths: "Chromatic Major 3rds",
+  in_6ths: "Chromatic Perfect 4ths",
+  in_7ths: "Chromatic Tritones",
+  in_octaves: "Chromatic Perfect 5ths",
+  in_9ths: "Chromatic minor 6ths",
+  in_10ths: "Chromatic Major 6ths",
+  in_11ths: "Chromatic minor 7ths",
+  in_12ths: "Chromatic Major 7ths",
+  in_13ths: "Chromatic Octaves",
+};
+
 /**
  * Generate a display-friendly title from generation parameters.
  */
@@ -936,10 +952,16 @@ export function generateDisplayTitle(
   let title = `${key} ${defDisplay} ${typeDisplay}`;
 
   if (pattern) {
-    const patternDisplay = pattern
-      .split("_")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
+    // Use chromatic-specific names when applicable
+    let patternDisplay: string;
+    if (definition === "chromatic" && CHROMATIC_PATTERN_NAMES[pattern]) {
+      patternDisplay = CHROMATIC_PATTERN_NAMES[pattern];
+    } else {
+      patternDisplay = pattern
+        .split("_")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+    }
     title += ` - ${patternDisplay}`;
   }
 
