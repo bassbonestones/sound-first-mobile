@@ -19,6 +19,7 @@ export const DEV_NAV_ITEMS: DevNavItem[] = [
   { screen: "MyScores", label: "My Scores", icon: "📚" },
   { screen: "History", label: "Practice History", icon: "📊" },
   { screen: "ExerciseTest", label: "Exercise Tester", icon: "🧪" },
+  { screen: "GenerationPreview", label: "Generation Preview", icon: "🎹" },
   { screen: "Admin", label: "Admin Console", icon: "⚙️" },
   { screen: "Onboarding", label: "Onboarding", icon: "👋" },
 ];

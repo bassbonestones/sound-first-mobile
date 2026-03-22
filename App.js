@@ -99,6 +99,7 @@ import AdminScreen from "./src/screens/Admin";
 import FirstNoteScreen from "./src/screens/FirstNote";
 import ExerciseTestScreen from "./src/screens/ExerciseTestScreen";
 import TuneMasteryScreen from "./src/screens/TuneMastery";
+import GenerationPreviewScreen from "./src/screens/GenerationPreviewScreen";
 import {
   ImportMusicScreen,
   ScoreCorrectionScreen,
@@ -250,6 +251,11 @@ export default function App() {
               name="Composer"
               component={ComposerScreen}
               options={{ title: "Practice Composer", headerShown: false }}
+            />
+            <Stack.Screen
+              name="GenerationPreview"
+              component={GenerationPreviewScreen}
+              options={{ title: "Generation Preview", headerShown: false }}
             />
           </Stack.Navigator>
         </NavigationContainer>

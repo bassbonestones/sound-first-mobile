@@ -24,6 +24,7 @@ import AdminScreen from "../screens/Admin";
 import FirstNoteScreen from "../screens/FirstNote";
 import ExerciseTestScreen from "../screens/ExerciseTestScreen";
 import TuneMasteryScreen from "../screens/TuneMastery";
+import GenerationPreviewScreen from "../screens/GenerationPreviewScreen";
 import {
   ImportMusicScreen,
   ScoreViewerScreen,
@@ -169,6 +170,11 @@ export function AppNavigator({
           name="TuneMastery"
           component={TuneMasteryScreen}
           options={{ title: "Tune Mastery", headerShown: false }}
+        />
+        <Stack.Screen
+          name="GenerationPreview"
+          component={GenerationPreviewScreen}
+          options={{ title: "Generation Preview", headerShown: false }}
         />
         <Stack.Screen
           name="ImportMusic"

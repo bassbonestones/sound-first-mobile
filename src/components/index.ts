@@ -38,3 +38,4 @@ export { default as DevNavMenu } from "./DevNavMenu";
 export { default as HelpMenu } from "./HelpMenu";
 export { default as ResetButton } from "./ResetButton";
 export { default as MiniLesson } from "./MiniLesson";
+export { TempoSlider, type TempoSliderProps } from "./TempoSlider";

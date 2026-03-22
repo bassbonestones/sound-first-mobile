@@ -47,6 +47,7 @@ export type RootStackParamList = {
   Admin: undefined;
   ExerciseTest: ExerciseTestParams;
   TuneMastery: TuneMasteryParams;
+  GenerationPreview: GenerationPreviewParams;
 
   // Import Music feature
   ImportMusic: ImportMusicParams;
@@ -139,6 +140,14 @@ export interface ExerciseTestParams {
 export interface TuneMasteryParams {
   /** Initial tune ID */
   tuneId?: string;
+}
+
+/** Params for GenerationPreviewScreen */
+export interface GenerationPreviewParams {
+  /** Pre-selected generation type */
+  generationType?: "scale" | "arpeggio" | "lick";
+  /** Pre-selected root key */
+  rootKey?: string;
 }
 
 // ============================================================================
@@ -260,6 +269,8 @@ export type HistoryScreenProps = RootStackScreenProps<"History">;
 export type AdminScreenProps = RootStackScreenProps<"Admin">;
 export type ExerciseTestScreenProps = RootStackScreenProps<"ExerciseTest">;
 export type TuneMasteryScreenProps = RootStackScreenProps<"TuneMastery">;
+export type GenerationPreviewScreenProps =
+  RootStackScreenProps<"GenerationPreview">;
 export type ImportMusicScreenProps = RootStackScreenProps<"ImportMusic">;
 export type ScoreViewerScreenProps = RootStackScreenProps<"ScoreViewer">;
 export type ScoreCorrectionScreenProps =
