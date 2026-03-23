@@ -335,23 +335,34 @@ function isSwingDuration(beats: number): boolean {
  * Groups notes by beat and assigns begin/continue/end for 8ths and 16ths.
  * For swing rhythms, beams each long-short pair together.
  * For triplets, groups notes by beat with proper triplet brackets.
+ * 
+ * @param events - Notes in this measure
+ * @param forceSwingBeaming - If true, use swing beaming (avoids per-measure re-detection)
  */
-function computeBeamGroups(events: PitchEvent[]): NoteBeamInfo[] {
+function computeBeamGroups(
+  events: PitchEvent[],
+  forceSwingBeaming: boolean = false,
+): NoteBeamInfo[] {
   const result: NoteBeamInfo[] = [];
 
-  // Check if this is swing rhythm FIRST (before triplet check)
-  // Swing uses 2/3 and 1/3 durations in alternating long-short pattern
-  // Must have alternating pattern to distinguish from triplets (all 1/3)
-  const swingLong = 2.0 / 3.0;
-  const swingShort = 1.0 / 3.0;
-  const swingCheckNotes = events.length > 1 ? events.slice(0, -1) : events;
-  const isSwingRhythm =
-    events.length >= 2 &&
-    swingCheckNotes.every((e, i) => {
-      // Even indices should be long (2/3), odd indices should be short (1/3)
-      const expectedDuration = i % 2 === 0 ? swingLong : swingShort;
-      return Math.abs(e.duration_beats - expectedDuration) < 0.01;
-    });
+  // Check if this is swing rhythm
+  // - If forceSwingBeaming is true (passed from caller who knows the rhythm type), use it
+  // - Otherwise, detect by checking for alternating long-short pattern
+  // This avoids incorrect detection when measure boundaries split swing pairs
+  let isSwingRhythm = forceSwingBeaming;
+  
+  if (!isSwingRhythm) {
+    // Detect swing: alternating long-short pattern (2/3, 1/3, 2/3, 1/3...)
+    const swingLong = 2.0 / 3.0;
+    const swingShort = 1.0 / 3.0;
+    const swingCheckNotes = events.length > 1 ? events.slice(0, -1) : events;
+    isSwingRhythm =
+      events.length >= 2 &&
+      swingCheckNotes.every((e, i) => {
+        const expectedDuration = i % 2 === 0 ? swingLong : swingShort;
+        return Math.abs(e.duration_beats - expectedDuration) < 0.01;
+      });
+  }
 
   if (isSwingRhythm) {
     // For swing: beam each pair of notes (long + short) together
@@ -734,7 +745,9 @@ function generateMeasureXml(
   const events = measureNotes.map((n) => n.event);
 
   // Compute beam groups for auto-beaming
-  const beamInfo = computeBeamGroups(events);
+  // Pass isSwingRhythm so we don't re-detect per-measure (which fails when
+  // measure boundaries split swing pairs, e.g., measure 2 starts with "short")
+  const beamInfo = computeBeamGroups(events, isSwingRhythm);
 
   // Track accidentals used in this measure for courtesy accidentals
   const measureAccidentals: MeasureAccidentalState = new Map();
