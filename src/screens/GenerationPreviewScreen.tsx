@@ -1664,7 +1664,9 @@ export default function GenerationPreviewScreen() {
             {response.capabilities_required &&
               response.capabilities_required.length > 0 && (
                 <>
-                  <Text style={styles.debugSubtitle}>Required Capabilities</Text>
+                  <Text style={styles.debugSubtitle}>
+                    Required Capabilities
+                  </Text>
                   <Text style={styles.debugCapabilities}>
                     {response.capabilities_required.join(", ")}
                   </Text>
