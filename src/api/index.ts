@@ -45,11 +45,17 @@ export {
   getMaterial,
   getMaterialAnalysis,
   analyzeMaterial,
+  listPreviewFiles,
+  previewMaterial,
 } from "./materials";
 export type {
   Material,
   MaterialAnalysis,
   MaterialsResponse,
+  MaterialPreviewFilesResponse,
+  MaterialPreviewResponse,
+  MaterialPreviewSoftGates,
+  MaterialPreviewUnifiedScores,
 } from "./materials";
 
 export { getCapabilities, getCapability } from "./capabilities";

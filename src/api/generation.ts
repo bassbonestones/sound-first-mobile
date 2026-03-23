@@ -219,18 +219,20 @@ export type MusicalKey =
 
 /** A single pitch event in the generated content */
 export interface PitchEvent {
-  /** MIDI note number (0-127) */
-  midi_note: number;
-  /** Pitch name with octave (e.g., 'C4', 'F#5') */
+  /** MIDI note number (0-127), null for rests */
+  midi_note: number | null;
+  /** Pitch name with octave (e.g., 'C4', 'F#5') or 'rest' */
   pitch_name: string;
   /** Duration in beats (quarter note = 1.0) */
   duration_beats: number;
   /** Offset from start in beats */
   offset_beats: number;
-  /** MIDI velocity (1-127) */
+  /** MIDI velocity (1-127), 0 for rests */
   velocity: number;
   /** Articulation marking for this note */
-  articulation: ArticulationType | null;
+  articulation?: ArticulationType | null;
+  /** Whether this is a rest event */
+  is_rest?: boolean;
 }
 
 /** Request model for generating musical content */

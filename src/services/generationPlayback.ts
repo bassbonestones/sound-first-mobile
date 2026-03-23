@@ -250,7 +250,11 @@ class GenerationPlaybackService {
         () => {
           this.currentIndex = i;
           this.onProgress?.(i);
-          this.playNote(event.midi_note, durationMs, event.velocity);
+
+          // Only play sound for actual notes (not rests)
+          if (event.midi_note != null && event.velocity > 0) {
+            this.playNote(event.midi_note, durationMs, event.velocity);
+          }
 
           // Check if this is the last event
           if (i === this.events.length - 1) {

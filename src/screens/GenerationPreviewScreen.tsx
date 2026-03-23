@@ -39,6 +39,14 @@ import {
   type MusicalKey,
 } from "../api/generation";
 import {
+  listPreviewFiles,
+  previewMaterial,
+  getSolfege,
+  analyzeMaterial,
+  type MaterialPreviewResponse,
+  type MaterialAnalysis,
+} from "../api/materials";
+import {
   generationPlayback,
   type PlaybackState,
 } from "../services/generationPlayback";
@@ -48,6 +56,9 @@ import {
   getMeasureIndexForNote,
   type ClefType,
 } from "../utils/generationNotation";
+
+// View modes for the screen
+type ViewMode = "generator" | "tunes";
 
 // =============================================================================
 // Constants
@@ -682,6 +693,28 @@ export default function GenerationPreviewScreen() {
   const [currentNoteIndex, setCurrentNoteIndex] = useState<number | null>(null);
   const isPlaybackInitialized = useRef(false);
 
+  // Preview mode state
+  const [viewMode, setViewMode] = useState<ViewMode>("generator");
+  const [previewFiles, setPreviewFiles] = useState<string[]>([]);
+  const [selectedPreviewFile, setSelectedPreviewFile] = useState<string | null>(
+    null,
+  );
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewResponse, setPreviewResponse] =
+    useState<MaterialPreviewResponse | null>(null);
+  const [previewTempo, setPreviewTempo] = useState(120);
+
+  // Solfège view toggle state
+  const [showSolfege, setShowSolfege] = useState(false);
+  const [solfegeXml, setSolfegeXml] = useState<string | null>(null);
+  const [isLoadingSolfege, setIsLoadingSolfege] = useState(false);
+
+  // Material analysis state
+  const [materialAnalysis, setMaterialAnalysis] =
+    useState<MaterialAnalysis | null>(null);
+  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
+
   // Compute MusicXML (only changes when content changes, not playback position)
   const musicXml = useMemo(() => {
     if (
@@ -1063,6 +1096,138 @@ export default function GenerationPreviewScreen() {
     generationPlayback.setTempo(bpm);
   }, []);
 
+  // Preview tempo control
+  const handlePreviewTempoChange = useCallback((bpm: number) => {
+    setPreviewTempo(bpm);
+    generationPlayback.setTempo(bpm);
+  }, []);
+
+  // Load preview files when switching to tunes mode
+  const loadPreviewFiles = useCallback(async () => {
+    try {
+      const result = await listPreviewFiles();
+      setPreviewFiles(result.files);
+      devLog("[GenerationPreview] Loaded preview files:", result.files);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      devError("[GenerationPreview] Failed to load preview files:", error);
+      setPreviewError(message);
+    }
+  }, []);
+
+  // Handle view mode change
+  const handleViewModeChange = useCallback(
+    (mode: ViewMode) => {
+      // Stop any active playback when switching modes
+      generationPlayback.stop();
+      setCurrentNoteIndex(null);
+      setPlaybackState("stopped");
+
+      setViewMode(mode);
+      if (mode === "tunes" && previewFiles.length === 0) {
+        loadPreviewFiles();
+      }
+    },
+    [previewFiles.length, loadPreviewFiles],
+  );
+
+  // Load preview for selected file
+  const handlePreviewFile = useCallback(
+    async (filename: string) => {
+      if (!filename) return;
+
+      setIsLoadingPreview(true);
+      setPreviewError(null);
+      setPreviewResponse(null);
+      setSelectedPreviewFile(filename);
+      setMaterialAnalysis(null);
+
+      // Stop any current playback
+      generationPlayback.stop();
+      setCurrentNoteIndex(null);
+      setPlaybackState("stopped");
+
+      try {
+        const result = await previewMaterial(filename);
+        setPreviewResponse(result);
+        devLog("[GenerationPreview] Preview result:", result);
+
+        // Load playback events if available
+        if (result.playback_events && result.playback_events.length > 0) {
+          generationPlayback.load(result.playback_events, {
+            tempo: result.tempo_bpm || previewTempo,
+            onStateChange: setPlaybackState,
+            onProgress: setCurrentNoteIndex,
+            onComplete: () => {
+              setCurrentNoteIndex(null);
+              devLog("[GenerationPreview] Preview playback complete");
+            },
+          });
+          devLog(
+            "[GenerationPreview] Loaded",
+            result.playback_events.length,
+            "events for playback",
+          );
+        }
+
+        // Run material analysis on the MusicXML
+        if (result.musicxml_content) {
+          setIsLoadingAnalysis(true);
+          try {
+            const analysis = await analyzeMaterial(
+              result.musicxml_content,
+              filename,
+            );
+            setMaterialAnalysis(analysis);
+            devLog("[GenerationPreview] Material analysis:", analysis);
+          } catch (analysisError) {
+            devError(
+              "[GenerationPreview] Material analysis failed:",
+              analysisError,
+            );
+          } finally {
+            setIsLoadingAnalysis(false);
+          }
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        devError("[GenerationPreview] Preview failed:", error);
+        setPreviewError(message);
+      } finally {
+        setIsLoadingPreview(false);
+      }
+    },
+    [previewTempo],
+  );
+
+  // Handle solfège toggle
+  const handleSolfegeToggle = useCallback(async () => {
+    const newShowSolfege = !showSolfege;
+    setShowSolfege(newShowSolfege);
+
+    // If enabling solfège and we don't have it cached, fetch it
+    if (newShowSolfege && !solfegeXml && selectedPreviewFile) {
+      setIsLoadingSolfege(true);
+      try {
+        const result = await getSolfege(selectedPreviewFile);
+        setSolfegeXml(result.solfege_xml);
+        devLog("[GenerationPreview] Solfège loaded for key:", result.key_used);
+      } catch (error) {
+        devError("[GenerationPreview] Solfège fetch failed:", error);
+        setShowSolfege(false); // Revert toggle on error
+      } finally {
+        setIsLoadingSolfege(false);
+      }
+    }
+  }, [showSolfege, solfegeXml, selectedPreviewFile]);
+
+  // Clear solfège cache when preview file changes
+  useEffect(() => {
+    setSolfegeXml(null);
+    setShowSolfege(false);
+  }, [selectedPreviewFile]);
+
   // Toggle pool item
   const togglePoolItem = <T extends string>(
     pool: T[],
@@ -1091,612 +1256,1008 @@ export default function GenerationPreviewScreen() {
       </View>
 
       <ScrollView style={styles.content}>
-        {/* Generation Type Selector */}
+        {/* View Mode Selector */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Content Type</Text>
+          <Text style={styles.sectionLabel}>Mode</Text>
           <View style={styles.buttonRow}>
-            {GENERATION_TYPES.map((type) => (
-              <TouchableOpacity
-                key={type}
+            <TouchableOpacity
+              style={[
+                styles.typeButton,
+                viewMode === "generator" && styles.typeButtonSelected,
+              ]}
+              onPress={() => handleViewModeChange("generator")}
+              accessibilityLabel="Switch to Generator mode"
+              accessibilityRole="button"
+            >
+              <Text
                 style={[
-                  styles.typeButton,
-                  generationType === type && styles.typeButtonSelected,
+                  styles.typeButtonText,
+                  viewMode === "generator" && styles.typeButtonTextSelected,
                 ]}
-                onPress={() => setGenerationType(type)}
               >
-                <Text
-                  style={[
-                    styles.typeButtonText,
-                    generationType === type && styles.typeButtonTextSelected,
-                  ]}
-                >
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                Generator
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.typeButton,
+                viewMode === "tunes" && styles.typeButtonSelected,
+              ]}
+              onPress={() => handleViewModeChange("tunes")}
+              accessibilityLabel="Switch to Tunes preview mode"
+              accessibilityRole="button"
+            >
+              <Text
+                style={[
+                  styles.typeButtonText,
+                  viewMode === "tunes" && styles.typeButtonTextSelected,
+                ]}
+              >
+                Tunes
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Scale/Arpeggio Type */}
-        {generationType === "scale" || generationType === "lick" ? (
-          <View style={styles.section}>
-            <View style={styles.labelRow}>
-              <Text style={styles.sectionLabel}>Scale Type</Text>
-              {randomize.scaleType && (
-                <Text style={styles.randomBadge}>🎲</Text>
-              )}
-            </View>
-            <View style={styles.pickerRow}>
-              <TouchableOpacity
-                style={styles.randomCheckbox}
-                onPress={() => toggleRandomize("scaleType")}
-              >
-                <Text style={styles.checkboxText}>
-                  {randomize.scaleType ? "☑" : "☐"}
-                </Text>
-              </TouchableOpacity>
-              <View
-                style={[
-                  styles.pickerContainer,
-                  { flex: 1 },
-                  randomize.scaleType && styles.pickerDisabled,
-                ]}
-              >
+        {/* Tunes Preview Mode */}
+        {viewMode === "tunes" && (
+          <>
+            {/* File Selector */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Select Tune</Text>
+              <View style={styles.pickerContainer}>
                 <Picker
-                  selectedValue={scaleType}
-                  onValueChange={(value) => setScaleType(value as ScaleType)}
+                  selectedValue={selectedPreviewFile ?? ""}
+                  onValueChange={(value) => {
+                    if (value) handlePreviewFile(value);
+                  }}
                   style={styles.picker}
-                  enabled={!randomize.scaleType}
+                  accessibilityLabel="Select tune file"
                 >
-                  {availableScaleTypes.map((type) => (
+                  <Picker.Item label="Choose a file..." value="" />
+                  {previewFiles.map((file) => (
                     <Picker.Item
-                      key={type}
-                      label={formatScaleLabel(type)}
-                      value={type}
+                      key={file}
+                      label={file
+                        .replace(/_/g, " ")
+                        .replace(/\.musicxml?$/i, "")}
+                      value={file}
                     />
                   ))}
                 </Picker>
               </View>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.section}>
-            <View style={styles.labelRow}>
-              <Text style={styles.sectionLabel}>Arpeggio Type</Text>
-              {randomize.arpeggioType && (
-                <Text style={styles.randomBadge}>🎲</Text>
+              {previewFiles.length === 0 && (
+                <Text style={styles.hintText}>
+                  No files in pending folder. Add MusicXML files to
+                  resources/materials/pending/
+                </Text>
               )}
             </View>
-            <View style={styles.pickerRow}>
-              <TouchableOpacity
-                style={styles.randomCheckbox}
-                onPress={() => toggleRandomize("arpeggioType")}
-              >
-                <Text style={styles.checkboxText}>
-                  {randomize.arpeggioType ? "☑" : "☐"}
-                </Text>
-              </TouchableOpacity>
-              <View
-                style={[
-                  styles.pickerContainer,
-                  { flex: 1 },
-                  randomize.arpeggioType && styles.pickerDisabled,
-                ]}
-              >
-                <Picker
-                  selectedValue={arpeggioType}
-                  onValueChange={(value) =>
-                    setArpeggioType(value as ArpeggioType)
-                  }
-                  style={styles.picker}
-                  enabled={!randomize.arpeggioType}
-                >
-                  {ARPEGGIO_TYPES.map((type) => (
-                    <Picker.Item
-                      key={type}
-                      label={formatArpeggioLabel(type)}
-                      value={type}
-                    />
-                  ))}
-                </Picker>
-              </View>
-            </View>
-          </View>
-        )}
 
-        {/* Pattern */}
-        <View style={styles.section}>
-          <View style={styles.labelRow}>
-            <Text style={styles.sectionLabel}>Pattern</Text>
-            {(generationType === "scale"
-              ? randomize.scalePattern
-              : randomize.arpeggioPattern) && (
-              <Text style={styles.randomBadge}>🎲</Text>
+            {/* Loading/Error State */}
+            {isLoadingPreview && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={styles.loadingText}>Loading preview...</Text>
+              </View>
             )}
-          </View>
-          <View style={styles.pickerRow}>
-            <TouchableOpacity
-              style={styles.randomCheckbox}
-              onPress={() =>
-                toggleRandomize(
-                  generationType === "scale"
-                    ? "scalePattern"
-                    : "arpeggioPattern",
-                )
-              }
-            >
-              <Text style={styles.checkboxText}>
-                {(
-                  generationType === "scale"
-                    ? randomize.scalePattern
-                    : randomize.arpeggioPattern
-                )
-                  ? "☑"
-                  : "☐"}
-              </Text>
-            </TouchableOpacity>
-            <View
-              style={[
-                styles.pickerContainer,
-                { flex: 1 },
-                (generationType === "scale"
-                  ? randomize.scalePattern
-                  : randomize.arpeggioPattern) && styles.pickerDisabled,
-              ]}
-            >
-              {generationType === "scale" ? (
-                <Picker
-                  selectedValue={scalePattern}
-                  onValueChange={(value) =>
-                    setScalePattern(value as ScalePattern)
-                  }
-                  style={styles.picker}
-                  enabled={!randomize.scalePattern}
-                >
-                  {availableScalePatterns.map((pattern) => (
-                    <Picker.Item
-                      key={pattern}
-                      label={formatScalePatternLabel(pattern, scaleType)}
-                      value={pattern}
-                    />
-                  ))}
-                </Picker>
-              ) : (
-                <Picker
-                  selectedValue={arpeggioPattern}
-                  onValueChange={(value) =>
-                    setArpeggioPattern(value as ArpeggioPattern)
-                  }
-                  style={styles.picker}
-                  enabled={!randomize.arpeggioPattern}
-                >
-                  {ARPEGGIO_PATTERNS.map((pattern) => (
-                    <Picker.Item
-                      key={pattern}
-                      label={formatArpeggioPatternLabel(pattern)}
-                      value={pattern}
-                    />
-                  ))}
-                </Picker>
-              )}
-            </View>
-          </View>
-        </View>
-
-        {/* Rhythm Type */}
-        <View style={styles.section}>
-          <View style={styles.labelRow}>
-            <Text style={styles.sectionLabel}>Rhythm</Text>
-            {randomize.rhythmType && <Text style={styles.randomBadge}>🎲</Text>}
-          </View>
-          <View style={styles.pickerRow}>
-            <TouchableOpacity
-              style={styles.randomCheckbox}
-              onPress={() => toggleRandomize("rhythmType")}
-            >
-              <Text style={styles.checkboxText}>
-                {randomize.rhythmType ? "☑" : "☐"}
-              </Text>
-            </TouchableOpacity>
-            <View
-              style={[
-                styles.pickerContainer,
-                { flex: 1 },
-                randomize.rhythmType && styles.pickerDisabled,
-              ]}
-            >
-              <Picker
-                selectedValue={rhythmType}
-                onValueChange={(value) => setRhythmType(value as RhythmType)}
-                style={styles.picker}
-                enabled={!randomize.rhythmType}
-              >
-                {getAvailableRhythmsForPattern(
-                  generationType === "scale" ? scalePattern : null,
-                ).map((r) => (
-                  <Picker.Item
-                    key={r}
-                    label={RHYTHM_DISPLAY_LABELS[r] ?? r.replace(/_/g, " ")}
-                    value={r}
-                  />
-                ))}
-              </Picker>
-            </View>
-          </View>
-        </View>
-
-        {/* Key */}
-        <View style={styles.section}>
-          <View style={styles.labelRow}>
-            <Text style={styles.sectionLabel}>Root Key</Text>
-            {randomize.rootKey && <Text style={styles.randomBadge}>🎲</Text>}
-          </View>
-          <View style={styles.pickerRow}>
-            <TouchableOpacity
-              style={styles.randomCheckbox}
-              onPress={() => toggleRandomize("rootKey")}
-            >
-              <Text style={styles.checkboxText}>
-                {randomize.rootKey ? "☑" : "☐"}
-              </Text>
-            </TouchableOpacity>
-            <View
-              style={[
-                styles.pickerContainer,
-                { flex: 1 },
-                randomize.rootKey && styles.pickerDisabled,
-              ]}
-            >
-              <Picker
-                selectedValue={rootKey}
-                onValueChange={(value) => setRootKey(value as MusicalKey)}
-                style={styles.picker}
-                enabled={!randomize.rootKey}
-              >
-                {ROOT_KEYS.map((key) => (
-                  <Picker.Item key={key} label={key} value={key} />
-                ))}
-              </Picker>
-            </View>
-          </View>
-        </View>
-
-        {/* Octave and Range */}
-        <View style={styles.rowSection}>
-          <View style={styles.halfSection}>
-            <View style={styles.labelRow}>
-              <Text style={styles.sectionLabel}>Start Oct</Text>
-              {randomize.startOctave && (
-                <Text style={styles.randomBadge}>🎲</Text>
-              )}
-            </View>
-            <View style={styles.pickerRow}>
-              <TouchableOpacity
-                style={styles.randomCheckbox}
-                onPress={() => toggleRandomize("startOctave")}
-              >
-                <Text style={styles.checkboxText}>
-                  {randomize.startOctave ? "☑" : "☐"}
-                </Text>
-              </TouchableOpacity>
-              <View
-                style={[
-                  styles.pickerContainer,
-                  { flex: 1 },
-                  randomize.startOctave && styles.pickerDisabled,
-                ]}
-              >
-                <Picker
-                  selectedValue={startOctave}
-                  onValueChange={(value) => setStartOctave(Number(value))}
-                  style={styles.picker}
-                  enabled={!randomize.startOctave}
-                >
-                  {OCTAVES.map((oct) => (
-                    <Picker.Item key={oct} label={String(oct)} value={oct} />
-                  ))}
-                </Picker>
+            {previewError && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>Error: {previewError}</Text>
               </View>
-            </View>
-          </View>
-          <View style={styles.halfSection}>
-            <View style={styles.labelRow}>
-              <Text style={styles.sectionLabel}># Octs</Text>
-              {randomize.numOctaves && (
-                <Text style={styles.randomBadge}>🎲</Text>
-              )}
-            </View>
-            <View style={styles.pickerRow}>
-              <TouchableOpacity
-                style={styles.randomCheckbox}
-                onPress={() => toggleRandomize("numOctaves")}
-              >
-                <Text style={styles.checkboxText}>
-                  {randomize.numOctaves ? "☑" : "☐"}
-                </Text>
-              </TouchableOpacity>
-              <View
-                style={[
-                  styles.pickerContainer,
-                  { flex: 1 },
-                  randomize.numOctaves && styles.pickerDisabled,
-                ]}
-              >
-                <Picker
-                  selectedValue={numOctaves}
-                  onValueChange={(value) =>
-                    setNumOctaves(Number(value) as 1 | 2 | 3)
-                  }
-                  style={styles.picker}
-                  enabled={!randomize.numOctaves}
-                >
-                  {[1, 2, 3]
-                    .filter((n) => n <= maxOctaves)
-                    .map((n) => (
-                      <Picker.Item key={n} label={String(n)} value={n} />
-                    ))}
-                </Picker>
-              </View>
-            </View>
-          </View>
-        </View>
+            )}
 
-        {/* Clef Selection */}
-        <View style={styles.section}>
-          <View style={styles.labelRow}>
-            <Text style={styles.sectionLabel}>Clef</Text>
-            {randomize.clef && <Text style={styles.randomBadge}>🎲</Text>}
-          </View>
-          <View style={styles.pickerRow}>
-            <TouchableOpacity
-              style={styles.randomCheckbox}
-              onPress={() => toggleRandomize("clef")}
-            >
-              <Text style={styles.checkboxText}>
-                {randomize.clef ? "☑" : "☐"}
-              </Text>
-            </TouchableOpacity>
-            <View
-              style={[
-                styles.pickerContainer,
-                { flex: 1 },
-                randomize.clef && styles.pickerDisabled,
-              ]}
-            >
-              <Picker
-                selectedValue={clef}
-                onValueChange={(value) => setClef(value as ClefType)}
-                style={styles.picker}
-                enabled={!randomize.clef}
-              >
-                {CLEFS.map((c) => (
-                  <Picker.Item
-                    key={c}
-                    label={c.charAt(0).toUpperCase() + c.slice(1)}
-                    value={c}
-                  />
-                ))}
-              </Picker>
-            </View>
-          </View>
-        </View>
-
-        {/* Pool Mode Toggle */}
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={[
-              styles.poolToggle,
-              poolModeEnabled && styles.poolToggleEnabled,
-            ]}
-            onPress={() => setPoolModeEnabled(!poolModeEnabled)}
-          >
-            <Text style={styles.poolToggleText}>
-              {poolModeEnabled ? "🎲 Pool Mode ON" : "Pool Mode OFF"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Pool Selection (when enabled) */}
-        {poolModeEnabled && (
-          <View style={styles.poolSection}>
-            <Text style={styles.poolTitle}>Random Selection Pools</Text>
-
-            <Text style={styles.poolSubtitle}>Keys:</Text>
-            <View style={styles.poolChipContainer}>
-              {ROOT_KEYS.slice(0, 12).map((key) => (
-                <TouchableOpacity
-                  key={key}
-                  style={[
-                    styles.poolChip,
-                    keyPool.includes(key) && styles.poolChipSelected,
-                  ]}
-                  onPress={() => togglePoolItem(keyPool, setKeyPool, key)}
-                >
-                  <Text style={styles.poolChipText}>{key}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {generationType === "scale" && (
+            {/* Preview Content */}
+            {previewResponse && !isLoadingPreview && (
               <>
-                <Text style={styles.poolSubtitle}>Scales:</Text>
-                <View style={styles.poolChipContainer}>
-                  {SCALE_TYPES.slice(0, 8).map((type) => (
+                {/* Notation Display */}
+                <View style={styles.section}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionLabel}>
+                      {previewResponse.title}
+                      {previewResponse.original_key_center &&
+                        ` (Original: ${previewResponse.original_key_center})`}
+                    </Text>
                     <TouchableOpacity
-                      key={type}
                       style={[
-                        styles.poolChip,
-                        scalePool.includes(type) && styles.poolChipSelected,
+                        styles.solfegeToggle,
+                        showSolfege && styles.solfegeToggleActive,
                       ]}
-                      onPress={() =>
-                        togglePoolItem(scalePool, setScalePool, type)
-                      }
+                      onPress={handleSolfegeToggle}
+                      disabled={isLoadingSolfege}
+                      accessibilityLabel="Toggle solfège view"
+                      accessibilityRole="switch"
+                      accessibilityState={{ checked: showSolfege }}
                     >
-                      <Text style={styles.poolChipText}>
-                        {type.replace(/_/g, " ")}
-                      </Text>
+                      {isLoadingSolfege ? (
+                        <ActivityIndicator size="small" color={colors.text} />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.solfegeToggleText,
+                            showSolfege && styles.solfegeToggleTextActive,
+                          ]}
+                        >
+                          {showSolfege ? "Remove Solfège" : "View Solfège"}
+                        </Text>
+                      )}
                     </TouchableOpacity>
-                  ))}
+                  </View>
+                  <View style={styles.notationContainer}>
+                    <ScoreViewport
+                      musicXml={
+                        showSolfege && solfegeXml
+                          ? solfegeXml
+                          : previewResponse.musicxml_content
+                      }
+                      height={350}
+                      fixedWidth={400}
+                      playbackState={playbackState}
+                      playbackMeasureIndex={undefined}
+                      highlightedNoteIndex={currentNoteIndex ?? undefined}
+                    />
+                  </View>
                 </View>
+
+                {/* Tempo Slider */}
+                <View style={styles.section}>
+                  <TempoSlider
+                    tempo={previewTempo}
+                    onTempoChange={handlePreviewTempoChange}
+                    minTempo={40}
+                    maxTempo={200}
+                    label="Preview Tempo"
+                  />
+                </View>
+
+                {/* Debug Info */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>Analysis</Text>
+                  <View style={styles.debugContainer}>
+                    <Text style={styles.debugText}>
+                      Measures: {previewResponse.measure_count}
+                    </Text>
+                    {previewResponse.tempo_bpm && (
+                      <Text style={styles.debugText}>
+                        Tempo: {previewResponse.tempo_bpm} BPM
+                        {previewResponse.tempo_marking &&
+                          ` (${previewResponse.tempo_marking})`}
+                      </Text>
+                    )}
+                    <Text style={styles.debugText}>
+                      Capabilities: {previewResponse.capability_count}
+                    </Text>
+                    {Object.entries(previewResponse.capabilities_by_domain).map(
+                      ([domain, caps]) => (
+                        <Text key={domain} style={styles.debugText}>
+                          • {domain}: {(caps as string[]).length}
+                        </Text>
+                      ),
+                    )}
+                  </View>
+                </View>
+
+                {/* Soft Gates */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>Soft Gates</Text>
+                  <View style={styles.debugContainer}>
+                    {previewResponse.soft_gates.interval_sustained_stage !==
+                      undefined && (
+                      <Text style={styles.debugText}>
+                        Interval Sustained:{" "}
+                        {previewResponse.soft_gates.interval_sustained_stage}/6
+                      </Text>
+                    )}
+                    {previewResponse.soft_gates.interval_hazard_stage !==
+                      undefined && (
+                      <Text style={styles.debugText}>
+                        Interval Hazard:{" "}
+                        {previewResponse.soft_gates.interval_hazard_stage}/6
+                      </Text>
+                    )}
+                    {previewResponse.soft_gates.rhythm_complexity_stage !==
+                      undefined && (
+                      <Text style={styles.debugText}>
+                        Rhythm Complexity:{" "}
+                        {previewResponse.soft_gates.rhythm_complexity_stage}/6
+                      </Text>
+                    )}
+                    {previewResponse.soft_gates.tonal_complexity_stage !==
+                      undefined && (
+                      <Text style={styles.debugText}>
+                        Tonal Complexity:{" "}
+                        {previewResponse.soft_gates.tonal_complexity_stage}/5
+                      </Text>
+                    )}
+                    {previewResponse.soft_gates.range_usage_stage !==
+                      undefined && (
+                      <Text style={styles.debugText}>
+                        Range Usage:{" "}
+                        {previewResponse.soft_gates.range_usage_stage}/6
+                      </Text>
+                    )}
+                  </View>
+                </View>
+
+                {/* Unified Scores */}
+                {previewResponse.unified_scores.difficulty_index !==
+                  undefined && (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionLabel}>Difficulty</Text>
+                    <View style={styles.debugContainer}>
+                      <Text style={styles.debugText}>
+                        Difficulty Index:{" "}
+                        {(
+                          previewResponse.unified_scores.difficulty_index * 100
+                        ).toFixed(1)}
+                        %
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Material Analysis */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>Material Analysis</Text>
+                  {isLoadingAnalysis ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                      <Text style={styles.loadingText}>
+                        Running analysis...
+                      </Text>
+                    </View>
+                  ) : materialAnalysis ? (
+                    <View style={styles.debugContainer}>
+                      {/* Extract key/time signatures from detailed_extraction */}
+                      {(() => {
+                        const detailed =
+                          materialAnalysis.detailed_extraction as
+                            | Record<string, unknown>
+                            | undefined;
+                        const keySignatures = detailed?.key_signatures as
+                          | string[]
+                          | undefined;
+                        const timeSignatures = detailed?.time_signatures as
+                          | string[]
+                          | undefined;
+                        const rangeAnalysis = detailed?.range_analysis as
+                          | {
+                              lowest_pitch?: string;
+                              highest_pitch?: string;
+                            }
+                          | undefined;
+                        return (
+                          <>
+                            {keySignatures && keySignatures.length > 0 && (
+                              <Text style={styles.debugText}>
+                                Key: {keySignatures.join(", ")}
+                              </Text>
+                            )}
+                            {timeSignatures && timeSignatures.length > 0 && (
+                              <Text style={styles.debugText}>
+                                Time: {timeSignatures.join(", ")}
+                              </Text>
+                            )}
+                            {materialAnalysis.tempo_bpm && (
+                              <Text style={styles.debugText}>
+                                Tempo: {materialAnalysis.tempo_bpm} BPM
+                              </Text>
+                            )}
+                            {rangeAnalysis && (
+                              <Text style={styles.debugText}>
+                                Range: {rangeAnalysis.lowest_pitch} -{" "}
+                                {rangeAnalysis.highest_pitch}
+                              </Text>
+                            )}
+                          </>
+                        );
+                      })()}
+                      {materialAnalysis.capabilities &&
+                        (materialAnalysis.capabilities as string[]).length >
+                          0 && (
+                          <>
+                            <Text style={styles.debugText}>
+                              Capabilities (
+                              {
+                                (materialAnalysis.capabilities as string[])
+                                  .length
+                              }
+                              ):
+                            </Text>
+                            {(materialAnalysis.capabilities as string[]).map(
+                              (cap, idx) => (
+                                <Text
+                                  key={idx}
+                                  style={[styles.debugText, { marginLeft: 8 }]}
+                                >
+                                  • {cap}
+                                </Text>
+                              ),
+                            )}
+                          </>
+                        )}
+                    </View>
+                  ) : (
+                    <Text style={styles.debugText}>No analysis available</Text>
+                  )}
+                </View>
+
+                {/* Playback Controls */}
+                {previewResponse.playback_events &&
+                  previewResponse.playback_events.length > 0 && (
+                    <View style={styles.playbackSection}>
+                      <Text style={styles.sectionLabel}>Playback</Text>
+                      <View style={styles.playbackControls}>
+                        {playbackState === "playing" ? (
+                          <TouchableOpacity
+                            style={styles.playButton}
+                            onPress={handlePause}
+                            accessibilityLabel="Pause playback"
+                          >
+                            <Text style={styles.playButtonText}>⏸ Pause</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <TouchableOpacity
+                            style={styles.playButton}
+                            onPress={handlePlay}
+                            accessibilityLabel="Play tune"
+                          >
+                            <Text style={styles.playButtonText}>▶️ Play</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                          style={styles.stopButton}
+                          onPress={handleStop}
+                          accessibilityLabel="Stop playback"
+                        >
+                          <Text style={styles.stopButtonText}>⏹ Stop</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={styles.playbackStatus}>
+                        State: {playbackState}
+                        {currentNoteIndex !== null &&
+                          ` | Note: ${currentNoteIndex + 1}/${previewResponse.playback_events.length}`}
+                      </Text>
+                    </View>
+                  )}
               </>
             )}
-
-            {generationType === "arpeggio" && (
-              <>
-                <Text style={styles.poolSubtitle}>Arpeggios:</Text>
-                <View style={styles.poolChipContainer}>
-                  {ARPEGGIO_TYPES.map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.poolChip,
-                        arpeggioPool.includes(type) && styles.poolChipSelected,
-                      ]}
-                      onPress={() =>
-                        togglePoolItem(arpeggioPool, setArpeggioPool, type)
-                      }
-                    >
-                      <Text style={styles.poolChipText}>
-                        {formatArpeggioLabel(type)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            )}
-          </View>
+          </>
         )}
 
-        {/* Generate Button */}
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={[
-              styles.generateButton,
-              isGenerating && styles.generateButtonDisabled,
-            ]}
-            onPress={handleGenerate}
-            disabled={isGenerating}
-          >
-            {isGenerating ? (
-              <ActivityIndicator color="#fff" />
+        {/* Generator Mode - Original UI */}
+        {viewMode === "generator" && (
+          <>
+            {/* Generation Type Selector */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Content Type</Text>
+              <View style={styles.buttonRow}>
+                {GENERATION_TYPES.map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.typeButton,
+                      generationType === type && styles.typeButtonSelected,
+                    ]}
+                    onPress={() => setGenerationType(type)}
+                  >
+                    <Text
+                      style={[
+                        styles.typeButtonText,
+                        generationType === type &&
+                          styles.typeButtonTextSelected,
+                      ]}
+                    >
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Scale/Arpeggio Type */}
+            {generationType === "scale" || generationType === "lick" ? (
+              <View style={styles.section}>
+                <View style={styles.labelRow}>
+                  <Text style={styles.sectionLabel}>Scale Type</Text>
+                  {randomize.scaleType && (
+                    <Text style={styles.randomBadge}>🎲</Text>
+                  )}
+                </View>
+                <View style={styles.pickerRow}>
+                  <TouchableOpacity
+                    style={styles.randomCheckbox}
+                    onPress={() => toggleRandomize("scaleType")}
+                  >
+                    <Text style={styles.checkboxText}>
+                      {randomize.scaleType ? "☑" : "☐"}
+                    </Text>
+                  </TouchableOpacity>
+                  <View
+                    style={[
+                      styles.pickerContainer,
+                      { flex: 1 },
+                      randomize.scaleType && styles.pickerDisabled,
+                    ]}
+                  >
+                    <Picker
+                      selectedValue={scaleType}
+                      onValueChange={(value) =>
+                        setScaleType(value as ScaleType)
+                      }
+                      style={styles.picker}
+                      enabled={!randomize.scaleType}
+                    >
+                      {availableScaleTypes.map((type) => (
+                        <Picker.Item
+                          key={type}
+                          label={formatScaleLabel(type)}
+                          value={type}
+                        />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+              </View>
             ) : (
-              <Text style={styles.generateButtonText}>
-                {poolModeEnabled ? "🎲 Randomize & Generate" : "Generate"}
-              </Text>
+              <View style={styles.section}>
+                <View style={styles.labelRow}>
+                  <Text style={styles.sectionLabel}>Arpeggio Type</Text>
+                  {randomize.arpeggioType && (
+                    <Text style={styles.randomBadge}>🎲</Text>
+                  )}
+                </View>
+                <View style={styles.pickerRow}>
+                  <TouchableOpacity
+                    style={styles.randomCheckbox}
+                    onPress={() => toggleRandomize("arpeggioType")}
+                  >
+                    <Text style={styles.checkboxText}>
+                      {randomize.arpeggioType ? "☑" : "☐"}
+                    </Text>
+                  </TouchableOpacity>
+                  <View
+                    style={[
+                      styles.pickerContainer,
+                      { flex: 1 },
+                      randomize.arpeggioType && styles.pickerDisabled,
+                    ]}
+                  >
+                    <Picker
+                      selectedValue={arpeggioType}
+                      onValueChange={(value) =>
+                        setArpeggioType(value as ArpeggioType)
+                      }
+                      style={styles.picker}
+                      enabled={!randomize.arpeggioType}
+                    >
+                      {ARPEGGIO_TYPES.map((type) => (
+                        <Picker.Item
+                          key={type}
+                          label={formatArpeggioLabel(type)}
+                          value={type}
+                        />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+              </View>
             )}
-          </TouchableOpacity>
-        </View>
 
-        {/* Error Display */}
-        {generationError && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{generationError}</Text>
-          </View>
-        )}
-
-        {/* Notation Display */}
-        {musicXml && (
-          <View style={styles.notationSection}>
-            <Text style={[styles.sectionLabel, { paddingHorizontal: 16 }]}>
-              Generated Content
-            </Text>
-            <ScoreViewport
-              musicXml={musicXml}
-              height={350}
-              fixedWidth={2000}
-              playbackState={playbackState}
-              playbackMeasureIndex={playbackMeasureIndex}
-              highlightedNoteIndex={currentNoteIndex ?? undefined}
-              testID="notation-display"
-            />
-          </View>
-        )}
-
-        {/* Playback Controls */}
-        {response && response.events && response.events.length > 0 && (
-          <View style={styles.playbackSection}>
-            <Text style={styles.sectionLabel}>Playback</Text>
-            <View style={styles.playbackControls}>
-              {playbackState === "playing" ? (
+            {/* Pattern */}
+            <View style={styles.section}>
+              <View style={styles.labelRow}>
+                <Text style={styles.sectionLabel}>Pattern</Text>
+                {(generationType === "scale"
+                  ? randomize.scalePattern
+                  : randomize.arpeggioPattern) && (
+                  <Text style={styles.randomBadge}>🎲</Text>
+                )}
+              </View>
+              <View style={styles.pickerRow}>
                 <TouchableOpacity
-                  style={styles.playButton}
-                  onPress={handlePause}
+                  style={styles.randomCheckbox}
+                  onPress={() =>
+                    toggleRandomize(
+                      generationType === "scale"
+                        ? "scalePattern"
+                        : "arpeggioPattern",
+                    )
+                  }
                 >
-                  <Text style={styles.playButtonText}>⏸ Pause</Text>
+                  <Text style={styles.checkboxText}>
+                    {(
+                      generationType === "scale"
+                        ? randomize.scalePattern
+                        : randomize.arpeggioPattern
+                    )
+                      ? "☑"
+                      : "☐"}
+                  </Text>
                 </TouchableOpacity>
-              ) : (
+                <View
+                  style={[
+                    styles.pickerContainer,
+                    { flex: 1 },
+                    (generationType === "scale"
+                      ? randomize.scalePattern
+                      : randomize.arpeggioPattern) && styles.pickerDisabled,
+                  ]}
+                >
+                  {generationType === "scale" ? (
+                    <Picker
+                      selectedValue={scalePattern}
+                      onValueChange={(value) =>
+                        setScalePattern(value as ScalePattern)
+                      }
+                      style={styles.picker}
+                      enabled={!randomize.scalePattern}
+                    >
+                      {availableScalePatterns.map((pattern) => (
+                        <Picker.Item
+                          key={pattern}
+                          label={formatScalePatternLabel(pattern, scaleType)}
+                          value={pattern}
+                        />
+                      ))}
+                    </Picker>
+                  ) : (
+                    <Picker
+                      selectedValue={arpeggioPattern}
+                      onValueChange={(value) =>
+                        setArpeggioPattern(value as ArpeggioPattern)
+                      }
+                      style={styles.picker}
+                      enabled={!randomize.arpeggioPattern}
+                    >
+                      {ARPEGGIO_PATTERNS.map((pattern) => (
+                        <Picker.Item
+                          key={pattern}
+                          label={formatArpeggioPatternLabel(pattern)}
+                          value={pattern}
+                        />
+                      ))}
+                    </Picker>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            {/* Rhythm Type */}
+            <View style={styles.section}>
+              <View style={styles.labelRow}>
+                <Text style={styles.sectionLabel}>Rhythm</Text>
+                {randomize.rhythmType && (
+                  <Text style={styles.randomBadge}>🎲</Text>
+                )}
+              </View>
+              <View style={styles.pickerRow}>
                 <TouchableOpacity
-                  style={styles.playButton}
-                  onPress={handlePlay}
+                  style={styles.randomCheckbox}
+                  onPress={() => toggleRandomize("rhythmType")}
                 >
-                  <Text style={styles.playButtonText}>▶️ Play</Text>
+                  <Text style={styles.checkboxText}>
+                    {randomize.rhythmType ? "☑" : "☐"}
+                  </Text>
                 </TouchableOpacity>
-              )}
-              <TouchableOpacity style={styles.stopButton} onPress={handleStop}>
-                <Text style={styles.stopButtonText}>⏹ Stop</Text>
+                <View
+                  style={[
+                    styles.pickerContainer,
+                    { flex: 1 },
+                    randomize.rhythmType && styles.pickerDisabled,
+                  ]}
+                >
+                  <Picker
+                    selectedValue={rhythmType}
+                    onValueChange={(value) =>
+                      setRhythmType(value as RhythmType)
+                    }
+                    style={styles.picker}
+                    enabled={!randomize.rhythmType}
+                  >
+                    {getAvailableRhythmsForPattern(
+                      generationType === "scale" ? scalePattern : null,
+                    ).map((r) => (
+                      <Picker.Item
+                        key={r}
+                        label={RHYTHM_DISPLAY_LABELS[r] ?? r.replace(/_/g, " ")}
+                        value={r}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+            </View>
+
+            {/* Key */}
+            <View style={styles.section}>
+              <View style={styles.labelRow}>
+                <Text style={styles.sectionLabel}>Root Key</Text>
+                {randomize.rootKey && (
+                  <Text style={styles.randomBadge}>🎲</Text>
+                )}
+              </View>
+              <View style={styles.pickerRow}>
+                <TouchableOpacity
+                  style={styles.randomCheckbox}
+                  onPress={() => toggleRandomize("rootKey")}
+                >
+                  <Text style={styles.checkboxText}>
+                    {randomize.rootKey ? "☑" : "☐"}
+                  </Text>
+                </TouchableOpacity>
+                <View
+                  style={[
+                    styles.pickerContainer,
+                    { flex: 1 },
+                    randomize.rootKey && styles.pickerDisabled,
+                  ]}
+                >
+                  <Picker
+                    selectedValue={rootKey}
+                    onValueChange={(value) => setRootKey(value as MusicalKey)}
+                    style={styles.picker}
+                    enabled={!randomize.rootKey}
+                  >
+                    {ROOT_KEYS.map((key) => (
+                      <Picker.Item key={key} label={key} value={key} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+            </View>
+
+            {/* Octave and Range */}
+            <View style={styles.rowSection}>
+              <View style={styles.halfSection}>
+                <View style={styles.labelRow}>
+                  <Text style={styles.sectionLabel}>Start Oct</Text>
+                  {randomize.startOctave && (
+                    <Text style={styles.randomBadge}>🎲</Text>
+                  )}
+                </View>
+                <View style={styles.pickerRow}>
+                  <TouchableOpacity
+                    style={styles.randomCheckbox}
+                    onPress={() => toggleRandomize("startOctave")}
+                  >
+                    <Text style={styles.checkboxText}>
+                      {randomize.startOctave ? "☑" : "☐"}
+                    </Text>
+                  </TouchableOpacity>
+                  <View
+                    style={[
+                      styles.pickerContainer,
+                      { flex: 1 },
+                      randomize.startOctave && styles.pickerDisabled,
+                    ]}
+                  >
+                    <Picker
+                      selectedValue={startOctave}
+                      onValueChange={(value) => setStartOctave(Number(value))}
+                      style={styles.picker}
+                      enabled={!randomize.startOctave}
+                    >
+                      {OCTAVES.map((oct) => (
+                        <Picker.Item
+                          key={oct}
+                          label={String(oct)}
+                          value={oct}
+                        />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.halfSection}>
+                <View style={styles.labelRow}>
+                  <Text style={styles.sectionLabel}># Octs</Text>
+                  {randomize.numOctaves && (
+                    <Text style={styles.randomBadge}>🎲</Text>
+                  )}
+                </View>
+                <View style={styles.pickerRow}>
+                  <TouchableOpacity
+                    style={styles.randomCheckbox}
+                    onPress={() => toggleRandomize("numOctaves")}
+                  >
+                    <Text style={styles.checkboxText}>
+                      {randomize.numOctaves ? "☑" : "☐"}
+                    </Text>
+                  </TouchableOpacity>
+                  <View
+                    style={[
+                      styles.pickerContainer,
+                      { flex: 1 },
+                      randomize.numOctaves && styles.pickerDisabled,
+                    ]}
+                  >
+                    <Picker
+                      selectedValue={numOctaves}
+                      onValueChange={(value) =>
+                        setNumOctaves(Number(value) as 1 | 2 | 3)
+                      }
+                      style={styles.picker}
+                      enabled={!randomize.numOctaves}
+                    >
+                      {[1, 2, 3]
+                        .filter((n) => n <= maxOctaves)
+                        .map((n) => (
+                          <Picker.Item key={n} label={String(n)} value={n} />
+                        ))}
+                    </Picker>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Clef Selection */}
+            <View style={styles.section}>
+              <View style={styles.labelRow}>
+                <Text style={styles.sectionLabel}>Clef</Text>
+                {randomize.clef && <Text style={styles.randomBadge}>🎲</Text>}
+              </View>
+              <View style={styles.pickerRow}>
+                <TouchableOpacity
+                  style={styles.randomCheckbox}
+                  onPress={() => toggleRandomize("clef")}
+                >
+                  <Text style={styles.checkboxText}>
+                    {randomize.clef ? "☑" : "☐"}
+                  </Text>
+                </TouchableOpacity>
+                <View
+                  style={[
+                    styles.pickerContainer,
+                    { flex: 1 },
+                    randomize.clef && styles.pickerDisabled,
+                  ]}
+                >
+                  <Picker
+                    selectedValue={clef}
+                    onValueChange={(value) => setClef(value as ClefType)}
+                    style={styles.picker}
+                    enabled={!randomize.clef}
+                  >
+                    {CLEFS.map((c) => (
+                      <Picker.Item
+                        key={c}
+                        label={c.charAt(0).toUpperCase() + c.slice(1)}
+                        value={c}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+            </View>
+
+            {/* Pool Mode Toggle */}
+            <View style={styles.section}>
+              <TouchableOpacity
+                style={[
+                  styles.poolToggle,
+                  poolModeEnabled && styles.poolToggleEnabled,
+                ]}
+                onPress={() => setPoolModeEnabled(!poolModeEnabled)}
+              >
+                <Text style={styles.poolToggleText}>
+                  {poolModeEnabled ? "🎲 Pool Mode ON" : "Pool Mode OFF"}
+                </Text>
               </TouchableOpacity>
             </View>
-            <TempoSlider
-              tempo={tempo}
-              tempoRange={response.tempo_range}
-              onTempoChange={handleTempoChange}
-              trackColor={colors.primary}
-              thumbColor={colors.primary}
-            />
-            <Text style={styles.playbackStatus}>
-              State: {playbackState}
-              {currentNoteIndex !== null &&
-                ` | Note: ${currentNoteIndex + 1}/${response.events.length}`}
-            </Text>
-          </View>
-        )}
 
-        {/* Response Debug Info */}
-        {response && (
-          <View style={styles.debugSection}>
-            <Text style={styles.debugTitle}>Response Info</Text>
-            <Text style={styles.debugText}>
-              Events: {response.events?.length ?? 0}
-              {"\n"}Total Beats: {response.total_beats}
-              {"\n"}Key: {response.key} | Octaves: {response.effective_octaves}
-              {"\n"}Definition: {response.definition}
-            </Text>
-            {response.capabilities_required &&
-              response.capabilities_required.length > 0 && (
-                <>
-                  <Text style={styles.debugSubtitle}>
-                    Required Capabilities
-                  </Text>
-                  <Text style={styles.debugCapabilities}>
-                    {response.capabilities_required.join(", ")}
-                  </Text>
-                </>
-              )}
-            {response.predicted_soft_gates && (
-              <>
-                <Text style={styles.debugSubtitle}>Predicted Soft Gates</Text>
-                <Text style={styles.debugText}>
-                  Interval Sustained:{" "}
-                  {response.predicted_soft_gates.interval_sustained_stage}/6
-                  {"\n"}Interval Hazard:{" "}
-                  {response.predicted_soft_gates.interval_hazard_stage}/6
-                  {"\n"}Rhythm Complexity:{" "}
-                  {(
-                    response.predicted_soft_gates.rhythm_complexity_score * 100
-                  ).toFixed(0)}
-                  %{"\n"}Tonal Stage:{" "}
-                  {response.predicted_soft_gates.tonal_complexity_stage}/5 (
-                  {response.predicted_soft_gates.accidental_count} accidentals)
-                  {"\n"}Max Interval:{" "}
-                  {response.predicted_soft_gates.max_interval_semitones}{" "}
-                  semitones
-                  {"\n"}P75 Interval:{" "}
-                  {response.predicted_soft_gates.interval_p75_semitones}{" "}
-                  semitones
-                </Text>
-              </>
+            {/* Pool Selection (when enabled) */}
+            {poolModeEnabled && (
+              <View style={styles.poolSection}>
+                <Text style={styles.poolTitle}>Random Selection Pools</Text>
+
+                <Text style={styles.poolSubtitle}>Keys:</Text>
+                <View style={styles.poolChipContainer}>
+                  {ROOT_KEYS.slice(0, 12).map((key) => (
+                    <TouchableOpacity
+                      key={key}
+                      style={[
+                        styles.poolChip,
+                        keyPool.includes(key) && styles.poolChipSelected,
+                      ]}
+                      onPress={() => togglePoolItem(keyPool, setKeyPool, key)}
+                    >
+                      <Text style={styles.poolChipText}>{key}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {generationType === "scale" && (
+                  <>
+                    <Text style={styles.poolSubtitle}>Scales:</Text>
+                    <View style={styles.poolChipContainer}>
+                      {SCALE_TYPES.slice(0, 8).map((type) => (
+                        <TouchableOpacity
+                          key={type}
+                          style={[
+                            styles.poolChip,
+                            scalePool.includes(type) && styles.poolChipSelected,
+                          ]}
+                          onPress={() =>
+                            togglePoolItem(scalePool, setScalePool, type)
+                          }
+                        >
+                          <Text style={styles.poolChipText}>
+                            {type.replace(/_/g, " ")}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </>
+                )}
+
+                {generationType === "arpeggio" && (
+                  <>
+                    <Text style={styles.poolSubtitle}>Arpeggios:</Text>
+                    <View style={styles.poolChipContainer}>
+                      {ARPEGGIO_TYPES.map((type) => (
+                        <TouchableOpacity
+                          key={type}
+                          style={[
+                            styles.poolChip,
+                            arpeggioPool.includes(type) &&
+                              styles.poolChipSelected,
+                          ]}
+                          onPress={() =>
+                            togglePoolItem(arpeggioPool, setArpeggioPool, type)
+                          }
+                        >
+                          <Text style={styles.poolChipText}>
+                            {formatArpeggioLabel(type)}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </>
+                )}
+              </View>
             )}
-          </View>
+
+            {/* Generate Button */}
+            <View style={styles.section}>
+              <TouchableOpacity
+                style={[
+                  styles.generateButton,
+                  isGenerating && styles.generateButtonDisabled,
+                ]}
+                onPress={handleGenerate}
+                disabled={isGenerating}
+              >
+                {isGenerating ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.generateButtonText}>
+                    {poolModeEnabled ? "🎲 Randomize & Generate" : "Generate"}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Error Display */}
+            {generationError && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{generationError}</Text>
+              </View>
+            )}
+
+            {/* Notation Display */}
+            {musicXml && (
+              <View style={styles.notationSection}>
+                <Text style={[styles.sectionLabel, { paddingHorizontal: 16 }]}>
+                  Generated Content
+                </Text>
+                <ScoreViewport
+                  musicXml={musicXml}
+                  height={350}
+                  fixedWidth={2000}
+                  playbackState={playbackState}
+                  playbackMeasureIndex={playbackMeasureIndex}
+                  highlightedNoteIndex={currentNoteIndex ?? undefined}
+                  testID="notation-display"
+                />
+              </View>
+            )}
+
+            {/* Playback Controls */}
+            {response && response.events && response.events.length > 0 && (
+              <View style={styles.playbackSection}>
+                <Text style={styles.sectionLabel}>Playback</Text>
+                <View style={styles.playbackControls}>
+                  {playbackState === "playing" ? (
+                    <TouchableOpacity
+                      style={styles.playButton}
+                      onPress={handlePause}
+                    >
+                      <Text style={styles.playButtonText}>⏸ Pause</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.playButton}
+                      onPress={handlePlay}
+                    >
+                      <Text style={styles.playButtonText}>▶️ Play</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={styles.stopButton}
+                    onPress={handleStop}
+                  >
+                    <Text style={styles.stopButtonText}>⏹ Stop</Text>
+                  </TouchableOpacity>
+                </View>
+                <TempoSlider
+                  tempo={tempo}
+                  tempoRange={response.tempo_range}
+                  onTempoChange={handleTempoChange}
+                  trackColor={colors.primary}
+                  thumbColor={colors.primary}
+                />
+                <Text style={styles.playbackStatus}>
+                  State: {playbackState}
+                  {currentNoteIndex !== null &&
+                    ` | Note: ${currentNoteIndex + 1}/${response.events.length}`}
+                </Text>
+              </View>
+            )}
+
+            {/* Response Debug Info */}
+            {response && (
+              <View style={styles.debugSection}>
+                <Text style={styles.debugTitle}>Response Info</Text>
+                <Text style={styles.debugText}>
+                  Events: {response.events?.length ?? 0}
+                  {"\n"}Total Beats: {response.total_beats}
+                  {"\n"}Key: {response.key} | Octaves:{" "}
+                  {response.effective_octaves}
+                  {"\n"}Definition: {response.definition}
+                </Text>
+                {response.capabilities_required &&
+                  response.capabilities_required.length > 0 && (
+                    <>
+                      <Text style={styles.debugSubtitle}>
+                        Required Capabilities
+                      </Text>
+                      <Text style={styles.debugCapabilities}>
+                        {response.capabilities_required.join(", ")}
+                      </Text>
+                    </>
+                  )}
+                {response.predicted_soft_gates && (
+                  <>
+                    <Text style={styles.debugSubtitle}>
+                      Predicted Soft Gates
+                    </Text>
+                    <Text style={styles.debugText}>
+                      Interval Sustained:{" "}
+                      {response.predicted_soft_gates.interval_sustained_stage}/6
+                      {"\n"}Interval Hazard:{" "}
+                      {response.predicted_soft_gates.interval_hazard_stage}/6
+                      {"\n"}Rhythm Complexity:{" "}
+                      {(
+                        response.predicted_soft_gates.rhythm_complexity_score *
+                        100
+                      ).toFixed(0)}
+                      %{"\n"}Tonal Stage:{" "}
+                      {response.predicted_soft_gates.tonal_complexity_stage}/5 (
+                      {response.predicted_soft_gates.accidental_count}{" "}
+                      accidentals)
+                      {"\n"}Max Interval:{" "}
+                      {response.predicted_soft_gates.max_interval_semitones}{" "}
+                      semitones
+                      {"\n"}P75 Interval:{" "}
+                      {response.predicted_soft_gates.interval_p75_semitones}{" "}
+                      semitones
+                    </Text>
+                  </>
+                )}
+              </View>
+            )}
+          </>
         )}
 
         <View style={styles.bottomSpacer} />
@@ -1960,5 +2521,33 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 40,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  solfegeToggle: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    minWidth: 70,
+    alignItems: "center",
+  },
+  solfegeToggleActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  solfegeToggleText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
+  solfegeToggleTextActive: {
+    color: colors.white,
   },
 });

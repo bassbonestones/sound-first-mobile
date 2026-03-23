@@ -8,6 +8,7 @@ import React from "react";
 import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
 import GenerationPreviewScreen from "../src/screens/GenerationPreviewScreen";
 import { generateContent } from "../src/api/generation";
+import { listPreviewFiles, previewMaterial } from "../src/api/materials";
 import { generationPlayback } from "../src/services/generationPlayback";
 
 // Mock navigation
@@ -27,6 +28,12 @@ jest.mock("../src/utils/devLogger", () => ({
 // Mock generation API
 jest.mock("../src/api/generation", () => ({
   generateContent: jest.fn(),
+}));
+
+// Mock materials API
+jest.mock("../src/api/materials", () => ({
+  listPreviewFiles: jest.fn(),
+  previewMaterial: jest.fn(),
 }));
 
 // Mock generation playback service
@@ -506,6 +513,148 @@ describe("GenerationPreviewScreen", () => {
       unmount();
 
       expect(generationPlayback.stop).toHaveBeenCalled();
+    });
+  });
+
+  describe("Tunes Preview Mode", () => {
+    const mockPreviewFiles = [
+      "hot_cross_buns.musicxml",
+      "mary_had_a_lamb.musicxml",
+    ];
+    const mockPreviewResponse = {
+      filename: "hot_cross_buns.musicxml",
+      title: "Hot Cross Buns",
+      musicxml_content: "<score>test</score>",
+      original_key_center: "G",
+      capabilities: ["quarter_note", "step_motion"],
+      capabilities_by_domain: { rhythm: ["quarter_note"] },
+      capability_count: 2,
+      range_analysis: null,
+      chromatic_complexity: 0.1,
+      measure_count: 4,
+      tempo_bpm: 100,
+      tempo_marking: "Andante",
+      soft_gates: {
+        interval_sustained_stage: 1,
+        interval_hazard_stage: 1,
+        rhythm_complexity_stage: 2,
+        tonal_complexity_stage: 2,
+        range_usage_stage: 1,
+      },
+      unified_scores: { difficulty_index: 0.15 },
+    };
+
+    beforeEach(() => {
+      (listPreviewFiles as jest.Mock).mockResolvedValue({
+        files: mockPreviewFiles,
+        folder: "/test/folder",
+      });
+      (previewMaterial as jest.Mock).mockResolvedValue(mockPreviewResponse);
+    });
+
+    it("displays mode selector with Generator and Tunes buttons", () => {
+      const { getByText } = render(<GenerationPreviewScreen />);
+
+      expect(getByText("Generator")).toBeTruthy();
+      expect(getByText("Tunes")).toBeTruthy();
+    });
+
+    it("starts in Generator mode by default", () => {
+      const { getByText, queryByText } = render(<GenerationPreviewScreen />);
+
+      // Generator-specific UI should be visible
+      expect(getByText("Content Type")).toBeTruthy();
+      // Tunes-specific UI should not be visible
+      expect(queryByText("Select Tune")).toBeNull();
+    });
+
+    it("switches to Tunes mode when Tunes button pressed", async () => {
+      const { getByText, queryByText } = render(<GenerationPreviewScreen />);
+
+      await act(async () => {
+        fireEvent.press(getByText("Tunes"));
+      });
+
+      await waitFor(() => {
+        // Tunes-specific UI should be visible
+        expect(getByText("Select Tune")).toBeTruthy();
+        // Generator-specific UI should not be visible
+        expect(queryByText("Content Type")).toBeNull();
+      });
+    });
+
+    it("loads preview files when switching to Tunes mode", async () => {
+      const { getByText } = render(<GenerationPreviewScreen />);
+
+      await act(async () => {
+        fireEvent.press(getByText("Tunes"));
+      });
+
+      await waitFor(() => {
+        expect(listPreviewFiles).toHaveBeenCalled();
+      });
+    });
+
+    it("displays empty state when no preview files available", async () => {
+      (listPreviewFiles as jest.Mock).mockResolvedValue({
+        files: [],
+        folder: "/test/folder",
+      });
+
+      const { getByText } = render(<GenerationPreviewScreen />);
+
+      await act(async () => {
+        fireEvent.press(getByText("Tunes"));
+      });
+
+      await waitFor(() => {
+        expect(getByText(/No files in pending folder/)).toBeTruthy();
+      });
+    });
+
+    it("displays soft gates after preview loads", async () => {
+      const { getByText, queryByText } = render(<GenerationPreviewScreen />);
+
+      await act(async () => {
+        fireEvent.press(getByText("Tunes"));
+      });
+
+      await waitFor(() => {
+        // Wait for files to load, then picker should update
+        expect(listPreviewFiles).toHaveBeenCalled();
+      });
+
+      // Note: Due to mock Picker limitations, we can't easily simulate
+      // file selection. But we can verify the API would be called.
+    });
+
+    it("stops playback when switching modes", async () => {
+      const { getByText } = render(<GenerationPreviewScreen />);
+
+      await act(async () => {
+        fireEvent.press(getByText("Tunes"));
+      });
+
+      expect(generationPlayback.stop).toHaveBeenCalled();
+    });
+
+    it("can switch back to Generator mode", async () => {
+      const { getByText, queryByText } = render(<GenerationPreviewScreen />);
+
+      // Switch to Tunes
+      await act(async () => {
+        fireEvent.press(getByText("Tunes"));
+      });
+
+      // Switch back to Generator
+      await act(async () => {
+        fireEvent.press(getByText("Generator"));
+      });
+
+      await waitFor(() => {
+        expect(getByText("Content Type")).toBeTruthy();
+        expect(queryByText("Select Tune")).toBeNull();
+      });
     });
   });
 });

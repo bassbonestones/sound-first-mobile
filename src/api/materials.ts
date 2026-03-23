@@ -6,13 +6,16 @@
 
 import { api, baseUrl } from "./client";
 import { devLog } from "../utils/devLogger";
+import type { PitchEvent } from "./generation";
 
 // ============================================
 // Types
 // ============================================
 
 export interface MaterialAnalysis {
+  title?: string;
   tempo?: number;
+  tempo_bpm?: number;
   key_signature?: string;
   time_signature?: string;
   pitch_range?: {
@@ -21,6 +24,12 @@ export interface MaterialAnalysis {
   };
   difficulty?: number;
   capabilities?: string[];
+  capabilities_by_domain?: Record<string, string[]>;
+  capability_count?: number;
+  measure_count?: number;
+  detailed_extraction?: Record<string, unknown>;
+  soft_gates?: Record<string, unknown>;
+  unified_scores?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -46,8 +55,8 @@ export interface GateCheckResult {
 }
 
 export interface AnalyzeRequest {
-  file_content: string;
-  file_name?: string;
+  musicxml_content: string;
+  title: string;
 }
 
 export interface MaterialUpdate {
@@ -130,8 +139,8 @@ export async function analyzeMaterial(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      file_content: fileContent,
-      file_name: fileName,
+      musicxml_content: fileContent,
+      title: fileName || "Untitled",
     } as AnalyzeRequest),
   });
   if (!response.ok) {
@@ -185,6 +194,114 @@ export async function deleteMaterial(materialId: number): Promise<void> {
   }
 }
 
+// ============================================
+// Preview Types
+// ============================================
+
+export interface MaterialPreviewFilesResponse {
+  files: string[];
+  folder: string;
+}
+
+export interface MaterialPreviewSoftGates {
+  tonal_complexity_stage?: number;
+  interval_sustained_stage?: number;
+  interval_hazard_stage?: number;
+  rhythm_complexity_stage?: number;
+  range_usage_stage?: number;
+  [key: string]: unknown;
+}
+
+export interface MaterialPreviewUnifiedScores {
+  tonal_complexity_composite?: number;
+  interval_complexity_composite?: number;
+  rhythm_complexity_composite?: number;
+  range_composite?: number;
+  difficulty_index?: number;
+  [key: string]: unknown;
+}
+
+export interface MaterialPreviewResponse {
+  filename: string;
+  title: string;
+  musicxml_content: string;
+  original_key_center: string | null;
+  capabilities: string[];
+  capabilities_by_domain: Record<string, string[]>;
+  capability_count: number;
+  range_analysis: Record<string, unknown> | null;
+  chromatic_complexity: number | null;
+  measure_count: number;
+  tempo_bpm: number | null;
+  tempo_marking: string | null;
+  soft_gates: MaterialPreviewSoftGates;
+  unified_scores: MaterialPreviewUnifiedScores;
+  playback_events: PitchEvent[];
+}
+
+// ============================================
+// Preview API Functions
+// ============================================
+
+/**
+ * List available MusicXML files in the pending materials folder
+ */
+export async function listPreviewFiles(): Promise<MaterialPreviewFilesResponse> {
+  const response = await fetch(`${baseUrl}/materials/preview/files`);
+  if (!response.ok) {
+    throw new Error(`Failed to list preview files: ${response.status}`);
+  }
+  return response.json() as Promise<MaterialPreviewFilesResponse>;
+}
+
+/**
+ * Preview a MusicXML file with full analysis
+ */
+export async function previewMaterial(
+  filename: string,
+): Promise<MaterialPreviewResponse> {
+  const response = await fetch(
+    `${baseUrl}/materials/preview?filename=${encodeURIComponent(filename)}`,
+  );
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const detail =
+      (errorData as { detail?: string }).detail || `Status ${response.status}`;
+    throw new Error(`Preview failed: ${detail}`);
+  }
+  return response.json() as Promise<MaterialPreviewResponse>;
+}
+
+/**
+ * Response from solfège conversion endpoint
+ */
+export interface SolfegeResponse {
+  filename: string;
+  solfege_xml: string;
+  key_used: string;
+}
+
+/**
+ * Get solfège version of a MusicXML file
+ */
+export async function getSolfege(
+  filename: string,
+  key?: string,
+): Promise<SolfegeResponse> {
+  let url = `${baseUrl}/materials/preview/solfege?filename=${encodeURIComponent(filename)}`;
+  if (key) {
+    url += `&key=${encodeURIComponent(key)}`;
+  }
+  const response = await fetch(url);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const detail =
+      (errorData as { detail?: string }).detail || `Status ${response.status}`;
+    throw new Error(`Solfège conversion failed: ${detail}`);
+  }
+  return response.json() as Promise<SolfegeResponse>;
+}
+
 export default {
   getMaterials,
   getMaterial,
@@ -194,4 +311,7 @@ export default {
   reanalyzeMaterial,
   updateMaterial,
   deleteMaterial,
+  listPreviewFiles,
+  previewMaterial,
+  getSolfege,
 };
