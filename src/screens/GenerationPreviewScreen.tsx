@@ -1121,6 +1121,12 @@ export default function GenerationPreviewScreen() {
         {generationType === "scale" || generationType === "lick" ? (
           <View style={styles.section}>
             <View style={styles.labelRow}>
+              <Text style={styles.sectionLabel}>Scale Type</Text>
+              {randomize.scaleType && (
+                <Text style={styles.randomBadge}>🎲</Text>
+              )}
+            </View>
+            <View style={styles.pickerRow}>
               <TouchableOpacity
                 style={styles.randomCheckbox}
                 onPress={() => toggleRandomize("scaleType")}
@@ -1129,36 +1135,39 @@ export default function GenerationPreviewScreen() {
                   {randomize.scaleType ? "☑" : "☐"}
                 </Text>
               </TouchableOpacity>
-              <Text style={styles.sectionLabel}>Scale Type</Text>
-              {randomize.scaleType && (
-                <Text style={styles.randomBadge}>🎲</Text>
-              )}
-            </View>
-            <View
-              style={[
-                styles.pickerContainer,
-                randomize.scaleType && styles.pickerDisabled,
-              ]}
-            >
-              <Picker
-                selectedValue={scaleType}
-                onValueChange={(value) => setScaleType(value as ScaleType)}
-                style={styles.picker}
-                enabled={!randomize.scaleType}
+              <View
+                style={[
+                  styles.pickerContainer,
+                  { flex: 1 },
+                  randomize.scaleType && styles.pickerDisabled,
+                ]}
               >
-                {availableScaleTypes.map((type) => (
-                  <Picker.Item
-                    key={type}
-                    label={formatScaleLabel(type)}
-                    value={type}
-                  />
-                ))}
-              </Picker>
+                <Picker
+                  selectedValue={scaleType}
+                  onValueChange={(value) => setScaleType(value as ScaleType)}
+                  style={styles.picker}
+                  enabled={!randomize.scaleType}
+                >
+                  {availableScaleTypes.map((type) => (
+                    <Picker.Item
+                      key={type}
+                      label={formatScaleLabel(type)}
+                      value={type}
+                    />
+                  ))}
+                </Picker>
+              </View>
             </View>
           </View>
         ) : (
           <View style={styles.section}>
             <View style={styles.labelRow}>
+              <Text style={styles.sectionLabel}>Arpeggio Type</Text>
+              {randomize.arpeggioType && (
+                <Text style={styles.randomBadge}>🎲</Text>
+              )}
+            </View>
+            <View style={styles.pickerRow}>
               <TouchableOpacity
                 style={styles.randomCheckbox}
                 onPress={() => toggleRandomize("arpeggioType")}
@@ -1167,33 +1176,30 @@ export default function GenerationPreviewScreen() {
                   {randomize.arpeggioType ? "☑" : "☐"}
                 </Text>
               </TouchableOpacity>
-              <Text style={styles.sectionLabel}>Arpeggio Type</Text>
-              {randomize.arpeggioType && (
-                <Text style={styles.randomBadge}>🎲</Text>
-              )}
-            </View>
-            <View
-              style={[
-                styles.pickerContainer,
-                randomize.arpeggioType && styles.pickerDisabled,
-              ]}
-            >
-              <Picker
-                selectedValue={arpeggioType}
-                onValueChange={(value) =>
-                  setArpeggioType(value as ArpeggioType)
-                }
-                style={styles.picker}
-                enabled={!randomize.arpeggioType}
+              <View
+                style={[
+                  styles.pickerContainer,
+                  { flex: 1 },
+                  randomize.arpeggioType && styles.pickerDisabled,
+                ]}
               >
-                {ARPEGGIO_TYPES.map((type) => (
-                  <Picker.Item
-                    key={type}
-                    label={formatArpeggioLabel(type)}
-                    value={type}
-                  />
-                ))}
-              </Picker>
+                <Picker
+                  selectedValue={arpeggioType}
+                  onValueChange={(value) =>
+                    setArpeggioType(value as ArpeggioType)
+                  }
+                  style={styles.picker}
+                  enabled={!randomize.arpeggioType}
+                >
+                  {ARPEGGIO_TYPES.map((type) => (
+                    <Picker.Item
+                      key={type}
+                      label={formatArpeggioLabel(type)}
+                      value={type}
+                    />
+                  ))}
+                </Picker>
+              </View>
             </View>
           </View>
         )}
@@ -1201,6 +1207,14 @@ export default function GenerationPreviewScreen() {
         {/* Pattern */}
         <View style={styles.section}>
           <View style={styles.labelRow}>
+            <Text style={styles.sectionLabel}>Pattern</Text>
+            {(generationType === "scale"
+              ? randomize.scalePattern
+              : randomize.arpeggioPattern) && (
+              <Text style={styles.randomBadge}>🎲</Text>
+            )}
+          </View>
+          <View style={styles.pickerRow}>
             <TouchableOpacity
               style={styles.randomCheckbox}
               onPress={() =>
@@ -1221,62 +1235,61 @@ export default function GenerationPreviewScreen() {
                   : "☐"}
               </Text>
             </TouchableOpacity>
-            <Text style={styles.sectionLabel}>Pattern</Text>
-            {(generationType === "scale"
-              ? randomize.scalePattern
-              : randomize.arpeggioPattern) && (
-              <Text style={styles.randomBadge}>🎲</Text>
-            )}
-          </View>
-          <View
-            style={[
-              styles.pickerContainer,
-              (generationType === "scale"
-                ? randomize.scalePattern
-                : randomize.arpeggioPattern) && styles.pickerDisabled,
-            ]}
-          >
-            {generationType === "scale" ? (
-              <Picker
-                selectedValue={scalePattern}
-                onValueChange={(value) =>
-                  setScalePattern(value as ScalePattern)
-                }
-                style={styles.picker}
-                enabled={!randomize.scalePattern}
-              >
-                {availableScalePatterns.map((pattern) => (
-                  <Picker.Item
-                    key={pattern}
-                    label={formatScalePatternLabel(pattern, scaleType)}
-                    value={pattern}
-                  />
-                ))}
-              </Picker>
-            ) : (
-              <Picker
-                selectedValue={arpeggioPattern}
-                onValueChange={(value) =>
-                  setArpeggioPattern(value as ArpeggioPattern)
-                }
-                style={styles.picker}
-                enabled={!randomize.arpeggioPattern}
-              >
-                {ARPEGGIO_PATTERNS.map((pattern) => (
-                  <Picker.Item
-                    key={pattern}
-                    label={formatArpeggioPatternLabel(pattern)}
-                    value={pattern}
-                  />
-                ))}
-              </Picker>
-            )}
+            <View
+              style={[
+                styles.pickerContainer,
+                { flex: 1 },
+                (generationType === "scale"
+                  ? randomize.scalePattern
+                  : randomize.arpeggioPattern) && styles.pickerDisabled,
+              ]}
+            >
+              {generationType === "scale" ? (
+                <Picker
+                  selectedValue={scalePattern}
+                  onValueChange={(value) =>
+                    setScalePattern(value as ScalePattern)
+                  }
+                  style={styles.picker}
+                  enabled={!randomize.scalePattern}
+                >
+                  {availableScalePatterns.map((pattern) => (
+                    <Picker.Item
+                      key={pattern}
+                      label={formatScalePatternLabel(pattern, scaleType)}
+                      value={pattern}
+                    />
+                  ))}
+                </Picker>
+              ) : (
+                <Picker
+                  selectedValue={arpeggioPattern}
+                  onValueChange={(value) =>
+                    setArpeggioPattern(value as ArpeggioPattern)
+                  }
+                  style={styles.picker}
+                  enabled={!randomize.arpeggioPattern}
+                >
+                  {ARPEGGIO_PATTERNS.map((pattern) => (
+                    <Picker.Item
+                      key={pattern}
+                      label={formatArpeggioPatternLabel(pattern)}
+                      value={pattern}
+                    />
+                  ))}
+                </Picker>
+              )}
+            </View>
           </View>
         </View>
 
         {/* Rhythm Type */}
         <View style={styles.section}>
           <View style={styles.labelRow}>
+            <Text style={styles.sectionLabel}>Rhythm</Text>
+            {randomize.rhythmType && <Text style={styles.randomBadge}>🎲</Text>}
+          </View>
+          <View style={styles.pickerRow}>
             <TouchableOpacity
               style={styles.randomCheckbox}
               onPress={() => toggleRandomize("rhythmType")}
@@ -1285,37 +1298,40 @@ export default function GenerationPreviewScreen() {
                 {randomize.rhythmType ? "☑" : "☐"}
               </Text>
             </TouchableOpacity>
-            <Text style={styles.sectionLabel}>Rhythm</Text>
-            {randomize.rhythmType && <Text style={styles.randomBadge}>🎲</Text>}
-          </View>
-          <View
-            style={[
-              styles.pickerContainer,
-              randomize.rhythmType && styles.pickerDisabled,
-            ]}
-          >
-            <Picker
-              selectedValue={rhythmType}
-              onValueChange={(value) => setRhythmType(value as RhythmType)}
-              style={styles.picker}
-              enabled={!randomize.rhythmType}
+            <View
+              style={[
+                styles.pickerContainer,
+                { flex: 1 },
+                randomize.rhythmType && styles.pickerDisabled,
+              ]}
             >
-              {getAvailableRhythmsForPattern(
-                generationType === "scale" ? scalePattern : null,
-              ).map((r) => (
-                <Picker.Item
-                  key={r}
-                  label={RHYTHM_DISPLAY_LABELS[r] ?? r.replace(/_/g, " ")}
-                  value={r}
-                />
-              ))}
-            </Picker>
+              <Picker
+                selectedValue={rhythmType}
+                onValueChange={(value) => setRhythmType(value as RhythmType)}
+                style={styles.picker}
+                enabled={!randomize.rhythmType}
+              >
+                {getAvailableRhythmsForPattern(
+                  generationType === "scale" ? scalePattern : null,
+                ).map((r) => (
+                  <Picker.Item
+                    key={r}
+                    label={RHYTHM_DISPLAY_LABELS[r] ?? r.replace(/_/g, " ")}
+                    value={r}
+                  />
+                ))}
+              </Picker>
+            </View>
           </View>
         </View>
 
         {/* Key */}
         <View style={styles.section}>
           <View style={styles.labelRow}>
+            <Text style={styles.sectionLabel}>Root Key</Text>
+            {randomize.rootKey && <Text style={styles.randomBadge}>🎲</Text>}
+          </View>
+          <View style={styles.pickerRow}>
             <TouchableOpacity
               style={styles.randomCheckbox}
               onPress={() => toggleRandomize("rootKey")}
@@ -1324,25 +1340,24 @@ export default function GenerationPreviewScreen() {
                 {randomize.rootKey ? "☑" : "☐"}
               </Text>
             </TouchableOpacity>
-            <Text style={styles.sectionLabel}>Root Key</Text>
-            {randomize.rootKey && <Text style={styles.randomBadge}>🎲</Text>}
-          </View>
-          <View
-            style={[
-              styles.pickerContainer,
-              randomize.rootKey && styles.pickerDisabled,
-            ]}
-          >
-            <Picker
-              selectedValue={rootKey}
-              onValueChange={(value) => setRootKey(value as MusicalKey)}
-              style={styles.picker}
-              enabled={!randomize.rootKey}
+            <View
+              style={[
+                styles.pickerContainer,
+                { flex: 1 },
+                randomize.rootKey && styles.pickerDisabled,
+              ]}
             >
-              {ROOT_KEYS.map((key) => (
-                <Picker.Item key={key} label={key} value={key} />
-              ))}
-            </Picker>
+              <Picker
+                selectedValue={rootKey}
+                onValueChange={(value) => setRootKey(value as MusicalKey)}
+                style={styles.picker}
+                enabled={!randomize.rootKey}
+              >
+                {ROOT_KEYS.map((key) => (
+                  <Picker.Item key={key} label={key} value={key} />
+                ))}
+              </Picker>
+            </View>
           </View>
         </View>
 
@@ -1350,6 +1365,12 @@ export default function GenerationPreviewScreen() {
         <View style={styles.rowSection}>
           <View style={styles.halfSection}>
             <View style={styles.labelRow}>
+              <Text style={styles.sectionLabel}>Start Oct</Text>
+              {randomize.startOctave && (
+                <Text style={styles.randomBadge}>🎲</Text>
+              )}
+            </View>
+            <View style={styles.pickerRow}>
               <TouchableOpacity
                 style={styles.randomCheckbox}
                 onPress={() => toggleRandomize("startOctave")}
@@ -1358,31 +1379,34 @@ export default function GenerationPreviewScreen() {
                   {randomize.startOctave ? "☑" : "☐"}
                 </Text>
               </TouchableOpacity>
-              <Text style={styles.sectionLabel}>Start Oct</Text>
-              {randomize.startOctave && (
-                <Text style={styles.randomBadge}>🎲</Text>
-              )}
-            </View>
-            <View
-              style={[
-                styles.pickerContainer,
-                randomize.startOctave && styles.pickerDisabled,
-              ]}
-            >
-              <Picker
-                selectedValue={startOctave}
-                onValueChange={(value) => setStartOctave(Number(value))}
-                style={styles.picker}
-                enabled={!randomize.startOctave}
+              <View
+                style={[
+                  styles.pickerContainer,
+                  { flex: 1 },
+                  randomize.startOctave && styles.pickerDisabled,
+                ]}
               >
-                {OCTAVES.map((oct) => (
-                  <Picker.Item key={oct} label={String(oct)} value={oct} />
-                ))}
-              </Picker>
+                <Picker
+                  selectedValue={startOctave}
+                  onValueChange={(value) => setStartOctave(Number(value))}
+                  style={styles.picker}
+                  enabled={!randomize.startOctave}
+                >
+                  {OCTAVES.map((oct) => (
+                    <Picker.Item key={oct} label={String(oct)} value={oct} />
+                  ))}
+                </Picker>
+              </View>
             </View>
           </View>
           <View style={styles.halfSection}>
             <View style={styles.labelRow}>
+              <Text style={styles.sectionLabel}># Octs</Text>
+              {randomize.numOctaves && (
+                <Text style={styles.randomBadge}>🎲</Text>
+              )}
+            </View>
+            <View style={styles.pickerRow}>
               <TouchableOpacity
                 style={styles.randomCheckbox}
                 onPress={() => toggleRandomize("numOctaves")}
@@ -1391,31 +1415,28 @@ export default function GenerationPreviewScreen() {
                   {randomize.numOctaves ? "☑" : "☐"}
                 </Text>
               </TouchableOpacity>
-              <Text style={styles.sectionLabel}># Octs</Text>
-              {randomize.numOctaves && (
-                <Text style={styles.randomBadge}>🎲</Text>
-              )}
-            </View>
-            <View
-              style={[
-                styles.pickerContainer,
-                randomize.numOctaves && styles.pickerDisabled,
-              ]}
-            >
-              <Picker
-                selectedValue={numOctaves}
-                onValueChange={(value) =>
-                  setNumOctaves(Number(value) as 1 | 2 | 3)
-                }
-                style={styles.picker}
-                enabled={!randomize.numOctaves}
+              <View
+                style={[
+                  styles.pickerContainer,
+                  { flex: 1 },
+                  randomize.numOctaves && styles.pickerDisabled,
+                ]}
               >
-                {[1, 2, 3]
-                  .filter((n) => n <= maxOctaves)
-                  .map((n) => (
-                    <Picker.Item key={n} label={String(n)} value={n} />
-                  ))}
-              </Picker>
+                <Picker
+                  selectedValue={numOctaves}
+                  onValueChange={(value) =>
+                    setNumOctaves(Number(value) as 1 | 2 | 3)
+                  }
+                  style={styles.picker}
+                  enabled={!randomize.numOctaves}
+                >
+                  {[1, 2, 3]
+                    .filter((n) => n <= maxOctaves)
+                    .map((n) => (
+                      <Picker.Item key={n} label={String(n)} value={n} />
+                    ))}
+                </Picker>
+              </View>
             </View>
           </View>
         </View>
@@ -1423,6 +1444,10 @@ export default function GenerationPreviewScreen() {
         {/* Clef Selection */}
         <View style={styles.section}>
           <View style={styles.labelRow}>
+            <Text style={styles.sectionLabel}>Clef</Text>
+            {randomize.clef && <Text style={styles.randomBadge}>🎲</Text>}
+          </View>
+          <View style={styles.pickerRow}>
             <TouchableOpacity
               style={styles.randomCheckbox}
               onPress={() => toggleRandomize("clef")}
@@ -1431,29 +1456,28 @@ export default function GenerationPreviewScreen() {
                 {randomize.clef ? "☑" : "☐"}
               </Text>
             </TouchableOpacity>
-            <Text style={styles.sectionLabel}>Clef</Text>
-            {randomize.clef && <Text style={styles.randomBadge}>🎲</Text>}
-          </View>
-          <View
-            style={[
-              styles.pickerContainer,
-              randomize.clef && styles.pickerDisabled,
-            ]}
-          >
-            <Picker
-              selectedValue={clef}
-              onValueChange={(value) => setClef(value as ClefType)}
-              style={styles.picker}
-              enabled={!randomize.clef}
+            <View
+              style={[
+                styles.pickerContainer,
+                { flex: 1 },
+                randomize.clef && styles.pickerDisabled,
+              ]}
             >
-              {CLEFS.map((c) => (
-                <Picker.Item
-                  key={c}
-                  label={c.charAt(0).toUpperCase() + c.slice(1)}
-                  value={c}
-                />
-              ))}
-            </Picker>
+              <Picker
+                selectedValue={clef}
+                onValueChange={(value) => setClef(value as ClefType)}
+                style={styles.picker}
+                enabled={!randomize.clef}
+              >
+                {CLEFS.map((c) => (
+                  <Picker.Item
+                    key={c}
+                    label={c.charAt(0).toUpperCase() + c.slice(1)}
+                    value={c}
+                  />
+                ))}
+              </Picker>
+            </View>
           </View>
         </View>
 
@@ -1699,8 +1723,13 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   checkboxText: {
-    fontSize: 20,
+    fontSize: 40,
     color: colors.primary,
+  },
+  pickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   randomBadge: {
     fontSize: 14,
