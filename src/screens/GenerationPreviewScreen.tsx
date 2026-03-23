@@ -1672,6 +1672,30 @@ export default function GenerationPreviewScreen() {
                   </Text>
                 </>
               )}
+            {response.predicted_soft_gates && (
+              <>
+                <Text style={styles.debugSubtitle}>Predicted Soft Gates</Text>
+                <Text style={styles.debugText}>
+                  Interval Sustained:{" "}
+                  {response.predicted_soft_gates.interval_sustained_stage}/6
+                  {"\n"}Interval Hazard:{" "}
+                  {response.predicted_soft_gates.interval_hazard_stage}/6
+                  {"\n"}Rhythm Complexity:{" "}
+                  {(
+                    response.predicted_soft_gates.rhythm_complexity_score * 100
+                  ).toFixed(0)}
+                  %{"\n"}Tonal Stage:{" "}
+                  {response.predicted_soft_gates.tonal_complexity_stage}/5 (
+                  {response.predicted_soft_gates.accidental_count} accidentals)
+                  {"\n"}Max Interval:{" "}
+                  {response.predicted_soft_gates.max_interval_semitones}{" "}
+                  semitones
+                  {"\n"}P75 Interval:{" "}
+                  {response.predicted_soft_gates.interval_p75_semitones}{" "}
+                  semitones
+                </Text>
+              </>
+            )}
           </View>
         )}
 

@@ -261,6 +261,27 @@ export interface GenerationRequest {
   tempo_max_bpm?: number;
 }
 
+/**
+ * Predicted soft gate metrics for generated content.
+ * Used to estimate complexity before the user attempts the exercise.
+ */
+export interface PredictedSoftGates {
+  /** Predicted interval sustained stage (0-6, based on p75 of melodic intervals) */
+  interval_sustained_stage: number;
+  /** Predicted interval hazard stage (0-6, based on max melodic interval) */
+  interval_hazard_stage: number;
+  /** Predicted rhythm complexity (0.0-1.0) */
+  rhythm_complexity_score: number;
+  /** Predicted tonal complexity stage (0-5) */
+  tonal_complexity_stage: number;
+  /** Number of accidentals in key signature */
+  accidental_count: number;
+  /** Maximum melodic interval in semitones */
+  max_interval_semitones: number;
+  /** 75th percentile melodic interval in semitones */
+  interval_p75_semitones: number;
+}
+
 /** Response model for generated musical content */
 export interface GenerationResponse {
   /** Type of content generated */
@@ -293,6 +314,8 @@ export interface GenerationResponse {
   tempo_range: [number, number] | null;
   /** Capability IDs required to perform this content */
   capabilities_required: string[];
+  /** Predicted soft gate metrics for difficulty estimation */
+  predicted_soft_gates: PredictedSoftGates | null;
 }
 
 // =============================================================================

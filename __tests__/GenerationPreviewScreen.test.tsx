@@ -144,6 +144,20 @@ const mockGenerationResponse = {
   total_beats: 3,
   tempo_range: [60, 120] as [number, number],
   capabilities_required: [],
+  predicted_soft_gates: null,
+};
+
+const mockGenerationResponseWithSoftGates = {
+  ...mockGenerationResponse,
+  predicted_soft_gates: {
+    interval_sustained_stage: 2,
+    interval_hazard_stage: 3,
+    rhythm_complexity_score: 0.4,
+    tonal_complexity_stage: 1,
+    accidental_count: 0,
+    max_interval_semitones: 5,
+    interval_p75_semitones: 3,
+  },
 };
 
 describe("GenerationPreviewScreen", () => {
@@ -315,6 +329,42 @@ describe("GenerationPreviewScreen", () => {
         expect(queryByText(/Events: 3/)).toBeTruthy();
         expect(queryByText(/Total Beats: 3/)).toBeTruthy();
       });
+    });
+
+    it("displays predicted soft gates when present", async () => {
+      (generateContent as jest.Mock).mockResolvedValueOnce(
+        mockGenerationResponseWithSoftGates,
+      );
+
+      const { getByText, queryByText } = render(<GenerationPreviewScreen />);
+
+      await act(async () => {
+        fireEvent.press(getByText("Generate"));
+      });
+
+      await waitFor(() => {
+        expect(queryByText("Predicted Soft Gates")).toBeTruthy();
+        expect(queryByText(/Interval Sustained: 2\/6/)).toBeTruthy();
+        expect(queryByText(/Interval Hazard: 3\/6/)).toBeTruthy();
+        expect(queryByText(/Rhythm Complexity: 40%/)).toBeTruthy();
+        expect(queryByText(/Tonal Stage: 1\/5/)).toBeTruthy();
+        expect(queryByText(/0 accidentals/)).toBeTruthy();
+      });
+    });
+
+    it("does not display soft gates section when null", async () => {
+      const { getByText, queryByText } = render(<GenerationPreviewScreen />);
+
+      await act(async () => {
+        fireEvent.press(getByText("Generate"));
+      });
+
+      await waitFor(() => {
+        expect(queryByText(/Events: 3/)).toBeTruthy();
+      });
+
+      // Should not show soft gates section
+      expect(queryByText("Predicted Soft Gates")).toBeNull();
     });
   });
 
