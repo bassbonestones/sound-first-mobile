@@ -68,6 +68,30 @@ interface PatternConstraints {
   blockedScaleTypes?: string[]; // Scale types that cannot use this pattern
   onlyForScaleTypes?: string[]; // If set, pattern only available for these scales
   chromaticDisplayName?: string; // Display name when applied to chromatic scale
+  pentatonicDisplayName?: string; // Display name for 5-note scales (pentatonic)
+  hexatonicDisplayName?: string; // Display name for 6-note scales (blues, whole tone)
+  octatonicDisplayName?: string; // Display name for 8-note scales (diminished, bebop)
+  minScaleNotes?: number; // Minimum notes per octave required for this pattern
+}
+
+// Scale categories by notes per octave
+const PENTATONIC_SCALES: ScaleType[] = ["pentatonic_major", "pentatonic_minor"];
+const HEXATONIC_SCALES: ScaleType[] = ["blues", "blues_major", "whole_tone"];
+const OCTATONIC_SCALES: ScaleType[] = [
+  "diminished_hw",
+  "diminished_wh",
+  "bebop_dominant",
+  "bebop_major",
+  "bebop_dorian",
+];
+
+/** Get the number of notes per octave for a scale type */
+function getScaleNoteCount(scaleType: ScaleType): number {
+  if (PENTATONIC_SCALES.includes(scaleType)) return 5;
+  if (HEXATONIC_SCALES.includes(scaleType)) return 6;
+  if (OCTATONIC_SCALES.includes(scaleType)) return 8;
+  if (scaleType === "chromatic") return 12;
+  return 7; // Standard heptatonic (modes, harmonic/melodic minor, etc.)
 }
 
 // Scales with more than 7 notes per octave (can use extended patterns)
@@ -81,16 +105,57 @@ const EXTENDED_SCALES: ScaleType[] = [
 ];
 
 const SCALE_PATTERN_CONSTRAINTS: Record<string, PatternConstraints> = {
-  // Interval patterns - show chromatic-specific names
-  // _in_interval(n) pairs notes at (pos, pos+n-1), so skip = n-1 notes
-  // In chromatic (12 notes/octave), skip N = N semitones
-  in_3rds: { chromaticDisplayName: "Chromatic Major 2nds" }, // skip 2 = 2 semitones
-  in_4ths: { chromaticDisplayName: "Chromatic minor 3rds" }, // skip 3 = 3 semitones
-  in_5ths: { maxOctaves: 2, chromaticDisplayName: "Chromatic Major 3rds" }, // skip 4 = 4 semitones
-  in_6ths: { maxOctaves: 2, chromaticDisplayName: "Chromatic Perfect 4ths" }, // skip 5 = 5 semitones
-  in_7ths: { maxOctaves: 2, chromaticDisplayName: "Chromatic Tritones" }, // skip 6 = 6 semitones
-  in_octaves: { chromaticDisplayName: "Chromatic Perfect 5ths" }, // skip 7 = 7 semitones
-  // Extended intervals - only for chromatic scale (need 8+ notes/octave)
+  // Interval patterns - use "Skip X" naming for non-heptatonic scales
+  // in_octaves is ISOLATED - always means literal octaves, not an interval skip
+  //
+  // For pentatonic (5 notes): Skip 1-3 available, then In Octaves (skip 4 = octave)
+  // For hexatonic (6 notes): Skip 1-4 available, then In Octaves (skip 5 = octave)
+  // For octatonic (8 notes): Skip 1-6 available, then In Octaves (skip 7 = octave)
+  // For chromatic: Use interval names (m2, M2, m3, etc.)
+  in_3rds: {
+    chromaticDisplayName: "Chromatic Major 2nds",
+    pentatonicDisplayName: "Skip 1",
+    hexatonicDisplayName: "Skip 1",
+    octatonicDisplayName: "Skip 1",
+  },
+  in_4ths: {
+    chromaticDisplayName: "Chromatic minor 3rds",
+    pentatonicDisplayName: "Skip 2",
+    hexatonicDisplayName: "Skip 2",
+    octatonicDisplayName: "Skip 2",
+  },
+  in_5ths: {
+    maxOctaves: 2,
+    chromaticDisplayName: "Chromatic Major 3rds",
+    pentatonicDisplayName: "Skip 3", // Last before octaves for pentatonic
+    hexatonicDisplayName: "Skip 3",
+    octatonicDisplayName: "Skip 3",
+  },
+  in_6ths: {
+    maxOctaves: 2,
+    chromaticDisplayName: "Chromatic Perfect 4ths",
+    hexatonicDisplayName: "Skip 4", // Last before octaves for hexatonic
+    octatonicDisplayName: "Skip 4",
+    minScaleNotes: 6, // Not available for pentatonic (skip 4 = octave)
+  },
+  in_7ths: {
+    maxOctaves: 2,
+    chromaticDisplayName: "Chromatic Tritones",
+    octatonicDisplayName: "Skip 5",
+    minScaleNotes: 7, // Not available for pentatonic (5) or hexatonic (6)
+  },
+  in_8ths: {
+    maxOctaves: 2,
+    chromaticDisplayName: "Chromatic Perfect 5ths",
+    octatonicDisplayName: "Skip 6", // Last before octaves for octatonic (8 notes)
+    minScaleNotes: 8, // Only for octatonic scales (diminished, bebop)
+  },
+  // in_octaves is a unique pattern that pairs each note with itself an octave up/down.
+  // NOT part of the interval skip sequence. For chromatic, use in_13ths instead.
+  in_octaves: {
+    blockedScaleTypes: ["chromatic"], // Chromatic uses in_13ths for octaves
+  },
+  // Extended intervals - chromatic only (9ths+ go beyond octave for smaller scales)
   in_9ths: {
     onlyForScaleTypes: ["chromatic"],
     chromaticDisplayName: "Chromatic minor 6ths",
@@ -308,6 +373,7 @@ const SCALE_PATTERNS: ScalePattern[] = [
   "in_5ths",
   "in_6ths",
   "in_7ths",
+  "in_8ths",
   "in_octaves",
   "in_9ths",
   "in_10ths",
@@ -338,11 +404,32 @@ function formatScalePatternLabel(
   pattern: ScalePattern,
   scaleType?: ScaleType,
 ): string {
-  // Check for chromatic-specific display name
-  if (scaleType === "chromatic") {
+  // Check for scale-type-specific display names
+  if (scaleType) {
     const constraints = SCALE_PATTERN_CONSTRAINTS[pattern];
-    if (constraints?.chromaticDisplayName) {
-      return constraints.chromaticDisplayName;
+    if (constraints) {
+      // Check in order of specificity
+      if (scaleType === "chromatic" && constraints.chromaticDisplayName) {
+        return constraints.chromaticDisplayName;
+      }
+      if (
+        PENTATONIC_SCALES.includes(scaleType) &&
+        constraints.pentatonicDisplayName
+      ) {
+        return constraints.pentatonicDisplayName;
+      }
+      if (
+        HEXATONIC_SCALES.includes(scaleType) &&
+        constraints.hexatonicDisplayName
+      ) {
+        return constraints.hexatonicDisplayName;
+      }
+      if (
+        OCTATONIC_SCALES.includes(scaleType) &&
+        constraints.octatonicDisplayName
+      ) {
+        return constraints.octatonicDisplayName;
+      }
     }
   }
 
@@ -358,6 +445,7 @@ function formatScalePatternLabel(
     in_5ths: "In 5ths",
     in_6ths: "In 6ths",
     in_7ths: "In 7ths",
+    in_8ths: "In 8ths",
     in_octaves: "In Octaves",
     in_9ths: "In 9ths",
     in_10ths: "In 10ths",
@@ -626,9 +714,13 @@ export default function GenerationPreviewScreen() {
     // When randomizing scale type, allow all patterns
     if (randomize.scaleType) return SCALE_PATTERNS;
     const isAsymmetric = ASYMMETRIC_SCALES.includes(scaleType);
+    const scaleNoteCount = getScaleNoteCount(scaleType);
     return SCALE_PATTERNS.filter((pattern) => {
       const constraints = SCALE_PATTERN_CONSTRAINTS[pattern];
       if (!constraints) return true;
+      // Exclude patterns that require more notes than the scale has
+      if (constraints.minScaleNotes && scaleNoteCount < constraints.minScaleNotes)
+        return false;
       // Exclude patterns that require symmetric scales when an asymmetric scale is selected
       if (constraints.requiresSymmetric && isAsymmetric) return false;
       // Exclude patterns blocked for this scale type
@@ -655,6 +747,13 @@ export default function GenerationPreviewScreen() {
     if (constraints.onlyForScaleTypes) {
       filtered = filtered.filter((type) =>
         constraints.onlyForScaleTypes!.includes(type),
+      );
+    }
+
+    // Exclude scales that don't have enough notes for this pattern
+    if (constraints.minScaleNotes) {
+      filtered = filtered.filter(
+        (type) => getScaleNoteCount(type) >= constraints.minScaleNotes!,
       );
     }
 

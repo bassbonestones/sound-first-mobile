@@ -944,13 +944,14 @@ function escapeXml(str: string): string {
 
 // Chromatic-specific pattern display names
 // Maps pattern values to their chromatic interval names
+// NOTE: in_octaves is NOT included - it's always "In Octaves" (literal octaves)
 const CHROMATIC_PATTERN_NAMES: Record<string, string> = {
   in_3rds: "Chromatic Major 2nds",
   in_4ths: "Chromatic minor 3rds",
   in_5ths: "Chromatic Major 3rds",
   in_6ths: "Chromatic Perfect 4ths",
   in_7ths: "Chromatic Tritones",
-  in_octaves: "Chromatic Perfect 5ths",
+  in_8ths: "Chromatic Perfect 5ths",
   in_9ths: "Chromatic minor 6ths",
   in_10ths: "Chromatic Major 6ths",
   in_11ths: "Chromatic minor 7ths",

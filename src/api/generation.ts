@@ -115,6 +115,7 @@ export type ScalePattern =
   | "in_5ths"
   | "in_6ths"
   | "in_7ths"
+  | "in_8ths"
   | "in_octaves"
   | "in_9ths"
   | "in_10ths"
