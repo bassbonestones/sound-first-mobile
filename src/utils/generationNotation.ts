@@ -335,7 +335,7 @@ function isSwingDuration(beats: number): boolean {
  * Groups notes by beat and assigns begin/continue/end for 8ths and 16ths.
  * For swing rhythms, beams each long-short pair together.
  * For triplets, groups notes by beat with proper triplet brackets.
- * 
+ *
  * @param events - Notes in this measure
  * @param forceSwingBeaming - If true, use swing beaming (avoids per-measure re-detection)
  */
@@ -350,7 +350,7 @@ function computeBeamGroups(
   // - Otherwise, detect by checking for alternating long-short pattern
   // This avoids incorrect detection when measure boundaries split swing pairs
   let isSwingRhythm = forceSwingBeaming;
-  
+
   if (!isSwingRhythm) {
     // Detect swing: alternating long-short pattern (2/3, 1/3, 2/3, 1/3...)
     const swingLong = 2.0 / 3.0;
@@ -942,9 +942,46 @@ function escapeXml(str: string): string {
     .replace(/'/g, "&apos;");
 }
 
+// Scale categories by notes per octave
+const PENTATONIC_SCALES = ["pentatonic_major", "pentatonic_minor"];
+const HEXATONIC_SCALES = ["blues", "blues_major", "whole_tone"];
+const OCTATONIC_SCALES = [
+  "diminished_hw",
+  "diminished_wh",
+  "bebop_dominant",
+  "bebop_major",
+  "bebop_dorian",
+];
+
+// Pattern display names for non-standard scales
+// Pentatonic (5 notes): Skip 1-3, then In Octaves
+const PENTATONIC_PATTERN_NAMES: Record<string, string> = {
+  in_3rds: "Skip 1",
+  in_4ths: "Skip 2",
+  in_5ths: "Skip 3",
+};
+
+// Hexatonic (6 notes): Skip 1-4, then In Octaves
+const HEXATONIC_PATTERN_NAMES: Record<string, string> = {
+  in_3rds: "Skip 1",
+  in_4ths: "Skip 2",
+  in_5ths: "Skip 3",
+  in_6ths: "Skip 4",
+};
+
+// Octatonic (8 notes): Skip 1-6, then In Octaves
+const OCTATONIC_PATTERN_NAMES: Record<string, string> = {
+  in_3rds: "Skip 1",
+  in_4ths: "Skip 2",
+  in_5ths: "Skip 3",
+  in_6ths: "Skip 4",
+  in_7ths: "Skip 5",
+  in_8ths: "Skip 6",
+};
+
 // Chromatic-specific pattern display names
 // Maps pattern values to their chromatic interval names
-// NOTE: in_octaves is NOT included - it's always "In Octaves" (literal octaves)
+// NOTE: in_octaves is NOT included - chromatic uses in_13ths for octaves
 const CHROMATIC_PATTERN_NAMES: Record<string, string> = {
   in_3rds: "Chromatic Major 2nds",
   in_4ths: "Chromatic minor 3rds",
@@ -1004,11 +1041,27 @@ export function generateDisplayTitle(
   let title = `${key} ${defDisplay} ${typeDisplay}`;
 
   if (pattern) {
-    // Use chromatic-specific names when applicable
+    // Use scale-type-specific pattern names
     let patternDisplay: string;
     if (definition === "chromatic" && CHROMATIC_PATTERN_NAMES[pattern]) {
       patternDisplay = CHROMATIC_PATTERN_NAMES[pattern];
+    } else if (
+      PENTATONIC_SCALES.includes(definition) &&
+      PENTATONIC_PATTERN_NAMES[pattern]
+    ) {
+      patternDisplay = PENTATONIC_PATTERN_NAMES[pattern];
+    } else if (
+      HEXATONIC_SCALES.includes(definition) &&
+      HEXATONIC_PATTERN_NAMES[pattern]
+    ) {
+      patternDisplay = HEXATONIC_PATTERN_NAMES[pattern];
+    } else if (
+      OCTATONIC_SCALES.includes(definition) &&
+      OCTATONIC_PATTERN_NAMES[pattern]
+    ) {
+      patternDisplay = OCTATONIC_PATTERN_NAMES[pattern];
     } else {
+      // Default: convert snake_case to Title Case (e.g., in_3rds -> In 3rds)
       patternDisplay = pattern
         .split("_")
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1))

@@ -719,7 +719,10 @@ export default function GenerationPreviewScreen() {
       const constraints = SCALE_PATTERN_CONSTRAINTS[pattern];
       if (!constraints) return true;
       // Exclude patterns that require more notes than the scale has
-      if (constraints.minScaleNotes && scaleNoteCount < constraints.minScaleNotes)
+      if (
+        constraints.minScaleNotes &&
+        scaleNoteCount < constraints.minScaleNotes
+      )
         return false;
       // Exclude patterns that require symmetric scales when an asymmetric scale is selected
       if (constraints.requiresSymmetric && isAsymmetric) return false;
