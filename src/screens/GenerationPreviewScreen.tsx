@@ -1661,6 +1661,15 @@ export default function GenerationPreviewScreen() {
               {"\n"}Key: {response.key} | Octaves: {response.effective_octaves}
               {"\n"}Definition: {response.definition}
             </Text>
+            {response.capabilities_required &&
+              response.capabilities_required.length > 0 && (
+                <>
+                  <Text style={styles.debugSubtitle}>Required Capabilities</Text>
+                  <Text style={styles.debugCapabilities}>
+                    {response.capabilities_required.join(", ")}
+                  </Text>
+                </>
+              )}
           </View>
         )}
 
@@ -1909,6 +1918,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
     fontFamily: "monospace",
+  },
+  debugSubtitle: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  debugCapabilities: {
+    fontSize: 10,
+    color: colors.primary,
+    fontFamily: "monospace",
+    lineHeight: 16,
   },
   bottomSpacer: {
     height: 40,
