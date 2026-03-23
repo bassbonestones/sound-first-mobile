@@ -192,7 +192,7 @@ function generateScoreHtml(options: {
           drawSubtitle: false,
           drawComposer: false,
           drawLyricist: false,
-          drawCredits: false,
+          drawCredits: true,
           drawPartNames: false,
           drawPartAbbreviations: false,
           drawMeasureNumbers: false,
@@ -222,6 +222,22 @@ function generateScoreHtml(options: {
         await osmd.load(musicxml);
         osmd.zoom = currentZoom;
         osmd.render();
+
+        // Left-align title text after render
+        const svgContainer = document.querySelector('#osmd-container svg');
+        if (svgContainer) {
+          const textElements = svgContainer.querySelectorAll('text');
+          // Find title text (typically the first large text element at the top)
+          textElements.forEach(function(textEl) {
+            const fontSize = parseFloat(textEl.getAttribute('font-size') || '0');
+            const y = parseFloat(textEl.getAttribute('y') || '0');
+            // Title is typically large font near the top
+            if (fontSize >= 20 && y < 100) {
+              textEl.setAttribute('x', '10');
+              textEl.setAttribute('text-anchor', 'start');
+            }
+          });
+        }
 
         // Calculate measure positions for auto-scroll
         calculateMeasurePositions();
@@ -423,11 +439,14 @@ function ScoreViewportComponent({
     }
   }, []);
 
-  // Render MusicXML when ready
+  // Render MusicXML when ready and scroll to start
   useEffect(() => {
     if (isReady && musicXml) {
       const escapedXml = musicXml.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
       executeScript(`window.renderMusicXML(\`${escapedXml}\`)`);
+      // Scroll to start when new content loads
+      scrollViewRef.current?.scrollTo({ x: 0, animated: false });
+      lastScrolledMeasureRef.current = -1;
     }
   }, [isReady, musicXml, executeScript]);
 

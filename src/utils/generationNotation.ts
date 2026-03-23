@@ -644,6 +644,13 @@ export function eventsToMusicXml(
     ? `  <work>\n    <work-title>${escapeXml(title)}</work-title>\n  </work>`
     : "";
 
+  // Add credit element for left-aligned title display
+  const creditElement = title
+    ? `  <credit page="1">
+    <credit-words default-x="100" default-y="1750" justify="left" halign="left" font-size="24" font-weight="bold">${escapeXml(title)}</credit-words>
+  </credit>`
+    : "";
+
   const partList = `  <part-list>
     <score-part id="P1">
       <part-name>Music</part-name>
@@ -673,6 +680,7 @@ export function eventsToMusicXml(
   return `${header}
 <score-partwise version="3.1">
 ${workTitle}
+${creditElement}
 ${partList}
   <part id="P1">
 ${measureXmls.join("\n")}
