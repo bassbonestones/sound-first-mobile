@@ -465,6 +465,47 @@ const RHYTHM_DISPLAY_LABELS: Record<RhythmType, string> = {
   syncopated: "Syncopated",
 };
 
+// =============================================================================
+// Rhythm-Pattern Compatibility
+// =============================================================================
+// Slow rhythms (whole notes, half notes) are only allowed with simple patterns
+
+/** Patterns that allow WHOLE_NOTES rhythm */
+const WHOLE_NOTE_PATTERNS: Set<ScalePattern> = new Set([
+  "straight_up",
+  "straight_down",
+]);
+
+/** Patterns that allow HALF_NOTES rhythm */
+const HALF_NOTE_PATTERNS: Set<ScalePattern> = new Set([
+  "straight_up",
+  "straight_down",
+  "straight_up_down",
+  "straight_down_up",
+]);
+
+/**
+ * Get available rhythm types for a given pattern.
+ * Whole/half notes are only available for simple patterns.
+ */
+function getAvailableRhythmsForPattern(
+  pattern: ScalePattern | null,
+): RhythmType[] {
+  return RHYTHM_TYPES.filter((rhythm) => {
+    // If no pattern, allow all rhythms
+    if (!pattern) return true;
+    // Check whole note compatibility
+    if (rhythm === "whole_notes" && !WHOLE_NOTE_PATTERNS.has(pattern)) {
+      return false;
+    }
+    // Check half note compatibility
+    if (rhythm === "half_notes" && !HALF_NOTE_PATTERNS.has(pattern)) {
+      return false;
+    }
+    return true;
+  });
+}
+
 const ROOT_KEYS: MusicalKey[] = [
   "C",
   "C#",
@@ -662,6 +703,17 @@ export default function GenerationPreviewScreen() {
     }
   }, [maxOctaves, numOctaves, randomize.numOctaves]);
 
+  // Reset rhythm if it becomes unavailable due to pattern selection
+  // (whole/half notes only allowed for simple patterns)
+  useEffect(() => {
+    if (!randomize.rhythmType && generationType === "scale") {
+      const availableRhythms = getAvailableRhythmsForPattern(scalePattern);
+      if (!availableRhythms.includes(rhythmType)) {
+        setRhythmType("quarter_notes");
+      }
+    }
+  }, [scalePattern, rhythmType, generationType, randomize.rhythmType]);
+
   // Initialize playback service
   useEffect(() => {
     const initPlayback = async () => {
@@ -704,8 +756,13 @@ export default function GenerationPreviewScreen() {
       let selectedArpeggioPattern: ArpeggioPattern = randomize.arpeggioPattern
         ? pickRandom(ARPEGGIO_PATTERNS)
         : arpeggioPattern;
+      // Get available rhythms for the selected pattern (scales only)
+      const availableRhythms =
+        selectedType === "scale"
+          ? getAvailableRhythmsForPattern(selectedScalePattern)
+          : RHYTHM_TYPES;
       let selectedRhythm: RhythmType = randomize.rhythmType
-        ? pickRandom(RHYTHM_TYPES)
+        ? pickRandom(availableRhythms)
         : rhythmType;
       let selectedStartOctave: number = randomize.startOctave
         ? pickRandom(OCTAVES)
@@ -718,7 +775,33 @@ export default function GenerationPreviewScreen() {
       // Pool mode overrides individual random selections
       if (poolModeEnabled) {
         if (generationType === "scale" && scalePool.length > 0) {
-          selectedScaleType = pickRandom(scalePool);
+          // Filter pool to respect pattern constraints
+          const patternConstraints =
+            SCALE_PATTERN_CONSTRAINTS[selectedScalePattern];
+          let validPool = scalePool;
+          if (patternConstraints?.onlyForScaleTypes) {
+            validPool = scalePool.filter((type) =>
+              patternConstraints.onlyForScaleTypes!.includes(type),
+            );
+          }
+          if (patternConstraints?.blockedScaleTypes) {
+            validPool = validPool.filter(
+              (type) => !patternConstraints.blockedScaleTypes!.includes(type),
+            );
+          }
+          if (patternConstraints?.requiresSymmetric) {
+            validPool = validPool.filter(
+              (type) => !ASYMMETRIC_SCALES.includes(type),
+            );
+          }
+          // If no valid options in pool, fall back to full pool or default
+          if (validPool.length > 0) {
+            selectedScaleType = pickRandom(validPool);
+          } else if (scalePool.length > 0) {
+            // Pool has items but none are valid for pattern - use straight_up_down
+            selectedScalePattern = "straight_up_down";
+            selectedScaleType = pickRandom(scalePool);
+          }
         }
         if (generationType === "arpeggio" && arpeggioPool.length > 0) {
           selectedArpeggioType = pickRandom(arpeggioPool);
@@ -726,6 +809,19 @@ export default function GenerationPreviewScreen() {
         if (keyPool.length > 0) {
           selectedKey = pickRandom(keyPool);
         }
+      }
+
+      // Validate scale/pattern combination after all selections
+      // (handles cases where non-pool random picked invalid combo)
+      const finalConstraints = SCALE_PATTERN_CONSTRAINTS[selectedScalePattern];
+      if (finalConstraints?.onlyForScaleTypes) {
+        if (!finalConstraints.onlyForScaleTypes.includes(selectedScaleType)) {
+          // Invalid combo - reset pattern to straight_up_down
+          selectedScalePattern = "straight_up_down";
+        }
+      }
+      if (finalConstraints?.blockedScaleTypes?.includes(selectedScaleType)) {
+        selectedScalePattern = "straight_up_down";
       }
 
       // Compute effective max octaves based on final selected values
@@ -745,10 +841,12 @@ export default function GenerationPreviewScreen() {
       }
 
       // Update dropdowns to show what was randomly selected
+      // Also update pattern if it was changed due to constraint validation
       if (randomize.scaleType) setScaleType(selectedScaleType);
       if (randomize.arpeggioType) setArpeggioType(selectedArpeggioType);
       if (randomize.rootKey) setRootKey(selectedKey);
-      if (randomize.scalePattern) setScalePattern(selectedScalePattern);
+      if (randomize.scalePattern || selectedScalePattern !== scalePattern)
+        setScalePattern(selectedScalePattern);
       if (randomize.arpeggioPattern)
         setArpeggioPattern(selectedArpeggioPattern);
       if (randomize.rhythmType) setRhythmType(selectedRhythm);
@@ -1100,7 +1198,9 @@ export default function GenerationPreviewScreen() {
               style={styles.picker}
               enabled={!randomize.rhythmType}
             >
-              {RHYTHM_TYPES.map((r) => (
+              {getAvailableRhythmsForPattern(
+                generationType === "scale" ? scalePattern : null,
+              ).map((r) => (
                 <Picker.Item
                   key={r}
                   label={RHYTHM_DISPLAY_LABELS[r] ?? r.replace(/_/g, " ")}

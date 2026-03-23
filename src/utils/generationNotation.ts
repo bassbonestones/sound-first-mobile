@@ -216,6 +216,10 @@ function durationToType(beats: number): string {
   if (Math.abs(beats - 1.0 / 3.0) < 0.01) {
     return "eighth";
   }
+  // Handle triplet quarters (2/3 beat)
+  if (Math.abs(beats - 2.0 / 3.0) < 0.01) {
+    return "quarter";
+  }
   // Handle triplet sixteenths (1/6 beat)
   if (Math.abs(beats - 1.0 / 6.0) < 0.01) {
     return "16th";
@@ -248,14 +252,22 @@ function isDotted(beats: number): boolean {
 /** Eighth triplet duration (1/3 beat) */
 const EIGHTH_TRIPLET_DURATION = 1.0 / 3.0;
 
+/** Quarter triplet duration (2/3 beat) */
+const QUARTER_TRIPLET_DURATION = 2.0 / 3.0;
+
 /** Check if duration is an eighth triplet */
 function isEighthTriplet(beats: number): boolean {
   return Math.abs(beats - EIGHTH_TRIPLET_DURATION) < 0.01;
 }
 
-/** Check if duration is any kind of triplet (currently only eighth triplets) */
+/** Check if duration is a quarter triplet */
+function isQuarterTriplet(beats: number): boolean {
+  return Math.abs(beats - QUARTER_TRIPLET_DURATION) < 0.01;
+}
+
+/** Check if duration is any kind of triplet */
 function isTripletDuration(beats: number): boolean {
-  return isEighthTriplet(beats);
+  return isEighthTriplet(beats) || isQuarterTriplet(beats);
 }
 
 /** Get triplet info for a duration */
@@ -271,6 +283,14 @@ function getTripletInfo(beats: number): TripletInfo {
     return {
       isTriplet: true,
       noteType: "eighth",
+      actualNotes: 3,
+      normalNotes: 2,
+    };
+  }
+  if (isQuarterTriplet(beats)) {
+    return {
+      isTriplet: true,
+      noteType: "quarter",
       actualNotes: 3,
       normalNotes: 2,
     };
@@ -314,82 +334,28 @@ function isSwingDuration(beats: number): boolean {
  * Compute beam groupings for a sequence of notes.
  * Groups notes by beat and assigns begin/continue/end for 8ths and 16ths.
  * For swing rhythms, beams each long-short pair together.
- * For triplets, beams each group of 3 together with triplet brackets.
+ * For triplets, groups notes by beat with proper triplet brackets.
  */
 function computeBeamGroups(events: PitchEvent[]): NoteBeamInfo[] {
   const result: NoteBeamInfo[] = [];
 
-  // Check if this is a triplet rhythm (all beamable notes are triplets)
-  const tripletCheckNotes = events.filter((e) =>
-    isBeamableDuration(e.duration_beats),
-  );
-  const isTripletRhythm =
-    tripletCheckNotes.length > 0 &&
-    tripletCheckNotes.every((e) => isTripletDuration(e.duration_beats));
-
-  if (isTripletRhythm) {
-    // For triplets: beam each group of 3 notes together
-    let i = 0;
-    while (i < events.length) {
-      const event = events[i];
-      const tripletInfo = getTripletInfo(event.duration_beats);
-
-      if (tripletInfo.isTriplet) {
-        // Find consecutive triplet notes
-        const tripletGroup: number[] = [i];
-        let j = i + 1;
-        while (
-          j < events.length &&
-          isTripletDuration(events[j].duration_beats)
-        ) {
-          tripletGroup.push(j);
-          j++;
-        }
-
-        // Assign beam and tuplet info for each note in groups of 3
-        for (let idx = 0; idx < tripletGroup.length; idx++) {
-          const positionInGroup = idx % 3;
-          const isFirst = positionInGroup === 0;
-          const isLast =
-            positionInGroup === 2 || idx === tripletGroup.length - 1;
-
-          // How many notes remain from this position?
-          const notesRemaining = tripletGroup.length - (idx - positionInGroup);
-          const skipBracket = isFirst && notesRemaining < 2;
-
-          result.push({
-            beam1: skipBracket
-              ? null
-              : isFirst
-                ? "begin"
-                : isLast
-                  ? "end"
-                  : "continue",
-            beam2: null,
-            tripletStart: isFirst && !skipBracket,
-            tripletStop: isLast && !skipBracket,
-            tripletInfo: tripletInfo,
-          });
-        }
-
-        i = j;
-      } else {
-        // Non-triplet note
-        result.push({ beam1: null, beam2: null });
-        i++;
-      }
-    }
-    return result;
-  }
-
-  // Check if this is swing rhythm
+  // Check if this is swing rhythm FIRST (before triplet check)
+  // Swing uses 2/3 and 1/3 durations in alternating long-short pattern
+  // Must have alternating pattern to distinguish from triplets (all 1/3)
+  const swingLong = 2.0 / 3.0;
+  const swingShort = 1.0 / 3.0;
   const swingCheckNotes = events.length > 1 ? events.slice(0, -1) : events;
   const isSwingRhythm =
-    events.length > 0 &&
-    swingCheckNotes.every((e) => isSwingDuration(e.duration_beats));
+    events.length >= 2 &&
+    swingCheckNotes.every((e, i) => {
+      // Even indices should be long (2/3), odd indices should be short (1/3)
+      const expectedDuration = i % 2 === 0 ? swingLong : swingShort;
+      return Math.abs(e.duration_beats - expectedDuration) < 0.01;
+    });
 
   if (isSwingRhythm) {
     // For swing: beam each pair of notes (long + short) together
+    // No triplet notation - swing is notated as regular eighths with "Swing" text
     for (let i = 0; i < events.length; i++) {
       const isBeamable = isSwingDuration(events[i].duration_beats);
 
@@ -410,6 +376,78 @@ function computeBeamGroups(events: PitchEvent[]): NoteBeamInfo[] {
         });
       } else {
         result.push({ beam1: null, beam2: null });
+      }
+    }
+    return result;
+  }
+
+  // Check if this rhythm has actual triplet notes (not swing)
+  const hasTriplets = events.some((e) => isTripletDuration(e.duration_beats));
+
+  if (hasTriplets) {
+    // For triplets: group by beat using offset_beats
+    let i = 0;
+    while (i < events.length) {
+      const event = events[i];
+      const isTriplet = isTripletDuration(event.duration_beats);
+
+      if (isTriplet) {
+        // Get the beat number for this note (round to handle floating point)
+        const currentBeat = Math.round(event.offset_beats * 1000000) / 1000000;
+        const currentBeatInt = Math.floor(currentBeat + 0.001); // Small epsilon for floating point
+
+        // Collect all triplet notes in this beat
+        const beatGroup: { index: number; tripletInfo: TripletInfo }[] = [];
+        let j = i;
+        while (
+          j < events.length &&
+          isTripletDuration(events[j].duration_beats)
+        ) {
+          const noteOffset =
+            Math.round(events[j].offset_beats * 1000000) / 1000000;
+          const noteBeatInt = Math.floor(noteOffset + 0.001);
+          if (noteBeatInt === currentBeatInt) {
+            beatGroup.push({
+              index: j,
+              tripletInfo: getTripletInfo(events[j].duration_beats),
+            });
+            j++;
+          } else {
+            break;
+          }
+        }
+
+        // Assign beam and tuplet info for each note in beat group
+        for (let idx = 0; idx < beatGroup.length; idx++) {
+          const { tripletInfo } = beatGroup[idx];
+          const isFirst = idx === 0;
+          const isLast = idx === beatGroup.length - 1;
+
+          // Only beam eighth triplets, not quarter triplets
+          const shouldBeam = isEighthTriplet(
+            events[beatGroup[idx].index].duration_beats,
+          );
+
+          result.push({
+            beam1: shouldBeam
+              ? isFirst
+                ? "begin"
+                : isLast
+                  ? "end"
+                  : "continue"
+              : null,
+            beam2: null,
+            tripletStart: isFirst,
+            tripletStop: isLast,
+            tripletInfo: tripletInfo,
+          });
+        }
+
+        i = j;
+      } else {
+        // Non-triplet note
+        result.push({ beam1: null, beam2: null });
+        i++;
       }
     }
     return result;
