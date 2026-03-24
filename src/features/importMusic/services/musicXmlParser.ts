@@ -102,6 +102,7 @@ interface RawAttributes {
 interface RawDirection {
   readonly metronome?: { beatUnit: string; perMinute: number };
   readonly words?: string;
+  readonly dynamics?: string;
 }
 
 interface RawLyric {
@@ -427,7 +428,7 @@ function extractAttributes(measureContent: string): RawAttributes | undefined {
 }
 
 /**
- * Extract direction elements (tempo, etc.)
+ * Extract direction elements (tempo, dynamics, etc.)
  */
 function extractDirections(measureContent: string): RawDirection[] {
   const directions: RawDirection[] = [];
@@ -451,8 +452,21 @@ function extractDirections(measureContent: string): RawDirection[] {
     // Words (tempo markings, etc.)
     const words = extractTagContent(dirContent, "words");
 
-    if (metronome || words) {
-      directions.push({ metronome, words: words ?? undefined });
+    // Dynamics (pp, p, mp, mf, f, ff, fp, sf, sfz, etc.)
+    let dynamics: string | undefined;
+    const dynamicsBlock = extractTagBlock(dirContent, "dynamics");
+    if (dynamicsBlock) {
+      // The dynamic is an empty element like <f/> or <mf/> inside <dynamics>
+      const dynamicMatch = dynamicsBlock.match(
+        /<(pp|p|mp|mf|f|ff|fff|fp|sf|sfz|fz|sfp|sfpp|rfz|ppp|pppp|ffff)[^>]*\/>/i,
+      );
+      if (dynamicMatch) {
+        dynamics = dynamicMatch[1].toLowerCase();
+      }
+    }
+
+    if (metronome || words || dynamics) {
+      directions.push({ metronome, words: words ?? undefined, dynamics });
     }
   }
 
@@ -748,28 +762,44 @@ function convertParts(raw: RawMusicXmlData): ImportedPart[] {
  * Convert measures
  */
 function convertMeasures(rawMeasures: RawMeasure[]): ImportedMeasure[] {
-  return rawMeasures.map((rawMeasure) => ({
-    number: rawMeasure.number,
-    events: convertNotes(rawMeasure.notes),
-    timeSignature: rawMeasure.attributes?.time
-      ? convertTimeSignature(rawMeasure.attributes.time)
-      : null,
-    keySignature: rawMeasure.attributes?.key
-      ? convertKeySignature(rawMeasure.attributes.key)
-      : null,
-    confidence: null,
-  }));
+  return rawMeasures.map((rawMeasure) => {
+    // Extract initial dynamic from directions (first one found)
+    const initialDynamic =
+      rawMeasure.direction?.find((d) => d.dynamics)?.dynamics ?? null;
+
+    return {
+      number: rawMeasure.number,
+      events: convertNotes(rawMeasure.notes, initialDynamic),
+      timeSignature: rawMeasure.attributes?.time
+        ? convertTimeSignature(rawMeasure.attributes.time)
+        : null,
+      keySignature: rawMeasure.attributes?.key
+        ? convertKeySignature(rawMeasure.attributes.key)
+        : null,
+      confidence: null,
+    };
+  });
 }
 
 /**
  * Convert notes to ImportedNoteEvent
+ * @param rawNotes - The raw notes to convert
+ * @param initialDynamic - Dynamic marking that applies to the first pitched note
  */
-function convertNotes(rawNotes: RawNote[]): ImportedNoteEvent[] {
+function convertNotes(
+  rawNotes: RawNote[],
+  initialDynamic: string | null = null,
+): ImportedNoteEvent[] {
   const events: ImportedNoteEvent[] = [];
   let currentChordPitches: PitchInfo[] = [];
   let currentChordNote: RawNote | null = null;
+  let dynamicApplied = false;
+  const dynamicToApply = initialDynamic;
 
   for (const rawNote of rawNotes) {
+    // Determine if this note should get the dynamic
+    const applyDynamic = !dynamicApplied && dynamicToApply && !rawNote.isRest;
+
     if (rawNote.isChord && currentChordNote) {
       // Add to current chord
       if (rawNote.pitch) {
@@ -778,13 +808,29 @@ function convertNotes(rawNotes: RawNote[]): ImportedNoteEvent[] {
     } else {
       // Flush previous chord if exists
       if (currentChordNote && currentChordPitches.length > 1) {
+        const useDynamic =
+          !dynamicApplied && dynamicToApply && !currentChordNote.isRest;
         events.push(
-          createNoteEvent(currentChordNote, null, currentChordPitches),
+          createNoteEvent(
+            currentChordNote,
+            null,
+            currentChordPitches,
+            useDynamic ? dynamicToApply : null,
+          ),
         );
+        if (useDynamic) dynamicApplied = true;
       } else if (currentChordNote && currentChordPitches.length === 1) {
+        const useDynamic =
+          !dynamicApplied && dynamicToApply && !currentChordNote.isRest;
         events.push(
-          createNoteEvent(currentChordNote, currentChordPitches[0], null),
+          createNoteEvent(
+            currentChordNote,
+            currentChordPitches[0],
+            null,
+            useDynamic ? dynamicToApply : null,
+          ),
         );
+        if (useDynamic) dynamicApplied = true;
       }
 
       // Start new note/chord
@@ -794,7 +840,7 @@ function convertNotes(rawNotes: RawNote[]): ImportedNoteEvent[] {
       // If it's a rest or non-chord note, add it immediately
       if (rawNote.isRest || !rawNote.isChord) {
         if (rawNote.isRest) {
-          events.push(createNoteEvent(rawNote, null, null));
+          events.push(createNoteEvent(rawNote, null, null, null));
           currentChordNote = null;
           currentChordPitches = [];
         }
@@ -804,10 +850,26 @@ function convertNotes(rawNotes: RawNote[]): ImportedNoteEvent[] {
 
   // Flush final note/chord
   if (currentChordNote && currentChordPitches.length > 1) {
-    events.push(createNoteEvent(currentChordNote, null, currentChordPitches));
-  } else if (currentChordNote && currentChordPitches.length === 1) {
+    const useDynamic =
+      !dynamicApplied && dynamicToApply && !currentChordNote.isRest;
     events.push(
-      createNoteEvent(currentChordNote, currentChordPitches[0], null),
+      createNoteEvent(
+        currentChordNote,
+        null,
+        currentChordPitches,
+        useDynamic ? dynamicToApply : null,
+      ),
+    );
+  } else if (currentChordNote && currentChordPitches.length === 1) {
+    const useDynamic =
+      !dynamicApplied && dynamicToApply && !currentChordNote.isRest;
+    events.push(
+      createNoteEvent(
+        currentChordNote,
+        currentChordPitches[0],
+        null,
+        useDynamic ? dynamicToApply : null,
+      ),
     );
   }
 
@@ -821,6 +883,7 @@ function createNoteEvent(
   rawNote: RawNote,
   pitch: PitchInfo | null,
   pitches: PitchInfo[] | null,
+  dynamics: string | null = null,
 ): ImportedNoteEvent {
   return {
     type: rawNote.isRest
@@ -834,7 +897,7 @@ function createNoteEvent(
     durationType: mapDurationType(rawNote.type),
     dots: rawNote.dots,
     articulations: [],
-    dynamics: null,
+    dynamics,
     tiedToNext: rawNote.tieStart,
     tiedFromPrevious: rawNote.tieStop,
     lyric: rawNote.lyric

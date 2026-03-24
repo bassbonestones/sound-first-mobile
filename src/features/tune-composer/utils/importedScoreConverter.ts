@@ -23,6 +23,7 @@ import type {
   Accidental,
   Note,
   Lyric,
+  DynamicType,
 } from "../types/tuneComposerTypes";
 import {
   generateId,
@@ -109,11 +110,41 @@ export function lyricInfoToLyric(lyricInfo: LyricInfo): Lyric {
 }
 
 /**
+ * Valid dynamic markings for TuneComposer
+ */
+const VALID_DYNAMICS: Set<string> = new Set([
+  "pp",
+  "p",
+  "mp",
+  "mf",
+  "f",
+  "ff",
+  "fp",
+  "sf",
+  "sfz",
+]);
+
+/**
+ * Convert dynamics string to DynamicType
+ */
+export function dynamicsStringToDynamicType(
+  dynamics: string | null,
+): DynamicType | undefined {
+  if (!dynamics) return undefined;
+  const normalized = dynamics.toLowerCase();
+  return VALID_DYNAMICS.has(normalized)
+    ? (normalized as DynamicType)
+    : undefined;
+}
+
+/**
  * Convert an ImportedNoteEvent to a composer Note
  */
 export function importedNoteEventToNote(event: ImportedNoteEvent): Note {
   // Convert lyric if present
   const lyric = event.lyric ? lyricInfoToLyric(event.lyric) : undefined;
+  // Convert dynamic if present
+  const dynamic = dynamicsStringToDynamicType(event.dynamics);
 
   if (event.type === "rest") {
     return createNote(null, durationTypeToDurationValue(event.durationType), {
@@ -134,6 +165,7 @@ export function importedNoteEventToNote(event: ImportedNoteEvent): Note {
       tieStart: event.tiedToNext,
       tieEnd: event.tiedFromPrevious,
       lyric,
+      dynamic,
     });
   }
 
@@ -150,6 +182,7 @@ export function importedNoteEventToNote(event: ImportedNoteEvent): Note {
       tieStart: event.tiedToNext,
       tieEnd: event.tiedFromPrevious,
       lyric,
+      dynamic,
     });
   }
 
