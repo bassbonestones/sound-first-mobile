@@ -345,6 +345,14 @@ function generateNoteXml(
     notationsContent += '<tied type="stop"/>';
   }
 
+  // Slurs
+  if (note.slurStart) {
+    notationsContent += '<slur type="start" number="1"/>';
+  }
+  if (note.slurEnd) {
+    notationsContent += '<slur type="stop" number="1"/>';
+  }
+
   const beamXml = beamType
     ? `\n        <beam number="1">${beamType}</beam>`
     : "";

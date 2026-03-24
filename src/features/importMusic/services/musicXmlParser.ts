@@ -30,6 +30,7 @@ import type {
   NoteLetter,
   DurationType,
   LocalImportAsset,
+  ArticulationType,
 } from "../../../types/import";
 import { createImportError } from "../../../types/import";
 import {
@@ -121,6 +122,9 @@ interface RawNote {
   readonly tieStart: boolean;
   readonly tieStop: boolean;
   readonly lyric?: RawLyric;
+  readonly articulations: string[];
+  readonly slurStart: boolean;
+  readonly slurEnd: boolean;
 }
 
 interface RawDefaults {
@@ -539,6 +543,45 @@ function extractNotes(measureContent: string, _warnings: string[]): RawNote[] {
       }
     }
 
+    // Articulations (inside <notations><articulations>)
+    const articulations: string[] = [];
+    let slurStart = false;
+    let slurEnd = false;
+    const notationsBlock = extractTagBlock(noteContent, "notations");
+    if (notationsBlock) {
+      const articulationsBlock = extractTagBlock(
+        notationsBlock,
+        "articulations",
+      );
+      if (articulationsBlock) {
+        // Look for common articulations as empty elements
+        const articulationTypes = [
+          "staccato",
+          "accent",
+          "tenuto",
+          "staccatissimo",
+          "strong-accent",
+          "detached-legato",
+        ];
+        for (const art of articulationTypes) {
+          if (new RegExp(`<${art}[^>]*/>`).test(articulationsBlock)) {
+            articulations.push(art);
+          }
+        }
+      }
+      // Fermata is directly inside notations, not articulations
+      if (/<fermata[^>]*\/?>/.test(notationsBlock)) {
+        articulations.push("fermata");
+      }
+      // Slurs - check for slur start and stop
+      if (/<slur[^>]*type=["']start["']/i.test(notationsBlock)) {
+        slurStart = true;
+      }
+      if (/<slur[^>]*type=["']stop["']/i.test(notationsBlock)) {
+        slurEnd = true;
+      }
+    }
+
     notes.push({
       isRest,
       isChord,
@@ -549,6 +592,9 @@ function extractNotes(measureContent: string, _warnings: string[]): RawNote[] {
       tieStart,
       tieStop,
       lyric,
+      articulations,
+      slurStart,
+      slurEnd,
     });
   }
 
@@ -767,9 +813,16 @@ function convertMeasures(rawMeasures: RawMeasure[]): ImportedMeasure[] {
     const initialDynamic =
       rawMeasure.direction?.find((d) => d.dynamics)?.dynamics ?? null;
 
+    // Extract expression text from directions (words without metronome = expression)
+    // Skip words that look like tempo markings (contain numbers or "Allegro", "Andante", etc.)
+    const initialExpression =
+      rawMeasure.direction?.find(
+        (d) => d.words && !d.metronome && !isTempoWord(d.words),
+      )?.words ?? null;
+
     return {
       number: rawMeasure.number,
-      events: convertNotes(rawMeasure.notes, initialDynamic),
+      events: convertNotes(rawMeasure.notes, initialDynamic, initialExpression),
       timeSignature: rawMeasure.attributes?.time
         ? convertTimeSignature(rawMeasure.attributes.time)
         : null,
@@ -782,24 +835,51 @@ function convertMeasures(rawMeasures: RawMeasure[]): ImportedMeasure[] {
 }
 
 /**
+ * Check if a word looks like a tempo marking rather than expression text
+ */
+function isTempoWord(word: string): boolean {
+  const tempoPatterns = [
+    /allegro/i,
+    /andante/i,
+    /adagio/i,
+    /presto/i,
+    /largo/i,
+    /moderato/i,
+    /vivace/i,
+    /lento/i,
+    /grave/i,
+    /tempo/i,
+    /a tempo/i,
+    /rit\./i,
+    /accel\./i,
+    /\d+\s*bpm/i,
+    /\d+\s*=/i,
+    /=\s*\d+/i,
+  ];
+  return tempoPatterns.some((p) => p.test(word));
+}
+
+/**
  * Convert notes to ImportedNoteEvent
  * @param rawNotes - The raw notes to convert
  * @param initialDynamic - Dynamic marking that applies to the first pitched note
+ * @param initialExpression - Expression text that applies to the first pitched note
  */
 function convertNotes(
   rawNotes: RawNote[],
   initialDynamic: string | null = null,
+  initialExpression: string | null = null,
 ): ImportedNoteEvent[] {
   const events: ImportedNoteEvent[] = [];
   let currentChordPitches: PitchInfo[] = [];
   let currentChordNote: RawNote | null = null;
   let dynamicApplied = false;
+  let expressionApplied = false;
+  let pitchedNoteCount = 0; // Track pitched notes to offset expression
   const dynamicToApply = initialDynamic;
+  const expressionToApply = initialExpression;
 
   for (const rawNote of rawNotes) {
-    // Determine if this note should get the dynamic
-    const applyDynamic = !dynamicApplied && dynamicToApply && !rawNote.isRest;
-
     if (rawNote.isChord && currentChordNote) {
       // Add to current chord
       if (rawNote.pitch) {
@@ -810,27 +890,45 @@ function convertNotes(
       if (currentChordNote && currentChordPitches.length > 1) {
         const useDynamic =
           !dynamicApplied && dynamicToApply && !currentChordNote.isRest;
+        // Expression goes on second pitched note (index 1) to avoid overlap with tempo
+        const useExpression =
+          !expressionApplied &&
+          expressionToApply &&
+          !currentChordNote.isRest &&
+          pitchedNoteCount === 1;
         events.push(
           createNoteEvent(
             currentChordNote,
             null,
             currentChordPitches,
             useDynamic ? dynamicToApply : null,
+            useExpression ? expressionToApply : null,
           ),
         );
         if (useDynamic) dynamicApplied = true;
+        if (useExpression) expressionApplied = true;
+        if (!currentChordNote.isRest) pitchedNoteCount++;
       } else if (currentChordNote && currentChordPitches.length === 1) {
         const useDynamic =
           !dynamicApplied && dynamicToApply && !currentChordNote.isRest;
+        // Expression goes on second pitched note (index 1) to avoid overlap with tempo
+        const useExpression =
+          !expressionApplied &&
+          expressionToApply &&
+          !currentChordNote.isRest &&
+          pitchedNoteCount === 1;
         events.push(
           createNoteEvent(
             currentChordNote,
             currentChordPitches[0],
             null,
             useDynamic ? dynamicToApply : null,
+            useExpression ? expressionToApply : null,
           ),
         );
         if (useDynamic) dynamicApplied = true;
+        if (useExpression) expressionApplied = true;
+        if (!currentChordNote.isRest) pitchedNoteCount++;
       }
 
       // Start new note/chord
@@ -840,7 +938,7 @@ function convertNotes(
       // If it's a rest or non-chord note, add it immediately
       if (rawNote.isRest || !rawNote.isChord) {
         if (rawNote.isRest) {
-          events.push(createNoteEvent(rawNote, null, null, null));
+          events.push(createNoteEvent(rawNote, null, null, null, null));
           currentChordNote = null;
           currentChordPitches = [];
         }
@@ -852,28 +950,61 @@ function convertNotes(
   if (currentChordNote && currentChordPitches.length > 1) {
     const useDynamic =
       !dynamicApplied && dynamicToApply && !currentChordNote.isRest;
+    const useExpression =
+      !expressionApplied &&
+      expressionToApply &&
+      !currentChordNote.isRest &&
+      pitchedNoteCount === 1;
     events.push(
       createNoteEvent(
         currentChordNote,
         null,
         currentChordPitches,
         useDynamic ? dynamicToApply : null,
+        useExpression ? expressionToApply : null,
       ),
     );
   } else if (currentChordNote && currentChordPitches.length === 1) {
     const useDynamic =
       !dynamicApplied && dynamicToApply && !currentChordNote.isRest;
+    const useExpression =
+      !expressionApplied &&
+      expressionToApply &&
+      !currentChordNote.isRest &&
+      pitchedNoteCount === 1;
     events.push(
       createNoteEvent(
         currentChordNote,
         currentChordPitches[0],
         null,
         useDynamic ? dynamicToApply : null,
+        useExpression ? expressionToApply : null,
       ),
     );
   }
 
   return events;
+}
+
+/**
+ * Map MusicXML articulation name to import ArticulationType
+ */
+function mapArticulation(art: string): ArticulationType | null {
+  switch (art.toLowerCase()) {
+    case "staccato":
+      return "staccato";
+    case "accent":
+      return "accent";
+    case "tenuto":
+      return "tenuto";
+    case "strong-accent":
+      return "marcato";
+    case "fermata":
+      return "fermata";
+    // staccatissimo and detached-legato not in import type, skip
+    default:
+      return null;
+  }
 }
 
 /**
@@ -884,7 +1015,13 @@ function createNoteEvent(
   pitch: PitchInfo | null,
   pitches: PitchInfo[] | null,
   dynamics: string | null = null,
+  expression: string | null = null,
 ): ImportedNoteEvent {
+  // Map raw articulations to typed ArticulationType
+  const articulations = rawNote.articulations
+    .map(mapArticulation)
+    .filter((a): a is ArticulationType => a !== null);
+
   return {
     type: rawNote.isRest
       ? "rest"
@@ -896,7 +1033,7 @@ function createNoteEvent(
     duration: rawNote.duration,
     durationType: mapDurationType(rawNote.type),
     dots: rawNote.dots,
-    articulations: [],
+    articulations,
     dynamics,
     tiedToNext: rawNote.tieStart,
     tiedFromPrevious: rawNote.tieStop,
@@ -907,6 +1044,9 @@ function createNoteEvent(
           extend: rawNote.lyric.extend,
         }
       : null,
+    slurStart: rawNote.slurStart,
+    slurEnd: rawNote.slurEnd,
+    expression,
   };
 }
 

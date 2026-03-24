@@ -262,6 +262,10 @@ export interface Note {
   articulation?: ArticulationType;
   /** Expression text (tempo, character, technique markings) */
   expression?: string;
+  /** Whether this note starts a slur */
+  slurStart?: boolean;
+  /** Whether this note ends a slur */
+  slurEnd?: boolean;
 }
 
 /**
@@ -295,6 +299,8 @@ export function createNote(
       | "wedge"
       | "articulation"
       | "expression"
+      | "slurStart"
+      | "slurEnd"
     >
   >,
 ): Note {

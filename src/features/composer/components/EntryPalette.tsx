@@ -13,6 +13,7 @@ import { colors, spacing } from "../../../constants";
 import { DurationSelector } from "./DurationSelector";
 import { PitchSelector } from "./PitchSelector";
 import { ModifierRow } from "./ModifierRow";
+import type { ArticulationType } from "./ModifierRow";
 import type { DurationValue, PitchName, Accidental, Note } from "../types";
 
 // =============================================================================
@@ -48,6 +49,12 @@ export interface EntryPaletteProps {
   onInsertRest: () => void;
   /** Called when tie is toggled */
   onToggleTie: () => void;
+  /** Called when an articulation is applied */
+  onArticulation?: (articulation: ArticulationType) => void;
+  /** Called when articulation is removed */
+  onRemoveArticulation?: () => void;
+  /** Currently active articulation on selected note */
+  activeArticulation?: ArticulationType | null;
   /** Whether the palette is disabled (e.g., during playback) */
   disabled?: boolean;
   /** Extra vertical padding per row for responsive layouts */
@@ -75,6 +82,9 @@ function EntryPaletteComponent({
   onAccidental,
   onInsertRest,
   onToggleTie,
+  onArticulation,
+  onRemoveArticulation,
+  activeArticulation,
   disabled = false,
   extraRowPadding = 0,
   testID,
@@ -116,13 +126,16 @@ function EntryPaletteComponent({
         />
       </View>
 
-      {/* Modifier row */}
+      {/* Modifier row (includes accidentals, tie, and articulations) */}
       <View style={rowPaddingStyle}>
         <ModifierRow
           onAccidental={onAccidental}
           onTie={onToggleTie}
           onOctaveChange={onOctaveChange}
+          onArticulation={onArticulation}
+          onRemoveArticulation={onRemoveArticulation}
           activeAccidental={activeAccidental}
+          activeArticulation={activeArticulation}
           tieActive={tieActive}
           hasSelection={hasSelection}
           disabled={disabled}

@@ -399,6 +399,12 @@ export interface ImportedNoteEvent {
   readonly tiedFromPrevious: boolean;
   /** Lyric syllable attached to this note */
   readonly lyric: LyricInfo | null;
+  /** Does this note start a slur? */
+  readonly slurStart: boolean;
+  /** Does this note end a slur? */
+  readonly slurEnd: boolean;
+  /** Expression text (e.g., "dolce", "espressivo") */
+  readonly expression: string | null;
 }
 
 /**

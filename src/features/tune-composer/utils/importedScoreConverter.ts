@@ -12,6 +12,7 @@ import type {
   PitchInfo,
   DurationType,
   LyricInfo,
+  ArticulationType as ImportArticulationType,
 } from "../../../types/import";
 import type {
   TuneComposerScore,
@@ -24,6 +25,7 @@ import type {
   Note,
   Lyric,
   DynamicType,
+  ArticulationType,
 } from "../types/tuneComposerTypes";
 import {
   generateId,
@@ -138,6 +140,28 @@ export function dynamicsStringToDynamicType(
 }
 
 /**
+ * Map import ArticulationType to TuneComposer ArticulationType
+ */
+export function mapArticulationType(
+  art: ImportArticulationType,
+): ArticulationType {
+  switch (art) {
+    case "staccato":
+      return "staccato";
+    case "accent":
+      return "accent";
+    case "tenuto":
+      return "tenuto";
+    case "marcato":
+      return "strong-accent";
+    case "fermata":
+      return "fermata";
+    default:
+      return "staccato"; // Fallback
+  }
+}
+
+/**
  * Convert an ImportedNoteEvent to a composer Note
  */
 export function importedNoteEventToNote(event: ImportedNoteEvent): Note {
@@ -145,6 +169,16 @@ export function importedNoteEventToNote(event: ImportedNoteEvent): Note {
   const lyric = event.lyric ? lyricInfoToLyric(event.lyric) : undefined;
   // Convert dynamic if present
   const dynamic = dynamicsStringToDynamicType(event.dynamics);
+  // Convert articulation if present (take first one)
+  const articulation =
+    event.articulations.length > 0
+      ? mapArticulationType(event.articulations[0])
+      : undefined;
+  // Convert expression if present
+  const expression = event.expression ?? undefined;
+  // Convert slurs
+  const slurStart = event.slurStart || undefined;
+  const slurEnd = event.slurEnd || undefined;
 
   if (event.type === "rest") {
     return createNote(null, durationTypeToDurationValue(event.durationType), {
@@ -166,6 +200,10 @@ export function importedNoteEventToNote(event: ImportedNoteEvent): Note {
       tieEnd: event.tiedFromPrevious,
       lyric,
       dynamic,
+      articulation,
+      expression,
+      slurStart,
+      slurEnd,
     });
   }
 
@@ -183,6 +221,10 @@ export function importedNoteEventToNote(event: ImportedNoteEvent): Note {
       tieEnd: event.tiedFromPrevious,
       lyric,
       dynamic,
+      articulation,
+      expression,
+      slurStart,
+      slurEnd,
     });
   }
 

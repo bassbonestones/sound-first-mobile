@@ -27,6 +27,16 @@ import type { Accidental } from "../types";
 // Types
 // =============================================================================
 
+/** Articulation types supported in the modifier row */
+export type ArticulationType =
+  | "accent"
+  | "strong-accent" // marcato
+  | "staccato"
+  | "staccatissimo"
+  | "tenuto"
+  | "detached-legato"
+  | "fermata";
+
 export interface ModifierRowProps {
   /** Called when an accidental is selected */
   onAccidental: (accidental: Accidental) => void;
@@ -34,8 +44,14 @@ export interface ModifierRowProps {
   onTie: () => void;
   /** Called when octave changes */
   onOctaveChange: (direction: "up" | "down") => void;
+  /** Called when an articulation is selected */
+  onArticulation?: (articulation: ArticulationType) => void;
+  /** Called when articulation is removed */
+  onRemoveArticulation?: () => void;
   /** Currently active accidental (if any) */
   activeAccidental?: Accidental | null;
+  /** Currently active articulation (if any) */
+  activeArticulation?: ArticulationType | null;
   /** Whether a tie is currently active on selected note */
   tieActive?: boolean;
   /** Whether modifiers are disabled */
@@ -50,8 +66,9 @@ interface ModifierButton {
   id: string;
   label: string;
   symbol: string;
-  type: "accidental" | "tie";
+  type: "accidental" | "tie" | "articulation";
   value?: Accidental;
+  articulationValue?: ArticulationType;
   useBravura?: boolean;
 }
 
@@ -68,6 +85,17 @@ const ACCIDENTAL_SYMBOLS = {
   natural: "\uE261",
   flat: "\uE260",
   "double-flat": "\uE264",
+};
+
+/**
+ * SMuFL codepoints for Bravura articulations
+ */
+const ARTICULATION_SYMBOLS = {
+  accent: "\uE4A0",
+  "strong-accent": "\uE4AC", // marcato
+  staccato: "\uE4A2",
+  staccatissimo: "\uE4A8",
+  tenuto: "\uE4A4",
 };
 
 const MODIFIER_BUTTONS: ModifierButton[] = [
@@ -112,6 +140,47 @@ const MODIFIER_BUTTONS: ModifierButton[] = [
     useBravura: true,
   },
   { id: "tie", label: "Tie", symbol: "\uE1FD", type: "tie", useBravura: true },
+  // Articulations
+  {
+    id: "accent",
+    label: "Accent",
+    symbol: ARTICULATION_SYMBOLS.accent,
+    type: "articulation",
+    articulationValue: "accent",
+    useBravura: true,
+  },
+  {
+    id: "strong-accent",
+    label: "Marcato",
+    symbol: ARTICULATION_SYMBOLS["strong-accent"],
+    type: "articulation",
+    articulationValue: "strong-accent",
+    useBravura: true,
+  },
+  {
+    id: "staccato",
+    label: "Staccato",
+    symbol: ARTICULATION_SYMBOLS.staccato,
+    type: "articulation",
+    articulationValue: "staccato",
+    useBravura: true,
+  },
+  {
+    id: "tenuto",
+    label: "Tenuto",
+    symbol: ARTICULATION_SYMBOLS.tenuto,
+    type: "articulation",
+    articulationValue: "tenuto",
+    useBravura: true,
+  },
+  {
+    id: "staccatissimo",
+    label: "Staccatissimo",
+    symbol: ARTICULATION_SYMBOLS.staccatissimo,
+    type: "articulation",
+    articulationValue: "staccatissimo",
+    useBravura: true,
+  },
 ];
 
 // =============================================================================
@@ -122,7 +191,10 @@ function ModifierRowComponent({
   onAccidental,
   onTie,
   onOctaveChange,
+  onArticulation,
+  onRemoveArticulation,
   activeAccidental,
+  activeArticulation,
   tieActive = false,
   disabled = false,
   hasSelection = false,
@@ -133,8 +205,8 @@ function ModifierRowComponent({
     containerWidth: 0,
   });
 
-  // Calculate minimum content width: 6 buttons * 44px + 5 gaps * 2px
-  const MIN_CONTENT_WIDTH = 6 * 44 + 5 * 2; // 274px
+  // Calculate minimum content width: 11 buttons * 44px + 10 gaps * 2px
+  const MIN_CONTENT_WIDTH = 11 * 44 + 10 * 2; // 504px
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -166,9 +238,29 @@ function ModifierRowComponent({
         case "tie":
           onTie();
           break;
+        case "articulation":
+          if (button.articulationValue && onArticulation) {
+            // Toggle off if pressing active articulation
+            if (
+              activeArticulation === button.articulationValue &&
+              onRemoveArticulation
+            ) {
+              onRemoveArticulation();
+            } else {
+              onArticulation(button.articulationValue);
+            }
+          }
+          break;
       }
     },
-    [disabled, onAccidental, onTie],
+    [
+      disabled,
+      onAccidental,
+      onTie,
+      onArticulation,
+      onRemoveArticulation,
+      activeArticulation,
+    ],
   );
 
   const isButtonActive = (button: ModifierButton): boolean => {
@@ -178,13 +270,20 @@ function ModifierRowComponent({
     if (button.type === "tie") {
       return tieActive;
     }
+    if (button.type === "articulation" && button.articulationValue) {
+      return activeArticulation === button.articulationValue;
+    }
     return false;
   };
 
   const isButtonDisabled = (button: ModifierButton): boolean => {
     if (disabled) return true;
-    // Accidentals and ties require a note to be selected
-    if (button.type === "accidental" || button.type === "tie") {
+    // Accidentals, ties, and articulations require a note to be selected
+    if (
+      button.type === "accidental" ||
+      button.type === "tie" ||
+      button.type === "articulation"
+    ) {
       return !hasSelection;
     }
     return false;

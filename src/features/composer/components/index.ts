@@ -22,7 +22,7 @@ export { PitchSelector } from "./PitchSelector";
 export type { PitchSelectorProps } from "./PitchSelector";
 
 export { ModifierRow } from "./ModifierRow";
-export type { ModifierRowProps } from "./ModifierRow";
+export type { ModifierRowProps, ArticulationType } from "./ModifierRow";
 
 export { OctaveControls } from "./OctaveControls";
 export type { OctaveControlsProps } from "./OctaveControls";

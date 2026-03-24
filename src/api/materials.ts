@@ -247,7 +247,9 @@ export interface MaterialPreviewResponse {
  * List available MusicXML files in the pending materials folder
  */
 export async function listPreviewFiles(): Promise<MaterialPreviewFilesResponse> {
-  const response = await fetch(`${baseUrl}/materials/preview/files`);
+  const response = await fetch(`${baseUrl}/materials/preview/files`, {
+    cache: "no-store",
+  });
   if (!response.ok) {
     throw new Error(`Failed to list preview files: ${response.status}`);
   }
@@ -270,6 +272,96 @@ export async function previewMaterial(
     throw new Error(`Preview failed: ${detail}`);
   }
   return response.json() as Promise<MaterialPreviewResponse>;
+}
+
+/**
+ * Request to save a preview file
+ */
+export interface SavePreviewRequest {
+  musicxml_content: string;
+  filename: string;
+}
+
+/**
+ * Response from save preview endpoint
+ */
+export interface SavePreviewResponse {
+  filename: string;
+  success: boolean;
+  message: string;
+}
+
+/**
+ * Save MusicXML content to an existing file in the preview folder
+ */
+export async function savePreviewFile(
+  filename: string,
+  musicxmlContent: string,
+): Promise<SavePreviewResponse> {
+  const response = await fetch(`${baseUrl}/materials/preview`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      filename,
+      musicxml_content: musicxmlContent,
+    }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const detail =
+      (errorData as { detail?: string }).detail || `Status ${response.status}`;
+    throw new Error(`Save failed: ${detail}`);
+  }
+  return response.json() as Promise<SavePreviewResponse>;
+}
+
+/**
+ * Create a new MusicXML file in the preview folder
+ */
+export async function createPreviewFile(
+  filename: string,
+  musicxmlContent: string,
+): Promise<SavePreviewResponse> {
+  const response = await fetch(`${baseUrl}/materials/preview/save`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      filename,
+      musicxml_content: musicxmlContent,
+    }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const detail =
+      (errorData as { detail?: string }).detail || `Status ${response.status}`;
+    throw new Error(`Create failed: ${detail}`);
+  }
+  return response.json() as Promise<SavePreviewResponse>;
+}
+
+/**
+ * Delete a MusicXML file from the preview folder
+ */
+export async function deletePreviewFile(
+  filename: string,
+): Promise<SavePreviewResponse> {
+  const response = await fetch(
+    `${baseUrl}/materials/preview/${encodeURIComponent(filename)}`,
+    {
+      method: "DELETE",
+    },
+  );
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const detail =
+      (errorData as { detail?: string }).detail || `Status ${response.status}`;
+    throw new Error(`Delete failed: ${detail}`);
+  }
+  return response.json() as Promise<SavePreviewResponse>;
 }
 
 /**

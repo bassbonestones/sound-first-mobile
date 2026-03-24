@@ -28,6 +28,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Text,
+  TextInput,
   ScrollView,
   Modal,
   Pressable,
@@ -66,7 +67,13 @@ import type {
 } from "../types";
 import ErrorBoundary from "../../../components/ErrorBoundary";
 import { composerScoreToImportedScore } from "../../composer/utils";
-import { listPreviewFiles, previewMaterial } from "../../../api/materials";
+import {
+  listPreviewFiles,
+  previewMaterial,
+  savePreviewFile,
+  createPreviewFile,
+  deletePreviewFile,
+} from "../../../api/materials";
 import { parseMusicXml } from "../../importMusic/services/musicXmlParser";
 import { importedScoreToComposerScore } from "../utils/importedScoreConverter";
 
@@ -157,6 +164,14 @@ function TuneComposerScreenContent({
   const [previewFiles, setPreviewFiles] = useState<string[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+
+  // Current imported filename (for save functionality)
+  const [currentFilename, setCurrentFilename] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Save new modal state
+  const [showSaveNewModal, setShowSaveNewModal] = useState(false);
+  const [newFilename, setNewFilename] = useState("");
 
   // Load existing score or check for autosave recovery
   useEffect(() => {
@@ -411,13 +426,6 @@ function TuneComposerScreenContent({
     playbackActions.stop();
   }, [playbackActions]);
 
-  // Save
-  const handleSave = useCallback(async () => {
-    await tuneComposerStorageService.saveScore(composerState.score);
-    await tuneComposerStorageService.clearAutosave();
-    Alert.alert("Saved", "Your score has been saved.");
-  }, [composerState.score]);
-
   // Back navigation helper
   const navigateBack = useCallback(() => {
     if (onBack) {
@@ -512,8 +520,9 @@ function TuneComposerScreenContent({
           title: preview.title,
         });
 
-        // Load into composer
+        // Load into composer and track filename
         composerState.loadScore(composerScore);
+        setCurrentFilename(filename);
         setShowImportModal(false);
 
         // Show success message
@@ -540,6 +549,145 @@ function TuneComposerScreenContent({
       .replace(/_/g, " ")
       .replace(/\//g, " / "); // Format folder paths nicely
   }, []);
+
+  // Save to current file (requires existing filename)
+  const handleSave = useCallback(async () => {
+    if (!currentFilename) {
+      // No current file, prompt for save as new
+      setShowSaveNewModal(true);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const musicxml = generateMusicXml(composerState.score);
+      await savePreviewFile(currentFilename, musicxml);
+      const msg = `File saved: ${formatFilename(currentFilename)}`;
+      if (Platform.OS === "web") {
+        window.alert(msg);
+      } else {
+        Alert.alert("Saved", msg);
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Failed to save file";
+      if (Platform.OS === "web") {
+        window.alert(`Save Error: ${errMsg}`);
+      } else {
+        Alert.alert("Save Error", errMsg);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }, [currentFilename, composerState.score, formatFilename]);
+
+  // Open save new modal
+  const handleSaveNew = useCallback(() => {
+    // Pre-fill with title converted to filename format
+    const suggestedName = composerState.score.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "");
+    setNewFilename(suggestedName || "untitled");
+    setShowSaveNewModal(true);
+  }, [composerState.score.title]);
+
+  // Confirm save new
+  const handleConfirmSaveNew = useCallback(async () => {
+    if (!newFilename.trim()) {
+      if (Platform.OS === "web") {
+        window.alert("Please enter a filename");
+      } else {
+        Alert.alert("Error", "Please enter a filename");
+      }
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const musicxml = generateMusicXml(composerState.score);
+      // Add folder prefix (beginner by default) and extension
+      const fullFilename = `beginner/${newFilename.trim()}`;
+      const result = await createPreviewFile(fullFilename, musicxml);
+      setCurrentFilename(result.filename);
+      setShowSaveNewModal(false);
+      const msg = `New file created: ${formatFilename(result.filename)}`;
+      if (Platform.OS === "web") {
+        window.alert(msg);
+      } else {
+        Alert.alert("Created", msg);
+      }
+    } catch (err) {
+      const errMsg =
+        err instanceof Error ? err.message : "Failed to create file";
+      if (Platform.OS === "web") {
+        window.alert(`Create Error: ${errMsg}`);
+      } else {
+        Alert.alert("Create Error", errMsg);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }, [newFilename, composerState.score, formatFilename]);
+
+  // Delete the current file
+  const handleDeleteFile = useCallback(async () => {
+    if (!currentFilename) {
+      Alert.alert("No File", "No file is currently loaded to delete.");
+      return;
+    }
+
+    const confirmDelete =
+      Platform.OS === "web"
+        ? window.confirm(
+            `Are you sure you want to delete "${formatFilename(currentFilename)}"? This cannot be undone.`,
+          )
+        : await new Promise<boolean>((resolve) => {
+            Alert.alert(
+              "Delete File?",
+              `Are you sure you want to delete "${formatFilename(currentFilename)}"? This cannot be undone.`,
+              [
+                {
+                  text: "Cancel",
+                  style: "cancel",
+                  onPress: () => resolve(false),
+                },
+                {
+                  text: "Delete",
+                  style: "destructive",
+                  onPress: () => resolve(true),
+                },
+              ],
+            );
+          });
+
+    if (!confirmDelete) return;
+
+    setIsSaving(true);
+    try {
+      await deletePreviewFile(currentFilename);
+      if (Platform.OS === "web") {
+        window.alert(`File deleted: ${formatFilename(currentFilename)}`);
+      } else {
+        Alert.alert(
+          "Deleted",
+          `File deleted: ${formatFilename(currentFilename)}`,
+        );
+      }
+      // Clear current filename and reset to empty score
+      setCurrentFilename(null);
+      composerState.clearScore();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to delete file";
+      if (Platform.OS === "web") {
+        window.alert(`Delete Error: ${message}`);
+      } else {
+        Alert.alert("Delete Error", message);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }, [currentFilename, formatFilename, composerState]);
 
   // Score tap handler (uses note ID now)
   const handleScoreTap = useCallback(
@@ -714,7 +862,7 @@ function TuneComposerScreenContent({
         </View>
 
         <View style={styles.controlsContainer}>
-          {/* Entry Palette - 3 rows get extraRowPadding each */}
+          {/* Entry Palette - 4 rows get extraRowPadding each */}
           <EntryPalette
             selectedDuration={composerState.state.selectedDuration}
             selectedNote={composerState.selectedNote}
@@ -732,6 +880,9 @@ function TuneComposerScreenContent({
             onAccidental={composerState.applyAccidental}
             onInsertRest={handleRestEnter}
             onToggleTie={composerState.toggleTie}
+            onArticulation={composerState.setArticulation}
+            onRemoveArticulation={composerState.removeArticulation}
+            activeArticulation={composerState.selectedNote?.articulation}
             disabled={isPlaying}
             extraRowPadding={rowExtraPadding}
             testID="composer-palette"
@@ -938,12 +1089,34 @@ function TuneComposerScreenContent({
           </TouchableOpacity>
           <TouchableOpacity
             style={[
+              styles.deleteFileButton,
+              (!currentFilename || isPlaying || isSaving) &&
+                styles.deleteFileButtonDisabled,
+            ]}
+            onPress={handleDeleteFile}
+            disabled={!currentFilename || isPlaying || isSaving}
+            accessibilityLabel="Delete current file"
+            accessibilityRole="button"
+            testID="composer-delete-file-button"
+          >
+            <Feather
+              name="trash-2"
+              size={16}
+              color={
+                currentFilename && !isPlaying && !isSaving
+                  ? colors.error
+                  : colors.textSecondary
+              }
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
               styles.saveButton,
-              (!composerState.allMeasuresValid || isPlaying) &&
+              (!composerState.allMeasuresValid || isPlaying || isSaving) &&
                 styles.saveButtonDisabled,
             ]}
             onPress={handleSave}
-            disabled={!composerState.allMeasuresValid || isPlaying}
+            disabled={!composerState.allMeasuresValid || isPlaying || isSaving}
             accessibilityLabel="Save score"
             accessibilityRole="button"
             testID="composer-save-button"
@@ -951,11 +1124,33 @@ function TuneComposerScreenContent({
             <Text
               style={[
                 styles.saveButtonText,
-                (!composerState.allMeasuresValid || isPlaying) &&
+                (!composerState.allMeasuresValid || isPlaying || isSaving) &&
                   styles.saveButtonTextDisabled,
               ]}
             >
-              Save
+              {isSaving ? "Saving..." : "Save"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.saveNewButton,
+              (!composerState.allMeasuresValid || isPlaying || isSaving) &&
+                styles.saveNewButtonDisabled,
+            ]}
+            onPress={handleSaveNew}
+            disabled={!composerState.allMeasuresValid || isPlaying || isSaving}
+            accessibilityLabel="Save as new file"
+            accessibilityRole="button"
+            testID="composer-save-new-button"
+          >
+            <Text
+              style={[
+                styles.saveNewButtonText,
+                (!composerState.allMeasuresValid || isPlaying || isSaving) &&
+                  styles.saveNewButtonTextDisabled,
+              ]}
+            >
+              Save New
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -1234,6 +1429,75 @@ function TuneComposerScreenContent({
             </View>
           </Pressable>
         </Modal>
+
+        {/* Save New File Modal */}
+        <Modal
+          visible={showSaveNewModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => !isSaving && setShowSaveNewModal(false)}
+        >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => !isSaving && setShowSaveNewModal(false)}
+          >
+            <View
+              style={[styles.modalContent, styles.saveNewModalContent]}
+              onStartShouldSetResponder={() => true}
+            >
+              <Text style={styles.modalTitle}>Save New File</Text>
+              <Text style={styles.modalMessage}>
+                Enter a filename for the new tune (will be saved in beginner/).
+              </Text>
+
+              <TextInput
+                style={styles.filenameInput}
+                value={newFilename}
+                onChangeText={setNewFilename}
+                placeholder="my_tune"
+                placeholderTextColor={colors.textSecondary}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!isSaving}
+                testID="save-new-filename-input"
+              />
+
+              <View style={styles.saveNewModalButtons}>
+                <TouchableOpacity
+                  style={styles.modalCancel}
+                  onPress={() => setShowSaveNewModal(false)}
+                  disabled={isSaving}
+                >
+                  <Text
+                    style={[
+                      styles.modalCancelText,
+                      isSaving && styles.textDisabled,
+                    ]}
+                  >
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.saveNewConfirmButton,
+                    isSaving && styles.saveNewConfirmButtonDisabled,
+                  ]}
+                  onPress={handleConfirmSaveNew}
+                  disabled={isSaving}
+                >
+                  <Text
+                    style={[
+                      styles.saveNewConfirmButtonText,
+                      isSaving && styles.textDisabled,
+                    ]}
+                  >
+                    {isSaving ? "Creating..." : "Create"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1401,6 +1665,62 @@ const styles = StyleSheet.create({
   saveButtonTextDisabled: {
     color: colors.textSecondary,
   },
+  saveNewButton: {
+    flex: 1,
+    marginRight: spacing.sm,
+    minHeight: 44,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.success,
+  },
+  saveNewButtonText: {
+    color: colors.success,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  saveNewButtonDisabled: {
+    borderColor: colors.textSecondary,
+    opacity: 0.5,
+  },
+  saveNewButtonTextDisabled: {
+    color: colors.textSecondary,
+  },
+  saveNewModalContent: {
+    width: "90%",
+    maxWidth: 360,
+  },
+  saveNewModalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: spacing.md,
+  },
+  filenameInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: spacing.sm,
+    fontSize: 16,
+    color: colors.textPrimary,
+    backgroundColor: colors.background,
+    marginTop: spacing.sm,
+  },
+  saveNewConfirmButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 8,
+  },
+  saveNewConfirmButtonDisabled: {
+    opacity: 0.5,
+  },
+  saveNewConfirmButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: "600",
+  },
   // Clef change modal styles
   modalOverlay: {
     flex: 1,
@@ -1465,6 +1785,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginLeft: spacing.xs,
+  },
+  deleteFileButton: {
+    width: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.error,
+    marginRight: spacing.sm,
+  },
+  deleteFileButtonDisabled: {
+    borderColor: colors.textSecondary,
+    opacity: 0.5,
   },
   // Import modal styles
   importModalContent: {
