@@ -53,7 +53,7 @@ import {
   CompactControls,
   SlurControls,
 } from "../../composer/components";
-import { TuneComposerScoreViewport } from "../components";
+import { TuneComposerScoreViewport, LyricsControls } from "../components";
 import {
   tuneComposerStorageService,
   createAutosaveHandler,
@@ -66,6 +66,7 @@ import type {
   KeySignature,
   PitchName,
 } from "../types";
+import { getPitchedNotes } from "../types";
 import ErrorBoundary from "../../../components/ErrorBoundary";
 import { composerScoreToImportedScore } from "../../composer/utils";
 import {
@@ -722,8 +723,66 @@ function TuneComposerScreenContent({
 
   const isPlaying = playback.state === "playing";
 
+  // ==========================================================================
+  // Lyrics Mode Helper Data
+  // ==========================================================================
+
+  const lyricsData = useMemo(() => {
+    const pitchedNotes = getPitchedNotes(composerState.score);
+    const totalNotes = pitchedNotes.length;
+    const lyricsCursor = composerState.lyricsCursor;
+    const currentNoteIndex = lyricsCursor !== null ? lyricsCursor + 1 : 0; // 1-based for display
+    const canGoPrev = lyricsCursor !== null && lyricsCursor > 0;
+    const canGoNext = lyricsCursor !== null && lyricsCursor < totalNotes - 1;
+
+    // Get current lyric text, syllabic type, and note id
+    let currentLyricText = "";
+    let currentSyllabic: "single" | "begin" | "middle" | "end" | undefined;
+    let prevSyllabic: "single" | "begin" | "middle" | "end" | undefined;
+    let currentNoteId: string | null = null;
+
+    if (lyricsCursor !== null && pitchedNotes[lyricsCursor]) {
+      const noteInfo = pitchedNotes[lyricsCursor];
+      const note =
+        composerState.score.measures[noteInfo.measureIndex]?.notes[
+          noteInfo.noteIndex
+        ];
+      if (note) {
+        currentNoteId = note.id;
+        if (note.lyric) {
+          currentLyricText = note.lyric.text;
+          currentSyllabic = note.lyric.syllabic;
+        }
+      }
+
+      // Get previous note's syllabic (if there is a previous note)
+      if (lyricsCursor > 0 && pitchedNotes[lyricsCursor - 1]) {
+        const prevNoteInfo = pitchedNotes[lyricsCursor - 1];
+        const prevNote =
+          composerState.score.measures[prevNoteInfo.measureIndex]?.notes[
+            prevNoteInfo.noteIndex
+          ];
+        if (prevNote?.lyric) {
+          prevSyllabic = prevNote.lyric.syllabic;
+        }
+      }
+    }
+
+    return {
+      totalNotes,
+      currentNoteIndex,
+      canGoPrev,
+      canGoNext,
+      currentLyricText,
+      currentSyllabic,
+      prevSyllabic,
+      currentNoteId,
+    };
+  }, [composerState.score, composerState.lyricsCursor]);
+
   // Compute which note should be highlighted
   // During playback: highlight the currently playing note
+  // In lyrics mode: highlight the note at lyricsCursor
   // When not playing: highlight the selected note
   const highlightedNoteId = useMemo(() => {
     if (isPlaying) {
@@ -735,12 +794,18 @@ function TuneComposerScreenContent({
       }
       return null;
     }
+    // In lyrics mode, highlight the note at lyricsCursor
+    if (composerState.lyricsMode) {
+      return lyricsData.currentNoteId;
+    }
     return composerState.state.selectedNoteId;
   }, [
     isPlaying,
     playback.position,
     composerState.score.measures,
     composerState.state.selectedNoteId,
+    composerState.lyricsMode,
+    lyricsData.currentNoteId,
   ]);
 
   // ==========================================================================
@@ -904,6 +969,7 @@ function TuneComposerScreenContent({
               onExtendSlurLeft={composerState.extendSlurLeft}
               onExtendSlurRight={composerState.extendSlurRight}
               onRemoveSlur={composerState.removeSlur}
+              onFlipSlur={composerState.flipSlur}
               onDone={composerState.endSlurMode}
               hasSelection={hasSelection}
               hasActiveSlur={composerState.activeSlurStartId !== null}
@@ -915,6 +981,28 @@ function TuneComposerScreenContent({
               canExtendRight={composerState.activeSlurEndId !== null}
               disabled={isPlaying}
               testID="slur-controls"
+            />
+
+            {/* Lyrics Controls */}
+            <LyricsControls
+              lyricsModeActive={composerState.lyricsMode}
+              onToggleLyricsMode={composerState.toggleLyricsMode}
+              currentLyricText={lyricsData.currentLyricText}
+              currentSyllabic={lyricsData.currentSyllabic}
+              prevSyllabic={lyricsData.prevSyllabic}
+              onSetLyric={composerState.setLyric}
+              onRemoveLyric={composerState.removeLyric}
+              onNextNote={composerState.moveLyricsCursorNext}
+              onPrevNote={composerState.moveLyricsCursorPrev}
+              onExtendMelisma={composerState.extendMelisma}
+              onShrinkMelisma={composerState.shrinkMelisma}
+              canGoPrev={lyricsData.canGoPrev}
+              canGoNext={lyricsData.canGoNext}
+              currentNoteIndex={lyricsData.currentNoteIndex}
+              totalNotes={lyricsData.totalNotes}
+              hasSelection={hasSelection}
+              disabled={isPlaying}
+              testID="lyrics-controls"
             />
 
             {/* Compact Controls Row */}

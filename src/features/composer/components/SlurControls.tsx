@@ -34,6 +34,8 @@ export interface SlurControlsProps {
   onExtendSlurRight: () => void;
   /** Remove slur from selected note */
   onRemoveSlur: () => void;
+  /** Flip slur placement (above/below) */
+  onFlipSlur: () => void;
   /** Exit slur mode */
   onDone: () => void;
   /** Whether there's a note selected */
@@ -63,6 +65,7 @@ function SlurControlsComponent({
   onExtendSlurLeft,
   onExtendSlurRight,
   onRemoveSlur,
+  onFlipSlur,
   onDone,
   hasSelection,
   hasActiveSlur,
@@ -134,6 +137,21 @@ function SlurControlsComponent({
               testID="slur-remove"
             >
               <Text style={styles.actionButtonText}>Remove</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Flip Slur (when there's an active slur or selected note has a slur) */}
+          {(hasActiveSlur || selectedNoteHasSlur) && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.flipButton]}
+              onPress={onFlipSlur}
+              disabled={disabled}
+              accessibilityRole={"button" as AccessibilityRole}
+              accessibilityLabel="Flip slur position"
+              testID="slur-flip"
+            >
+              <Feather name="refresh-cw" size={14} color={colors.white} />
+              <Text style={styles.flipButtonText}>Flip</Text>
             </TouchableOpacity>
           )}
 
@@ -269,6 +287,16 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     backgroundColor: colors.error,
+  },
+  flipButton: {
+    backgroundColor: colors.warning,
+    flexDirection: "row",
+    gap: 4,
+  },
+  flipButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: "600",
   },
   actionButtonText: {
     color: colors.white,

@@ -222,6 +222,8 @@ export interface UseTuneComposerStateReturn {
   activeSlurEndId: string | null;
   /** Remove slur from current note (clears both slurStart and slurEnd) */
   removeSlur: () => void;
+  /** Flip slur placement (above/below) */
+  flipSlur: () => void;
 }
 
 // =============================================================================
@@ -1527,51 +1529,68 @@ export function useTuneComposerState(
     if (!state.lyricsMode || state.lyricsCursor === null) return;
 
     const pitchedNotes = getPitchedNotes(state.score);
-    const currentNoteInfo = pitchedNotes[state.lyricsCursor];
-    if (!currentNoteInfo) return;
 
-    const currentNote =
-      state.score.measures[currentNoteInfo.measureIndex]?.notes[
-        currentNoteInfo.noteIndex
-      ];
-    if (!currentNote || !currentNote.lyric) return;
+    // Can't extend if we're at the last note
+    if (state.lyricsCursor >= pitchedNotes.length - 1) return;
+
+    // Find the note with the lyric that we're extending
+    // This could be the current note, or a previous note if we're in a melisma
+    let lyricNoteIndex = state.lyricsCursor;
+    let lyricNoteInfo = pitchedNotes[lyricNoteIndex];
+    let lyricNote = lyricNoteInfo
+      ? state.score.measures[lyricNoteInfo.measureIndex]?.notes[
+          lyricNoteInfo.noteIndex
+        ]
+      : null;
+
+    // If current note doesn't have a lyric, search backwards for the note with the lyric
+    while (lyricNoteIndex > 0 && (!lyricNote || !lyricNote.lyric)) {
+      lyricNoteIndex--;
+      lyricNoteInfo = pitchedNotes[lyricNoteIndex];
+      lyricNote = lyricNoteInfo
+        ? state.score.measures[lyricNoteInfo.measureIndex]?.notes[
+            lyricNoteInfo.noteIndex
+          ]
+        : null;
+    }
+
+    // If we still don't have a lyric, can't extend
+    if (!lyricNote || !lyricNote.lyric || !lyricNoteInfo) return;
 
     // Extend melisma by incrementing melismaLength
-    const newMelismaLength = (currentNote.lyric.melismaLength || 1) + 1;
+    const newMelismaLength = (lyricNote.lyric.melismaLength || 1) + 1;
     const newLyric: Lyric = {
-      ...currentNote.lyric,
+      ...lyricNote.lyric,
       melismaLength: newMelismaLength,
     };
 
     const position: CursorPosition = {
-      measureIndex: currentNoteInfo.measureIndex,
-      noteIndex: currentNoteInfo.noteIndex,
+      measureIndex: lyricNoteInfo.measureIndex,
+      noteIndex: lyricNoteInfo.noteIndex,
     };
 
     const action = createSetLyricAction(
       position,
-      currentNote.id,
+      lyricNote.id,
       newLyric,
-      currentNote.lyric,
+      lyricNote.lyric,
     );
     undoManager.pushAction(action);
 
     // Move cursor to next note
     const nextIndex = state.lyricsCursor + 1;
-    const newLyricsCursor =
-      nextIndex < pitchedNotes.length ? nextIndex : state.lyricsCursor;
 
     setState((prev) => ({
       ...prev,
-      lyricsCursor: newLyricsCursor,
+      lyricsCursor: nextIndex,
       score: {
         ...prev.score,
         measures: prev.score.measures.map((m, mi) =>
-          mi === currentNoteInfo.measureIndex
+          mi === lyricNoteInfo.measureIndex
             ? {
                 ...m,
                 notes: m.notes.map((n, ni) =>
-                  ni === currentNoteInfo.noteIndex
+                  ni === lyricNoteInfo.noteIndex
                     ? { ...n, lyric: newLyric }
                     : n,
                 ),
@@ -2129,6 +2148,64 @@ export function useTuneComposerState(
     updateScore,
   ]);
 
+  /** Flip slur placement (above/below) for the slur involving the selected note */
+  const flipSlur = useCallback(() => {
+    if (!state.selectedNoteId) return;
+
+    const position = findNotePosition(state.selectedNoteId, state.score);
+    if (!position) return;
+
+    const note =
+      state.score.measures[position.measureIndex]?.notes[position.noteIndex];
+    if (!note || (!note.slurStart && !note.slurEnd)) return;
+
+    const pitchedNotes = getPitchedNotesWithPositions();
+    const selectedIndex = pitchedNotes.findIndex((n) => n.note.id === note.id);
+
+    // Find the slur start note
+    let slurStartNoteId: string | null = null;
+    let currentPlacement: "above" | "below" | undefined;
+
+    if (note.slurStart) {
+      slurStartNoteId = note.id;
+      currentPlacement = note.slurPlacement;
+    } else if (note.slurEnd) {
+      // Search backward for slurStart
+      for (let i = selectedIndex - 1; i >= 0; i--) {
+        if (pitchedNotes[i].note.slurStart) {
+          slurStartNoteId = pitchedNotes[i].note.id;
+          currentPlacement = pitchedNotes[i].note.slurPlacement;
+          break;
+        }
+      }
+    }
+
+    if (!slurStartNoteId) return;
+
+    // Toggle placement: undefined -> below, below -> above, above -> below
+    const newPlacement: "above" | "below" =
+      currentPlacement === "above" ? "below" : "above";
+
+    // Update the slur start note with new placement
+    updateScore((score) => ({
+      ...score,
+      measures: score.measures.map((m) => ({
+        ...m,
+        notes: m.notes.map((n) => {
+          if (n.id === slurStartNoteId) {
+            return { ...n, slurPlacement: newPlacement };
+          }
+          return n;
+        }),
+      })),
+    }));
+  }, [
+    state.selectedNoteId,
+    state.score,
+    getPitchedNotesWithPositions,
+    updateScore,
+  ]);
+
   // ==========================================================================
   // Return
   // ==========================================================================
@@ -2231,5 +2308,6 @@ export function useTuneComposerState(
     activeSlurStartId: state.activeSlurStartId,
     activeSlurEndId: state.activeSlurEndId,
     removeSlur,
+    flipSlur,
   };
 }

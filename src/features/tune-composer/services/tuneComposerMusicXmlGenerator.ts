@@ -347,7 +347,10 @@ function generateNoteXml(
 
   // Slurs
   if (note.slurStart) {
-    notationsContent += '<slur type="start" number="1"/>';
+    const placement = note.slurPlacement
+      ? ` placement="${note.slurPlacement}"`
+      : "";
+    notationsContent += `<slur type="start" number="1"${placement}/>`;
   }
   if (note.slurEnd) {
     notationsContent += '<slur type="stop" number="1"/>';

@@ -266,6 +266,8 @@ export interface Note {
   slurStart?: boolean;
   /** Whether this note ends a slur */
   slurEnd?: boolean;
+  /** Slur placement (above or below the notes) */
+  slurPlacement?: "above" | "below";
 }
 
 /**
