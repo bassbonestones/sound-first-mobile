@@ -18,6 +18,7 @@ import type {
   KeySignature,
   Accidental,
   DynamicType,
+  DynamicTextType,
   ArticulationType,
   WedgeMark,
   Lyric,
@@ -97,12 +98,14 @@ const MIDI_TO_PITCH_FLAT: Record<number, { step: string; alter: number }> = {
 
 // Dynamic to MusicXML mapping
 const DYNAMIC_TO_XML: Record<DynamicType, string> = {
+  ppp: "ppp",
   pp: "pp",
   p: "p",
   mp: "mp",
   mf: "mf",
   f: "f",
   ff: "ff",
+  fff: "fff",
   fp: "fp",
   sf: "sf",
   sfz: "sfz",
@@ -215,6 +218,14 @@ function generateDynamicDirectionXml(dynamic: DynamicType): string {
       </direction>`;
 }
 
+function generateDynamicTextDirectionXml(dynamicText: DynamicTextType): string {
+  return `      <direction placement="below">
+        <direction-type>
+          <words font-style="italic">${escapeXml(dynamicText)}</words>
+        </direction-type>
+      </direction>`;
+}
+
 function generateExpressionDirectionXml(expression: string): string {
   return `      <direction placement="above">
         <direction-type>
@@ -224,12 +235,9 @@ function generateExpressionDirectionXml(expression: string): string {
 }
 
 function generateWedgeDirectionXml(wedge: WedgeMark): string {
-  const wedgeType =
-    wedge.type === "crescendo"
-      ? "crescendo"
-      : wedge.type === "diminuendo"
-        ? "diminuendo"
-        : "stop";
+  // For start position, use the wedge type (crescendo/diminuendo)
+  // For stop position, use "stop"
+  const wedgeType = wedge.position === "stop" ? "stop" : wedge.type;
 
   return `      <direction placement="below">
         <direction-type>
@@ -475,6 +483,9 @@ function generateMeasureXml(
     // Add direction before note for dynamics/expression
     if (note.dynamic) {
       notesXml += "\n" + generateDynamicDirectionXml(note.dynamic);
+    }
+    if (note.dynamicText) {
+      notesXml += "\n" + generateDynamicTextDirectionXml(note.dynamicText);
     }
     if (note.expression) {
       notesXml += "\n" + generateExpressionDirectionXml(note.expression);

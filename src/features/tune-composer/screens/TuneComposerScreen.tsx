@@ -53,7 +53,12 @@ import {
   CompactControls,
   SlurControls,
 } from "../../composer/components";
-import { TuneComposerScoreViewport, LyricsControls } from "../components";
+import {
+  TuneComposerScoreViewport,
+  LyricsControls,
+  ExpressionControls,
+  DynamicsControls,
+} from "../components";
 import {
   tuneComposerStorageService,
   createAutosaveHandler,
@@ -1003,6 +1008,43 @@ function TuneComposerScreenContent({
               hasSelection={hasSelection}
               disabled={isPlaying}
               testID="lyrics-controls"
+            />
+
+            {/* Expression Controls */}
+            <ExpressionControls
+              expressionModeActive={composerState.expressionMode}
+              onToggleExpressionMode={composerState.toggleExpressionMode}
+              currentExpression={composerState.selectedNote?.expression || ""}
+              onSetExpression={composerState.setExpression}
+              onRemoveExpression={composerState.removeExpression}
+              hasSelection={hasSelection}
+              disabled={isPlaying}
+              testID="expression-controls"
+            />
+
+            {/* Dynamics Controls */}
+            <DynamicsControls
+              dynamicsModeActive={composerState.dynamicsMode}
+              onToggleDynamicsMode={composerState.toggleDynamicsMode}
+              currentDynamic={composerState.selectedNote?.dynamic}
+              currentDynamicText={composerState.selectedNote?.dynamicText}
+              onSetDynamic={composerState.setDynamic}
+              onRemoveDynamic={composerState.removeDynamic}
+              onSetDynamicText={composerState.setDynamicText}
+              onRemoveDynamicText={composerState.removeDynamicText}
+              wedgeModeActive={composerState.wedgeMode}
+              onToggleWedgeMode={composerState.toggleWedgeMode}
+              onStartCrescendo={composerState.startCrescendo}
+              onStartDiminuendo={composerState.startDiminuendo}
+              onExtendWedge={composerState.extendWedge}
+              onEndWedgeMode={composerState.endWedgeMode}
+              onRemoveWedgeMarking={composerState.removeWedgeMarking}
+              activeWedgeType={composerState.activeWedgeType}
+              activeWedgeStartId={composerState.activeWedgeStartId}
+              selectedNoteHasWedge={!!composerState.selectedNote?.wedge}
+              hasSelection={hasSelection}
+              disabled={isPlaying}
+              testID="dynamics-controls"
             />
 
             {/* Compact Controls Row */}

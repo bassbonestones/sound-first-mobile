@@ -194,15 +194,20 @@ export interface Lyric {
 
 /** Dynamic marking types */
 export type DynamicType =
+  | "ppp"
   | "pp"
   | "p"
   | "mp"
   | "mf"
   | "f"
   | "ff"
+  | "fff"
   | "fp"
   | "sf"
   | "sfz";
+
+/** Text dynamic marking (cresc., dim., etc.) */
+export type DynamicTextType = "cresc." | "decresc." | "dim.";
 
 /** Wedge (crescendo/decrescendo) marking */
 export interface WedgeMark {
@@ -256,6 +261,8 @@ export interface Note {
   lyric?: Lyric;
   /** Dynamic marking at this note */
   dynamic?: DynamicType;
+  /** Text dynamic marking (cresc., decresc., dim.) */
+  dynamicText?: DynamicTextType;
   /** Wedge (crescendo/diminuendo) marking */
   wedge?: WedgeMark;
   /** Articulation marking */
@@ -537,6 +544,16 @@ export interface TuneComposerState {
   activeSlurStartId: string | null;
   /** Note ID where the currently active slur ends */
   activeSlurEndId: string | null;
+  /** Whether expression text mode is active */
+  expressionMode: boolean;
+  /** Whether dynamics mode is active */
+  dynamicsMode: boolean;
+  /** Whether wedge (crescendo/decrescendo) editing mode is active */
+  wedgeMode: boolean;
+  /** Type of wedge being edited */
+  activeWedgeType: "crescendo" | "diminuendo" | null;
+  /** Note ID where the currently active wedge starts */
+  activeWedgeStartId: string | null;
 }
 
 /** Create initial composer state */
@@ -559,6 +576,11 @@ export function createInitialState(
     slurMode: false,
     activeSlurStartId: null,
     activeSlurEndId: null,
+    expressionMode: false,
+    dynamicsMode: false,
+    wedgeMode: false,
+    activeWedgeType: null,
+    activeWedgeStartId: null,
   };
 }
 

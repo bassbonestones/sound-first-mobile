@@ -13,6 +13,7 @@ import type {
   CursorPosition,
   DurationValue,
   DynamicType,
+  DynamicTextType,
   KeySignature,
   Lyric,
   MeasureValidation,
@@ -190,6 +191,10 @@ export interface UseTuneComposerStateReturn {
   setDynamic: (dynamic: DynamicType) => void;
   /** Remove dynamic marking from selected note */
   removeDynamic: () => void;
+  /** Set text dynamic marking on selected note */
+  setDynamicText: (text: DynamicTextType) => void;
+  /** Remove text dynamic marking from selected note */
+  removeDynamicText: () => void;
   /** Set wedge (crescendo/diminuendo) on selected note */
   setWedge: (wedge: WedgeMark) => void;
   /** Remove wedge from selected note */
@@ -202,6 +207,32 @@ export interface UseTuneComposerStateReturn {
   setExpression: (text: string) => void;
   /** Remove expression text from selected note */
   removeExpression: () => void;
+
+  // === DYNAMICS MODE ===
+  /** Whether dynamics mode is active */
+  dynamicsMode: boolean;
+  /** Toggle dynamics mode on/off */
+  toggleDynamicsMode: () => void;
+
+  // === WEDGE MODE ===
+  /** Whether wedge editing mode is active */
+  wedgeMode: boolean;
+  /** Toggle wedge mode on/off */
+  toggleWedgeMode: () => void;
+  /** Start a crescendo from current note */
+  startCrescendo: () => void;
+  /** Start a diminuendo from current note */
+  startDiminuendo: () => void;
+  /** Extend wedge to next note */
+  extendWedge: () => void;
+  /** End wedge mode and finalize */
+  endWedgeMode: () => void;
+  /** Type of wedge being edited */
+  activeWedgeType: "crescendo" | "diminuendo" | null;
+  /** Note ID where active wedge starts */
+  activeWedgeStartId: string | null;
+  /** Remove wedge involving selected note */
+  removeWedgeMarking: () => void;
 
   // === SLUR MODE ===
   /** Whether slur editing mode is active */
@@ -224,6 +255,12 @@ export interface UseTuneComposerStateReturn {
   removeSlur: () => void;
   /** Flip slur placement (above/below) */
   flipSlur: () => void;
+
+  // === EXPRESSION MODE ===
+  /** Whether expression text mode is active */
+  expressionMode: boolean;
+  /** Toggle expression mode on/off */
+  toggleExpressionMode: () => void;
 }
 
 // =============================================================================
@@ -1785,6 +1822,384 @@ export function useTuneComposerState(
     }));
   }, [state.selectedNoteId, state.score, updateScore]);
 
+  const setDynamicText = useCallback(
+    (text: DynamicTextType) => {
+      if (!state.selectedNoteId) return;
+
+      const position = findNotePosition(state.selectedNoteId, state.score);
+      if (!position) return;
+
+      const note =
+        state.score.measures[position.measureIndex]?.notes[position.noteIndex];
+      if (!note) return;
+
+      updateScore((score) => ({
+        ...score,
+        measures: score.measures.map((m, mi) =>
+          mi === position.measureIndex
+            ? {
+                ...m,
+                notes: m.notes.map((n) =>
+                  n.id === note.id ? { ...n, dynamicText: text } : n,
+                ),
+              }
+            : m,
+        ),
+      }));
+    },
+    [state.selectedNoteId, state.score, updateScore],
+  );
+
+  const removeDynamicText = useCallback(() => {
+    if (!state.selectedNoteId) return;
+
+    const position = findNotePosition(state.selectedNoteId, state.score);
+    if (!position) return;
+
+    const note =
+      state.score.measures[position.measureIndex]?.notes[position.noteIndex];
+    if (!note || !note.dynamicText) return;
+
+    updateScore((score) => ({
+      ...score,
+      measures: score.measures.map((m, mi) =>
+        mi === position.measureIndex
+          ? {
+              ...m,
+              notes: m.notes.map((n) =>
+                n.id === note.id ? { ...n, dynamicText: undefined } : n,
+              ),
+            }
+          : m,
+      ),
+    }));
+  }, [state.selectedNoteId, state.score, updateScore]);
+
+  // ==========================================================================
+  // DYNAMICS MODE
+  // ==========================================================================
+
+  const toggleDynamicsMode = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      dynamicsMode: !prev.dynamicsMode,
+    }));
+  }, []);
+
+  // ==========================================================================
+  // WEDGE MODE (Crescendo/Decrescendo)
+  // ==========================================================================
+
+  const toggleWedgeMode = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      wedgeMode: !prev.wedgeMode,
+      activeWedgeType: !prev.wedgeMode ? prev.activeWedgeType : null,
+      activeWedgeStartId: !prev.wedgeMode ? prev.activeWedgeStartId : null,
+    }));
+  }, []);
+
+  const startCrescendo = useCallback(() => {
+    if (!state.selectedNoteId) return;
+
+    const position = findNotePosition(state.selectedNoteId, state.score);
+    if (!position) return;
+
+    const note =
+      state.score.measures[position.measureIndex]?.notes[position.noteIndex];
+    if (!note) return;
+
+    // Find pitched notes to get the next note for auto-extend
+    const pitchedNotes: Array<{
+      note: Note;
+      measureIndex: number;
+      noteIndex: number;
+    }> = [];
+    state.score.measures.forEach((measure, measureIndex) => {
+      measure.notes.forEach((n, noteIndex) => {
+        if (n.midi !== null) {
+          pitchedNotes.push({ note: n, measureIndex, noteIndex });
+        }
+      });
+    });
+
+    const startIndex = pitchedNotes.findIndex((n) => n.note.id === note.id);
+    if (startIndex < 0 || startIndex >= pitchedNotes.length - 1) return;
+
+    const nextNote = pitchedNotes[startIndex + 1];
+
+    // Set wedge start on this note and stop on the next note
+    updateScore((score) => ({
+      ...score,
+      measures: score.measures.map((m, mi) => ({
+        ...m,
+        notes: m.notes.map((n) => {
+          if (n.id === note.id) {
+            return { ...n, wedge: { type: "crescendo", position: "start" } };
+          }
+          if (n.id === nextNote.note.id) {
+            return { ...n, wedge: { type: "crescendo", position: "stop" } };
+          }
+          return n;
+        }),
+      })),
+    }));
+
+    setState((prev) => ({
+      ...prev,
+      activeWedgeType: "crescendo",
+      activeWedgeStartId: note.id,
+      selectedNoteId: nextNote.note.id,
+    }));
+  }, [state.selectedNoteId, state.score, updateScore]);
+
+  const startDiminuendo = useCallback(() => {
+    if (!state.selectedNoteId) return;
+
+    const position = findNotePosition(state.selectedNoteId, state.score);
+    if (!position) return;
+
+    const note =
+      state.score.measures[position.measureIndex]?.notes[position.noteIndex];
+    if (!note) return;
+
+    // Find pitched notes to get the next note for auto-extend
+    const pitchedNotes: Array<{
+      note: Note;
+      measureIndex: number;
+      noteIndex: number;
+    }> = [];
+    state.score.measures.forEach((measure, measureIndex) => {
+      measure.notes.forEach((n, noteIndex) => {
+        if (n.midi !== null) {
+          pitchedNotes.push({ note: n, measureIndex, noteIndex });
+        }
+      });
+    });
+
+    const startIndex = pitchedNotes.findIndex((n) => n.note.id === note.id);
+    if (startIndex < 0 || startIndex >= pitchedNotes.length - 1) return;
+
+    const nextNote = pitchedNotes[startIndex + 1];
+
+    // Set wedge start on this note and stop on the next note
+    updateScore((score) => ({
+      ...score,
+      measures: score.measures.map((m, mi) => ({
+        ...m,
+        notes: m.notes.map((n) => {
+          if (n.id === note.id) {
+            return { ...n, wedge: { type: "diminuendo", position: "start" } };
+          }
+          if (n.id === nextNote.note.id) {
+            return { ...n, wedge: { type: "diminuendo", position: "stop" } };
+          }
+          return n;
+        }),
+      })),
+    }));
+
+    setState((prev) => ({
+      ...prev,
+      activeWedgeType: "diminuendo",
+      activeWedgeStartId: note.id,
+      selectedNoteId: nextNote.note.id,
+    }));
+  }, [state.selectedNoteId, state.score, updateScore]);
+
+  const extendWedge = useCallback(() => {
+    if (!state.activeWedgeStartId || !state.activeWedgeType) return;
+
+    // Inline getPitchedNotesWithPositions to avoid TDZ
+    const pitchedNotes: Array<{
+      note: Note;
+      measureIndex: number;
+      noteIndex: number;
+    }> = [];
+    state.score.measures.forEach((measure, measureIndex) => {
+      measure.notes.forEach((note, noteIndex) => {
+        if (note.midi !== null) {
+          pitchedNotes.push({ note, measureIndex, noteIndex });
+        }
+      });
+    });
+
+    const startIndex = pitchedNotes.findIndex(
+      (n) => n.note.id === state.activeWedgeStartId,
+    );
+    if (startIndex < 0 || startIndex >= pitchedNotes.length - 1) return;
+
+    // Find the current end of the wedge (last note with wedge stop, or just after start)
+    let currentEndIndex = startIndex;
+    for (let i = startIndex + 1; i < pitchedNotes.length; i++) {
+      if (pitchedNotes[i].note.wedge?.position === "stop") {
+        currentEndIndex = i;
+        break;
+      }
+    }
+
+    // Move end to next note
+    const newEndIndex = Math.min(currentEndIndex + 1, pitchedNotes.length - 1);
+    if (newEndIndex === currentEndIndex) return;
+
+    const oldEndNote = pitchedNotes[currentEndIndex];
+    const newEndNote = pitchedNotes[newEndIndex];
+
+    updateScore((score) => ({
+      ...score,
+      measures: score.measures.map((m, mi) => ({
+        ...m,
+        notes: m.notes.map((n) => {
+          // Remove stop from old end (if it had one)
+          if (n.id === oldEndNote.note.id && n.wedge?.position === "stop") {
+            return { ...n, wedge: undefined };
+          }
+          // Add stop to new end
+          if (n.id === newEndNote.note.id) {
+            return {
+              ...n,
+              wedge: { type: state.activeWedgeType!, position: "stop" },
+            };
+          }
+          return n;
+        }),
+      })),
+    }));
+
+    // Move cursor to the new end note
+    setState((prev) => ({
+      ...prev,
+      selectedNoteId: newEndNote.note.id,
+    }));
+  }, [
+    state.activeWedgeStartId,
+    state.activeWedgeType,
+    state.score,
+    updateScore,
+  ]);
+
+  const endWedgeMode = useCallback(() => {
+    // If there's an active wedge without a stop, add stop at current note
+    if (
+      state.activeWedgeStartId &&
+      state.selectedNoteId &&
+      state.activeWedgeType
+    ) {
+      const position = findNotePosition(state.selectedNoteId, state.score);
+      if (position) {
+        const note =
+          state.score.measures[position.measureIndex]?.notes[
+            position.noteIndex
+          ];
+        // Only set stop if it's not the start note
+        if (note && note.id !== state.activeWedgeStartId) {
+          updateScore((score) => ({
+            ...score,
+            measures: score.measures.map((m, mi) =>
+              mi === position.measureIndex
+                ? {
+                    ...m,
+                    notes: m.notes.map((n) =>
+                      n.id === note.id
+                        ? {
+                            ...n,
+                            wedge: {
+                              type: state.activeWedgeType!,
+                              position: "stop",
+                            },
+                          }
+                        : n,
+                    ),
+                  }
+                : m,
+            ),
+          }));
+        }
+      }
+    }
+
+    setState((prev) => ({
+      ...prev,
+      wedgeMode: false,
+      activeWedgeType: null,
+      activeWedgeStartId: null,
+    }));
+  }, [
+    state.activeWedgeStartId,
+    state.selectedNoteId,
+    state.activeWedgeType,
+    state.score,
+    updateScore,
+  ]);
+
+  const removeWedgeMarking = useCallback(() => {
+    if (!state.selectedNoteId) return;
+
+    const position = findNotePosition(state.selectedNoteId, state.score);
+    if (!position) return;
+
+    const note =
+      state.score.measures[position.measureIndex]?.notes[position.noteIndex];
+    if (!note || !note.wedge) return;
+
+    // Inline getPitchedNotesWithPositions to avoid TDZ
+    const pitchedNotes: Array<{
+      note: Note;
+      measureIndex: number;
+      noteIndex: number;
+    }> = [];
+    state.score.measures.forEach((measure, measureIndex) => {
+      measure.notes.forEach((n, noteIndex) => {
+        if (n.midi !== null) {
+          pitchedNotes.push({ note: n, measureIndex, noteIndex });
+        }
+      });
+    });
+
+    const selectedIndex = pitchedNotes.findIndex((n) => n.note.id === note.id);
+
+    // Find the other end of the wedge
+    let otherEndId: string | null = null;
+
+    if (note.wedge.position === "start") {
+      // Find the stop
+      for (let i = selectedIndex + 1; i < pitchedNotes.length; i++) {
+        if (pitchedNotes[i].note.wedge?.position === "stop") {
+          otherEndId = pitchedNotes[i].note.id;
+          break;
+        }
+      }
+    } else {
+      // Find the start
+      for (let i = selectedIndex - 1; i >= 0; i--) {
+        if (pitchedNotes[i].note.wedge?.position === "start") {
+          otherEndId = pitchedNotes[i].note.id;
+          break;
+        }
+      }
+    }
+
+    // Remove wedge from both notes
+    updateScore((score) => ({
+      ...score,
+      measures: score.measures.map((m) => ({
+        ...m,
+        notes: m.notes.map((n) => {
+          if (n.id === note.id || n.id === otherEndId) {
+            return { ...n, wedge: undefined };
+          }
+          return n;
+        }),
+      })),
+    }));
+
+    setState((prev) => ({
+      ...prev,
+      activeWedgeType: null,
+      activeWedgeStartId: null,
+    }));
+  }, [state.selectedNoteId, state.score, updateScore]);
+
   const setArticulation = useCallback(
     (articulation: ArticulationType) => {
       if (!state.selectedNoteId) return;
@@ -2207,6 +2622,17 @@ export function useTuneComposerState(
   ]);
 
   // ==========================================================================
+  // EXPRESSION MODE
+  // ==========================================================================
+
+  const toggleExpressionMode = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      expressionMode: !prev.expressionMode,
+    }));
+  }, []);
+
+  // ==========================================================================
   // Return
   // ==========================================================================
 
@@ -2293,6 +2719,8 @@ export function useTuneComposerState(
     removeDynamic,
     setWedge,
     removeWedge,
+    setDynamicText,
+    removeDynamicText,
     setArticulation,
     removeArticulation,
     setExpression,
@@ -2309,5 +2737,24 @@ export function useTuneComposerState(
     activeSlurEndId: state.activeSlurEndId,
     removeSlur,
     flipSlur,
+
+    // Expression Mode
+    expressionMode: state.expressionMode,
+    toggleExpressionMode,
+
+    // Dynamics Mode
+    dynamicsMode: state.dynamicsMode,
+    toggleDynamicsMode,
+
+    // Wedge Mode (Crescendo/Decrescendo)
+    wedgeMode: state.wedgeMode,
+    toggleWedgeMode,
+    startCrescendo,
+    startDiminuendo,
+    extendWedge,
+    endWedgeMode,
+    activeWedgeType: state.activeWedgeType,
+    activeWedgeStartId: state.activeWedgeStartId,
+    removeWedgeMarking,
   };
 }
