@@ -529,6 +529,12 @@ export interface TuneComposerState {
   lyricsMode: boolean;
   /** Cursor position for lyrics editing (index of selected note) */
   lyricsCursor: number | null;
+  /** Whether slur editing mode is active */
+  slurMode: boolean;
+  /** Note ID where the currently active slur starts */
+  activeSlurStartId: string | null;
+  /** Note ID where the currently active slur ends */
+  activeSlurEndId: string | null;
 }
 
 /** Create initial composer state */
@@ -548,6 +554,9 @@ export function createInitialState(
     isDirty: false,
     lyricsMode: false,
     lyricsCursor: null,
+    slurMode: false,
+    activeSlurStartId: null,
+    activeSlurEndId: null,
   };
 }
 

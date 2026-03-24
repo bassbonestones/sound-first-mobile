@@ -47,3 +47,7 @@ export type { CompactControlsProps } from "./CompactControls";
 // Transport / playback
 export { ComposerTransport } from "./ComposerTransport";
 export type { ComposerTransportProps } from "./ComposerTransport";
+
+// Slur controls
+export { SlurControls } from "./SlurControls";
+export type { SlurControlsProps } from "./SlurControls";

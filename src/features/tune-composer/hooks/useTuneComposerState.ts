@@ -202,6 +202,26 @@ export interface UseTuneComposerStateReturn {
   setExpression: (text: string) => void;
   /** Remove expression text from selected note */
   removeExpression: () => void;
+
+  // === SLUR MODE ===
+  /** Whether slur editing mode is active */
+  slurMode: boolean;
+  /** Toggle slur mode on/off */
+  toggleSlurMode: () => void;
+  /** Start a slur from current note (creates 2-note slur to next note) */
+  startSlur: () => void;
+  /** Extend slur start to previous note */
+  extendSlurLeft: () => void;
+  /** Extend slur end to next note */
+  extendSlurRight: () => void;
+  /** Exit slur mode */
+  endSlurMode: () => void;
+  /** Note ID where active slur starts (null if no active slur) */
+  activeSlurStartId: string | null;
+  /** Note ID where active slur ends (null if no active slur) */
+  activeSlurEndId: string | null;
+  /** Remove slur from current note (clears both slurStart and slurEnd) */
+  removeSlur: () => void;
 }
 
 // =============================================================================
@@ -1883,6 +1903,233 @@ export function useTuneComposerState(
   }, [state.selectedNoteId, state.score, undoManager, updateScore]);
 
   // ==========================================================================
+  // Slur Mode
+  // ==========================================================================
+
+  /** Get flat list of all pitched notes with their positions */
+  const getPitchedNotesWithPositions = useCallback(() => {
+    const notes: Array<{
+      note: Note;
+      measureIndex: number;
+      noteIndex: number;
+    }> = [];
+    state.score.measures.forEach((measure, measureIndex) => {
+      measure.notes.forEach((note, noteIndex) => {
+        if (note.midi !== null) {
+          notes.push({ note, measureIndex, noteIndex });
+        }
+      });
+    });
+    return notes;
+  }, [state.score]);
+
+  /** Toggle slur mode on/off */
+  const toggleSlurMode = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      slurMode: !prev.slurMode,
+      // Clear active slur when exiting mode
+      activeSlurStartId: !prev.slurMode ? prev.activeSlurStartId : null,
+      activeSlurEndId: !prev.slurMode ? prev.activeSlurEndId : null,
+    }));
+  }, []);
+
+  /** Exit slur mode */
+  const endSlurMode = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      slurMode: false,
+      activeSlurStartId: null,
+      activeSlurEndId: null,
+    }));
+  }, []);
+
+  /** Start a new slur from the selected note to the next pitched note */
+  const startSlur = useCallback(() => {
+    if (!state.selectedNoteId) return;
+
+    const pitchedNotes = getPitchedNotesWithPositions();
+    const currentIndex = pitchedNotes.findIndex(
+      (n) => n.note.id === state.selectedNoteId,
+    );
+    if (currentIndex === -1 || currentIndex >= pitchedNotes.length - 1) return;
+
+    const startNote = pitchedNotes[currentIndex];
+    const endNote = pitchedNotes[currentIndex + 1];
+
+    // Update score with slurStart on start note and slurEnd on end note
+    updateScore((score) => ({
+      ...score,
+      measures: score.measures.map((m, mi) => ({
+        ...m,
+        notes: m.notes.map((n) => {
+          if (n.id === startNote.note.id) {
+            return { ...n, slurStart: true };
+          }
+          if (n.id === endNote.note.id) {
+            return { ...n, slurEnd: true };
+          }
+          return n;
+        }),
+      })),
+    }));
+
+    // Track active slur
+    setState((prev) => ({
+      ...prev,
+      activeSlurStartId: startNote.note.id,
+      activeSlurEndId: endNote.note.id,
+      isDirty: true,
+    }));
+  }, [state.selectedNoteId, getPitchedNotesWithPositions, updateScore]);
+
+  /** Extend slur start to previous note */
+  const extendSlurLeft = useCallback(() => {
+    if (!state.activeSlurStartId) return;
+
+    const pitchedNotes = getPitchedNotesWithPositions();
+    const startIndex = pitchedNotes.findIndex(
+      (n) => n.note.id === state.activeSlurStartId,
+    );
+    if (startIndex <= 0) return; // Can't extend left past first note
+
+    const oldStartNote = pitchedNotes[startIndex];
+    const newStartNote = pitchedNotes[startIndex - 1];
+
+    // Move slurStart from old note to new note
+    updateScore((score) => ({
+      ...score,
+      measures: score.measures.map((m) => ({
+        ...m,
+        notes: m.notes.map((n) => {
+          if (n.id === oldStartNote.note.id) {
+            return { ...n, slurStart: undefined };
+          }
+          if (n.id === newStartNote.note.id) {
+            return { ...n, slurStart: true };
+          }
+          return n;
+        }),
+      })),
+    }));
+
+    setState((prev) => ({
+      ...prev,
+      activeSlurStartId: newStartNote.note.id,
+      isDirty: true,
+    }));
+  }, [state.activeSlurStartId, getPitchedNotesWithPositions, updateScore]);
+
+  /** Extend slur end to next note */
+  const extendSlurRight = useCallback(() => {
+    if (!state.activeSlurEndId) return;
+
+    const pitchedNotes = getPitchedNotesWithPositions();
+    const endIndex = pitchedNotes.findIndex(
+      (n) => n.note.id === state.activeSlurEndId,
+    );
+    if (endIndex === -1 || endIndex >= pitchedNotes.length - 1) return;
+
+    const oldEndNote = pitchedNotes[endIndex];
+    const newEndNote = pitchedNotes[endIndex + 1];
+
+    // Move slurEnd from old note to new note
+    updateScore((score) => ({
+      ...score,
+      measures: score.measures.map((m) => ({
+        ...m,
+        notes: m.notes.map((n) => {
+          if (n.id === oldEndNote.note.id) {
+            return { ...n, slurEnd: undefined };
+          }
+          if (n.id === newEndNote.note.id) {
+            return { ...n, slurEnd: true };
+          }
+          return n;
+        }),
+      })),
+    }));
+
+    setState((prev) => ({
+      ...prev,
+      activeSlurEndId: newEndNote.note.id,
+      isDirty: true,
+    }));
+  }, [state.activeSlurEndId, getPitchedNotesWithPositions, updateScore]);
+
+  /** Remove slur involving the selected note (removes both start and end of the slur) */
+  const removeSlur = useCallback(() => {
+    if (!state.selectedNoteId) return;
+
+    const position = findNotePosition(state.selectedNoteId, state.score);
+    if (!position) return;
+
+    const note =
+      state.score.measures[position.measureIndex]?.notes[position.noteIndex];
+    if (!note || (!note.slurStart && !note.slurEnd)) return;
+
+    const pitchedNotes = getPitchedNotesWithPositions();
+    const selectedIndex = pitchedNotes.findIndex((n) => n.note.id === note.id);
+
+    // Find the corresponding slur start/end note
+    let slurStartNoteId: string | null = null;
+    let slurEndNoteId: string | null = null;
+
+    if (note.slurStart) {
+      // Selected note starts a slur - find the end
+      slurStartNoteId = note.id;
+      // Search forward for slurEnd
+      for (let i = selectedIndex + 1; i < pitchedNotes.length; i++) {
+        if (pitchedNotes[i].note.slurEnd) {
+          slurEndNoteId = pitchedNotes[i].note.id;
+          break;
+        }
+      }
+    }
+
+    if (note.slurEnd) {
+      // Selected note ends a slur - find the start
+      slurEndNoteId = note.id;
+      // Search backward for slurStart
+      for (let i = selectedIndex - 1; i >= 0; i--) {
+        if (pitchedNotes[i].note.slurStart) {
+          slurStartNoteId = pitchedNotes[i].note.id;
+          break;
+        }
+      }
+    }
+
+    // Remove slur from both notes
+    updateScore((score) => ({
+      ...score,
+      measures: score.measures.map((m) => ({
+        ...m,
+        notes: m.notes.map((n) => {
+          if (n.id === slurStartNoteId) {
+            return { ...n, slurStart: undefined };
+          }
+          if (n.id === slurEndNoteId) {
+            return { ...n, slurEnd: undefined };
+          }
+          return n;
+        }),
+      })),
+    }));
+
+    // Clear active slur if it was the one we removed
+    setState((prev) => ({
+      ...prev,
+      activeSlurStartId: null,
+      activeSlurEndId: null,
+    }));
+  }, [
+    state.selectedNoteId,
+    state.score,
+    getPitchedNotesWithPositions,
+    updateScore,
+  ]);
+
+  // ==========================================================================
   // Return
   // ==========================================================================
 
@@ -1973,5 +2220,16 @@ export function useTuneComposerState(
     removeArticulation,
     setExpression,
     removeExpression,
+
+    // Slur Mode
+    slurMode: state.slurMode,
+    toggleSlurMode,
+    startSlur,
+    extendSlurLeft,
+    extendSlurRight,
+    endSlurMode,
+    activeSlurStartId: state.activeSlurStartId,
+    activeSlurEndId: state.activeSlurEndId,
+    removeSlur,
   };
 }
