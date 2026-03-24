@@ -19,6 +19,8 @@ import {
   SafeAreaView,
   ScrollView,
   ActivityIndicator,
+  Modal,
+  Pressable,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Picker } from "@react-native-picker/picker";
@@ -42,6 +44,7 @@ import {
   listPreviewFiles,
   previewMaterial,
   getSolfege,
+  transposeMaterial,
   analyzeMaterial,
   type MaterialPreviewResponse,
   type MaterialAnalysis,
@@ -622,6 +625,22 @@ const ROOT_KEYS: MusicalKey[] = [
   "B",
 ];
 
+// Simplified key list for tune transposition (no enharmonic duplicates)
+const TUNE_KEYS: MusicalKey[] = [
+  "C",
+  "Db",
+  "D",
+  "Eb",
+  "E",
+  "F",
+  "F#",
+  "G",
+  "Ab",
+  "A",
+  "Bb",
+  "B",
+];
+
 const OCTAVES = [1, 2, 3, 4, 5, 6, 7];
 
 const CLEFS: ClefType[] = ["treble", "bass"];
@@ -709,6 +728,24 @@ export default function GenerationPreviewScreen() {
   const [showSolfege, setShowSolfege] = useState(false);
   const [solfegeXml, setSolfegeXml] = useState<string | null>(null);
   const [isLoadingSolfege, setIsLoadingSolfege] = useState(false);
+
+  // Tune transposition state
+  const [tuneClef, setTuneClef] = useState<ClefType>("treble");
+  const [tuneKey, setTuneKey] = useState<MusicalKey>("C");
+  const [transposedXml, setTransposedXml] = useState<string | null>(null);
+  const [isTransposing, setIsTransposing] = useState(false);
+
+  // Clef change modal state
+  const [clefChangeModal, setClefChangeModal] = useState<{
+    visible: boolean;
+    targetClef: ClefType;
+  }>({ visible: false, targetClef: "treble" });
+
+  // Key change modal state
+  const [keyChangeModal, setKeyChangeModal] = useState<{
+    visible: boolean;
+    targetKey: MusicalKey;
+  }>({ visible: false, targetKey: "C" });
 
   // Material analysis state
   const [materialAnalysis, setMaterialAnalysis] =
@@ -1210,7 +1247,8 @@ export default function GenerationPreviewScreen() {
     if (newShowSolfege && !solfegeXml && selectedPreviewFile) {
       setIsLoadingSolfege(true);
       try {
-        const result = await getSolfege(selectedPreviewFile);
+        // Pass the current tune key so solfege is in the correct key
+        const result = await getSolfege(selectedPreviewFile, tuneKey);
         setSolfegeXml(result.solfege_xml);
         devLog("[GenerationPreview] Solfège loaded for key:", result.key_used);
       } catch (error) {
@@ -1220,12 +1258,146 @@ export default function GenerationPreviewScreen() {
         setIsLoadingSolfege(false);
       }
     }
-  }, [showSolfege, solfegeXml, selectedPreviewFile]);
+  }, [showSolfege, solfegeXml, selectedPreviewFile, tuneKey]);
 
-  // Clear solfège cache when preview file changes
+  // Handle tune clef change - show modal to ask about transposition
+  const handleTuneClefChange = useCallback(
+    (newClef: ClefType) => {
+      if (!previewResponse || newClef === tuneClef) return;
+      // Show modal to ask about transposition
+      setClefChangeModal({ visible: true, targetClef: newClef });
+    },
+    [previewResponse, tuneClef],
+  );
+
+  // Handle clef transposition selection from modal
+  const handleClefTranspose = useCallback(
+    async (octaves: number) => {
+      const targetClef = clefChangeModal.targetClef;
+      setClefChangeModal({ visible: false, targetClef: "treble" });
+      setTuneClef(targetClef);
+      setIsTransposing(true);
+      try {
+        const result = await transposeMaterial(
+          previewResponse!.musicxml_content,
+          { octaves, target_clef: targetClef },
+        );
+        setTransposedXml(result.musicxml_content);
+        // Clear solfege when clef changes (it would need re-fetching)
+        setSolfegeXml(null);
+        setShowSolfege(false);
+        devLog(
+          "[GenerationPreview] Transposed to clef:",
+          targetClef,
+          "octaves:",
+          octaves,
+        );
+      } catch (error) {
+        devError("[GenerationPreview] Clef transpose failed:", error);
+      } finally {
+        setIsTransposing(false);
+      }
+    },
+    [clefChangeModal.targetClef, previewResponse],
+  );
+
+  // Cancel clef change modal
+  const handleClefChangeCancel = useCallback(() => {
+    setClefChangeModal({ visible: false, targetClef: "treble" });
+  }, []);
+
+  // Handle tune key change - show modal to ask about transposition direction
+  const handleTuneKeyChange = useCallback(
+    (newKey: MusicalKey) => {
+      if (!previewResponse || newKey === tuneKey) return;
+      // Show modal to ask about transposition direction
+      setKeyChangeModal({ visible: true, targetKey: newKey });
+    },
+    [previewResponse, tuneKey],
+  );
+
+  // Key to semitones helper
+  const keyToSemitones: Record<MusicalKey, number> = {
+    C: 0,
+    "C#": 1,
+    Db: 1,
+    D: 2,
+    "D#": 3,
+    Eb: 3,
+    E: 4,
+    F: 5,
+    "F#": 6,
+    Gb: 6,
+    G: 7,
+    "G#": 8,
+    Ab: 8,
+    A: 9,
+    "A#": 10,
+    Bb: 10,
+    B: 11,
+  };
+
+  // Calculate transpose intervals for key change
+  const getKeyTransposeIntervals = useCallback(
+    (targetKey: MusicalKey): { down: number; up: number } => {
+      const currentSemitones = keyToSemitones[tuneKey] ?? 0;
+      const newSemitones = keyToSemitones[targetKey] ?? 0;
+
+      // Calculate the interval (can be 0-11)
+      const rawInterval = (((newSemitones - currentSemitones) % 12) + 12) % 12;
+
+      // Down interval is negative, up interval is positive
+      const down = rawInterval === 0 ? 0 : rawInterval - 12;
+      const up = rawInterval;
+
+      return { down, up };
+    },
+    [tuneKey, keyToSemitones],
+  );
+
+  // Handle key transposition selection from modal
+  const handleKeyTranspose = useCallback(
+    async (semitones: number) => {
+      const targetKey = keyChangeModal.targetKey;
+      setKeyChangeModal({ visible: false, targetKey: "C" });
+      setTuneKey(targetKey);
+      setIsTransposing(true);
+      try {
+        const result = await transposeMaterial(
+          previewResponse!.musicxml_content,
+          { semitones, target_clef: tuneClef },
+        );
+        setTransposedXml(result.musicxml_content);
+        // Clear solfege when key changes
+        setSolfegeXml(null);
+        setShowSolfege(false);
+        devLog(
+          "[GenerationPreview] Transposed to key:",
+          targetKey,
+          "semitones:",
+          semitones,
+        );
+      } catch (error) {
+        devError("[GenerationPreview] Key transpose failed:", error);
+      } finally {
+        setIsTransposing(false);
+      }
+    },
+    [keyChangeModal.targetKey, previewResponse, tuneClef],
+  );
+
+  // Cancel key change modal
+  const handleKeyChangeCancel = useCallback(() => {
+    setKeyChangeModal({ visible: false, targetKey: "C" });
+  }, []);
+
+  // Clear solfège and transposition cache when preview file changes
   useEffect(() => {
     setSolfegeXml(null);
     setShowSolfege(false);
+    setTransposedXml(null);
+    setTuneKey("C");
+    setTuneClef("treble");
   }, [selectedPreviewFile]);
 
   // Toggle pool item
@@ -1350,6 +1522,58 @@ export default function GenerationPreviewScreen() {
             {/* Preview Content */}
             {previewResponse && !isLoadingPreview && (
               <>
+                {/* Key and Clef Selectors */}
+                <View style={styles.section}>
+                  <View style={styles.rowContainer}>
+                    <View style={styles.halfWidth}>
+                      <Text style={styles.sectionLabel}>Key</Text>
+                      <View style={styles.pickerContainer}>
+                        <Picker
+                          selectedValue={tuneKey}
+                          onValueChange={(value) =>
+                            handleTuneKeyChange(value as MusicalKey)
+                          }
+                          style={styles.picker}
+                          enabled={!isTransposing}
+                          accessibilityLabel="Select key"
+                        >
+                          {ROOT_KEYS.map((key) => (
+                            <Picker.Item key={key} label={key} value={key} />
+                          ))}
+                        </Picker>
+                      </View>
+                    </View>
+                    <View style={styles.halfWidth}>
+                      <Text style={styles.sectionLabel}>Clef</Text>
+                      <View style={styles.pickerContainer}>
+                        <Picker
+                          selectedValue={tuneClef}
+                          onValueChange={(value) =>
+                            handleTuneClefChange(value as ClefType)
+                          }
+                          style={styles.picker}
+                          enabled={!isTransposing}
+                          accessibilityLabel="Select clef"
+                        >
+                          {CLEFS.map((c) => (
+                            <Picker.Item
+                              key={c}
+                              label={c.charAt(0).toUpperCase() + c.slice(1)}
+                              value={c}
+                            />
+                          ))}
+                        </Picker>
+                      </View>
+                    </View>
+                  </View>
+                  {isTransposing && (
+                    <View style={styles.transposingIndicator}>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                      <Text style={styles.transposingText}>Transposing...</Text>
+                    </View>
+                  )}
+                </View>
+
                 {/* Notation Display */}
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
@@ -1388,7 +1612,7 @@ export default function GenerationPreviewScreen() {
                       musicXml={
                         showSolfege && solfegeXml
                           ? solfegeXml
-                          : previewResponse.musicxml_content
+                          : (transposedXml ?? previewResponse.musicxml_content)
                       }
                       height={350}
                       fixedWidth={400}
@@ -2262,6 +2486,123 @@ export default function GenerationPreviewScreen() {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      {/* Clef Change Transposition Modal */}
+      <Modal
+        visible={clefChangeModal.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleClefChangeCancel}
+      >
+        <Pressable style={styles.modalOverlay} onPress={handleClefChangeCancel}>
+          <View
+            style={styles.modalContent}
+            onStartShouldSetResponder={() => true}
+          >
+            <Text style={styles.modalTitle}>Transpose Notes?</Text>
+            <Text style={styles.modalMessage}>
+              How would you like to transpose the notes when switching to{" "}
+              {clefChangeModal.targetClef === "bass" ? "bass" : "treble"} clef?
+            </Text>
+            {clefChangeModal.targetClef === "bass" ? (
+              <>
+                <TouchableOpacity
+                  style={styles.modalOption}
+                  onPress={() => handleClefTranspose(0)}
+                >
+                  <Text style={styles.modalOptionText}>No Transpose</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalOption}
+                  onPress={() => handleClefTranspose(-1)}
+                >
+                  <Text style={styles.modalOptionText}>Octave Down</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalOption}
+                  onPress={() => handleClefTranspose(-2)}
+                >
+                  <Text style={styles.modalOptionText}>2 Octaves Down</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={styles.modalOption}
+                  onPress={() => handleClefTranspose(0)}
+                >
+                  <Text style={styles.modalOptionText}>No Transpose</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalOption}
+                  onPress={() => handleClefTranspose(1)}
+                >
+                  <Text style={styles.modalOptionText}>Octave Up</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalOption}
+                  onPress={() => handleClefTranspose(2)}
+                >
+                  <Text style={styles.modalOptionText}>2 Octaves Up</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            <TouchableOpacity
+              style={styles.modalCancel}
+              onPress={handleClefChangeCancel}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Key Change Transposition Modal */}
+      <Modal
+        visible={keyChangeModal.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleKeyChangeCancel}
+      >
+        <Pressable style={styles.modalOverlay} onPress={handleKeyChangeCancel}>
+          <View
+            style={styles.modalContent}
+            onStartShouldSetResponder={() => true}
+          >
+            <Text style={styles.modalTitle}>Transpose Notes?</Text>
+            <Text style={styles.modalMessage}>
+              How would you like to transpose the notes when changing key?
+            </Text>
+            {(() => {
+              const { down, up } = getKeyTransposeIntervals(
+                keyChangeModal.targetKey,
+              );
+              return (
+                <>
+                  <TouchableOpacity
+                    style={styles.modalOption}
+                    onPress={() => handleKeyTranspose(up)}
+                  >
+                    <Text style={styles.modalOptionText}>Transpose Up</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalOption}
+                    onPress={() => handleKeyTranspose(down)}
+                  >
+                    <Text style={styles.modalOptionText}>Transpose Down</Text>
+                  </TouchableOpacity>
+                </>
+              );
+            })()}
+            <TouchableOpacity
+              style={styles.modalCancel}
+              onPress={handleKeyChangeCancel}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -2372,6 +2713,24 @@ const styles = StyleSheet.create({
   },
   halfSection: {
     flex: 1,
+  },
+  rowContainer: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  halfWidth: {
+    flex: 1,
+  },
+  transposingIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 8,
+  },
+  transposingText: {
+    fontSize: 14,
+    color: colors.textSecondary,
   },
   poolToggle: {
     paddingVertical: 12,
@@ -2549,5 +2908,56 @@ const styles = StyleSheet.create({
   },
   solfegeToggleTextActive: {
     color: colors.white,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 20,
+    width: "80%",
+    maxWidth: 320,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.text,
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  modalOption: {
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+    alignItems: "center",
+  },
+  modalOptionText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#fff",
+  },
+  modalCancel: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 4,
+    alignItems: "center",
+  },
+  modalCancelText: {
+    fontSize: 16,
+    color: colors.textSecondary,
   },
 });

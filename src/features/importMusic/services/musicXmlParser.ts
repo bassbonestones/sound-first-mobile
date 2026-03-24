@@ -104,6 +104,12 @@ interface RawDirection {
   readonly words?: string;
 }
 
+interface RawLyric {
+  readonly text: string;
+  readonly syllabic: "single" | "begin" | "middle" | "end";
+  readonly extend?: boolean;
+}
+
 interface RawNote {
   readonly isRest: boolean;
   readonly isChord: boolean;
@@ -113,6 +119,7 @@ interface RawNote {
   readonly dots: number;
   readonly tieStart: boolean;
   readonly tieStop: boolean;
+  readonly lyric?: RawLyric;
 }
 
 interface RawDefaults {
@@ -501,6 +508,23 @@ function extractNotes(measureContent: string, _warnings: string[]): RawNote[] {
     const tieStart = /<tie[^>]*type=["']start["']/i.test(noteContent);
     const tieStop = /<tie[^>]*type=["']stop["']/i.test(noteContent);
 
+    // Lyric
+    let lyric: RawLyric | undefined;
+    const lyricBlock = extractTagBlock(noteContent, "lyric");
+    if (lyricBlock) {
+      const lyricText = extractTagContent(lyricBlock, "text");
+      const syllabicStr = extractTagContent(lyricBlock, "syllabic");
+      const hasExtend = lyricBlock.includes("<extend");
+
+      if (lyricText) {
+        lyric = {
+          text: lyricText,
+          syllabic: (syllabicStr as RawLyric["syllabic"]) || "single",
+          extend: hasExtend || undefined,
+        };
+      }
+    }
+
     notes.push({
       isRest,
       isChord,
@@ -510,6 +534,7 @@ function extractNotes(measureContent: string, _warnings: string[]): RawNote[] {
       dots,
       tieStart,
       tieStop,
+      lyric,
     });
   }
 
@@ -812,6 +837,13 @@ function createNoteEvent(
     dynamics: null,
     tiedToNext: rawNote.tieStart,
     tiedFromPrevious: rawNote.tieStop,
+    lyric: rawNote.lyric
+      ? {
+          text: rawNote.lyric.text,
+          syllabic: rawNote.lyric.syllabic,
+          extend: rawNote.lyric.extend,
+        }
+      : null,
   };
 }
 

@@ -47,6 +47,8 @@ export {
   analyzeMaterial,
   listPreviewFiles,
   previewMaterial,
+  getSolfege,
+  transposeMaterial,
 } from "./materials";
 export type {
   Material,
@@ -56,6 +58,9 @@ export type {
   MaterialPreviewResponse,
   MaterialPreviewSoftGates,
   MaterialPreviewUnifiedScores,
+  SolfegeResponse,
+  TransposeRequest,
+  TransposeResponse,
 } from "./materials";
 
 export { getCapabilities, getCapability } from "./capabilities";

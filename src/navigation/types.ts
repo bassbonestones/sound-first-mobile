@@ -58,6 +58,9 @@ export type RootStackParamList = {
 
   // Practice Composer feature
   Composer: ComposerParams;
+
+  // Tune Composer feature
+  TuneComposer: TuneComposerParams;
 };
 
 // ============================================================================
@@ -232,6 +235,12 @@ export interface ImportedScorePracticeParams {
 
 /** Params for ComposerScreen */
 export interface ComposerParams {
+  /** Score ID to load from storage (undefined for new score) */
+  scoreId?: string;
+}
+
+/** Params for TuneComposerScreen */
+export interface TuneComposerParams {
   /** Score ID to load from storage (undefined for new score) */
   scoreId?: string;
 }

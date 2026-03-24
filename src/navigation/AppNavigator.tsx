@@ -33,6 +33,7 @@ import {
   ImportedScorePracticeScreen,
 } from "../features/importMusic";
 import { ComposerScreen } from "../features/composer";
+import { TuneComposerScreen } from "../features/tune-composer";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -205,6 +206,11 @@ export function AppNavigator({
           name="Composer"
           component={ComposerScreen}
           options={{ title: "Practice Composer", headerShown: false }}
+        />
+        <Stack.Screen
+          name="TuneComposer"
+          component={TuneComposerScreen}
+          options={{ title: "Tune Composer", headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>

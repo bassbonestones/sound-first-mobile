@@ -210,6 +210,7 @@ export function generateComposerOsmdHtml(
           drawComposer: false,
           drawPartNames: false,
           drawCredits: false,
+          drawLyrics: true,
           drawingParameters: "compact",
           backend: "svg",
           autoBeam: true,

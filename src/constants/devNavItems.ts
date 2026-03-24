@@ -12,6 +12,7 @@ export const DEV_NAV_ITEMS: DevNavItem[] = [
   { screen: "Home", label: "Home", icon: "🏠" },
   { screen: "GenerationPreview", label: "Generation Preview", icon: "🎹" },
   { screen: "Composer", label: "Practice Composer", icon: "✏️" },
+  { screen: "TuneComposer", label: "Tune Composer", icon: "🎼" },
   { screen: "StartPractice", label: "Practice Setup", icon: "🎯" },
   { screen: "FirstNote", label: "First Note (Day 0)", icon: "🎵" },
   { screen: "SelfDirected", label: "Self-Directed Mode", icon: "🎹" },

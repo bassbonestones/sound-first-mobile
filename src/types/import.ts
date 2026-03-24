@@ -397,6 +397,20 @@ export interface ImportedNoteEvent {
   readonly tiedToNext: boolean;
   /** Is this tied from the previous note? */
   readonly tiedFromPrevious: boolean;
+  /** Lyric syllable attached to this note */
+  readonly lyric: LyricInfo | null;
+}
+
+/**
+ * Lyric information for a note
+ */
+export interface LyricInfo {
+  /** The lyric text/syllable */
+  readonly text: string;
+  /** How this syllable relates to the word */
+  readonly syllabic: "single" | "begin" | "middle" | "end";
+  /** If true, this note continues a melisma (no new syllable) */
+  readonly extend?: boolean;
 }
 
 /**

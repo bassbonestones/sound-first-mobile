@@ -281,6 +281,47 @@ export interface SolfegeResponse {
   key_used: string;
 }
 
+export interface TransposeRequest {
+  musicxml_content: string;
+  semitones?: number; // Key transposition in semitones (-12 to +12)
+  octaves?: number; // Additional octave transposition (-2 to +2)
+  target_clef?: string; // "treble" or "bass" to change clef
+}
+
+export interface TransposeResponse {
+  musicxml_content: string;
+  original_key: string | null;
+  new_key: string | null;
+  transposition_semitones: number;
+  transposition_octaves: number;
+}
+
+/**
+ * Transpose MusicXML content by semitones and/or octaves, optionally changing clef
+ */
+export async function transposeMaterial(
+  musicxml_content: string,
+  options: { semitones?: number; octaves?: number; target_clef?: string } = {},
+): Promise<TransposeResponse> {
+  const response = await fetch(`${baseUrl}/materials/preview/transpose`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      musicxml_content,
+      semitones: options.semitones ?? 0,
+      octaves: options.octaves ?? 0,
+      target_clef: options.target_clef,
+    } as TransposeRequest),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const detail =
+      (errorData as { detail?: string }).detail || `Status ${response.status}`;
+    throw new Error(`Transpose failed: ${detail}`);
+  }
+  return response.json() as Promise<TransposeResponse>;
+}
+
 /**
  * Get solfège version of a MusicXML file
  */
@@ -314,4 +355,5 @@ export default {
   listPreviewFiles,
   previewMaterial,
   getSolfege,
+  transposeMaterial,
 };
