@@ -325,10 +325,12 @@ export function useComposerPlayback(
   }, []);
 
   const pause = useCallback(() => {
+    composerSynth.stopAll();
     setState("paused");
   }, []);
 
   const stop = useCallback(() => {
+    composerSynth.stopAll();
     setState("stopped");
     setPosition(INITIAL_POSITION);
     setCurrentEvent(null);
@@ -338,6 +340,7 @@ export function useComposerPlayback(
   }, []);
 
   const stopAt = useCallback((pos: PlaybackPosition) => {
+    composerSynth.stopAll();
     setState("stopped");
     setPosition(pos);
     setCurrentEvent(null);

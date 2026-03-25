@@ -32,10 +32,17 @@ export function midiToFrequency(midi: number): number {
 // Synthesizer Class
 // =============================================================================
 
+interface ActiveSound {
+  oscillator1: OscillatorNode;
+  oscillator2: OscillatorNode;
+  envelope: GainNode;
+}
+
 class ComposerSynthesizer {
   private audioContext: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private isInitialized = false;
+  private activeSounds: ActiveSound[] = [];
 
   /**
    * Initialize the audio context. Must be called after a user gesture on web.
@@ -147,6 +154,14 @@ class ComposerSynthesizer {
     envelope.gain.value = 0.5; // Mix level for second oscillator
     envelope.connect(this.masterGain);
 
+    // Track this sound
+    const activeSound: ActiveSound = {
+      oscillator1: oscillator,
+      oscillator2: oscillator2,
+      envelope,
+    };
+    this.activeSounds.push(activeSound);
+
     // Start and stop
     oscillator.start(now);
     oscillator2.start(now);
@@ -158,7 +173,38 @@ class ComposerSynthesizer {
       oscillator.disconnect();
       oscillator2.disconnect();
       envelope.disconnect();
+      // Remove from active sounds
+      const index = this.activeSounds.indexOf(activeSound);
+      if (index > -1) {
+        this.activeSounds.splice(index, 1);
+      }
     };
+  }
+
+  /**
+   * Immediately stop all currently playing sounds.
+   */
+  stopAll(): void {
+    if (!this.audioContext) return;
+
+    const now = this.audioContext.currentTime;
+
+    for (const sound of this.activeSounds) {
+      try {
+        // Quickly fade out to avoid clicks
+        sound.envelope.gain.cancelScheduledValues(now);
+        sound.envelope.gain.setValueAtTime(sound.envelope.gain.value, now);
+        sound.envelope.gain.linearRampToValueAtTime(0, now + 0.02);
+
+        // Stop oscillators shortly after fade
+        sound.oscillator1.stop(now + 0.03);
+        sound.oscillator2.stop(now + 0.03);
+      } catch {
+        // Already stopped, ignore
+      }
+    }
+
+    this.activeSounds = [];
   }
 
   /**
