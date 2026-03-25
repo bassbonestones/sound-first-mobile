@@ -259,10 +259,18 @@ function ChordControlsComponent({
 
   // Insert symbol at cursor position
   const handleInsertSymbol = useCallback((symbol: string) => {
-    setInputText((prev) => prev + symbol);
+    // Cancel any pending blur submission
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+    const newText = inputText + symbol;
+    setInputText(newText);
+    // Notify parent for live preview on the score
+    onChordInputChange?.(newText);
     // Focus the input after inserting
     inputRef.current?.focus();
-  }, []);
+  }, [inputText, onChordInputChange]);
 
   // Handle chord preview
   const handlePreview = useCallback(() => {
