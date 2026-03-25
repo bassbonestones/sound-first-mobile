@@ -910,143 +910,36 @@ function TuneComposerScreenContent({
           testID="composer-topbar"
         />
 
-        {/* Scrollable middle section */}
+        {/* Score Viewport with swipe gestures - fixed at top */}
+        <View
+          style={[styles.viewportWrapper, { height: viewportHeight }]}
+          {...panResponder.panHandlers}
+        >
+          <TuneComposerScoreViewport
+            score={composerState.score}
+            cursor={composerState.cursor}
+            selectedNoteId={highlightedNoteId}
+            onNoteTap={handleScoreTap}
+            playbackState={playback.state}
+            playbackMeasureIndex={playback.position.measureIndex}
+            onPlay={handlePlay}
+            onPause={handlePause}
+            onStop={handleStop}
+            zoom={zoom}
+            onZoomChange={setZoom}
+            showZoomControls={false}
+            testID="composer-viewport"
+          />
+        </View>
+
+        {/* Scrollable controls section */}
         <ScrollView
           style={styles.scrollArea}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={true}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Score Viewport with swipe gestures */}
-          <View
-            style={[styles.viewportWrapper, { height: viewportHeight }]}
-            {...panResponder.panHandlers}
-          >
-            <TuneComposerScoreViewport
-              score={composerState.score}
-              cursor={composerState.cursor}
-              selectedNoteId={highlightedNoteId}
-              onNoteTap={handleScoreTap}
-              playbackState={playback.state}
-              playbackMeasureIndex={playback.position.measureIndex}
-              onPlay={handlePlay}
-              onPause={handlePause}
-              onStop={handleStop}
-              zoom={zoom}
-              onZoomChange={setZoom}
-              showZoomControls={false}
-              testID="composer-viewport"
-            />
-          </View>
-
           <View style={styles.controlsContainer}>
-            {/* Entry Palette - 4 rows get extraRowPadding each */}
-            <EntryPalette
-              selectedDuration={composerState.state.selectedDuration}
-              selectedNote={composerState.selectedNote}
-              onDurationSelect={composerState.setDuration}
-              dottedMode={composerState.dottedMode}
-              onToggleDotted={composerState.toggleDottedMode}
-              tripletPosition={
-                composerState.tripletPosition as 1 | 2 | 3 | undefined
-              }
-              tripletGroupType={composerState.tripletGroupType}
-              tripletsAllowed={composerState.score.timeSignature.beatUnit === 4}
-              canStartTriplet={composerState.canStartTriplet}
-              onPitchTap={handlePitchEnter}
-              onOctaveChange={composerState.changeOctave}
-              onAccidental={composerState.applyAccidental}
-              onInsertRest={handleRestEnter}
-              onToggleTie={composerState.toggleTie}
-              onArticulation={composerState.setArticulation}
-              onRemoveArticulation={composerState.removeArticulation}
-              activeArticulation={composerState.selectedNote?.articulation}
-              disabled={isPlaying}
-              extraRowPadding={rowExtraPadding}
-              testID="composer-palette"
-            />
-
-            {/* Slur Controls */}
-            <SlurControls
-              slurModeActive={composerState.slurMode}
-              onToggleSlurMode={composerState.toggleSlurMode}
-              onStartSlur={composerState.startSlur}
-              onExtendSlurLeft={composerState.extendSlurLeft}
-              onExtendSlurRight={composerState.extendSlurRight}
-              onRemoveSlur={composerState.removeSlur}
-              onFlipSlur={composerState.flipSlur}
-              onDone={composerState.endSlurMode}
-              hasSelection={hasSelection}
-              hasActiveSlur={composerState.activeSlurStartId !== null}
-              selectedNoteHasSlur={
-                composerState.selectedNote?.slurStart === true ||
-                composerState.selectedNote?.slurEnd === true
-              }
-              canExtendLeft={composerState.activeSlurStartId !== null}
-              canExtendRight={composerState.activeSlurEndId !== null}
-              disabled={isPlaying}
-              testID="slur-controls"
-            />
-
-            {/* Lyrics Controls */}
-            <LyricsControls
-              lyricsModeActive={composerState.lyricsMode}
-              onToggleLyricsMode={composerState.toggleLyricsMode}
-              currentLyricText={lyricsData.currentLyricText}
-              currentSyllabic={lyricsData.currentSyllabic}
-              prevSyllabic={lyricsData.prevSyllabic}
-              onSetLyric={composerState.setLyric}
-              onRemoveLyric={composerState.removeLyric}
-              onNextNote={composerState.moveLyricsCursorNext}
-              onPrevNote={composerState.moveLyricsCursorPrev}
-              onExtendMelisma={composerState.extendMelisma}
-              onShrinkMelisma={composerState.shrinkMelisma}
-              canGoPrev={lyricsData.canGoPrev}
-              canGoNext={lyricsData.canGoNext}
-              currentNoteIndex={lyricsData.currentNoteIndex}
-              totalNotes={lyricsData.totalNotes}
-              hasSelection={hasSelection}
-              disabled={isPlaying}
-              testID="lyrics-controls"
-            />
-
-            {/* Expression Controls */}
-            <ExpressionControls
-              expressionModeActive={composerState.expressionMode}
-              onToggleExpressionMode={composerState.toggleExpressionMode}
-              currentExpression={composerState.selectedNote?.expression || ""}
-              onSetExpression={composerState.setExpression}
-              onRemoveExpression={composerState.removeExpression}
-              hasSelection={hasSelection}
-              disabled={isPlaying}
-              testID="expression-controls"
-            />
-
-            {/* Dynamics Controls */}
-            <DynamicsControls
-              dynamicsModeActive={composerState.dynamicsMode}
-              onToggleDynamicsMode={composerState.toggleDynamicsMode}
-              currentDynamic={composerState.selectedNote?.dynamic}
-              currentDynamicText={composerState.selectedNote?.dynamicText}
-              onSetDynamic={composerState.setDynamic}
-              onRemoveDynamic={composerState.removeDynamic}
-              onSetDynamicText={composerState.setDynamicText}
-              onRemoveDynamicText={composerState.removeDynamicText}
-              wedgeModeActive={composerState.wedgeMode}
-              onToggleWedgeMode={composerState.toggleWedgeMode}
-              onStartCrescendo={composerState.startCrescendo}
-              onStartDiminuendo={composerState.startDiminuendo}
-              onExtendWedge={composerState.extendWedge}
-              onEndWedgeMode={composerState.endWedgeMode}
-              onRemoveWedgeMarking={composerState.removeWedgeMarking}
-              activeWedgeType={composerState.activeWedgeType}
-              activeWedgeStartId={composerState.activeWedgeStartId}
-              selectedNoteHasWedge={!!composerState.selectedNote?.wedge}
-              hasSelection={hasSelection}
-              disabled={isPlaying}
-              testID="dynamics-controls"
-            />
-
             {/* Compact Controls Row */}
             <View
               style={[
@@ -1154,6 +1047,113 @@ function TuneComposerScreenContent({
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* Entry Palette - 4 rows get extraRowPadding each */}
+            <EntryPalette
+              selectedDuration={composerState.state.selectedDuration}
+              selectedNote={composerState.selectedNote}
+              onDurationSelect={composerState.setDuration}
+              dottedMode={composerState.dottedMode}
+              onToggleDotted={composerState.toggleDottedMode}
+              tripletPosition={
+                composerState.tripletPosition as 1 | 2 | 3 | undefined
+              }
+              tripletGroupType={composerState.tripletGroupType}
+              tripletsAllowed={composerState.score.timeSignature.beatUnit === 4}
+              canStartTriplet={composerState.canStartTriplet}
+              onPitchTap={handlePitchEnter}
+              onOctaveChange={composerState.changeOctave}
+              onAccidental={composerState.applyAccidental}
+              onInsertRest={handleRestEnter}
+              onToggleTie={composerState.toggleTie}
+              onArticulation={composerState.setArticulation}
+              onRemoveArticulation={composerState.removeArticulation}
+              activeArticulation={composerState.selectedNote?.articulation}
+              disabled={isPlaying}
+              extraRowPadding={rowExtraPadding}
+              testID="composer-palette"
+            />
+
+            {/* Slur Controls */}
+            <SlurControls
+              slurModeActive={composerState.slurMode}
+              onToggleSlurMode={composerState.toggleSlurMode}
+              onStartSlur={composerState.startSlur}
+              onExtendSlurLeft={composerState.extendSlurLeft}
+              onExtendSlurRight={composerState.extendSlurRight}
+              onRemoveSlur={composerState.removeSlur}
+              onFlipSlur={composerState.flipSlur}
+              onDone={composerState.endSlurMode}
+              hasSelection={hasSelection}
+              hasActiveSlur={composerState.activeSlurStartId !== null}
+              selectedNoteHasSlur={
+                composerState.selectedNote?.slurStart === true ||
+                composerState.selectedNote?.slurEnd === true
+              }
+              canExtendLeft={composerState.activeSlurStartId !== null}
+              canExtendRight={composerState.activeSlurEndId !== null}
+              disabled={isPlaying}
+              testID="slur-controls"
+            />
+
+            {/* Lyrics Controls */}
+            <LyricsControls
+              lyricsModeActive={composerState.lyricsMode}
+              onToggleLyricsMode={composerState.toggleLyricsMode}
+              currentLyricText={lyricsData.currentLyricText}
+              currentSyllabic={lyricsData.currentSyllabic}
+              prevSyllabic={lyricsData.prevSyllabic}
+              onSetLyric={composerState.setLyric}
+              onRemoveLyric={composerState.removeLyric}
+              onNextNote={composerState.moveLyricsCursorNext}
+              onPrevNote={composerState.moveLyricsCursorPrev}
+              onExtendMelisma={composerState.extendMelisma}
+              onShrinkMelisma={composerState.shrinkMelisma}
+              canGoPrev={lyricsData.canGoPrev}
+              canGoNext={lyricsData.canGoNext}
+              currentNoteIndex={lyricsData.currentNoteIndex}
+              totalNotes={lyricsData.totalNotes}
+              hasSelection={hasSelection}
+              disabled={isPlaying}
+              testID="lyrics-controls"
+            />
+
+            {/* Expression Controls */}
+            <ExpressionControls
+              expressionModeActive={composerState.expressionMode}
+              onToggleExpressionMode={composerState.toggleExpressionMode}
+              currentExpression={composerState.selectedNote?.expression || ""}
+              onSetExpression={composerState.setExpression}
+              onRemoveExpression={composerState.removeExpression}
+              hasSelection={hasSelection}
+              disabled={isPlaying}
+              testID="expression-controls"
+            />
+
+            {/* Dynamics Controls */}
+            <DynamicsControls
+              dynamicsModeActive={composerState.dynamicsMode}
+              onToggleDynamicsMode={composerState.toggleDynamicsMode}
+              currentDynamic={composerState.selectedNote?.dynamic}
+              currentDynamicText={composerState.selectedNote?.dynamicText}
+              onSetDynamic={composerState.setDynamic}
+              onRemoveDynamic={composerState.removeDynamic}
+              onSetDynamicText={composerState.setDynamicText}
+              onRemoveDynamicText={composerState.removeDynamicText}
+              wedgeModeActive={composerState.wedgeMode}
+              onToggleWedgeMode={composerState.toggleWedgeMode}
+              onStartCrescendo={composerState.startCrescendo}
+              onStartDiminuendo={composerState.startDiminuendo}
+              onExtendWedge={composerState.extendWedge}
+              onEndWedgeMode={composerState.endWedgeMode}
+              onRemoveWedgeMarking={composerState.removeWedgeMarking}
+              activeWedgeType={composerState.activeWedgeType}
+              activeWedgeStartId={composerState.activeWedgeStartId}
+              selectedNoteHasWedge={!!composerState.selectedNote?.wedge}
+              hasSelection={hasSelection}
+              disabled={isPlaying}
+              testID="dynamics-controls"
+            />
 
             {/* Playback Panel */}
             <View

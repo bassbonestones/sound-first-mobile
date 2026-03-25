@@ -130,11 +130,7 @@ function DynamicsControlsComponent({
           accessibilityLabel="Add dynamics"
           testID="dynamics-mode-toggle"
         >
-          <Text
-            style={[styles.dynamicSymbol, isDisabled && styles.labelDisabled]}
-          >
-            f
-          </Text>
+          <Text style={styles.dynamicSymbol}>f</Text>
           <Text
             style={[styles.toggleLabel, isDisabled && styles.labelDisabled]}
           >
@@ -375,12 +371,13 @@ const styles = StyleSheet.create({
   toggleButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.surface,
+    justifyContent: "center",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.primary,
     gap: spacing.xs,
   },
   buttonDisabled: {
@@ -394,8 +391,8 @@ const styles = StyleSheet.create({
   },
   toggleLabel: {
     fontSize: 14,
-    color: colors.textPrimary,
-    fontWeight: "500",
+    fontWeight: "600",
+    color: colors.primary,
   },
   labelDisabled: {
     color: colors.textSecondary,
