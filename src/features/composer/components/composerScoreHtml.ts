@@ -282,16 +282,53 @@ export function generateComposerOsmdHtml(
         
         const bbox = staffMeasure.boundingBox;
         const posX = bbox.absolutePosition ? bbox.absolutePosition.x : bbox.x;
-        const width = bbox.width || 0;
         
-        if (posX !== undefined && !isNaN(posX)) {
-          // Convert to pixels (OSMD units * 10 * zoom)
-          positions.push({
-            measureIndex: i,
-            x: posX * 10,
-            width: width * 10
-          });
+        if (posX === undefined || isNaN(posX)) continue;
+        
+        // Collect all beat positions from staff entries
+        const beatPositions = [];
+        let firstNoteX = null;
+        let lastNoteX = null;
+        
+        if (staffMeasure.staffEntries && staffMeasure.staffEntries.length > 0) {
+          let entryIndex = 0;
+          for (const entry of staffMeasure.staffEntries) {
+            if (entry && entry.boundingBox) {
+              const entryX = entry.boundingBox.absolutePosition 
+                ? entry.boundingBox.absolutePosition.x 
+                : entry.boundingBox.x;
+              if (entryX !== undefined && !isNaN(entryX)) {
+                // Use the entry index as the beat position
+                // This works for simple cases with one note per beat
+                beatPositions.push({
+                  beat: entryIndex,
+                  x: entryX * 10
+                });
+                
+                if (firstNoteX === null) {
+                  firstNoteX = entryX;
+                }
+                lastNoteX = entryX;
+                entryIndex++;
+              }
+            }
+          }
         }
+        
+        // Convert to pixels (OSMD units * 10)
+        const measureX = posX * 10;
+        const noteStartX = firstNoteX !== null ? firstNoteX * 10 : measureX + 50;
+        const noteEndX = lastNoteX !== null ? lastNoteX * 10 : noteStartX + 100;
+        
+        positions.push({
+          measureIndex: i,
+          x: measureX,
+          noteStartX: noteStartX,
+          noteEndX: noteEndX,
+          beatPositions: beatPositions,
+          // Width is from first note to end of measure (estimated as last note + some padding)
+          width: (noteEndX - noteStartX) + 40,
+        });
       }
       
       // Also get total content width

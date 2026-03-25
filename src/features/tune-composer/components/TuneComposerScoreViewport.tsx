@@ -59,6 +59,8 @@ export interface TuneComposerScoreViewportProps {
   cursor: CursorPosition;
   /** ID of selected note (for highlighting) */
   selectedNoteId?: string | null;
+  /** Chord cursor position (for chord entry mode) */
+  chordCursor?: { measureIndex: number; beatPosition: number } | null;
   /** Called when a note is tapped */
   onNoteTap?: (measureIndex: number, noteIndex: number) => void;
   /** Called when rendering completes */
@@ -104,6 +106,7 @@ function TuneComposerScoreViewportComponent({
   score,
   cursor,
   selectedNoteId,
+  chordCursor,
   onNoteTap,
   onRenderComplete,
   onError,
@@ -129,7 +132,14 @@ function TuneComposerScoreViewportComponent({
   const [error, setError] = useState<string | null>(null);
   const [internalZoom, setInternalZoom] = useState(initialZoom);
   const [measurePositions, setMeasurePositions] = useState<
-    { measureIndex: number; x: number; width: number }[]
+    {
+      measureIndex: number;
+      x: number;
+      width: number;
+      noteStartX?: number;
+      noteEndX?: number;
+      beatPositions?: { beat: number; x: number }[];
+    }[]
   >([]);
   const [contentWidth, setContentWidth] = useState(2000);
   const [osmdZoom, setOsmdZoom] = useState(1);
@@ -138,6 +148,107 @@ function TuneComposerScoreViewportComponent({
   // Use controlled zoom if provided, otherwise internal state
   const zoom = controlledZoom ?? internalZoom;
   const setZoom = onZoomChange ?? setInternalZoom;
+
+  // Calculate chord cursor x position for overlay
+  const chordCursorX = useMemo(() => {
+    console.log(
+      "[ChordCursor] useMemo triggered, measurePositions:",
+      measurePositions.length,
+      "chordCursor:",
+      chordCursor,
+    );
+
+    if (!chordCursor || measurePositions.length === 0) return null;
+
+    const measurePos = measurePositions.find(
+      (m) => m.measureIndex === chordCursor.measureIndex,
+    );
+    if (!measurePos) {
+      console.log(
+        "[ChordCursor] No measure position found for index:",
+        chordCursor.measureIndex,
+      );
+      return null;
+    }
+
+    // Try to find the actual beat position from OSMD staffEntries
+    const beatPositions = measurePos.beatPositions;
+    let xPosition: number;
+
+    const targetBeat = chordCursor.beatPosition;
+    console.log(
+      "[ChordCursor] Looking for beat:",
+      targetBeat,
+      "Available beats:",
+      beatPositions?.map((bp) => bp.beat),
+    );
+
+    if (beatPositions && beatPositions.length > 0) {
+      // Find exact beat match or interpolate between beats
+      const exactMatch = beatPositions.find(
+        (bp) => Math.abs(bp.beat - targetBeat) < 0.01,
+      );
+
+      if (exactMatch) {
+        console.log(
+          "[ChordCursor] Found exact match for beat",
+          targetBeat,
+          "at x:",
+          exactMatch.x,
+        );
+        xPosition = exactMatch.x;
+      } else {
+        // Find surrounding beats and interpolate
+        const sorted = [...beatPositions].sort((a, b) => a.beat - b.beat);
+        const before = sorted.filter((bp) => bp.beat <= targetBeat).pop();
+        const after = sorted.find((bp) => bp.beat > targetBeat);
+
+        console.log(
+          "[ChordCursor] Interpolating - before:",
+          before,
+          "after:",
+          after,
+        );
+
+        if (before && after) {
+          // Linear interpolation between beats
+          const fraction =
+            (targetBeat - before.beat) / (after.beat - before.beat);
+          xPosition = before.x + fraction * (after.x - before.x);
+        } else if (before) {
+          xPosition = before.x;
+        } else if (after) {
+          xPosition = after.x;
+        } else {
+          xPosition = measurePos.noteStartX ?? measurePos.x + 50;
+        }
+      }
+    } else {
+      // Fallback to proportional calculation
+      const noteStartX = measurePos.noteStartX ?? measurePos.x + 50;
+      const noteWidth = measurePos.width;
+      const beatsPerMeasure = score.timeSignature.beats;
+      const beatFraction = chordCursor.beatPosition / beatsPerMeasure;
+      xPosition = noteStartX + beatFraction * noteWidth;
+    }
+
+    const result = xPosition * osmdZoom;
+
+    console.log("[ChordCursor] Final position:", {
+      measure: chordCursor.measureIndex,
+      beat: chordCursor.beatPosition,
+      xPosition,
+      result,
+    });
+
+    return result;
+  }, [
+    chordCursor?.measureIndex,
+    chordCursor?.beatPosition,
+    measurePositions,
+    score.timeSignature.beats,
+    osmdZoom,
+  ]);
 
   // Generate MusicXML from score
   const musicXml = useMemo(() => {
@@ -217,6 +328,32 @@ function TuneComposerScoreViewportComponent({
     }
   }, [cursor.measureIndex, playbackState, measurePositions, osmdZoom]);
 
+  // Scroll to chord cursor when in chord entry mode
+  useEffect(() => {
+    if (!chordCursor || playbackState === "playing") return;
+
+    const measurePos = measurePositions.find(
+      (m) => m.measureIndex === chordCursor.measureIndex,
+    );
+    if (measurePos && scrollViewRef.current) {
+      // Calculate position with beat offset
+      const beatsPerMeasure = score.timeSignature.beats;
+      const beatFraction = chordCursor.beatPosition / beatsPerMeasure;
+      const xInMeasure = measurePos.x + beatFraction * measurePos.width;
+      const scrollX = xInMeasure * osmdZoom - 80; // Keep cursor centered-ish
+      scrollViewRef.current.scrollTo({
+        x: Math.max(0, scrollX),
+        animated: true,
+      });
+    }
+  }, [
+    chordCursor,
+    playbackState,
+    measurePositions,
+    osmdZoom,
+    score.timeSignature.beats,
+  ]);
+
   // Apply zoom when controlled zoom changes
   useEffect(() => {
     if (isReady && controlledZoom !== undefined) {
@@ -256,10 +393,25 @@ function TuneComposerScoreViewportComponent({
               contentWidth: width,
               zoom: reportedZoom,
             } = data.payload as {
-              positions: { measureIndex: number; x: number; width: number }[];
+              positions: {
+                measureIndex: number;
+                x: number;
+                width: number;
+                noteStartX?: number;
+                noteEndX?: number;
+                beatPositions?: { beat: number; x: number }[];
+              }[];
               contentWidth: number;
               zoom: number;
             };
+            console.log(
+              "[MeasurePositions] Received:",
+              JSON.stringify(positions),
+            );
+            console.log(
+              "[MeasurePositions] Measure 0 beatPositions:",
+              positions[0]?.beatPositions,
+            );
             setMeasurePositions(positions);
             setContentWidth(width);
             setOsmdZoom(reportedZoom);
@@ -371,40 +523,63 @@ function TuneComposerScoreViewportComponent({
             height: "100%",
           }}
         >
-          {Platform.OS === "web" ? (
-            <iframe
-              ref={iframeRef as React.RefObject<HTMLIFrameElement>}
-              srcDoc={html}
-              style={{
-                width: contentWidth * osmdZoom,
-                height: "100%",
-                border: "none",
-                backgroundColor: "white",
-              }}
-              sandbox="allow-scripts"
-            />
-          ) : WebView ? (
-            <WebView
-              ref={webViewRef as React.RefObject<InstanceType<typeof WebView>>}
-              source={{ html }}
-              style={[styles.webView, { width: contentWidth * osmdZoom }]}
-              originWhitelist={["*"]}
-              javaScriptEnabled
-              domStorageEnabled
-              scrollEnabled={false}
-              onMessage={handleMessage}
-              onError={() => {
-                setError("Failed to load renderer");
-                onError?.("Failed to load renderer");
-              }}
-            />
-          ) : (
-            <View style={styles.noWebView}>
-              <Text style={styles.noWebViewText}>
-                WebView not available on this platform
-              </Text>
-            </View>
-          )}
+          {/* Wrapper for WebView + chord cursor overlay */}
+          <View
+            style={{
+              width: contentWidth * osmdZoom,
+              height: "100%",
+              position: "relative",
+            }}
+          >
+            {Platform.OS === "web" ? (
+              <iframe
+                ref={iframeRef as React.RefObject<HTMLIFrameElement>}
+                srcDoc={html}
+                style={{
+                  width: contentWidth * osmdZoom,
+                  height: "100%",
+                  border: "none",
+                  backgroundColor: "white",
+                }}
+                sandbox="allow-scripts"
+              />
+            ) : WebView ? (
+              <WebView
+                ref={
+                  webViewRef as React.RefObject<InstanceType<typeof WebView>>
+                }
+                source={{ html }}
+                style={[styles.webView, { width: contentWidth * osmdZoom }]}
+                originWhitelist={["*"]}
+                javaScriptEnabled
+                domStorageEnabled
+                scrollEnabled={false}
+                onMessage={handleMessage}
+                onError={() => {
+                  setError("Failed to load renderer");
+                  onError?.("Failed to load renderer");
+                }}
+              />
+            ) : (
+              <View style={styles.noWebView}>
+                <Text style={styles.noWebViewText}>
+                  WebView not available on this platform
+                </Text>
+              </View>
+            )}
+
+            {/* Chord cursor overlay - shows beat position for chord entry */}
+            {chordCursorX !== null && (
+              <View
+                style={[styles.chordCursorOverlay, { left: chordCursorX }]}
+                pointerEvents="none"
+                testID="chord-cursor-overlay"
+              >
+                <View style={styles.chordCursorLine} />
+                <View style={styles.chordCursorDiamond} />
+              </View>
+            )}
+          </View>
         </ScrollView>
 
         {/* Loading overlay */}
@@ -611,12 +786,34 @@ const styles = StyleSheet.create({
     minWidth: 40,
     textAlign: "center",
   },
+  chordCursorOverlay: {
+    position: "absolute",
+    top: 10,
+    bottom: 40,
+    width: 20,
+    alignItems: "center",
+    zIndex: 10,
+  },
+  chordCursorLine: {
+    flex: 1,
+    width: 2,
+    backgroundColor: colors.primary,
+    opacity: 0.8,
+  },
+  chordCursorDiamond: {
+    position: "absolute",
+    top: -6,
+    width: 12,
+    height: 12,
+    backgroundColor: colors.primary,
+    transform: [{ rotate: "45deg" }],
+    borderRadius: 2,
+  },
 });
 
 // =============================================================================
 // Export
 // =============================================================================
 
-export const TuneComposerScoreViewport = memo(
-  TuneComposerScoreViewportComponent,
-);
+// Note: Not using memo for now to ensure chordCursor prop changes trigger re-render
+export const TuneComposerScoreViewport = TuneComposerScoreViewportComponent;

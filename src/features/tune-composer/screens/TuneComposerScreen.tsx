@@ -58,6 +58,7 @@ import {
   LyricsControls,
   ExpressionControls,
   DynamicsControls,
+  ChordControls,
 } from "../components";
 import {
   tuneComposerStorageService,
@@ -919,6 +920,9 @@ function TuneComposerScreenContent({
             score={composerState.score}
             cursor={composerState.cursor}
             selectedNoteId={highlightedNoteId}
+            chordCursor={
+              composerState.chordMode ? composerState.chordCursor : null
+            }
             onNoteTap={handleScoreTap}
             playbackState={playback.state}
             playbackMeasureIndex={playback.position.measureIndex}
@@ -1153,6 +1157,31 @@ function TuneComposerScreenContent({
               hasSelection={hasSelection}
               disabled={isPlaying}
               testID="dynamics-controls"
+            />
+
+            {/* Chord Controls */}
+            <ChordControls
+              chordModeActive={composerState.chordMode}
+              onToggleChordMode={composerState.toggleChordMode}
+              currentChordSymbol={composerState.currentChordSymbol}
+              onSetChord={composerState.setChordAtCursor}
+              onChordInputChange={composerState.setChordAtCursor}
+              onRemoveChord={composerState.removeChordAtCursor}
+              onNextBeat={composerState.moveChordCursorNext}
+              onPrevBeat={composerState.moveChordCursorPrev}
+              canGoPrev={composerState.canChordCursorGoPrev}
+              canGoNext={composerState.canChordCursorGoNext}
+              currentPosition={
+                composerState.chordCursor ?? {
+                  measureIndex: 0,
+                  beatPosition: 0,
+                }
+              }
+              hasSelection={composerState.chordCursor !== null}
+              showChordSymbols={composerState.showChordSymbols}
+              onToggleVisibility={composerState.toggleChordSymbolVisibility}
+              disabled={isPlaying}
+              testID="chord-controls"
             />
 
             {/* Playback Panel */}

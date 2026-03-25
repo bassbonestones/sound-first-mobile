@@ -22,8 +22,15 @@ import type {
   ArticulationType,
   WedgeMark,
   Lyric,
+  ChordSymbol,
 } from "../types";
-import { DURATION, isRest } from "../types";
+import {
+  DURATION,
+  isRest,
+  getActiveProgression,
+  getChordsForMeasure,
+} from "../types";
+import { recognizeChord } from "./chordRecognition";
 
 // =============================================================================
 // Types
@@ -122,6 +129,57 @@ const ARTICULATION_TO_XML: Record<ArticulationType, string> = {
   fermata: "fermata",
 };
 
+/**
+ * Mapping from chord quality to MusicXML kind.
+ * Based on MusicXML 3.1 kind element values.
+ */
+const CHORD_QUALITY_TO_MUSICXML_KIND: Record<string, string> = {
+  // Triads
+  major: "major",
+  minor: "minor",
+  diminished: "diminished",
+  augmented: "augmented",
+  sus2: "suspended-second",
+  sus4: "suspended-fourth",
+  // Seventh chords
+  maj7: "major-seventh",
+  "7": "dominant",
+  m7: "minor-seventh",
+  mMaj7: "major-minor",
+  dim7: "diminished-seventh",
+  m7b5: "half-diminished",
+  aug7: "augmented-seventh",
+  "7sus4": "dominant-suspended-fourth",
+  "7sus2": "dominant-suspended-second",
+  // Extended chords
+  maj9: "major-ninth",
+  "9": "dominant-ninth",
+  m9: "minor-ninth",
+  mMaj9: "major-minor-ninth",
+  maj11: "major-11th",
+  "11": "dominant-11th",
+  m11: "minor-11th",
+  maj13: "major-13th",
+  "13": "dominant-13th",
+  m13: "minor-13th",
+  // Add chords
+  add9: "major", // with added degree
+  add11: "major", // with added degree
+  madd9: "minor", // with added degree
+  "6": "major-sixth",
+  m6: "minor-sixth",
+  "6/9": "major-sixth",
+  "m6/9": "minor-sixth",
+  // Altered chords - use dominant as base
+  "7b9": "dominant",
+  "7#9": "dominant",
+  "7b5": "dominant",
+  "7#5": "augmented-seventh",
+  "7b5b9": "dominant",
+  "7#5#9": "augmented-seventh",
+  "7alt": "dominant",
+};
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -178,6 +236,94 @@ function escapeXml(text: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
+}
+
+// =============================================================================
+// Harmony XML Generation
+// =============================================================================
+
+/**
+ * Convert a root note alter value to MusicXML format.
+ */
+function alterToXml(alter: number): string {
+  if (alter === 0) return "";
+  return `\n        <root-alter>${alter}</root-alter>`;
+}
+
+/**
+ * Generate MusicXML <harmony> element from a ChordSymbol.
+ * Returns empty string if chord cannot be parsed.
+ */
+export function generateHarmonyXml(chord: ChordSymbol): string {
+  const result = recognizeChord(chord.symbol);
+  if (!result.recognized || !result.parsed) {
+    return "";
+  }
+
+  const { root, quality, bass, alterations } = result.parsed;
+
+  // Parse root note
+  const rootStep = root.replace(/[#b]/g, "");
+  const rootAlter =
+    root.includes("##") || root.includes("x")
+      ? 2
+      : root.includes("#")
+        ? 1
+        : root.includes("bb")
+          ? -2
+          : root.includes("b")
+            ? -1
+            : 0;
+
+  // Get MusicXML kind
+  const kind = CHORD_QUALITY_TO_MUSICXML_KIND[quality] || "major";
+
+  // Build root element with placement above staff
+  let harmonyXml = `      <harmony placement="above">
+        <root>
+          <root-step>${rootStep}</root-step>${alterToXml(rootAlter)}
+        </root>
+        <kind>${kind}</kind>`;
+
+  // Add degree elements for alterations
+  for (const alteration of alterations) {
+    const degreeMatch = alteration.match(/([#b])?(\d+)/);
+    if (degreeMatch) {
+      const alter =
+        degreeMatch[1] === "#" ? 1 : degreeMatch[1] === "b" ? -1 : 0;
+      const value = degreeMatch[2];
+      harmonyXml += `
+        <degree>
+          <degree-value>${value}</degree-value>
+          <degree-alter>${alter}</degree-alter>
+          <degree-type>alter</degree-type>
+        </degree>`;
+    }
+  }
+
+  // Add bass note for slash chords
+  if (bass) {
+    const bassStep = bass.replace(/[#b]/g, "");
+    const bassAlter =
+      bass.includes("##") || bass.includes("x")
+        ? 2
+        : bass.includes("#")
+          ? 1
+          : bass.includes("bb")
+            ? -2
+            : bass.includes("b")
+              ? -1
+              : 0;
+    harmonyXml += `
+        <bass>
+          <bass-step>${bassStep}</bass-step>${bassAlter !== 0 ? `\n          <bass-alter>${bassAlter}</bass-alter>` : ""}
+        </bass>`;
+  }
+
+  harmonyXml += `
+      </harmony>`;
+
+  return harmonyXml;
 }
 
 // =============================================================================
@@ -417,6 +563,7 @@ function generateMeasureXml(
   score: TuneComposerScore,
   options: MusicXmlGeneratorOptions,
   scoreHasNotes: boolean,
+  activeChords: ChordSymbol[],
 ): string {
   const preferFlats = score.keySignature < 0;
   let notesXml = "";
@@ -427,6 +574,17 @@ function generateMeasureXml(
   ) {
     notesXml += `\n      <!-- cursor:${options.cursorPosition.noteIndex} -->`;
   }
+
+  // Get sorted chords for this measure (only if chord symbols are visible)
+  const measureChords: ChordSymbol[] = [];
+  if (score.displaySettings.showChordSymbols) {
+    const chords = getChordsForMeasure(activeChords, measureNumber - 1);
+    measureChords.push(
+      ...chords.sort((a, b) => a.beatPosition - b.beatPosition),
+    );
+  }
+  // Track which chords have been output
+  let nextChordIndex = 0;
 
   // Pre-compute last in triplet group
   const lastInTripletGroup = new Set<string>();
@@ -478,8 +636,18 @@ function generateMeasureXml(
     }
   }
 
-  // Generate notes with directions
+  // Generate notes with directions - interleave harmony at correct beat positions
+  let currentBeat = 0;
   for (const note of measure.notes) {
+    // Output any harmony elements that should appear at or before this beat position
+    while (
+      nextChordIndex < measureChords.length &&
+      measureChords[nextChordIndex].beatPosition <= currentBeat
+    ) {
+      notesXml += "\n" + generateHarmonyXml(measureChords[nextChordIndex]);
+      nextChordIndex++;
+    }
+
     // Add direction before note for dynamics/expression
     if (note.dynamic) {
       notesXml += "\n" + generateDynamicDirectionXml(note.dynamic);
@@ -498,6 +666,15 @@ function generateMeasureXml(
     const beam = beamInfo.get(note.id) || null;
     notesXml +=
       "\n" + generateNoteXml(note, preferFlats, options, isLastInTriplet, beam);
+
+    // Advance beat position by note duration
+    currentBeat += note.duration;
+  }
+
+  // Output any remaining harmony elements (chords at the end of the measure)
+  while (nextChordIndex < measureChords.length) {
+    notesXml += "\n" + generateHarmonyXml(measureChords[nextChordIndex]);
+    nextChordIndex++;
   }
 
   const attributesXml = isFirstMeasure
@@ -542,6 +719,10 @@ export function generateMusicXml(
     (measure) => measure.notes.length > 0,
   );
 
+  // Get active chord progression chords
+  const activeProgression = getActiveProgression(score);
+  const activeChords = activeProgression?.chords ?? [];
+
   const measuresXml = score.measures
     .map((measure, index) =>
       generateMeasureXml(
@@ -552,6 +733,7 @@ export function generateMusicXml(
         score,
         options,
         scoreHasNotes,
+        activeChords,
       ),
     )
     .join("\n");

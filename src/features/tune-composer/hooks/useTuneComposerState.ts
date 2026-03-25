@@ -23,6 +23,8 @@ import type {
   TuneComposerScore,
   TuneComposerState,
   WedgeMark,
+  ChordProgression,
+  ChordSymbol,
 } from "../types";
 import {
   createInitialState,
@@ -41,6 +43,8 @@ import {
   generateRestsForDurationAtPosition,
   getBeatPositionAt,
   getPitchedNotes,
+  findChordAtPosition,
+  createChordSymbol,
 } from "../types";
 import {
   createInsertNoteAction,
@@ -261,6 +265,36 @@ export interface UseTuneComposerStateReturn {
   expressionMode: boolean;
   /** Toggle expression mode on/off */
   toggleExpressionMode: () => void;
+
+  // === CHORD MODE ===
+  /** Whether chord entry mode is active */
+  chordMode: boolean;
+  /** Toggle chord mode on/off */
+  toggleChordMode: () => void;
+  /** Current chord cursor position */
+  chordCursor: { measureIndex: number; beatPosition: number } | null;
+  /** Current chord symbol at cursor position */
+  currentChordSymbol: string;
+  /** Set chord at current cursor position */
+  setChordAtCursor: (symbol: string) => void;
+  /** Remove chord at current cursor position */
+  removeChordAtCursor: () => void;
+  /** Move chord cursor to next beat */
+  moveChordCursorNext: () => void;
+  /** Move chord cursor to previous beat */
+  moveChordCursorPrev: () => void;
+  /** Whether chord cursor can move to previous beat */
+  canChordCursorGoPrev: boolean;
+  /** Whether chord cursor can move to next beat */
+  canChordCursorGoNext: boolean;
+  /** Whether chord symbols are visible in the score */
+  showChordSymbols: boolean;
+  /** Toggle chord symbol visibility */
+  toggleChordSymbolVisibility: () => void;
+  /** Active chord progression (the one being edited) */
+  activeProgression:
+    | import("../types/tuneComposerTypes").ChordProgression
+    | null;
 }
 
 // =============================================================================
@@ -2633,6 +2667,237 @@ export function useTuneComposerState(
   }, []);
 
   // ==========================================================================
+  // CHORD MODE
+  // ==========================================================================
+
+  /**
+   * Toggle chord mode on/off.
+   * When entering, places cursor at measure 0, beat 0.
+   * When exiting, clears the chord cursor.
+   */
+  const toggleChordMode = useCallback(() => {
+    setState((prev) => {
+      const newChordMode = !prev.chordMode;
+      if (newChordMode) {
+        // Entering chord mode - set cursor to first beat of first measure
+        return {
+          ...prev,
+          chordMode: true,
+          chordCursor: { measureIndex: 0, beatPosition: 0 },
+        };
+      } else {
+        // Exiting chord mode
+        return {
+          ...prev,
+          chordMode: false,
+          chordCursor: null,
+        };
+      }
+    });
+  }, []);
+
+  /**
+   * Get the active (default) chord progression.
+   */
+  const activeProgression = useMemo((): ChordProgression | null => {
+    const defaultProg = state.score.chordProgressions.find((p) => p.isDefault);
+    return defaultProg ?? state.score.chordProgressions[0] ?? null;
+  }, [state.score.chordProgressions]);
+
+  /**
+   * Get the current chord symbol at the chord cursor position.
+   */
+  const currentChordSymbol = useMemo((): string => {
+    if (!state.chordCursor || !activeProgression) return "";
+    const chord = findChordAtPosition(
+      activeProgression.chords,
+      state.chordCursor.measureIndex,
+      state.chordCursor.beatPosition,
+    );
+    return chord?.symbol ?? "";
+  }, [state.chordCursor, activeProgression]);
+
+  /**
+   * Set a chord at the current cursor position.
+   */
+  const setChordAtCursor = useCallback(
+    (symbol: string) => {
+      if (!state.chordCursor || !activeProgression) return;
+      const { measureIndex, beatPosition } = state.chordCursor;
+
+      updateScore((score) => {
+        const progIndex = score.chordProgressions.findIndex(
+          (p) => p.id === activeProgression.id,
+        );
+        if (progIndex === -1) return score;
+
+        const newProgressions = [...score.chordProgressions];
+        const prog = { ...newProgressions[progIndex] };
+        const existingIndex = prog.chords.findIndex(
+          (c) =>
+            c.measureIndex === measureIndex && c.beatPosition === beatPosition,
+        );
+
+        if (existingIndex !== -1) {
+          // Update existing chord
+          const newChords = [...prog.chords];
+          newChords[existingIndex] = {
+            ...newChords[existingIndex],
+            symbol,
+          };
+          prog.chords = newChords;
+        } else {
+          // Add new chord
+          const newChord = createChordSymbol(
+            symbol,
+            measureIndex,
+            beatPosition,
+          );
+          prog.chords = [...prog.chords, newChord];
+        }
+
+        newProgressions[progIndex] = prog;
+        return { ...score, chordProgressions: newProgressions };
+      });
+    },
+    [state.chordCursor, activeProgression, updateScore],
+  );
+
+  /**
+   * Remove the chord at the current cursor position.
+   */
+  const removeChordAtCursor = useCallback(() => {
+    if (!state.chordCursor || !activeProgression) return;
+    const { measureIndex, beatPosition } = state.chordCursor;
+
+    updateScore((score) => {
+      const progIndex = score.chordProgressions.findIndex(
+        (p) => p.id === activeProgression.id,
+      );
+      if (progIndex === -1) return score;
+
+      const newProgressions = [...score.chordProgressions];
+      const prog = { ...newProgressions[progIndex] };
+      prog.chords = prog.chords.filter(
+        (c) =>
+          !(c.measureIndex === measureIndex && c.beatPosition === beatPosition),
+      );
+      newProgressions[progIndex] = prog;
+      return { ...score, chordProgressions: newProgressions };
+    });
+  }, [state.chordCursor, activeProgression, updateScore]);
+
+  /**
+   * Move chord cursor to the next beat position.
+   * Advances by 1 beat, moving to the next measure if needed.
+   */
+  const moveChordCursorNext = useCallback(() => {
+    setState((prev) => {
+      if (!prev.chordMode || !prev.chordCursor) return prev;
+      const { measureIndex, beatPosition } = prev.chordCursor;
+      const beatsPerMeasure = getBeatsPerMeasure(prev.score.timeSignature);
+      const nextBeat = beatPosition + 1;
+
+      if (nextBeat >= beatsPerMeasure) {
+        // Move to next measure
+        const nextMeasure = measureIndex + 1;
+        if (nextMeasure >= prev.score.measures.length) {
+          // At end of score
+          return prev;
+        }
+        return {
+          ...prev,
+          chordCursor: { measureIndex: nextMeasure, beatPosition: 0 },
+        };
+      } else {
+        return {
+          ...prev,
+          chordCursor: { measureIndex, beatPosition: nextBeat },
+        };
+      }
+    });
+  }, []);
+
+  /**
+   * Move chord cursor to the previous beat position.
+   * Goes back by 1 beat, moving to the previous measure if needed.
+   */
+  const moveChordCursorPrev = useCallback(() => {
+    setState((prev) => {
+      if (!prev.chordMode || !prev.chordCursor) return prev;
+      const { measureIndex, beatPosition } = prev.chordCursor;
+
+      if (beatPosition > 0) {
+        return {
+          ...prev,
+          chordCursor: { measureIndex, beatPosition: beatPosition - 1 },
+        };
+      } else if (measureIndex > 0) {
+        // Move to last beat of previous measure
+        const beatsPerMeasure = getBeatsPerMeasure(prev.score.timeSignature);
+        return {
+          ...prev,
+          chordCursor: {
+            measureIndex: measureIndex - 1,
+            beatPosition: beatsPerMeasure - 1,
+          },
+        };
+      }
+      // At beginning
+      return prev;
+    });
+  }, []);
+
+  /**
+   * Whether the chord cursor can move to the previous beat.
+   */
+  const canChordCursorGoPrev = useMemo((): boolean => {
+    if (!state.chordCursor) return false;
+    const { measureIndex, beatPosition } = state.chordCursor;
+    return measureIndex > 0 || beatPosition > 0;
+  }, [state.chordCursor]);
+
+  /**
+   * Whether the chord cursor can move to the next beat.
+   */
+  const canChordCursorGoNext = useMemo((): boolean => {
+    if (!state.chordCursor) return false;
+    const { measureIndex, beatPosition } = state.chordCursor;
+    const beatsPerMeasure = getBeatsPerMeasure(state.score.timeSignature);
+    const totalMeasures = state.score.measures.length;
+
+    // Can go next if not at last beat of last measure
+    return (
+      measureIndex < totalMeasures - 1 || beatPosition < beatsPerMeasure - 1
+    );
+  }, [
+    state.chordCursor,
+    state.score.timeSignature,
+    state.score.measures.length,
+  ]);
+
+  /**
+   * Whether chord symbols are visible in score display.
+   */
+  const showChordSymbols = useMemo(
+    (): boolean => state.score.displaySettings.showChordSymbols ?? true,
+    [state.score.displaySettings.showChordSymbols],
+  );
+
+  /**
+   * Toggle chord symbol visibility in the score.
+   */
+  const toggleChordSymbolVisibility = useCallback(() => {
+    updateScore((score) => ({
+      ...score,
+      displaySettings: {
+        ...score.displaySettings,
+        showChordSymbols: !score.displaySettings.showChordSymbols,
+      },
+    }));
+  }, [updateScore]);
+
+  // ==========================================================================
   // Return
   // ==========================================================================
 
@@ -2756,5 +3021,20 @@ export function useTuneComposerState(
     activeWedgeType: state.activeWedgeType,
     activeWedgeStartId: state.activeWedgeStartId,
     removeWedgeMarking,
+
+    // Chord Mode
+    chordMode: state.chordMode,
+    toggleChordMode,
+    chordCursor: state.chordCursor,
+    currentChordSymbol,
+    setChordAtCursor,
+    removeChordAtCursor,
+    moveChordCursorNext,
+    moveChordCursorPrev,
+    canChordCursorGoPrev,
+    canChordCursorGoNext,
+    showChordSymbols,
+    toggleChordSymbolVisibility,
+    activeProgression,
   };
 }

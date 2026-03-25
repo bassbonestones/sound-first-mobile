@@ -5,6 +5,8 @@
 import {
   parseMusicXml,
   extractMusicXmlMetadataQuick,
+  harmonyToChordSymbol,
+  extractChordsFromMusicXml,
 } from "../src/features/importMusic/services/musicXmlParser";
 
 describe("MusicXML Parser", () => {
@@ -374,6 +376,289 @@ describe("MusicXML Parser", () => {
       const events = result.score?.parts[0].measures[0].events;
 
       expect(events?.[0].dots).toBe(1);
+    });
+  });
+});
+
+// =============================================================================
+// Harmony/Chord Symbol Tests
+// =============================================================================
+
+describe("MusicXML Harmony Parsing", () => {
+  describe("harmonyToChordSymbol", () => {
+    it("should convert major triad", () => {
+      expect(harmonyToChordSymbol({ step: "C" }, "major")).toBe("C");
+    });
+
+    it("should convert minor triad", () => {
+      expect(harmonyToChordSymbol({ step: "A" }, "minor")).toBe("Am");
+    });
+
+    it("should convert major seventh", () => {
+      expect(harmonyToChordSymbol({ step: "C" }, "major-seventh")).toBe(
+        "Cmaj7",
+      );
+    });
+
+    it("should convert dominant seventh", () => {
+      expect(harmonyToChordSymbol({ step: "G" }, "dominant")).toBe("G7");
+    });
+
+    it("should convert minor seventh", () => {
+      expect(harmonyToChordSymbol({ step: "D" }, "minor-seventh")).toBe("Dm7");
+    });
+
+    it("should convert half diminished", () => {
+      expect(harmonyToChordSymbol({ step: "B" }, "half-diminished")).toBe(
+        "Bm7b5",
+      );
+    });
+
+    it("should convert diminished seventh", () => {
+      expect(harmonyToChordSymbol({ step: "C" }, "diminished-seventh")).toBe(
+        "Cdim7",
+      );
+    });
+
+    it("should handle sharp root", () => {
+      expect(harmonyToChordSymbol({ step: "F", alter: 1 }, "minor")).toBe(
+        "F#m",
+      );
+    });
+
+    it("should handle flat root", () => {
+      expect(
+        harmonyToChordSymbol({ step: "B", alter: -1 }, "major-seventh"),
+      ).toBe("Bbmaj7");
+    });
+
+    it("should handle double sharp", () => {
+      expect(harmonyToChordSymbol({ step: "C", alter: 2 }, "major")).toBe(
+        "C##",
+      );
+    });
+
+    it("should handle double flat", () => {
+      expect(harmonyToChordSymbol({ step: "D", alter: -2 }, "minor")).toBe(
+        "Dbbm",
+      );
+    });
+
+    it("should convert slash chord with bass", () => {
+      expect(harmonyToChordSymbol({ step: "C" }, "major", { step: "E" })).toBe(
+        "C/E",
+      );
+    });
+
+    it("should convert slash chord with altered bass", () => {
+      expect(
+        harmonyToChordSymbol({ step: "G" }, "dominant", {
+          step: "B",
+          alter: -1,
+        }),
+      ).toBe("G7/Bb");
+    });
+
+    it("should convert suspended fourth", () => {
+      expect(harmonyToChordSymbol({ step: "D" }, "suspended-fourth")).toBe(
+        "Dsus4",
+      );
+    });
+
+    it("should convert sixth chord", () => {
+      expect(harmonyToChordSymbol({ step: "C" }, "major-sixth")).toBe("C6");
+    });
+
+    it("should convert ninth chord", () => {
+      expect(harmonyToChordSymbol({ step: "G" }, "dominant-ninth")).toBe("G9");
+    });
+
+    it("should convert augmented", () => {
+      expect(harmonyToChordSymbol({ step: "C" }, "augmented")).toBe("Caug");
+    });
+
+    it("should convert diminished", () => {
+      expect(harmonyToChordSymbol({ step: "B" }, "diminished")).toBe("Bdim");
+    });
+
+    it("should handle unknown kind gracefully", () => {
+      expect(harmonyToChordSymbol({ step: "C" }, "unknown-kind")).toBe("C");
+    });
+  });
+
+  describe("extractChordsFromMusicXml", () => {
+    it("should return empty array when no harmony elements", () => {
+      const xml = `<?xml version="1.0"?>
+<score-partwise>
+  <part id="P1">
+    <measure number="1">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+      const result = extractChordsFromMusicXml(xml);
+      expect(result).toEqual([]);
+    });
+
+    it("should extract single chord from measure", () => {
+      const xml = `<?xml version="1.0"?>
+<score-partwise>
+  <part id="P1">
+    <measure number="1">
+      <harmony>
+        <root><root-step>C</root-step></root>
+        <kind>major-seventh</kind>
+      </harmony>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+      const result = extractChordsFromMusicXml(xml);
+      expect(result).toHaveLength(1);
+      expect(result[0].measureNumber).toBe(1);
+      expect(result[0].chords).toHaveLength(1);
+      expect(result[0].chords[0].symbol).toBe("Cmaj7");
+      expect(result[0].chords[0].offset).toBe(0);
+    });
+
+    it("should extract multiple chords from measure", () => {
+      const xml = `<?xml version="1.0"?>
+<score-partwise>
+  <part id="P1">
+    <measure number="1">
+      <harmony>
+        <root><root-step>C</root-step></root>
+        <kind>major-seventh</kind>
+      </harmony>
+      <harmony>
+        <root><root-step>D</root-step></root>
+        <kind>minor-seventh</kind>
+        <offset>2</offset>
+      </harmony>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+      const result = extractChordsFromMusicXml(xml);
+      expect(result).toHaveLength(1);
+      expect(result[0].chords).toHaveLength(2);
+      expect(result[0].chords[0].symbol).toBe("Cmaj7");
+      expect(result[0].chords[0].offset).toBe(0);
+      expect(result[0].chords[1].symbol).toBe("Dm7");
+      expect(result[0].chords[1].offset).toBe(2);
+    });
+
+    it("should extract chords from multiple measures", () => {
+      const xml = `<?xml version="1.0"?>
+<score-partwise>
+  <part id="P1">
+    <measure number="1">
+      <harmony>
+        <root><root-step>C</root-step></root>
+        <kind>major</kind>
+      </harmony>
+    </measure>
+    <measure number="2">
+      <harmony>
+        <root><root-step>G</root-step></root>
+        <kind>dominant</kind>
+      </harmony>
+    </measure>
+  </part>
+</score-partwise>`;
+
+      const result = extractChordsFromMusicXml(xml);
+      expect(result).toHaveLength(2);
+      expect(result[0].measureNumber).toBe(1);
+      expect(result[0].chords[0].symbol).toBe("C");
+      expect(result[1].measureNumber).toBe(2);
+      expect(result[1].chords[0].symbol).toBe("G7");
+    });
+
+    it("should handle altered roots", () => {
+      const xml = `<?xml version="1.0"?>
+<score-partwise>
+  <part id="P1">
+    <measure number="1">
+      <harmony>
+        <root>
+          <root-step>F</root-step>
+          <root-alter>1</root-alter>
+        </root>
+        <kind>minor</kind>
+      </harmony>
+    </measure>
+  </part>
+</score-partwise>`;
+
+      const result = extractChordsFromMusicXml(xml);
+      expect(result[0].chords[0].symbol).toBe("F#m");
+    });
+
+    it("should handle slash chords with bass", () => {
+      const xml = `<?xml version="1.0"?>
+<score-partwise>
+  <part id="P1">
+    <measure number="1">
+      <harmony>
+        <root><root-step>C</root-step></root>
+        <kind>major</kind>
+        <bass><bass-step>E</bass-step></bass>
+      </harmony>
+    </measure>
+  </part>
+</score-partwise>`;
+
+      const result = extractChordsFromMusicXml(xml);
+      expect(result[0].chords[0].symbol).toBe("C/E");
+    });
+
+    it("should handle slash chords with altered bass", () => {
+      const xml = `<?xml version="1.0"?>
+<score-partwise>
+  <part id="P1">
+    <measure number="1">
+      <harmony>
+        <root><root-step>G</root-step></root>
+        <kind>dominant</kind>
+        <bass>
+          <bass-step>B</bass-step>
+          <bass-alter>-1</bass-alter>
+        </bass>
+      </harmony>
+    </measure>
+  </part>
+</score-partwise>`;
+
+      const result = extractChordsFromMusicXml(xml);
+      expect(result[0].chords[0].symbol).toBe("G7/Bb");
+    });
+
+    it("should skip measures without harmony", () => {
+      const xml = `<?xml version="1.0"?>
+<score-partwise>
+  <part id="P1">
+    <measure number="1">
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2">
+      <harmony>
+        <root><root-step>G</root-step></root>
+        <kind>dominant</kind>
+      </harmony>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+      const result = extractChordsFromMusicXml(xml);
+      expect(result).toHaveLength(1);
+      expect(result[0].measureNumber).toBe(2);
     });
   });
 });

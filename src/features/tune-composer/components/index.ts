@@ -13,3 +13,9 @@ export type { ExpressionControlsProps } from "./ExpressionControls";
 
 export { DynamicsControls } from "./DynamicsControls";
 export type { DynamicsControlsProps } from "./DynamicsControls";
+
+export { ChordControls } from "./ChordControls";
+export type { ChordControlsProps } from "./ChordControls";
+
+export { ProgressionSelector } from "./ProgressionSelector";
+export type { ProgressionSelectorProps } from "./ProgressionSelector";
