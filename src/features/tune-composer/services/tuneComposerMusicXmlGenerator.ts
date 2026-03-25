@@ -243,6 +243,41 @@ function escapeXml(text: string): string {
 // =============================================================================
 
 /**
+ * Convert a chord symbol to a shorter display version using Unicode symbols.
+ * This helps prevent chord text from overlapping on the score.
+ * Note: △ alone means "major 7th" in jazz notation (no need for redundant 7)
+ */
+function shortenChordSymbol(symbol: string): string {
+  return (
+    symbol
+      // Root note accidentals
+      .replace(/([A-G])#/g, "$1♯")
+      .replace(/([A-G])b/g, "$1♭")
+      // Quality abbreviations (△ = maj7, ø = m7b5 - no redundant 7)
+      .replace(/maj13/gi, "△13")
+      .replace(/maj9/gi, "△9")
+      .replace(/maj7/gi, "△")
+      .replace(/maj/gi, "△")
+      .replace(/min7/gi, "m7")
+      .replace(/min9/gi, "m9")
+      .replace(/min/gi, "m")
+      .replace(/dim7/gi, "°7")
+      .replace(/dim/gi, "°")
+      .replace(/aug/gi, "+")
+      .replace(/m7b5/gi, "ø")
+      .replace(/half-dim/gi, "ø")
+      // Alterations in parentheses
+      .replace(/\(alt\s*/gi, "(")
+      .replace(/#9/g, "♯9")
+      .replace(/b9/g, "♭9")
+      .replace(/#11/g, "♯11")
+      .replace(/b5/g, "♭5")
+      .replace(/#5/g, "♯5")
+      .replace(/b13/g, "♭13")
+  );
+}
+
+/**
  * Convert a root note alter value to MusicXML format.
  */
 function alterToXml(alter: number): string {
@@ -278,12 +313,19 @@ export function generateHarmonyXml(chord: ChordSymbol): string {
   // Get MusicXML kind
   const kind = CHORD_QUALITY_TO_MUSICXML_KIND[quality] || "major";
 
+  // Create shortened display text for the chord quality/alterations
+  // Remove the root note from the symbol and shorten the rest
+  const symbolWithoutRoot = chord.symbol.slice(root.length);
+  const shortenedQuality = shortenChordSymbol(symbolWithoutRoot);
+  const displayText = escapeXml(shortenedQuality);
+
   // Build root element with placement above staff
+  // Use the semantic kind with text attribute for display
   let harmonyXml = `      <harmony placement="above">
         <root>
           <root-step>${rootStep}</root-step>${alterToXml(rootAlter)}
         </root>
-        <kind>${kind}</kind>`;
+        <kind text="${displayText}">${kind}</kind>`;
 
   // Add degree elements for alterations
   for (const alteration of alterations) {

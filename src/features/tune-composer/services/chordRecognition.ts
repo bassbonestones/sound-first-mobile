@@ -22,12 +22,16 @@ export type ChordRoot =
   | "Db"
   | "D#"
   | "Eb"
+  | "E#"
   | "F#"
   | "Gb"
   | "G#"
   | "Ab"
   | "A#"
-  | "Bb";
+  | "Bb"
+  | "B#"
+  | "Cb"
+  | "Fb";
 
 /**
  * Chord quality/type identifier.
@@ -120,7 +124,9 @@ const ROOT_NOTES: readonly ChordRoot[] = [
   "D#",
   "Eb",
   "E",
+  "E#",
   "F",
+  "Fb",
   "F#",
   "Gb",
   "G",
@@ -130,17 +136,22 @@ const ROOT_NOTES: readonly ChordRoot[] = [
   "A#",
   "Bb",
   "B",
+  "B#",
+  "Cb",
 ] as const;
 
 /** Root note to semitone offset from C */
 const ROOT_TO_SEMITONE: Record<ChordRoot, number> = {
   C: 0,
+  "B#": 0,
   "C#": 1,
   Db: 1,
   D: 2,
   "D#": 3,
   Eb: 3,
   E: 4,
+  Fb: 4,
+  "E#": 5,
   F: 5,
   "F#": 6,
   Gb: 6,
@@ -151,6 +162,7 @@ const ROOT_TO_SEMITONE: Record<ChordRoot, number> = {
   "A#": 10,
   Bb: 10,
   B: 11,
+  Cb: 11,
 };
 
 /** Semitone offset to root note (prefer sharps for ascending, flats for descending) */
@@ -511,45 +523,74 @@ function parseSuffix(suffix: string): {
     return { quality: "major", alterations: [] };
   }
 
+  // Pre-process: extract parenthetical alterations first
+  // e.g., "maj7(b9,11)" -> suffix="maj7", parenAlterations=["b9", "11"]
+  let mainSuffix = suffix;
+  let parenAlterations: string[] = [];
+
+  const parenMatch = suffix.match(/^([^(]*)\(([^)]+)\)(.*)$/);
+  if (parenMatch) {
+    mainSuffix = parenMatch[1] + parenMatch[3]; // Everything outside parens
+    // Split on commas and clean up each alteration
+    parenAlterations = parenMatch[2]
+      .split(",")
+      .map((a) => a.trim())
+      .filter((a) => a);
+  }
+
   // Try to match against known suffixes FIRST (before normalization)
   for (const [pattern, quality] of SUFFIX_TO_QUALITY) {
-    if (suffix.startsWith(pattern)) {
-      const remaining = suffix.slice(pattern.length);
-      const alterations = remaining ? [remaining] : [];
+    if (mainSuffix.startsWith(pattern)) {
+      const remaining = mainSuffix.slice(pattern.length);
+      const alterations = remaining
+        ? [remaining, ...parenAlterations]
+        : [...parenAlterations];
       return { quality, alterations };
     }
   }
 
   // Normalize common variations and try again
-  const normalized = suffix.replace(/♯/g, "#").replace(/♭/g, "b");
+  const normalized = mainSuffix.replace(/♯/g, "#").replace(/♭/g, "b");
 
   // Handle special Unicode symbols after initial pattern match failed
-  if (suffix.startsWith("Δ")) {
+  if (mainSuffix.startsWith("Δ")) {
     // Δ alone = maj7, Δ7 already matched above
     return {
       quality: "maj7",
-      alterations: suffix.length > 1 ? [suffix.slice(1)] : [],
+      alterations:
+        mainSuffix.length > 1
+          ? [mainSuffix.slice(1), ...parenAlterations]
+          : [...parenAlterations],
     };
   }
-  if (suffix.startsWith("°") || suffix.startsWith("o")) {
+  if (mainSuffix.startsWith("°") || mainSuffix.startsWith("o")) {
     // ° alone = diminished, °7 already matched above
     return {
       quality: "diminished",
-      alterations: suffix.length > 1 ? [suffix.slice(1)] : [],
+      alterations:
+        mainSuffix.length > 1
+          ? [mainSuffix.slice(1), ...parenAlterations]
+          : [...parenAlterations],
     };
   }
-  if (suffix.startsWith("ø")) {
+  if (mainSuffix.startsWith("ø")) {
     // ø = half-diminished (m7b5)
     return {
       quality: "m7b5",
-      alterations: suffix.length > 1 ? [suffix.slice(1)] : [],
+      alterations:
+        mainSuffix.length > 1
+          ? [mainSuffix.slice(1), ...parenAlterations]
+          : [...parenAlterations],
     };
   }
-  if (suffix.startsWith("+")) {
+  if (mainSuffix.startsWith("+")) {
     // + = augmented
     return {
       quality: "augmented",
-      alterations: suffix.length > 1 ? [suffix.slice(1)] : [],
+      alterations:
+        mainSuffix.length > 1
+          ? [mainSuffix.slice(1), ...parenAlterations]
+          : [...parenAlterations],
     };
   }
 
@@ -557,14 +598,16 @@ function parseSuffix(suffix: string): {
   for (const [pattern, quality] of SUFFIX_TO_QUALITY) {
     if (normalized.startsWith(pattern)) {
       const remaining = normalized.slice(pattern.length);
-      const alterations = remaining ? [remaining] : [];
+      const alterations = remaining
+        ? [remaining, ...parenAlterations]
+        : [...parenAlterations];
       return { quality, alterations };
     }
   }
 
   // Special cases for standalone suffixes
   if (normalized === "M" || normalized === "maj") {
-    return { quality: "major", alterations: [] };
+    return { quality: "major", alterations: [...parenAlterations] };
   }
 
   // Try to extract alterations from unrecognized suffix
@@ -575,12 +618,17 @@ function parseSuffix(suffix: string): {
     const base = parseSuffix(baseSuffix);
     return {
       quality: base.quality,
-      alterations: [...base.alterations, alts],
+      alterations: [...base.alterations, alts, ...parenAlterations],
     };
   }
 
   // Unrecognized suffix - default to major with the suffix as alteration
-  return { quality: "major", alterations: [normalized] };
+  return {
+    quality: "major",
+    alterations: normalized
+      ? [normalized, ...parenAlterations]
+      : [...parenAlterations],
+  };
 }
 
 /**

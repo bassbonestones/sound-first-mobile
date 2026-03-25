@@ -257,20 +257,57 @@ function ChordControlsComponent({
     [onSetChord],
   );
 
-  // Insert symbol at cursor position
-  const handleInsertSymbol = useCallback((symbol: string) => {
-    // Cancel any pending blur submission
-    if (blurTimeoutRef.current) {
-      clearTimeout(blurTimeoutRef.current);
-      blurTimeoutRef.current = null;
-    }
-    const newText = inputText + symbol;
-    setInputText(newText);
-    // Notify parent for live preview on the score
-    onChordInputChange?.(newText);
-    // Focus the input after inserting
-    inputRef.current?.focus();
-  }, [inputText, onChordInputChange]);
+  // Insert symbol at cursor position with smart formatting for alterations
+  const handleInsertSymbol = useCallback(
+    (symbol: string) => {
+      // Cancel any pending blur submission
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+        blurTimeoutRef.current = null;
+      }
+
+      let newText = inputText;
+
+      // Check if we're adding an extension/alteration (b9, #9, 11, b5, #5, 13, b13, etc.)
+      // These are NOT alterations: 7, maj7, m7, dim7 (these are chord qualities)
+      const isExtension = /^[b#]?(9|11|13|5)$/.test(symbol);
+
+      if (isExtension && inputText.length > 0) {
+        // Check if there's already a parenthesis group
+        if (inputText.includes("(") && !inputText.endsWith(")")) {
+          // Inside open parens, add comma separator
+          newText = inputText + "," + symbol;
+        } else if (inputText.endsWith(")")) {
+          // Closed parens - reopen and add
+          newText = inputText.slice(0, -1) + "," + symbol + ")";
+        } else if (/\([^)]+$/.test(inputText)) {
+          // Has unclosed paren, just add with comma
+          newText = inputText + "," + symbol;
+        } else if (/[b#](9|11|13|5)$/.test(inputText)) {
+          // Already has an extension without parens (like b9, #11) - wrap both
+          const match = inputText.match(/^(.+?)([b#](?:9|11|13|5))$/);
+          if (match) {
+            newText = match[1] + "(" + match[2] + "," + symbol + ")";
+          } else {
+            newText = inputText + "(" + symbol + ")";
+          }
+        } else {
+          // First extension - add with parens
+          newText = inputText + "(" + symbol + ")";
+        }
+      } else {
+        // Not an extension, just append
+        newText = inputText + symbol;
+      }
+
+      setInputText(newText);
+      // Notify parent for live preview on the score
+      onChordInputChange?.(newText);
+      // Focus the input after inserting
+      inputRef.current?.focus();
+    },
+    [inputText, onChordInputChange],
+  );
 
   // Handle chord preview
   const handlePreview = useCallback(() => {

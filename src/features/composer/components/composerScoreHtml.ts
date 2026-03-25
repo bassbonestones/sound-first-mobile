@@ -126,6 +126,12 @@ export function generateComposerOsmdHtml(
       fill: #0066CC !important;
     }
 
+    /* Make chord symbols smaller to prevent overlap */
+    svg text[font-family*="Times"],
+    svg text[font-style="italic"] {
+      font-size: 85% !important;
+    }
+
     /* Make notes clickable */
     svg .vf-notehead,
     svg .vf-stavenote,
@@ -217,6 +223,19 @@ export function generateComposerOsmdHtml(
           renderSingleHorizontalStaffline: ${horizontalStaffline},
         });
 
+        // Configure chord symbol rendering
+        if (osmd.EngravingRules) {
+          // Increase spacing for chord symbols
+          osmd.EngravingRules.ChordSymbolTextHeight = 2.0;
+          osmd.EngravingRules.ChordSymbolXSpacing = 2.0;
+          // Reduce font size to help with long chord names
+          osmd.EngravingRules.ChordSymbolRelativeFontSize = 0.75;
+          // Try to use text attribute from MusicXML
+          osmd.EngravingRules.RenderChordSymbolText = true;
+          // Use Unicode symbols for alterations
+          osmd.EngravingRules.ChordSymbolUseSharpFlat = true;
+        }
+
         if (loadingEl) {
           loadingEl.style.display = 'none';
         }
@@ -255,6 +274,7 @@ export function generateComposerOsmdHtml(
         }
         
         setZoom(currentZoom);
+        shortenChordSymbols();
         buildNoteMap();
         addNoteClickHandlers();
         sendMeasurePositions();
@@ -265,6 +285,54 @@ export function generateComposerOsmdHtml(
         sendMessage('error', error.message);
       }
     };
+
+    // Post-process SVG to shorten chord symbols using Unicode
+    function shortenChordSymbols() {
+      const container = document.getElementById('osmd-container');
+      if (!container) return;
+      
+      // Find all text elements that might be chord symbols
+      // OSMD renders chords as text elements with specific styling
+      const textElements = container.querySelectorAll('svg text');
+      
+      textElements.forEach(function(el) {
+        const text = el.textContent || '';
+        // Skip if it's not likely a chord symbol
+        if (text.length < 2 || /^[0-9]+$/.test(text)) return;
+        // Skip note names, dynamics, etc. (single letters except chord roots)
+        if (/^[a-gA-G][#b]?$/.test(text)) return;
+        
+        // Apply chord symbol shortenings
+        // Note: △ alone means "major 7th" in jazz notation
+        let shortened = text
+          // Quality abbreviations (△ = maj7, no need for redundant 7)
+          .replace(/maj13/gi, '△13')
+          .replace(/maj9/gi, '△9')
+          .replace(/maj7/gi, '△')
+          .replace(/maj/gi, '△')
+          .replace(/min7/gi, 'm7')
+          .replace(/min9/gi, 'm9')
+          .replace(/min/gi, 'm')
+          .replace(/dim7/gi, '°7')
+          .replace(/dim/gi, '°')
+          .replace(/aug/gi, '+')
+          .replace(/m7b5/gi, 'ø')
+          .replace(/half-dim/gi, 'ø')
+          // Parenthetical alterations
+          .replace(/\\(alt\\s*/gi, '(')
+          // Alteration symbols
+          .replace(/#9/g, '♯9')
+          .replace(/b9/g, '♭9')
+          .replace(/#11/g, '♯11')
+          .replace(/b5/g, '♭5')
+          .replace(/#5/g, '♯5')
+          .replace(/b13/g, '♭13');
+        
+        if (shortened !== text) {
+          el.textContent = shortened;
+        }
+      });
+    }
 
     // Send measure positions to parent for external scrolling
     function sendMeasurePositions() {

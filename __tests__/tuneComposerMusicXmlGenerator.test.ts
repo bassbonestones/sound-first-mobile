@@ -19,6 +19,15 @@ import {
   type ChordSymbol,
 } from "../src/features/tune-composer/types";
 
+/**
+ * Helper to check if XML contains a <kind> element with the given type.
+ * Handles the text attribute that may be present for display purposes.
+ */
+function expectKind(xml: string, kindType: string): void {
+  const pattern = new RegExp(`<kind[^>]*>${kindType}</kind>`);
+  expect(xml).toMatch(pattern);
+}
+
 describe("Tune Composer MusicXML Generator", () => {
   describe("generateMusicXml", () => {
     it("should generate valid MusicXML header", () => {
@@ -96,7 +105,7 @@ describe("Tune Composer MusicXML Generator", () => {
 
         expect(xml).toContain('<harmony placement="above">');
         expect(xml).toContain("<root-step>C</root-step>");
-        expect(xml).toContain("<kind>major</kind>");
+        expectKind(xml, "major");
         expect(xml).toContain("</harmony>");
       });
 
@@ -105,7 +114,7 @@ describe("Tune Composer MusicXML Generator", () => {
         const xml = generateHarmonyXml(chord);
 
         expect(xml).toContain("<root-step>A</root-step>");
-        expect(xml).toContain("<kind>minor</kind>");
+        expectKind(xml, "minor");
       });
 
       it("should generate harmony for major seventh", () => {
@@ -113,7 +122,7 @@ describe("Tune Composer MusicXML Generator", () => {
         const xml = generateHarmonyXml(chord);
 
         expect(xml).toContain("<root-step>C</root-step>");
-        expect(xml).toContain("<kind>major-seventh</kind>");
+        expectKind(xml, "major-seventh");
       });
 
       it("should generate harmony for dominant seventh", () => {
@@ -121,7 +130,7 @@ describe("Tune Composer MusicXML Generator", () => {
         const xml = generateHarmonyXml(chord);
 
         expect(xml).toContain("<root-step>G</root-step>");
-        expect(xml).toContain("<kind>dominant</kind>");
+        expectKind(xml, "dominant");
       });
 
       it("should generate harmony for minor seventh", () => {
@@ -129,7 +138,7 @@ describe("Tune Composer MusicXML Generator", () => {
         const xml = generateHarmonyXml(chord);
 
         expect(xml).toContain("<root-step>D</root-step>");
-        expect(xml).toContain("<kind>minor-seventh</kind>");
+        expectKind(xml, "minor-seventh");
       });
 
       it("should generate harmony for half diminished", () => {
@@ -137,7 +146,7 @@ describe("Tune Composer MusicXML Generator", () => {
         const xml = generateHarmonyXml(chord);
 
         expect(xml).toContain("<root-step>B</root-step>");
-        expect(xml).toContain("<kind>half-diminished</kind>");
+        expectKind(xml, "half-diminished");
       });
 
       it("should generate harmony for diminished seventh", () => {
@@ -145,7 +154,7 @@ describe("Tune Composer MusicXML Generator", () => {
         const xml = generateHarmonyXml(chord);
 
         expect(xml).toContain("<root-step>C</root-step>");
-        expect(xml).toContain("<kind>diminished-seventh</kind>");
+        expectKind(xml, "diminished-seventh");
       });
 
       it("should handle sharp root", () => {
@@ -154,7 +163,7 @@ describe("Tune Composer MusicXML Generator", () => {
 
         expect(xml).toContain("<root-step>F</root-step>");
         expect(xml).toContain("<root-alter>1</root-alter>");
-        expect(xml).toContain("<kind>minor-seventh</kind>");
+        expectKind(xml, "minor-seventh");
       });
 
       it("should handle flat root", () => {
@@ -163,7 +172,7 @@ describe("Tune Composer MusicXML Generator", () => {
 
         expect(xml).toContain("<root-step>B</root-step>");
         expect(xml).toContain("<root-alter>-1</root-alter>");
-        expect(xml).toContain("<kind>major-seventh</kind>");
+        expectKind(xml, "major-seventh");
       });
 
       it("should generate harmony for slash chord", () => {
@@ -171,7 +180,7 @@ describe("Tune Composer MusicXML Generator", () => {
         const xml = generateHarmonyXml(chord);
 
         expect(xml).toContain("<root-step>C</root-step>");
-        expect(xml).toContain("<kind>major</kind>");
+        expectKind(xml, "major");
         expect(xml).toContain("<bass>");
         expect(xml).toContain("<bass-step>E</bass-step>");
         expect(xml).toContain("</bass>");
@@ -191,7 +200,7 @@ describe("Tune Composer MusicXML Generator", () => {
         const xml = generateHarmonyXml(chord);
 
         expect(xml).toContain("<root-step>G</root-step>");
-        expect(xml).toContain("<kind>suspended-fourth</kind>");
+        expectKind(xml, "suspended-fourth");
       });
 
       it("should generate harmony for sixth chord", () => {
@@ -199,7 +208,7 @@ describe("Tune Composer MusicXML Generator", () => {
         const xml = generateHarmonyXml(chord);
 
         expect(xml).toContain("<root-step>C</root-step>");
-        expect(xml).toContain("<kind>major-sixth</kind>");
+        expectKind(xml, "major-sixth");
       });
 
       it("should generate harmony for ninth chord", () => {
@@ -207,7 +216,7 @@ describe("Tune Composer MusicXML Generator", () => {
         const xml = generateHarmonyXml(chord);
 
         expect(xml).toContain("<root-step>G</root-step>");
-        expect(xml).toContain("<kind>dominant-ninth</kind>");
+        expectKind(xml, "dominant-ninth");
       });
 
       it("should generate harmony for augmented", () => {
@@ -215,7 +224,7 @@ describe("Tune Composer MusicXML Generator", () => {
         const xml = generateHarmonyXml(chord);
 
         expect(xml).toContain("<root-step>C</root-step>");
-        expect(xml).toContain("<kind>augmented</kind>");
+        expectKind(xml, "augmented");
       });
 
       it("should generate harmony for diminished", () => {
@@ -223,7 +232,7 @@ describe("Tune Composer MusicXML Generator", () => {
         const xml = generateHarmonyXml(chord);
 
         expect(xml).toContain("<root-step>C</root-step>");
-        expect(xml).toContain("<kind>diminished</kind>");
+        expectKind(xml, "diminished");
       });
 
       it("should return empty string for unrecognized chord", () => {
@@ -251,9 +260,9 @@ describe("Tune Composer MusicXML Generator", () => {
 
         expect(xml).toContain("<harmony");
         expect(xml).toContain("<root-step>C</root-step>");
-        expect(xml).toContain("<kind>major</kind>");
+        expectKind(xml, "major");
         expect(xml).toContain("<root-step>G</root-step>");
-        expect(xml).toContain("<kind>dominant</kind>");
+        expectKind(xml, "dominant");
       });
 
       it("should include harmony in correct measure", () => {
@@ -276,8 +285,8 @@ describe("Tune Composer MusicXML Generator", () => {
         const xml = generateMusicXml(score);
 
         // Verify both chords are present
-        expect(xml).toContain("<kind>major-seventh</kind>");
-        expect(xml).toContain("<kind>minor-seventh</kind>");
+        expectKind(xml, "major-seventh");
+        expectKind(xml, "minor-seventh");
       });
 
       it("should not include harmony when no chords in progression", () => {
@@ -353,7 +362,7 @@ describe("Tune Composer MusicXML Generator", () => {
 
         expect(xml).toContain("<harmony");
         expect(xml).toContain("<root-step>D</root-step>");
-        expect(xml).toContain("<kind>minor-seventh</kind>");
+        expectKind(xml, "minor-seventh");
       });
     });
   });
