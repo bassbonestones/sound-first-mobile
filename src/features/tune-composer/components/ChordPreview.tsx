@@ -5,13 +5,14 @@
  * Used by ChordControls to provide visual preview of chord voicings.
  */
 
-import React, { memo, useMemo } from "react";
+import React, { memo, useMemo, useState, useCallback } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
 import NotationDisplay from "../../../components/NotationDisplay";
 import { colors, spacing } from "../../../constants";
-import { generateChordPreviewMusicXml } from "../services";
+import { generateChordPreviewMusicXml, spellChord } from "../services";
+import { composerSynth } from "../../composer/services/composerSynth";
 
 // =============================================================================
 // Types
@@ -41,10 +42,57 @@ function ChordPreviewComponent({
   clef = "treble",
   testID,
 }: ChordPreviewProps): React.ReactElement | null {
+  const [isPlaying, setIsPlaying] = useState(false);
+
   // Generate MusicXML for the chord
   const musicXml = useMemo(() => {
     return generateChordPreviewMusicXml(symbol, rootMidi, clef);
   }, [symbol, rootMidi, clef]);
+
+  // Get sorted MIDI notes for playback
+  const midiNotes = useMemo(() => {
+    const notes = spellChord(symbol, rootMidi);
+    return [...notes].sort((a, b) => a - b); // Sort low to high
+  }, [symbol, rootMidi]);
+
+  /**
+   * Play chord tones: each note from bottom to top as quarter notes,
+   * then all notes together as a half note.
+   * At 120 BPM: quarter = 500ms, half = 1000ms
+   */
+  const handlePlay = useCallback(async () => {
+    if (isPlaying || midiNotes.length === 0) return;
+
+    setIsPlaying(true);
+
+    try {
+      // Initialize synth if needed
+      await composerSynth.init();
+      await composerSynth.resume();
+
+      const quarterNoteDuration = 500; // 120 BPM
+      const halfNoteDuration = 1000;
+
+      // Play each note from bottom to top
+      for (const midi of midiNotes) {
+        composerSynth.playNote(midi, quarterNoteDuration);
+        // Wait for the note to finish before playing the next
+        await new Promise((resolve) =>
+          setTimeout(resolve, quarterNoteDuration),
+        );
+      }
+
+      // Play all notes together as a chord
+      for (const midi of midiNotes) {
+        composerSynth.playNote(midi, halfNoteDuration);
+      }
+
+      // Wait for final chord to finish
+      await new Promise((resolve) => setTimeout(resolve, halfNoteDuration));
+    } finally {
+      setIsPlaying(false);
+    }
+  }, [isPlaying, midiNotes]);
 
   // If chord can't be rendered, show error message
   if (!musicXml) {
@@ -73,15 +121,31 @@ function ChordPreviewComponent({
     <View style={styles.container} testID={testID}>
       <View style={styles.header}>
         <Text style={styles.title}>{symbol}</Text>
-        <TouchableOpacity
-          onPress={onClose}
-          style={styles.closeButton}
-          accessibilityLabel="Close preview"
-          accessibilityRole="button"
-          testID="chord-preview-close"
-        >
-          <Feather name="x" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            onPress={handlePlay}
+            style={[styles.playButton, isPlaying && styles.playButtonDisabled]}
+            accessibilityLabel={isPlaying ? "Playing chord" : "Play chord"}
+            accessibilityRole="button"
+            disabled={isPlaying}
+            testID="chord-preview-play"
+          >
+            <Feather
+              name={isPlaying ? "volume-2" : "play"}
+              size={18}
+              color={isPlaying ? colors.textSecondary : colors.primary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeButton}
+            accessibilityLabel="Close preview"
+            accessibilityRole="button"
+            testID="chord-preview-close"
+          >
+            <Feather name="x" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={styles.staffContainer}>
         <NotationDisplay musicxml={musicXml} width={160} height={120} />
@@ -110,10 +174,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: spacing.xs,
   },
+  headerButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
   title: {
     fontSize: 16,
     fontWeight: "600",
     color: colors.textPrimary,
+  },
+  playButton: {
+    padding: spacing.xs,
+  },
+  playButtonDisabled: {
+    opacity: 0.5,
   },
   closeButton: {
     padding: spacing.xs,
