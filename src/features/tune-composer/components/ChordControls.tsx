@@ -399,21 +399,25 @@ function ChordControlsComponent({
         </View>
 
         {/* Progression selector */}
-        {progressions && onSelectProgression && onCreateProgression && onDuplicateProgression && onToggleProgressionEditMode && (
-          <ProgressionSelector
-            progressions={progressions}
-            activeProgressionId={activeProgressionId}
-            onSelectProgression={onSelectProgression}
-            onCreateProgression={onCreateProgression}
-            onDuplicateProgression={onDuplicateProgression}
-            onDeleteProgression={onDeleteProgression}
-            onRenameProgression={onRenameProgression}
-            isEditMode={isProgressionEditMode}
-            onToggleEditMode={onToggleProgressionEditMode}
-            disabled={disabled}
-            testID="progression-selector"
-          />
-        )}
+        {progressions &&
+          onSelectProgression &&
+          onCreateProgression &&
+          onDuplicateProgression &&
+          onToggleProgressionEditMode && (
+            <ProgressionSelector
+              progressions={progressions}
+              activeProgressionId={activeProgressionId}
+              onSelectProgression={onSelectProgression}
+              onCreateProgression={onCreateProgression}
+              onDuplicateProgression={onDuplicateProgression}
+              onDeleteProgression={onDeleteProgression}
+              onRenameProgression={onRenameProgression}
+              isEditMode={isProgressionEditMode}
+              onToggleEditMode={onToggleProgressionEditMode}
+              disabled={disabled}
+              testID="progression-selector"
+            />
+          )}
 
         {/* Chord input row */}
         <View style={styles.inputRow}>

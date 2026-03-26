@@ -613,7 +613,10 @@ function TuneComposerScreenContent({
         },
       ]);
     }
-  }, [composerState.activeProgression?.chords.length, composerState.clearActiveProgressionChords]);
+  }, [
+    composerState.activeProgression?.chords.length,
+    composerState.clearActiveProgressionChords,
+  ]);
 
   // ==========================================================================
   // Import Handlers
@@ -1321,12 +1324,17 @@ function TuneComposerScreenContent({
               onSelectProgression={composerState.selectProgression}
               onCreateProgression={composerState.createProgression}
               onDuplicateProgression={(sourceId, newName) => {
-                composerState.duplicateProgression(sourceId, newName ?? "New Progression");
+                composerState.duplicateProgression(
+                  sourceId,
+                  newName ?? "New Progression",
+                );
               }}
               onDeleteProgression={composerState.deleteProgression}
               onRenameProgression={composerState.renameProgression}
               isProgressionEditMode={isProgressionEditMode}
-              onToggleProgressionEditMode={() => setIsProgressionEditMode(!isProgressionEditMode)}
+              onToggleProgressionEditMode={() =>
+                setIsProgressionEditMode(!isProgressionEditMode)
+              }
               disabled={isPlaying}
               testID="chord-controls"
             />
