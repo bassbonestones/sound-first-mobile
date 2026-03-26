@@ -66,6 +66,10 @@ export interface ChordControlsProps {
   showChordSymbols?: boolean;
   /** Callback to toggle chord symbol visibility */
   onToggleVisibility?: () => void;
+  /** Callback to infer chords from melody */
+  onInferChords?: () => void;
+  /** Whether chord inference is in progress */
+  isInferring?: boolean;
   /** Test ID for testing */
   testID?: string;
 }
@@ -135,6 +139,8 @@ function ChordControlsComponent({
   onPreviewChord,
   showChordSymbols = true,
   onToggleVisibility,
+  onInferChords,
+  isInferring = false,
   testID,
 }: ChordControlsProps): React.ReactElement {
   const [inputText, setInputText] = useState(currentChordSymbol);
@@ -562,6 +568,32 @@ function ChordControlsComponent({
           </TouchableOpacity>
         )}
 
+        {/* Infer Chords button */}
+        {onInferChords && (
+          <TouchableOpacity
+            style={[styles.inferButton, isInferring && styles.buttonDisabled]}
+            onPress={onInferChords}
+            disabled={isInferring}
+            accessibilityRole={"button" as AccessibilityRole}
+            accessibilityLabel="Infer chords from melody"
+            testID="chord-infer-button"
+          >
+            <Feather
+              name="zap"
+              size={16}
+              color={isInferring ? colors.textSecondary : colors.primary}
+            />
+            <Text
+              style={[
+                styles.inferButtonText,
+                isInferring && styles.inferButtonTextDisabled,
+              ]}
+            >
+              {isInferring ? "Inferring..." : "Infer Chords from Melody"}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* Exit button */}
         <TouchableOpacity
           style={styles.exitButton}
@@ -780,6 +812,27 @@ const styles = StyleSheet.create({
   visibilityLabel: {
     fontSize: 13,
     color: colors.textPrimary,
+  },
+  inferButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    gap: spacing.xs,
+  },
+  inferButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: colors.primary,
+  },
+  inferButtonTextDisabled: {
+    color: colors.textSecondary,
   },
   exitButton: {
     marginTop: spacing.sm,

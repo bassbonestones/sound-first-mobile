@@ -3094,8 +3094,9 @@ export function useTuneComposerState(
    * Get the active (default) chord progression.
    */
   const activeProgression = useMemo((): ChordProgression | null => {
-    const defaultProg = state.score.chordProgressions.find((p) => p.isDefault);
-    return defaultProg ?? state.score.chordProgressions[0] ?? null;
+    const progressions = state.score.chordProgressions ?? [];
+    const defaultProg = progressions.find((p) => p.isDefault);
+    return defaultProg ?? progressions[0] ?? null;
   }, [state.score.chordProgressions]);
 
   /**
@@ -3183,6 +3184,48 @@ export function useTuneComposerState(
       return { ...score, chordProgressions: newProgressions };
     });
   }, [state.chordCursor, activeProgression, updateScore]);
+
+  /**
+   * Add a chord progression to the score.
+   * If isDefault is true on the new progression, set it as active.
+   */
+  const addChordProgression = useCallback(
+    (progression: ChordProgression) => {
+      updateScore((score) => {
+        // Check if a progression with this ID already exists
+        const existingIndex = score.chordProgressions.findIndex(
+          (p) => p.id === progression.id,
+        );
+
+        let newProgressions: ChordProgression[];
+        if (existingIndex !== -1) {
+          // Replace existing progression
+          newProgressions = [...score.chordProgressions];
+          newProgressions[existingIndex] = progression;
+        } else {
+          // Add new progression
+          newProgressions = [...score.chordProgressions, progression];
+        }
+
+        // If this is marked as default, update activeProgressionId
+        const newDisplaySettings =
+          progression.isDefault || score.chordProgressions.length === 0
+            ? {
+                ...score.displaySettings,
+                activeProgressionId: progression.id,
+                showChordSymbols: true,
+              }
+            : score.displaySettings;
+
+        return {
+          ...score,
+          chordProgressions: newProgressions,
+          displaySettings: newDisplaySettings,
+        };
+      });
+    },
+    [updateScore],
+  );
 
   /**
    * Move chord cursor to the next beat position.
@@ -3431,6 +3474,7 @@ export function useTuneComposerState(
     showChordSymbols,
     toggleChordSymbolVisibility,
     activeProgression,
+    addChordProgression,
 
     // Rhythm Change Confirmation
     pendingRhythmChange,

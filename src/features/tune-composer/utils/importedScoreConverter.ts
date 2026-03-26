@@ -31,6 +31,9 @@ import {
   generateId,
   createNote,
   createMeasure,
+  createDefaultProgression,
+  createDisplaySettings,
+  createPlaybackSettings,
   DURATION,
 } from "../types/tuneComposerTypes";
 
@@ -300,6 +303,9 @@ export function importedScoreToComposerScore(
       timeSignature: timeSig,
       tempo: metadata.tempo?.bpm ?? 120,
       measures: [createMeasure(timeSig)],
+      chordProgressions: [createDefaultProgression()],
+      displaySettings: createDisplaySettings(),
+      playbackSettings: createPlaybackSettings(),
       createdAt: now,
       updatedAt: now,
     };
@@ -342,6 +348,9 @@ export function importedScoreToComposerScore(
     timeSignature: timeSig,
     tempo,
     measures,
+    chordProgressions: [createDefaultProgression()],
+    displaySettings: createDisplaySettings(),
+    playbackSettings: createPlaybackSettings(),
     createdAt: now,
     updatedAt: now,
   };

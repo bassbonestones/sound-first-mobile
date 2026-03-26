@@ -82,6 +82,7 @@ import {
   createPreviewFile,
   deletePreviewFile,
 } from "../../../api/materials";
+import { analyzeChords } from "../../../api/tunes";
 import { parseMusicXml } from "../../importMusic/services/musicXmlParser";
 import { importedScoreToComposerScore } from "../utils/importedScoreConverter";
 
@@ -163,6 +164,9 @@ function TuneComposerScreenContent({
     targetKey: KeySignature;
   }>({ visible: false, targetKey: 0 });
 
+  // Chord style modal state (for web where Alert.alert with buttons doesn't work)
+  const [chordStyleModalVisible, setChordStyleModalVisible] = useState(false);
+
   // Add measure prompt modal state
   const [showAddMeasureModal, setShowAddMeasureModal] = useState(false);
   const prevIsAtLastMeasureEnd = useRef(false);
@@ -180,6 +184,9 @@ function TuneComposerScreenContent({
   // Save new modal state
   const [showSaveNewModal, setShowSaveNewModal] = useState(false);
   const [newFilename, setNewFilename] = useState("");
+
+  // Chord inference state
+  const [isInferringChords, setIsInferringChords] = useState(false);
 
   // Load existing score or check for autosave recovery
   useEffect(() => {
@@ -481,6 +488,102 @@ function TuneComposerScreenContent({
       });
     }
   }, [composerState.score, onPractice, navigation]);
+
+  // ==========================================================================
+  // Chord Inference Handler
+  // ==========================================================================
+
+  // Actual inference logic - called with selected options
+  const performInferChords = useCallback(
+    async (useSeventhChords: boolean, chordsPerMeasure: 1 | 2) => {
+      const measures = composerState.score.measures;
+      setIsInferringChords(true);
+      try {
+        // Convert measures to the format expected by the API
+        // API expects 'pitch' field with MIDI number (Note type uses 'midi')
+        const measuresJson = JSON.stringify(
+          measures.map((m) => ({
+            id: m.id,
+            notes: m.notes.map((n) => ({
+              pitch: n.midi,
+              duration: n.duration,
+              isRest: n.midi === null,
+            })),
+          })),
+        );
+
+        const result = await analyzeChords({
+          measures_json: measuresJson,
+          key_signature: composerState.score.keySignature,
+          time_signature: {
+            beats: composerState.score.timeSignature.beats,
+            beatUnit: composerState.score.timeSignature.beatUnit,
+          },
+          use_seventh_chords: useSeventhChords,
+          chords_per_measure: chordsPerMeasure,
+        });
+
+        if (result.chord_count === 0) {
+          Alert.alert(
+            "No Chords Inferred",
+            "Could not infer any chords from the melody.",
+          );
+          return;
+        }
+
+        // Merge the inferred progression into the score
+        // Mark as default so it becomes the active progression
+        composerState.addChordProgression({
+          ...result.progression,
+          isDefault: true,
+        });
+
+        Alert.alert(
+          "Chords Inferred",
+          `Added ${result.chord_count} chord${result.chord_count > 1 ? "s" : ""} to the score.`,
+        );
+      } catch (error) {
+        Alert.alert(
+          "Inference Failed",
+          error instanceof Error
+            ? error.message
+            : "Could not connect to the server.",
+        );
+      } finally {
+        setIsInferringChords(false);
+      }
+    },
+    [composerState],
+  );
+
+  // Show style selection and then perform inference
+  const handleInferChords = useCallback(() => {
+    if (isInferringChords) return;
+
+    const measures = composerState.score.measures;
+    if (!measures || measures.length === 0) {
+      Alert.alert(
+        "No Melody",
+        "Add some notes to the score before inferring chords.",
+      );
+      return;
+    }
+
+    // Check if there are any pitched notes (midi !== null means it's not a rest)
+    const hasPitchedNotes = measures.some((m) =>
+      m.notes.some((n) => n.midi !== null),
+    );
+    if (!hasPitchedNotes) {
+      Alert.alert(
+        "No Notes",
+        "Add some pitched notes to the score before inferring chords.",
+      );
+      return;
+    }
+
+    // Show chord style selection modal
+    setChordStyleModalVisible(true);
+  }, [composerState, isInferringChords]);
 
   // ==========================================================================
   // Import Handlers
@@ -1180,6 +1283,8 @@ function TuneComposerScreenContent({
               hasSelection={composerState.chordCursor !== null}
               showChordSymbols={composerState.showChordSymbols}
               onToggleVisibility={composerState.toggleChordSymbolVisibility}
+              onInferChords={handleInferChords}
+              isInferring={isInferringChords}
               disabled={isPlaying}
               testID="chord-controls"
             />
@@ -1487,6 +1592,64 @@ function TuneComposerScreenContent({
               <TouchableOpacity
                 style={styles.modalCancel}
                 onPress={handleKeyChangeCancel}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Modal>
+
+        {/* Chord Style Selection Modal */}
+        <Modal
+          visible={chordStyleModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setChordStyleModalVisible(false)}
+        >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setChordStyleModalVisible(false)}
+          >
+            <View
+              style={styles.modalContent}
+              onStartShouldSetResponder={() => true}
+            >
+              <Text style={styles.modalTitle}>Choose Chord Style</Text>
+              <Text style={styles.modalMessage}>
+                Select the harmony style for your melody:
+              </Text>
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={() => {
+                  setChordStyleModalVisible(false);
+                  performInferChords(false, 1);
+                }}
+              >
+                <Text style={styles.modalOptionText}>Simple (Triads)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={() => {
+                  setChordStyleModalVisible(false);
+                  performInferChords(true, 1);
+                }}
+              >
+                <Text style={styles.modalOptionText}>Jazz (7th Chords)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={() => {
+                  setChordStyleModalVisible(false);
+                  performInferChords(true, 2);
+                }}
+              >
+                <Text style={styles.modalOptionText}>
+                  Dense (2 per measure)
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setChordStyleModalVisible(false)}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>

@@ -24,6 +24,7 @@ export * as materials from "./materials";
 export * as capabilities from "./capabilities";
 export * as users from "./users";
 export * as generation from "./generation";
+export * as tunes from "./tunes";
 
 // Re-export commonly used functions at top level for convenience
 export {
