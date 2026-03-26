@@ -627,8 +627,10 @@ export function getActiveProgression(
     );
     if (found) return found;
   }
-  // Fall back to default progression
-  return getDefaultProgression(score.chordProgressions);
+  // Fall back to default progression, then to first progression
+  return (
+    getDefaultProgression(score.chordProgressions) || score.chordProgressions[0]
+  );
 }
 
 // =============================================================================

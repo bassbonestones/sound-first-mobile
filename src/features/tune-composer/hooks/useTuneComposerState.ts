@@ -48,6 +48,9 @@ import {
   createChordSymbol,
   getChordsForMeasure,
   getActiveProgression,
+  createChordProgression,
+  generateId,
+  duplicateProgression as duplicateProgressionUtil,
 } from "../types";
 import {
   createInsertNoteAction,
@@ -3091,13 +3094,11 @@ export function useTuneComposerState(
   }, []);
 
   /**
-   * Get the active (default) chord progression.
+   * Get the active chord progression (respects activeProgressionId).
    */
   const activeProgression = useMemo((): ChordProgression | null => {
-    const progressions = state.score.chordProgressions ?? [];
-    const defaultProg = progressions.find((p) => p.isDefault);
-    return defaultProg ?? progressions[0] ?? null;
-  }, [state.score.chordProgressions]);
+    return getActiveProgression(state.score) ?? null;
+  }, [state.score]);
 
   /**
    * Get the current chord symbol at the chord cursor position.
@@ -3223,6 +3224,220 @@ export function useTuneComposerState(
           displaySettings: newDisplaySettings,
         };
       });
+    },
+    [updateScore],
+  );
+
+  /**
+   * Select a chord progression by ID, making it the active progression.
+   */
+  const selectProgression = useCallback(
+    (progressionId: string) => {
+      updateScore((score) => {
+        // Verify the progression exists
+        const exists = score.chordProgressions.some(
+          (p) => p.id === progressionId,
+        );
+        if (!exists) return score;
+
+        return {
+          ...score,
+          displaySettings: {
+            ...score.displaySettings,
+            activeProgressionId: progressionId,
+          },
+        };
+      });
+    },
+    [updateScore],
+  );
+
+  /**
+   * Create a new empty chord progression with the given name.
+   * The new progression is automatically selected as active.
+   */
+  const createProgression = useCallback(
+    (name: string): string => {
+      const newProgression = createChordProgression(name);
+      const newId = newProgression.id;
+
+      updateScore((score) => ({
+        ...score,
+        chordProgressions: [...score.chordProgressions, newProgression],
+        displaySettings: {
+          ...score.displaySettings,
+          activeProgressionId: newId,
+        },
+      }));
+
+      return newId;
+    },
+    [updateScore],
+  );
+
+  /**
+   * Duplicate an existing progression with a new name.
+   * The duplicated progression is automatically selected as active.
+   */
+  const duplicateProgression = useCallback(
+    (sourceId: string, newName: string): string | null => {
+      // Find source synchronously to check if it exists
+      const source = state.score.chordProgressions.find(
+        (p) => p.id === sourceId,
+      );
+      if (!source) return null;
+
+      // Create the duplicate with a known ID synchronously
+      const duplicated = duplicateProgressionUtil(source, newName);
+      const newId = duplicated.id;
+
+      // Now update state
+      updateScore((score) => ({
+        ...score,
+        chordProgressions: [...score.chordProgressions, duplicated],
+        displaySettings: {
+          ...score.displaySettings,
+          activeProgressionId: newId,
+        },
+      }));
+
+      return newId;
+    },
+    [state.score.chordProgressions, updateScore],
+  );
+
+  /**
+   * Rename a chord progression.
+   */
+  const renameProgression = useCallback(
+    (progressionId: string, newName: string): boolean => {
+      let success = false;
+
+      updateScore((score) => {
+        const index = score.chordProgressions.findIndex(
+          (p) => p.id === progressionId,
+        );
+        if (index === -1) return score;
+
+        success = true;
+        const newProgressions = [...score.chordProgressions];
+        newProgressions[index] = {
+          ...score.chordProgressions[index],
+          name: newName,
+        };
+        return { ...score, chordProgressions: newProgressions };
+      });
+
+      return success;
+    },
+    [updateScore],
+  );
+
+  /**
+   * Delete a chord progression.
+   * If the deleted progression was active, switches to the first available.
+   */
+  const deleteProgression = useCallback(
+    (progressionId: string): boolean => {
+      let success = false;
+
+      updateScore((score) => {
+        const progression = score.chordProgressions.find(
+          (p) => p.id === progressionId,
+        );
+        if (!progression) return score;
+
+        success = true;
+        const newProgressions = score.chordProgressions.filter(
+          (p) => p.id !== progressionId,
+        );
+
+        // If we deleted the active progression, switch to the first one
+        let newActiveId = score.displaySettings.activeProgressionId;
+        if (newActiveId === progressionId) {
+          newActiveId = newProgressions[0]?.id ?? "";
+        }
+
+        return {
+          ...score,
+          chordProgressions: newProgressions,
+          displaySettings: {
+            ...score.displaySettings,
+            activeProgressionId: newActiveId,
+          },
+        };
+      });
+
+      return success;
+    },
+    [updateScore],
+  );
+
+  /**
+   * Set chords on the active progression (used by chord inference).
+   * Replaces the chords array without creating a new progression.
+   */
+  const setActiveProgressionChords = useCallback(
+    (chords: ChordSymbol[]) => {
+      updateScore((score) => {
+        // Use the same logic as getActiveProgression to find the active one
+        const activeProg = getActiveProgression(score);
+        if (!activeProg) return score;
+
+        const index = score.chordProgressions.findIndex(
+          (p) => p.id === activeProg.id,
+        );
+        if (index === -1) return score;
+
+        const newProgressions = [...score.chordProgressions];
+        newProgressions[index] = {
+          ...newProgressions[index],
+          chords,
+        };
+        return {
+          ...score,
+          chordProgressions: newProgressions,
+          displaySettings: {
+            ...score.displaySettings,
+            showChordSymbols: true,
+          },
+        };
+      });
+    },
+    [updateScore],
+  );
+
+  /**
+   * Clear all chords from the active progression.
+   */
+  const clearActiveProgressionChords = useCallback(() => {
+    setActiveProgressionChords([]);
+  }, [setActiveProgressionChords]);
+
+  /**
+   * Set whether a progression is system-defined.
+   * Admin tool control for marking progressions as read-only for users.
+   */
+  const setProgressionSystemDefined = useCallback(
+    (progressionId: string, isSystemDefined: boolean): boolean => {
+      let success = false;
+
+      updateScore((score) => {
+        const index = score.chordProgressions.findIndex(
+          (p) => p.id === progressionId,
+        );
+        if (index === -1) return score;
+
+        success = true;
+        const newProgressions = [...score.chordProgressions];
+        newProgressions[index] = {
+          ...newProgressions[index],
+          isSystemDefined,
+        };
+        return { ...score, chordProgressions: newProgressions };
+      });
+
+      return success;
     },
     [updateScore],
   );
@@ -3475,6 +3690,15 @@ export function useTuneComposerState(
     toggleChordSymbolVisibility,
     activeProgression,
     addChordProgression,
+    selectProgression,
+    createProgression,
+    duplicateProgression,
+    renameProgression,
+    deleteProgression,
+    setActiveProgressionChords,
+    clearActiveProgressionChords,
+    setProgressionSystemDefined,
+    chordProgressions: state.score.chordProgressions,
 
     // Rhythm Change Confirmation
     pendingRhythmChange,

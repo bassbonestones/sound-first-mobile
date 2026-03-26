@@ -188,6 +188,9 @@ function TuneComposerScreenContent({
   // Chord inference state
   const [isInferringChords, setIsInferringChords] = useState(false);
 
+  // Progression edit mode state
+  const [isProgressionEditMode, setIsProgressionEditMode] = useState(false);
+
   // Load existing score or check for autosave recovery
   useEffect(() => {
     const loadScore = async () => {
@@ -531,16 +534,13 @@ function TuneComposerScreenContent({
           return;
         }
 
-        // Merge the inferred progression into the score
-        // Mark as default so it becomes the active progression
-        composerState.addChordProgression({
-          ...result.progression,
-          isDefault: true,
-        });
+        // Populate the active progression with inferred chords
+        // Does NOT create a new progression - admin can "Save As" if desired
+        composerState.setActiveProgressionChords(result.progression.chords);
 
         Alert.alert(
           "Chords Inferred",
-          `Added ${result.chord_count} chord${result.chord_count > 1 ? "s" : ""} to the score.`,
+          `Added ${result.chord_count} chord${result.chord_count > 1 ? "s" : ""} to the active progression.`,
         );
       } catch (error) {
         Alert.alert(
@@ -584,6 +584,36 @@ function TuneComposerScreenContent({
     // Show chord style selection modal
     setChordStyleModalVisible(true);
   }, [composerState, isInferringChords]);
+
+  // Clear all chords from active progression with confirmation
+  const handleClearChords = useCallback(() => {
+    const chordCount = composerState.activeProgression?.chords.length ?? 0;
+    if (chordCount === 0) {
+      if (Platform.OS === "web") {
+        window.alert("There are no chords to clear.");
+      } else {
+        Alert.alert("No Chords", "There are no chords to clear.");
+      }
+      return;
+    }
+
+    const message = `Are you sure you want to remove all ${chordCount} chord${chordCount > 1 ? "s" : ""} from this progression?`;
+
+    if (Platform.OS === "web") {
+      if (window.confirm(message)) {
+        composerState.clearActiveProgressionChords();
+      }
+    } else {
+      Alert.alert("Clear All Chords", message, [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: composerState.clearActiveProgressionChords,
+        },
+      ]);
+    }
+  }, [composerState.activeProgression?.chords.length, composerState.clearActiveProgressionChords]);
 
   // ==========================================================================
   // Import Handlers
@@ -1285,6 +1315,18 @@ function TuneComposerScreenContent({
               onToggleVisibility={composerState.toggleChordSymbolVisibility}
               onInferChords={handleInferChords}
               isInferring={isInferringChords}
+              onClearChords={handleClearChords}
+              progressions={composerState.chordProgressions}
+              activeProgressionId={composerState.activeProgression?.id}
+              onSelectProgression={composerState.selectProgression}
+              onCreateProgression={composerState.createProgression}
+              onDuplicateProgression={(sourceId, newName) => {
+                composerState.duplicateProgression(sourceId, newName ?? "New Progression");
+              }}
+              onDeleteProgression={composerState.deleteProgression}
+              onRenameProgression={composerState.renameProgression}
+              isProgressionEditMode={isProgressionEditMode}
+              onToggleProgressionEditMode={() => setIsProgressionEditMode(!isProgressionEditMode)}
               disabled={isPlaying}
               testID="chord-controls"
             />

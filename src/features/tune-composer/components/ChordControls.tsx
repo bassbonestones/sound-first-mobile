@@ -25,6 +25,8 @@ import {
   getAutocompleteSuggestions,
   spellChord,
 } from "../services";
+import { ProgressionSelector } from "./ProgressionSelector";
+import type { ChordProgression } from "../types";
 
 // =============================================================================
 // Types
@@ -70,6 +72,27 @@ export interface ChordControlsProps {
   onInferChords?: () => void;
   /** Whether chord inference is in progress */
   isInferring?: boolean;
+  /** Callback to clear all chords from current progression */
+  onClearChords?: () => void;
+  // Progression management props
+  /** All available progressions */
+  progressions?: ChordProgression[];
+  /** ID of the currently active progression */
+  activeProgressionId?: string;
+  /** Callback when a progression is selected */
+  onSelectProgression?: (id: string) => void;
+  /** Callback to create a new progression */
+  onCreateProgression?: (name: string) => void;
+  /** Callback to duplicate a progression */
+  onDuplicateProgression?: (sourceId: string, newName?: string) => void;
+  /** Callback to delete a progression */
+  onDeleteProgression?: (id: string) => void;
+  /** Callback to rename a progression */
+  onRenameProgression?: (id: string, newName: string) => void;
+  /** Whether progression edit mode is active */
+  isProgressionEditMode?: boolean;
+  /** Callback to toggle progression edit mode */
+  onToggleProgressionEditMode?: () => void;
   /** Test ID for testing */
   testID?: string;
 }
@@ -141,6 +164,16 @@ function ChordControlsComponent({
   onToggleVisibility,
   onInferChords,
   isInferring = false,
+  onClearChords,
+  progressions,
+  activeProgressionId,
+  onSelectProgression,
+  onCreateProgression,
+  onDuplicateProgression,
+  onDeleteProgression,
+  onRenameProgression,
+  isProgressionEditMode = false,
+  onToggleProgressionEditMode,
   testID,
 }: ChordControlsProps): React.ReactElement {
   const [inputText, setInputText] = useState(currentChordSymbol);
@@ -364,6 +397,23 @@ function ChordControlsComponent({
             {currentPosition.beatPosition + 1}
           </Text>
         </View>
+
+        {/* Progression selector */}
+        {progressions && onSelectProgression && onCreateProgression && onDuplicateProgression && onToggleProgressionEditMode && (
+          <ProgressionSelector
+            progressions={progressions}
+            activeProgressionId={activeProgressionId}
+            onSelectProgression={onSelectProgression}
+            onCreateProgression={onCreateProgression}
+            onDuplicateProgression={onDuplicateProgression}
+            onDeleteProgression={onDeleteProgression}
+            onRenameProgression={onRenameProgression}
+            isEditMode={isProgressionEditMode}
+            onToggleEditMode={onToggleProgressionEditMode}
+            disabled={disabled}
+            testID="progression-selector"
+          />
+        )}
 
         {/* Chord input row */}
         <View style={styles.inputRow}>
@@ -591,6 +641,20 @@ function ChordControlsComponent({
             >
               {isInferring ? "Inferring..." : "Infer Chords from Melody"}
             </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Clear All Chords button */}
+        {onClearChords && (
+          <TouchableOpacity
+            style={styles.clearAllButton}
+            onPress={onClearChords}
+            accessibilityRole={"button" as AccessibilityRole}
+            accessibilityLabel="Clear all chords from progression"
+            testID="chord-clear-button"
+          >
+            <Feather name="trash-2" size={16} color={colors.error} />
+            <Text style={styles.clearAllButtonText}>Clear All Chords</Text>
           </TouchableOpacity>
         )}
 
@@ -833,6 +897,24 @@ const styles = StyleSheet.create({
   },
   inferButtonTextDisabled: {
     color: colors.textSecondary,
+  },
+  clearAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.error,
+    gap: spacing.xs,
+  },
+  clearAllButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: colors.error,
   },
   exitButton: {
     marginTop: spacing.sm,
