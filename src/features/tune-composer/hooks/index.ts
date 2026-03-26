@@ -3,7 +3,11 @@
  */
 
 export { useTuneComposerState } from "./useTuneComposerState";
-export type { UseTuneComposerStateReturn } from "./useTuneComposerState";
+export type {
+  UseTuneComposerStateReturn,
+  PendingRhythmChange,
+  PendingRhythmChangeType,
+} from "./useTuneComposerState";
 
 export {
   useTuneComposerUndo,

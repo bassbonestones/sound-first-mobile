@@ -36,7 +36,6 @@ import {
   STAFF_CENTER_MIDI,
   getBeatsPerMeasure,
   getBeatUnitCount,
-  getBeatUnitDuration,
   getMeasureDuration,
   getNoteDuration,
   validateMeasure,
@@ -47,6 +46,8 @@ import {
   getPitchedNotes,
   findChordAtPosition,
   createChordSymbol,
+  getChordsForMeasure,
+  getActiveProgression,
 } from "../types";
 import {
   createInsertNoteAction,
@@ -94,6 +95,25 @@ import {
   reverseAction,
   reapplyAction,
 } from "./useTuneComposerUndo";
+
+// =============================================================================
+// Types
+// =============================================================================
+
+/** Type of rhythm change pending confirmation */
+export type PendingRhythmChangeType =
+  | { kind: "insertNote"; pitchName: PitchName }
+  | { kind: "insertRest" }
+  | { kind: "deleteNote" }
+  | { kind: "changeDuration"; duration: DurationValue };
+
+/** Pending rhythm change awaiting user confirmation */
+export interface PendingRhythmChange {
+  measureIndex: number;
+  hasChords: boolean;
+  hasLyrics: boolean;
+  changeType: PendingRhythmChangeType;
+}
 
 // =============================================================================
 // Return Type
@@ -297,6 +317,14 @@ export interface UseTuneComposerStateReturn {
   activeProgression:
     | import("../types/tuneComposerTypes").ChordProgression
     | null;
+
+  // === RHYTHM CHANGE CONFIRMATION ===
+  /** Pending rhythm change awaiting confirmation (null if none) */
+  pendingRhythmChange: PendingRhythmChange | null;
+  /** Confirm pending rhythm change (clears chords/lyrics and executes) */
+  confirmRhythmChange: () => void;
+  /** Cancel pending rhythm change */
+  cancelRhythmChange: () => void;
 }
 
 // =============================================================================
@@ -309,6 +337,9 @@ export function useTuneComposerState(
   const [state, setState] = useState<TuneComposerState>(() =>
     createInitialState(initialScore),
   );
+
+  const [pendingRhythmChange, setPendingRhythmChange] =
+    useState<PendingRhythmChange | null>(null);
 
   const undoManager = useTuneComposerUndo(100);
 
@@ -422,16 +453,251 @@ export function useTuneComposerState(
   );
 
   // ==========================================================================
+  // Helper: Check if Measure has Chords or Lyrics
+  // ==========================================================================
+
+  /**
+   * Check if a measure has chords or lyrics that would be affected by rhythm changes.
+   */
+  const getMeasureChordsAndLyrics = useCallback(
+    (measureIndex: number): { hasChords: boolean; hasLyrics: boolean } => {
+      const measure = state.score.measures[measureIndex];
+      const hasLyrics = measure?.notes.some((n) => n.lyric?.text) ?? false;
+
+      const activeProgression = getActiveProgression(state.score);
+      const chords = activeProgression?.chords ?? [];
+      const measureChords = getChordsForMeasure(chords, measureIndex);
+      const hasChords = measureChords.length > 0;
+
+      return { hasChords, hasLyrics };
+    },
+    [state.score],
+  );
+
+  /**
+   * Clear chords and lyrics for a specific measure.
+   */
+  const clearMeasureChordsAndLyrics = useCallback(
+    (measureIndex: number) => {
+      updateScore((score) => {
+        // Find the active progression ID
+        const activeProgId = score.displaySettings?.activeProgressionId;
+        const defaultProg = score.chordProgressions.find((p) => p.isDefault);
+        const targetProgId = activeProgId || defaultProg?.id;
+
+        // Clear lyrics from notes in this measure
+        const newMeasures = score.measures.map((m, i) => {
+          if (i !== measureIndex) return m;
+          return {
+            ...m,
+            notes: m.notes.map((n) => ({ ...n, lyric: undefined })),
+          };
+        });
+
+        // Clear chords for this measure from active progression
+        const newProgressions = score.chordProgressions.map((prog) => {
+          if (prog.id !== targetProgId) return prog;
+          return {
+            ...prog,
+            chords: prog.chords.filter((c) => c.measureIndex !== measureIndex),
+          };
+        });
+
+        return {
+          ...score,
+          measures: newMeasures,
+          chordProgressions: newProgressions,
+        };
+      });
+    },
+    [updateScore],
+  );
+
+  // ==========================================================================
+  // Rhythm Change Confirmation
+  // ==========================================================================
+
+  const confirmRhythmChange = useCallback(() => {
+    if (!pendingRhythmChange) return;
+    const { measureIndex, changeType } = pendingRhythmChange;
+
+    // Clear the pending change first
+    setPendingRhythmChange(null);
+
+    // For duration changes, we can do clearing + change in one state update
+    if (changeType.kind === "changeDuration") {
+      const noteId = state.selectedNoteId;
+      if (!noteId) return;
+
+      const position = findNotePosition(noteId, state.score);
+      if (!position) return;
+
+      const note =
+        state.score.measures[position.measureIndex]?.notes[position.noteIndex];
+      if (!note) return;
+
+      const newDuration = changeType.duration;
+
+      // Push undo action
+      const action = createChangeDurationAction(
+        position,
+        note.id,
+        note.duration,
+        newDuration,
+      );
+      undoManager.pushAction(action);
+
+      // Do clearing AND duration change in single update
+      setState((prev) => {
+        // Find the active progression ID
+        const activeProgId = prev.score.displaySettings?.activeProgressionId;
+        const defaultProg = prev.score.chordProgressions.find(
+          (p) => p.isDefault,
+        );
+        const targetProgId = activeProgId || defaultProg?.id;
+
+        // Clear lyrics from notes in this measure
+        const clearedMeasures = prev.score.measures.map((m, i) => {
+          if (i !== measureIndex) return m;
+          return {
+            ...m,
+            notes: m.notes.map((n) => ({ ...n, lyric: undefined })),
+          };
+        });
+
+        // Clear chords for this measure from the active progression
+        const clearedProgressions = prev.score.chordProgressions.map((prog) => {
+          if (prog.id !== targetProgId) return prog;
+          return {
+            ...prog,
+            chords: prog.chords.filter((c) => c.measureIndex !== measureIndex),
+          };
+        });
+
+        // Apply duration change
+        const finalMeasures = clearedMeasures.map((m, mi) =>
+          mi === position.measureIndex
+            ? {
+                ...m,
+                notes: m.notes.map((n) =>
+                  n.id === note.id ? { ...n, duration: newDuration } : n,
+                ),
+              }
+            : m,
+        );
+
+        return {
+          ...prev,
+          score: {
+            ...prev.score,
+            measures: finalMeasures,
+            chordProgressions: clearedProgressions,
+            updatedAt: new Date().toISOString(),
+          },
+          isDirty: true,
+        };
+      });
+      return;
+    }
+
+    // For other changes, use refs after clearing
+    // Clear chords and lyrics first
+    setState((prev) => {
+      // Find the active progression ID
+      const activeProgId = prev.score.displaySettings?.activeProgressionId;
+      const defaultProg = prev.score.chordProgressions.find((p) => p.isDefault);
+      const targetProgId = activeProgId || defaultProg?.id;
+
+      const newMeasures = prev.score.measures.map((m, i) => {
+        if (i !== measureIndex) return m;
+        return {
+          ...m,
+          notes: m.notes.map((n) => ({ ...n, lyric: undefined })),
+        };
+      });
+
+      const newProgressions = prev.score.chordProgressions.map((prog) => {
+        if (prog.id !== targetProgId) return prog;
+        return {
+          ...prog,
+          chords: prog.chords.filter((c) => c.measureIndex !== measureIndex),
+        };
+      });
+
+      return {
+        ...prev,
+        score: {
+          ...prev.score,
+          measures: newMeasures,
+          chordProgressions: newProgressions,
+          updatedAt: new Date().toISOString(),
+        },
+        isDirty: true,
+      };
+    });
+
+    // Execute other changes after state update
+    // Use requestAnimationFrame to ensure refs are updated
+    requestAnimationFrame(() => {
+      switch (changeType.kind) {
+        case "insertNote":
+          insertNoteRef.current?.(changeType.pitchName, true);
+          break;
+        case "insertRest":
+          insertRestRef.current?.(true);
+          break;
+        case "deleteNote":
+          deleteNoteRef.current?.(true);
+          break;
+      }
+    });
+  }, [pendingRhythmChange, state.selectedNoteId, state.score, undoManager]);
+
+  // Refs for insert/delete functions so confirmRhythmChange can call latest versions
+  const insertNoteRef =
+    useRef<(pitchName: PitchName, skipConfirmation?: boolean) => boolean>();
+  const insertRestRef = useRef<(skipConfirmation?: boolean) => boolean>();
+  const deleteNoteRef = useRef<(skipConfirmation?: boolean) => boolean>();
+  const changeDurationRef =
+    useRef<(duration: DurationValue, skipConfirmation?: boolean) => void>();
+
+  const cancelRhythmChange = useCallback(() => {
+    setPendingRhythmChange(null);
+  }, []);
+
+  // ==========================================================================
   // Note Operations (simplified from composer - key operations included)
   // ==========================================================================
 
+  /**
+   * Insert a note at the current cursor position.
+   * @param pitchName The pitch name to insert
+   * @param skipConfirmation If true, skip the chord/lyrics confirmation check (used after user confirms)
+   */
   const insertNote = useCallback(
-    (pitchName: PitchName): boolean => {
+    (pitchName: PitchName, skipConfirmation = false): boolean => {
       const currentCursor = cursorRef.current;
       const measure = state.score.measures[currentCursor.measureIndex];
       if (!measure) return false;
 
       const isReplaceMode = currentCursor.noteIndex < measure.notes.length;
+
+      // Check if measure has chords or lyrics that need confirmation (only in replace mode)
+      if (isReplaceMode && !skipConfirmation) {
+        const { hasChords, hasLyrics } = getMeasureChordsAndLyrics(
+          currentCursor.measureIndex,
+        );
+        if (hasChords || hasLyrics) {
+          // Set pending change for user confirmation
+          setPendingRhythmChange({
+            measureIndex: currentCursor.measureIndex,
+            hasChords,
+            hasLyrics,
+            changeType: { kind: "insertNote", pitchName },
+          });
+          return false; // Change not executed yet
+        }
+      }
 
       const targetCursor = {
         measureIndex: currentCursor.measureIndex,
@@ -562,180 +828,254 @@ export function useTuneComposerState(
         return true;
       }
     },
-    [state.score, state.selectedDuration, state.dottedMode, undoManager],
+    [
+      state.score,
+      state.selectedDuration,
+      state.dottedMode,
+      undoManager,
+      getMeasureChordsAndLyrics,
+    ],
   );
 
-  const insertRest = useCallback((): boolean => {
-    const currentCursor = cursorRef.current;
-    const measure = state.score.measures[currentCursor.measureIndex];
-    if (!measure) return false;
+  /**
+   * Insert a rest at the current cursor position.
+   * @param skipConfirmation If true, skip the chord/lyrics confirmation check
+   */
+  const insertRest = useCallback(
+    (skipConfirmation = false): boolean => {
+      const currentCursor = cursorRef.current;
+      const measure = state.score.measures[currentCursor.measureIndex];
+      if (!measure) return false;
 
-    const isReplaceMode = currentCursor.noteIndex < measure.notes.length;
-    const targetCursor = {
-      measureIndex: currentCursor.measureIndex,
-      noteIndex: currentCursor.noteIndex,
-    };
+      const isReplaceMode = currentCursor.noteIndex < measure.notes.length;
 
-    const rest = createRest(
-      state.selectedDuration,
-      state.dottedMode || undefined,
-    );
+      // Check if measure has chords or lyrics that need confirmation (only in replace mode)
+      if (isReplaceMode && !skipConfirmation) {
+        const { hasChords, hasLyrics } = getMeasureChordsAndLyrics(
+          currentCursor.measureIndex,
+        );
+        if (hasChords || hasLyrics) {
+          // Set pending change for user confirmation
+          setPendingRhythmChange({
+            measureIndex: currentCursor.measureIndex,
+            hasChords,
+            hasLyrics,
+            changeType: { kind: "insertRest" },
+          });
+          return false; // Change not executed yet
+        }
+      }
 
-    if (isReplaceMode) {
-      const replaceResult = replaceNoteAtIndex(
-        measure,
-        currentCursor.noteIndex,
-        rest,
-        state.score.timeSignature,
+      const targetCursor = {
+        measureIndex: currentCursor.measureIndex,
+        noteIndex: currentCursor.noteIndex,
+      };
+
+      const rest = createRest(
+        state.selectedDuration,
+        state.dottedMode || undefined,
       );
 
-      const action = createInsertNoteAction(targetCursor, rest);
-      undoManager.pushAction(action);
+      if (isReplaceMode) {
+        const replaceResult = replaceNoteAtIndex(
+          measure,
+          currentCursor.noteIndex,
+          rest,
+          state.score.timeSignature,
+        );
 
-      const newNoteIndex = replaceResult.insertedIndex + 1;
-      let newCursor: CursorPosition;
-      if (newNoteIndex >= replaceResult.notes.length) {
-        const nextMeasureIndex = currentCursor.measureIndex + 1;
-        if (nextMeasureIndex < state.score.measures.length) {
-          newCursor = { measureIndex: nextMeasureIndex, noteIndex: 0 };
+        const action = createInsertNoteAction(targetCursor, rest);
+        undoManager.pushAction(action);
+
+        const newNoteIndex = replaceResult.insertedIndex + 1;
+        let newCursor: CursorPosition;
+        if (newNoteIndex >= replaceResult.notes.length) {
+          const nextMeasureIndex = currentCursor.measureIndex + 1;
+          if (nextMeasureIndex < state.score.measures.length) {
+            newCursor = { measureIndex: nextMeasureIndex, noteIndex: 0 };
+          } else {
+            newCursor = {
+              measureIndex: currentCursor.measureIndex,
+              noteIndex: replaceResult.notes.length - 1,
+            };
+          }
         } else {
           newCursor = {
             measureIndex: currentCursor.measureIndex,
-            noteIndex: replaceResult.notes.length - 1,
+            noteIndex: newNoteIndex,
           };
         }
-      } else {
-        newCursor = {
-          measureIndex: currentCursor.measureIndex,
-          noteIndex: newNoteIndex,
-        };
-      }
-      cursorRef.current = newCursor;
+        cursorRef.current = newCursor;
 
-      setState((prev) => {
-        const newMeasures = prev.score.measures.map((m, i) =>
-          i === currentCursor.measureIndex
-            ? { ...m, notes: replaceResult.notes }
-            : m,
+        setState((prev) => {
+          const newMeasures = prev.score.measures.map((m, i) =>
+            i === currentCursor.measureIndex
+              ? { ...m, notes: replaceResult.notes }
+              : m,
+          );
+
+          return {
+            ...prev,
+            score: {
+              ...prev.score,
+              measures: newMeasures,
+              updatedAt: new Date().toISOString(),
+            },
+            cursor: newCursor,
+            selectedNoteId: rest.id,
+            isDirty: true,
+          };
+        });
+
+        return true;
+      }
+      return false;
+    },
+    [
+      state.score,
+      state.selectedDuration,
+      state.dottedMode,
+      undoManager,
+      getMeasureChordsAndLyrics,
+    ],
+  );
+
+  /**
+   * Delete the note at the current cursor position.
+   * @param skipConfirmation If true, skip the chord/lyrics confirmation check
+   */
+  const deleteNote = useCallback(
+    (skipConfirmation = false): boolean => {
+      let currentPosition: CursorPosition = state.cursor;
+      let currentNote: Note | null = null;
+
+      if (state.selectedNoteId) {
+        const position = findNotePosition(state.selectedNoteId, state.score);
+        if (position) {
+          currentPosition = position;
+          currentNote =
+            state.score.measures[position.measureIndex]?.notes[
+              position.noteIndex
+            ] || null;
+        }
+      }
+
+      if (!currentNote) {
+        currentNote = getNoteAtCursor(state.cursor, state.score);
+        currentPosition = state.cursor;
+      }
+
+      if (!currentNote) return false;
+
+      if (currentNote.midi === null) {
+        // Just navigate left if on rest
+        const newCursor = moveCursorLeft(currentPosition, state.score);
+        if (
+          newCursor.measureIndex !== currentPosition.measureIndex ||
+          newCursor.noteIndex !== currentPosition.noteIndex
+        ) {
+          const noteAtNew = getNoteAtCursor(newCursor, state.score);
+          setState((prevState) => ({
+            ...prevState,
+            cursor: newCursor,
+            selectedNoteId: noteAtNew?.id ?? null,
+          }));
+          cursorRef.current = newCursor;
+          return true;
+        }
+        return false;
+      }
+
+      // Check if measure has chords or lyrics that need confirmation
+      if (!skipConfirmation) {
+        const { hasChords, hasLyrics } = getMeasureChordsAndLyrics(
+          currentPosition.measureIndex,
         );
+        if (hasChords || hasLyrics) {
+          // Set pending change for user confirmation
+          setPendingRhythmChange({
+            measureIndex: currentPosition.measureIndex,
+            hasChords,
+            hasLyrics,
+            changeType: { kind: "deleteNote" },
+          });
+          return false; // Change not executed yet
+        }
+      }
+
+      // Execute the delete
+      const positionToDelete = currentPosition;
+      const noteToDelete = currentNote;
+
+      const action = createDeleteNoteAction(positionToDelete, noteToDelete);
+      undoManager.pushAction(action);
+
+      suppressAddMeasurePromptRef.current = true;
+
+      const measure = state.score.measures[positionToDelete.measureIndex];
+      const deletedDuration = getNoteDuration(noteToDelete);
+      const beatPosition = getBeatPositionAt(
+        measure,
+        positionToDelete.noteIndex,
+      );
+
+      const replacementRests = generateRestsForDurationAtPosition(
+        deletedDuration,
+        beatPosition,
+        state.score.timeSignature,
+      );
+
+      cursorRef.current = positionToDelete;
+
+      setState((prevState) => {
+        const newMeasures = prevState.score.measures.map((m, i) => {
+          if (i !== positionToDelete.measureIndex) return m;
+
+          const newNotes = [
+            ...m.notes.slice(0, positionToDelete.noteIndex),
+            ...replacementRests,
+            ...m.notes.slice(positionToDelete.noteIndex + 1),
+          ];
+
+          return { ...m, notes: newNotes };
+        });
+
+        const newMeasure = newMeasures[positionToDelete.measureIndex];
+        const newCursorIndex = Math.min(
+          positionToDelete.noteIndex,
+          newMeasure.notes.length - 1,
+        );
+        const newCursor = {
+          measureIndex: positionToDelete.measureIndex,
+          noteIndex: newCursorIndex,
+        };
+        const newSelectedId = newMeasure.notes[newCursorIndex]?.id || null;
+
+        cursorRef.current = newCursor;
 
         return {
-          ...prev,
+          ...prevState,
           score: {
-            ...prev.score,
+            ...prevState.score,
             measures: newMeasures,
             updatedAt: new Date().toISOString(),
           },
           cursor: newCursor,
-          selectedNoteId: rest.id,
+          selectedNoteId: newSelectedId,
           isDirty: true,
         };
       });
 
       return true;
-    }
-    return false;
-  }, [state.score, state.selectedDuration, state.dottedMode, undoManager]);
-
-  const deleteNote = useCallback((): boolean => {
-    let currentPosition: CursorPosition = state.cursor;
-    let currentNote: Note | null = null;
-
-    if (state.selectedNoteId) {
-      const position = findNotePosition(state.selectedNoteId, state.score);
-      if (position) {
-        currentPosition = position;
-        currentNote =
-          state.score.measures[position.measureIndex]?.notes[
-            position.noteIndex
-          ] || null;
-      }
-    }
-
-    if (!currentNote) {
-      currentNote = getNoteAtCursor(state.cursor, state.score);
-      currentPosition = state.cursor;
-    }
-
-    if (!currentNote) return false;
-
-    if (currentNote.midi === null) {
-      // Just navigate left if on rest
-      const newCursor = moveCursorLeft(currentPosition, state.score);
-      if (
-        newCursor.measureIndex !== currentPosition.measureIndex ||
-        newCursor.noteIndex !== currentPosition.noteIndex
-      ) {
-        const noteAtNew = getNoteAtCursor(newCursor, state.score);
-        setState((prevState) => ({
-          ...prevState,
-          cursor: newCursor,
-          selectedNoteId: noteAtNew?.id ?? null,
-        }));
-        cursorRef.current = newCursor;
-        return true;
-      }
-      return false;
-    }
-
-    const action = createDeleteNoteAction(currentPosition, currentNote);
-    undoManager.pushAction(action);
-
-    suppressAddMeasurePromptRef.current = true;
-
-    const measure = state.score.measures[currentPosition.measureIndex];
-    const deletedDuration = getNoteDuration(currentNote);
-    const beatPosition = getBeatPositionAt(measure, currentPosition.noteIndex);
-
-    const replacementRests = generateRestsForDurationAtPosition(
-      deletedDuration,
-      beatPosition,
-      state.score.timeSignature,
-    );
-
-    cursorRef.current = currentPosition;
-
-    setState((prevState) => {
-      const newMeasures = prevState.score.measures.map((m, i) => {
-        if (i !== currentPosition.measureIndex) return m;
-
-        const newNotes = [
-          ...m.notes.slice(0, currentPosition.noteIndex),
-          ...replacementRests,
-          ...m.notes.slice(currentPosition.noteIndex + 1),
-        ];
-
-        return { ...m, notes: newNotes };
-      });
-
-      const newMeasure = newMeasures[currentPosition.measureIndex];
-      const newCursorIndex = Math.min(
-        currentPosition.noteIndex,
-        newMeasure.notes.length - 1,
-      );
-      const newCursor = {
-        measureIndex: currentPosition.measureIndex,
-        noteIndex: newCursorIndex,
-      };
-      const newSelectedId = newMeasure.notes[newCursorIndex]?.id || null;
-
-      cursorRef.current = newCursor;
-
-      return {
-        ...prevState,
-        score: {
-          ...prevState.score,
-          measures: newMeasures,
-          updatedAt: new Date().toISOString(),
-        },
-        cursor: newCursor,
-        selectedNoteId: newSelectedId,
-        isDirty: true,
-      };
-    });
-
-    return true;
-  }, [state.cursor, state.score, state.selectedNoteId, undoManager]);
+    },
+    [
+      state.cursor,
+      state.score,
+      state.selectedNoteId,
+      undoManager,
+      getMeasureChordsAndLyrics,
+    ],
+  );
 
   const changePitch = useCallback(
     (direction: "up" | "down") => {
@@ -927,8 +1267,13 @@ export function useTuneComposerState(
     setState((prev) => ({ ...prev, dottedMode: !prev.dottedMode }));
   }, []);
 
+  /**
+   * Change the duration of the selected note.
+   * @param duration The new duration
+   * @param skipConfirmation If true, skip the chord/lyrics confirmation check
+   */
   const changeDurationOfSelected = useCallback(
-    (duration: DurationValue) => {
+    (duration: DurationValue, skipConfirmation = false) => {
       if (!state.selectedNoteId) return;
 
       const position = findNotePosition(state.selectedNoteId, state.score);
@@ -945,6 +1290,24 @@ export function useTuneComposerState(
 
       if (newTotalDuration > maxDuration + 0.001) return;
 
+      // Check if measure has chords or lyrics that need confirmation
+      if (!skipConfirmation) {
+        const { hasChords, hasLyrics } = getMeasureChordsAndLyrics(
+          position.measureIndex,
+        );
+        if (hasChords || hasLyrics) {
+          // Set pending change for user confirmation
+          setPendingRhythmChange({
+            measureIndex: position.measureIndex,
+            hasChords,
+            hasLyrics,
+            changeType: { kind: "changeDuration", duration },
+          });
+          return; // Change not executed yet
+        }
+      }
+
+      // Execute the change
       const action = createChangeDurationAction(
         position,
         note.id,
@@ -967,8 +1330,31 @@ export function useTuneComposerState(
         ),
       }));
     },
-    [state.selectedNoteId, state.score, undoManager, updateScore],
+    [
+      state.selectedNoteId,
+      state.score,
+      undoManager,
+      updateScore,
+      getMeasureChordsAndLyrics,
+    ],
   );
+
+  // Update refs for rhythm change confirmation to use latest function versions
+  useEffect(() => {
+    insertNoteRef.current = insertNote;
+  }, [insertNote]);
+
+  useEffect(() => {
+    insertRestRef.current = insertRest;
+  }, [insertRest]);
+
+  useEffect(() => {
+    deleteNoteRef.current = deleteNote;
+  }, [deleteNote]);
+
+  useEffect(() => {
+    changeDurationRef.current = changeDurationOfSelected;
+  }, [changeDurationOfSelected]);
 
   // ==========================================================================
   // Navigation
@@ -1409,10 +1795,16 @@ export function useTuneComposerState(
   const clearScore = useCallback(() => {
     setState((prev) => {
       const emptyMeasure = createMeasure(prev.score.timeSignature);
+      // Clear chord progressions when clearing score
+      const clearedProgressions = prev.score.chordProgressions.map((prog) => ({
+        ...prog,
+        chords: [],
+      }));
       return {
         ...createInitialState({
           ...prev.score,
           measures: [emptyMeasure],
+          chordProgressions: clearedProgressions,
           updatedAt: new Date().toISOString(),
         }),
         isDirty: true,
@@ -2708,6 +3100,7 @@ export function useTuneComposerState(
 
   /**
    * Get the current chord symbol at the chord cursor position.
+   * Uses beat unit index directly since chords store beat unit indices.
    */
   const currentChordSymbol = useMemo((): string => {
     if (!state.chordCursor || !activeProgression) return "";
@@ -2721,6 +3114,7 @@ export function useTuneComposerState(
 
   /**
    * Set a chord at the current cursor position.
+   * Stores beat unit index directly; MusicXML generator converts to quarter notes.
    */
   const setChordAtCursor = useCallback(
     (symbol: string) => {
@@ -2767,6 +3161,7 @@ export function useTuneComposerState(
 
   /**
    * Remove the chord at the current cursor position.
+   * Uses beat unit index directly.
    */
   const removeChordAtCursor = useCallback(() => {
     if (!state.chordCursor || !activeProgression) return;
@@ -3036,5 +3431,10 @@ export function useTuneComposerState(
     showChordSymbols,
     toggleChordSymbolVisibility,
     activeProgression,
+
+    // Rhythm Change Confirmation
+    pendingRhythmChange,
+    confirmRhythmChange,
+    cancelRhythmChange,
   };
 }

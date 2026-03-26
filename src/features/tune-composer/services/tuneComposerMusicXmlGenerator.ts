@@ -29,6 +29,7 @@ import {
   isRest,
   getActiveProgression,
   getChordsForMeasure,
+  getBeatUnitDuration,
 } from "../types";
 import { recognizeChord } from "./chordRecognition";
 
@@ -288,6 +289,7 @@ function alterToXml(alter: number): string {
 /**
  * Generate MusicXML <harmony> element from a ChordSymbol.
  * Returns empty string if chord cannot be parsed.
+ * @param chord The chord symbol to generate
  */
 export function generateHarmonyXml(chord: ChordSymbol): string {
   const result = recognizeChord(chord.symbol);
@@ -618,15 +620,21 @@ function generateMeasureXml(
   }
 
   // Get sorted chords for this measure (only if chord symbols are visible)
-  const measureChords: ChordSymbol[] = [];
+  // Convert beat unit index to quarter note position for comparison with currentBeat
+  const beatUnitDuration = getBeatUnitDuration(score.timeSignature);
+  const measureChords: Array<ChordSymbol & { beatPositionInQuarters: number }> =
+    [];
   if (score.displaySettings.showChordSymbols) {
     const chords = getChordsForMeasure(activeChords, measureNumber - 1);
     measureChords.push(
-      ...chords.sort((a, b) => a.beatPosition - b.beatPosition),
+      ...chords
+        .map((c) => ({
+          ...c,
+          beatPositionInQuarters: c.beatPosition * beatUnitDuration,
+        }))
+        .sort((a, b) => a.beatPositionInQuarters - b.beatPositionInQuarters),
     );
   }
-  // Track which chords have been output
-  let nextChordIndex = 0;
 
   // Pre-compute last in triplet group
   const lastInTripletGroup = new Set<string>();
@@ -678,13 +686,17 @@ function generateMeasureXml(
     }
   }
 
-  // Generate notes with directions - interleave harmony at correct beat positions
+  // Track chord index for interleaving with notes
+  let nextChordIndex = 0;
   let currentBeat = 0;
+
+  // Generate notes with directions, interleaving harmony at correct beat positions
   for (const note of measure.notes) {
     // Output any harmony elements that should appear at or before this beat position
     while (
       nextChordIndex < measureChords.length &&
-      measureChords[nextChordIndex].beatPosition <= currentBeat
+      measureChords[nextChordIndex].beatPositionInQuarters <=
+        currentBeat + 0.001
     ) {
       notesXml += "\n" + generateHarmonyXml(measureChords[nextChordIndex]);
       nextChordIndex++;
@@ -713,7 +725,7 @@ function generateMeasureXml(
     currentBeat += note.duration;
   }
 
-  // Output any remaining harmony elements (chords at the end of the measure)
+  // Output any remaining harmony elements (chords at beat positions after all notes)
   while (nextChordIndex < measureChords.length) {
     notesXml += "\n" + generateHarmonyXml(measureChords[nextChordIndex]);
     nextChordIndex++;

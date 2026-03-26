@@ -1691,6 +1691,50 @@ function TuneComposerScreenContent({
             </View>
           </Pressable>
         </Modal>
+
+        {/* Rhythm Change Confirmation Modal */}
+        <Modal
+          visible={!!composerState.pendingRhythmChange}
+          transparent
+          animationType="fade"
+          onRequestClose={composerState.cancelRhythmChange}
+        >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={composerState.cancelRhythmChange}
+          >
+            <View
+              style={styles.modalContent}
+              onStartShouldSetResponder={() => true}
+            >
+              <Text style={styles.modalTitle}>Clear Chords & Lyrics?</Text>
+              <Text style={styles.modalMessage}>
+                This measure has{" "}
+                {composerState.pendingRhythmChange?.hasChords &&
+                composerState.pendingRhythmChange?.hasLyrics
+                  ? "chords and lyrics"
+                  : composerState.pendingRhythmChange?.hasChords
+                    ? "chords"
+                    : "lyrics"}
+                . Changing the rhythm will remove them from this measure.
+              </Text>
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={composerState.confirmRhythmChange}
+              >
+                <Text style={styles.modalOptionText}>
+                  Clear & Change Rhythm
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalOption, styles.modalCancelOption]}
+                onPress={composerState.cancelRhythmChange}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
