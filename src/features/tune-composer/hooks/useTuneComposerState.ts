@@ -35,6 +35,8 @@ import {
   DURATION,
   STAFF_CENTER_MIDI,
   getBeatsPerMeasure,
+  getBeatUnitCount,
+  getBeatUnitDuration,
   getMeasureDuration,
   getNoteDuration,
   validateMeasure,
@@ -2789,16 +2791,16 @@ export function useTuneComposerState(
 
   /**
    * Move chord cursor to the next beat position.
-   * Advances by 1 beat, moving to the next measure if needed.
+   * Advances by 1 beat unit (e.g., eighth note in 6/8), moving to the next measure if needed.
    */
   const moveChordCursorNext = useCallback(() => {
     setState((prev) => {
       if (!prev.chordMode || !prev.chordCursor) return prev;
       const { measureIndex, beatPosition } = prev.chordCursor;
-      const beatsPerMeasure = getBeatsPerMeasure(prev.score.timeSignature);
+      const beatUnitCount = getBeatUnitCount(prev.score.timeSignature);
       const nextBeat = beatPosition + 1;
 
-      if (nextBeat >= beatsPerMeasure) {
+      if (nextBeat >= beatUnitCount) {
         // Move to next measure
         const nextMeasure = measureIndex + 1;
         if (nextMeasure >= prev.score.measures.length) {
@@ -2820,7 +2822,7 @@ export function useTuneComposerState(
 
   /**
    * Move chord cursor to the previous beat position.
-   * Goes back by 1 beat, moving to the previous measure if needed.
+   * Goes back by 1 beat unit, moving to the previous measure if needed.
    */
   const moveChordCursorPrev = useCallback(() => {
     setState((prev) => {
@@ -2834,12 +2836,12 @@ export function useTuneComposerState(
         };
       } else if (measureIndex > 0) {
         // Move to last beat of previous measure
-        const beatsPerMeasure = getBeatsPerMeasure(prev.score.timeSignature);
+        const beatUnitCount = getBeatUnitCount(prev.score.timeSignature);
         return {
           ...prev,
           chordCursor: {
             measureIndex: measureIndex - 1,
-            beatPosition: beatsPerMeasure - 1,
+            beatPosition: beatUnitCount - 1,
           },
         };
       }
@@ -2863,13 +2865,11 @@ export function useTuneComposerState(
   const canChordCursorGoNext = useMemo((): boolean => {
     if (!state.chordCursor) return false;
     const { measureIndex, beatPosition } = state.chordCursor;
-    const beatsPerMeasure = getBeatsPerMeasure(state.score.timeSignature);
+    const beatUnitCount = getBeatUnitCount(state.score.timeSignature);
     const totalMeasures = state.score.measures.length;
 
     // Can go next if not at last beat of last measure
-    return (
-      measureIndex < totalMeasures - 1 || beatPosition < beatsPerMeasure - 1
-    );
+    return measureIndex < totalMeasures - 1 || beatPosition < beatUnitCount - 1;
   }, [
     state.chordCursor,
     state.score.timeSignature,

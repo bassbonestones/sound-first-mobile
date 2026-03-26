@@ -171,6 +171,23 @@ export function getBeatsPerMeasure(timeSig: TimeSignature): number {
   return (timeSig.beats * 4) / timeSig.beatUnit;
 }
 
+/**
+ * Get the number of beat unit positions in a measure.
+ * This is the numerator of the time signature (e.g., 6 in 6/8).
+ * Used for chord cursor navigation where each beat unit is a position.
+ */
+export function getBeatUnitCount(timeSig: TimeSignature): number {
+  return timeSig.beats;
+}
+
+/**
+ * Get the duration of one beat unit in quarter notes.
+ * e.g., 4/4 = 1.0 (quarter), 6/8 = 0.5 (eighth), 2/2 = 2.0 (half)
+ */
+export function getBeatUnitDuration(timeSig: TimeSignature): number {
+  return 4 / timeSig.beatUnit;
+}
+
 // =============================================================================
 // Lyrics
 // =============================================================================

@@ -34,7 +34,7 @@ import { colors, spacing } from "../../../constants";
 import { generateComposerOsmdHtml } from "../../composer/components/composerScoreHtml";
 import { generateMusicXml } from "../services/tuneComposerMusicXmlGenerator";
 import type { TuneComposerScore, Note } from "../types";
-import { getNoteDuration } from "../types";
+import { getNoteDuration, getBeatUnitDuration } from "../types";
 import type { CursorPosition } from "../../composer/types";
 
 // Conditionally import WebView
@@ -176,10 +176,12 @@ function TuneComposerScoreViewportComponent({
     const xPositions = measurePos.beatPositions ?? [];
     let xPosition: number;
 
-    const targetBeat = chordCursor.beatPosition;
+    // Convert beat position (beat unit index) to quarter notes
+    const beatUnitDuration = getBeatUnitDuration(score.timeSignature);
+    const targetBeatInQuarters = chordCursor.beatPosition * beatUnitDuration;
     const beatsPerMeasure = score.timeSignature.beats;
 
-    // Calculate beat positions from our score model
+    // Calculate beat positions from our score model (in quarter notes)
     const measure = score.measures[chordCursor.measureIndex];
     const noteBeatPositions: { beat: number; x: number }[] = [];
 
@@ -194,23 +196,32 @@ function TuneComposerScoreViewportComponent({
     }
 
     console.log(
-      "[ChordCursor] Looking for beat:",
-      targetBeat,
+      "[ChordCursor] Looking for beat index:",
+      chordCursor.beatPosition,
+      "in quarters:",
+      targetBeatInQuarters,
+      "beatUnitDuration:",
+      beatUnitDuration,
       "beatsPerMeasure:",
       beatsPerMeasure,
-      "Calculated beat positions:",
+      "Note positions:",
       JSON.stringify(noteBeatPositions),
     );
+
+    // Total measure duration in quarter notes
+    const measureDurationInQuarters = beatsPerMeasure * beatUnitDuration;
 
     if (noteBeatPositions.length === 0) {
       // No notes - use proportional fallback
       const noteStartX = measurePos.noteStartX ?? measurePos.x + 50;
       const measureWidth = measurePos.width ?? 100;
-      xPosition = noteStartX + (targetBeat / beatsPerMeasure) * measureWidth;
+      xPosition =
+        noteStartX +
+        (targetBeatInQuarters / measureDurationInQuarters) * measureWidth;
     } else {
-      // Find exact match first
+      // Find exact match first (comparing in quarter notes)
       const exactMatch = noteBeatPositions.find(
-        (bp) => Math.abs(bp.beat - targetBeat) < 0.01,
+        (bp) => Math.abs(bp.beat - targetBeatInQuarters) < 0.01,
       );
 
       if (exactMatch) {
@@ -218,16 +229,18 @@ function TuneComposerScoreViewportComponent({
         xPosition = exactMatch.x;
         console.log(
           "[ChordCursor] Exact match at beat",
-          targetBeat,
+          targetBeatInQuarters,
           "x:",
           xPosition,
         );
       } else {
         // Find surrounding notes and interpolate
         const before = noteBeatPositions
-          .filter((bp) => bp.beat < targetBeat)
+          .filter((bp) => bp.beat < targetBeatInQuarters)
           .pop();
-        const after = noteBeatPositions.find((bp) => bp.beat > targetBeat);
+        const after = noteBeatPositions.find(
+          (bp) => bp.beat > targetBeatInQuarters,
+        );
 
         console.log(
           "[ChordCursor] Interpolating - before:",
@@ -239,31 +252,47 @@ function TuneComposerScoreViewportComponent({
         if (before && after) {
           // Interpolate between the two surrounding notes
           const beatRange = after.beat - before.beat;
-          const beatOffset = targetBeat - before.beat;
+          const beatOffset = targetBeatInQuarters - before.beat;
           const fraction = beatOffset / beatRange;
           xPosition = before.x + fraction * (after.x - before.x);
         } else if (before) {
-          // Target is after all notes - extrapolate
+          // Target is after all notes - extrapolate using note spacing
+          const beatsAfterLastNote = targetBeatInQuarters - before.beat;
+
           if (noteBeatPositions.length >= 2) {
-            const lastTwo = noteBeatPositions.slice(-2);
-            const beatRange = lastTwo[1].beat - lastTwo[0].beat;
-            if (beatRange > 0) {
-              const spacingPerBeat = (lastTwo[1].x - lastTwo[0].x) / beatRange;
-              xPosition =
-                before.x + (targetBeat - before.beat) * spacingPerBeat;
+            // Use spacing from existing notes to extrapolate
+            const firstNote = noteBeatPositions[0];
+            const lastNote = noteBeatPositions[noteBeatPositions.length - 1];
+            const totalNoteBeatSpan = lastNote.beat - firstNote.beat;
+            const totalNoteXSpan = lastNote.x - firstNote.x;
+
+            if (totalNoteBeatSpan > 0) {
+              const pixelsPerBeat = totalNoteXSpan / totalNoteBeatSpan;
+              xPosition = before.x + beatsAfterLastNote * pixelsPerBeat;
             } else {
-              const measureWidth = measurePos.width ?? 100;
+              // All notes at same beat - use measure width estimate
+              const estimatedPixelsPerBeat =
+                (measurePos.width ?? 100) / measureDurationInQuarters;
               xPosition =
-                before.x +
-                ((targetBeat - before.beat) / beatsPerMeasure) * measureWidth;
+                before.x + beatsAfterLastNote * estimatedPixelsPerBeat;
             }
           } else {
-            // Only one note
-            const measureWidth = measurePos.width ?? 100;
-            xPosition =
-              before.x +
-              ((targetBeat - before.beat) / beatsPerMeasure) * measureWidth;
+            // Only one note - estimate spacing from measure width
+            const estimatedPixelsPerBeat =
+              (measurePos.width ?? 100) / measureDurationInQuarters;
+            xPosition = before.x + beatsAfterLastNote * estimatedPixelsPerBeat;
           }
+
+          console.log(
+            "[ChordCursor] Extrapolating after last note - lastNoteBeat:",
+            before.beat,
+            "targetBeat:",
+            targetBeatInQuarters,
+            "beatsAfter:",
+            beatsAfterLastNote,
+            "x:",
+            xPosition,
+          );
         } else if (after) {
           // Target is before all notes (shouldn't happen normally)
           if (noteBeatPositions.length >= 2) {
@@ -272,18 +301,23 @@ function TuneComposerScoreViewportComponent({
             if (beatRange > 0) {
               const spacingPerBeat =
                 (firstTwo[1].x - firstTwo[0].x) / beatRange;
-              xPosition = after.x - (after.beat - targetBeat) * spacingPerBeat;
+              xPosition =
+                after.x - (after.beat - targetBeatInQuarters) * spacingPerBeat;
             } else {
               const measureWidth = measurePos.width ?? 100;
               xPosition =
                 after.x -
-                ((after.beat - targetBeat) / beatsPerMeasure) * measureWidth;
+                ((after.beat - targetBeatInQuarters) /
+                  measureDurationInQuarters) *
+                  measureWidth;
             }
           } else {
             const measureWidth = measurePos.width ?? 100;
             xPosition =
               after.x -
-              ((after.beat - targetBeat) / beatsPerMeasure) * measureWidth;
+              ((after.beat - targetBeatInQuarters) /
+                measureDurationInQuarters) *
+                measureWidth;
           }
         } else {
           xPosition = measurePos.noteStartX ?? measurePos.x + 50;
@@ -292,8 +326,10 @@ function TuneComposerScoreViewportComponent({
     }
 
     console.log(
-      "[ChordCursor] Calculated position - beat:",
-      targetBeat,
+      "[ChordCursor] Calculated position - beat index:",
+      chordCursor.beatPosition,
+      "in quarters:",
+      targetBeatInQuarters,
       "x:",
       xPosition,
     );
