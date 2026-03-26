@@ -109,6 +109,8 @@ export interface ChordRecognitionResult {
   suggestions: string[];
   /** Error message if not recognized */
   error?: string;
+  /** Validation warnings (chord still usable but unusual) */
+  warnings?: string[];
 }
 
 // =============================================================================
@@ -506,6 +508,62 @@ const COMMON_CHORDS: readonly string[] = [
 ] as const;
 
 // =============================================================================
+// Alteration Validation
+// =============================================================================
+
+/** All recognized chord alterations */
+const VALID_ALTERATIONS: ReadonlySet<string> = new Set([
+  "b9",
+  "#9",
+  "b5",
+  "#5",
+  "b11",
+  "#11",
+  "b13",
+  "#13",
+  "add9",
+  "add11",
+  "add13",
+  "alt",
+  "no3",
+  "no5",
+]);
+
+/** Conflicting alteration pairs - these shouldn't coexist */
+const CONFLICTING_ALTERATIONS: readonly [string, string][] = [
+  ["b9", "#9"], // Can't have both flat and sharp 9
+  ["b5", "#5"], // Can't have both flat and sharp 5
+  ["b13", "#13"], // Can't have both flat and sharp 13
+  ["b11", "#11"], // Can't have both flat and sharp 11
+];
+
+/**
+ * Validate alterations and return any warnings.
+ * @param alterations - List of alteration strings
+ * @returns Array of warning messages (empty if no issues)
+ */
+function validateAlterations(alterations: string[]): string[] {
+  const warnings: string[] = [];
+  const altSet = new Set(alterations);
+
+  // Check for unrecognized alterations
+  for (const alt of alterations) {
+    if (!VALID_ALTERATIONS.has(alt)) {
+      warnings.push(`Unrecognized alteration "${alt}"`);
+    }
+  }
+
+  // Check for conflicting alterations
+  for (const [alt1, alt2] of CONFLICTING_ALTERATIONS) {
+    if (altSet.has(alt1) && altSet.has(alt2)) {
+      warnings.push(`Conflicting: ${alt1} and ${alt2} can't coexist`);
+    }
+  }
+
+  return warnings;
+}
+
+// =============================================================================
 // Parsing Functions
 // =============================================================================
 
@@ -814,6 +872,9 @@ export function recognizeChord(input: string): ChordRecognitionResult {
   // Parse suffix (quality + alterations)
   const { quality, alterations } = parseSuffix(suffix);
 
+  // Validate alterations for warnings
+  const warnings = validateAlterations(alterations);
+
   // Build parsed chord
   const parsed: ParsedChord = {
     input: trimmed,
@@ -829,6 +890,7 @@ export function recognizeChord(input: string): ChordRecognitionResult {
     recognized: true,
     parsed,
     suggestions: [],
+    warnings: warnings.length > 0 ? warnings : undefined,
   };
 }
 

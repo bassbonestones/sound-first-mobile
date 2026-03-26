@@ -200,6 +200,8 @@ function ChordControlsComponent({
     : null;
   const isRecognized = recognitionResult?.recognized ?? false;
   const hasInput = inputText.trim().length > 0;
+  const hasWarnings = (recognitionResult?.warnings?.length ?? 0) > 0;
+  const warningMessages = recognitionResult?.warnings ?? [];
 
   // Sync input text with current chord when position changes
   useEffect(() => {
@@ -444,6 +446,10 @@ function ChordControlsComponent({
             style={[
               styles.textInput,
               hasInput && !isRecognized && styles.textInputWarning,
+              hasInput &&
+                isRecognized &&
+                hasWarnings &&
+                styles.textInputCaution,
             ]}
             value={inputText}
             onChangeText={handleTextChange}
@@ -459,6 +465,11 @@ function ChordControlsComponent({
           {hasInput && !isRecognized && (
             <View style={styles.warningBadge}>
               <Feather name="alert-circle" size={14} color={colors.warning} />
+            </View>
+          )}
+          {hasInput && isRecognized && hasWarnings && (
+            <View style={styles.cautionBadge} testID="chord-caution-badge">
+              <Feather name="alert-triangle" size={14} color={colors.warning} />
             </View>
           )}
           <TouchableOpacity
@@ -518,6 +529,22 @@ function ChordControlsComponent({
               </TouchableOpacity>
             ))}
           </ScrollView>
+        )}
+
+        {/* Validation warnings */}
+        {hasWarnings && (
+          <View style={styles.warningMessagesContainer} testID="chord-warnings">
+            {warningMessages.map((warning, index) => (
+              <View key={index} style={styles.warningMessage}>
+                <Feather
+                  name="alert-triangle"
+                  size={12}
+                  color={colors.warning}
+                />
+                <Text style={styles.warningMessageText}>{warning}</Text>
+              </View>
+            ))}
+          </View>
         )}
 
         {/* Symbol palette - Row 1: Accidentals */}
@@ -779,10 +806,34 @@ const styles = StyleSheet.create({
     borderColor: colors.warning,
     borderWidth: 2,
   },
+  textInputCaution: {
+    borderColor: colors.warning,
+    borderWidth: 2,
+  },
   warningBadge: {
     position: "absolute",
     right: 80,
     top: 12,
+  },
+  cautionBadge: {
+    position: "absolute",
+    right: 80,
+    top: 12,
+  },
+  warningMessagesContainer: {
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  warningMessage: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingVertical: 2,
+  },
+  warningMessageText: {
+    fontSize: 12,
+    color: colors.warning,
+    fontStyle: "italic",
   },
   previewButton: {
     width: 36,

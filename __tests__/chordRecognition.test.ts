@@ -621,6 +621,63 @@ describe("Chord Recognition Service", () => {
     });
   });
 
+  describe("alteration validation", () => {
+    it("should not warn for valid alterations", () => {
+      const result = recognizeChord("C7(b9)");
+      expect(result.recognized).toBe(true);
+      expect(result.warnings).toBeUndefined();
+    });
+
+    it("should warn for conflicting b9 and #9", () => {
+      const result = recognizeChord("C7(b9,#9)");
+      expect(result.recognized).toBe(true);
+      expect(result.warnings).toBeDefined();
+      expect(result.warnings?.length).toBeGreaterThan(0);
+      expect(
+        result.warnings?.some((w) => w.includes("b9") && w.includes("#9")),
+      ).toBe(true);
+    });
+
+    it("should warn for conflicting b5 and #5", () => {
+      const result = recognizeChord("C7(b5,#5)");
+      expect(result.recognized).toBe(true);
+      expect(result.warnings).toBeDefined();
+      expect(
+        result.warnings?.some((w) => w.includes("b5") && w.includes("#5")),
+      ).toBe(true);
+    });
+
+    it("should warn for unrecognized alterations", () => {
+      const result = recognizeChord("C7(xyz)");
+      expect(result.recognized).toBe(true);
+      expect(result.warnings).toBeDefined();
+      expect(result.warnings?.some((w) => w.includes("xyz"))).toBe(true);
+    });
+
+    it("should not warn for multiple valid non-conflicting alterations", () => {
+      const result = recognizeChord("C7(b9,#11)");
+      expect(result.recognized).toBe(true);
+      expect(result.warnings).toBeUndefined();
+    });
+
+    it("should still parse chords with conflicting alterations", () => {
+      const result = recognizeChord("C7(b9,#9)");
+      expect(result.recognized).toBe(true);
+      expect(result.parsed?.alterations).toContain("b9");
+      expect(result.parsed?.alterations).toContain("#9");
+    });
+
+    it("should handle alteration order consistently", () => {
+      const result1 = recognizeChord("C7(b9,#11)");
+      const result2 = recognizeChord("C7(#11,b9)");
+
+      expect(new Set(result1.parsed?.alterations)).toEqual(
+        new Set(result2.parsed?.alterations),
+      );
+      expect(result1.warnings).toEqual(result2.warnings);
+    });
+  });
+
   describe("generateChordPreviewMusicXml", () => {
     it("should generate MusicXML for a major triad", () => {
       const xml = generateChordPreviewMusicXml("C", 60, "treble");
