@@ -360,24 +360,39 @@ export function generateComposerOsmdHtml(
         
         if (staffMeasure.staffEntries && staffMeasure.staffEntries.length > 0) {
           console.log('[OSMD] Measure', i, 'staffEntries:', staffMeasure.staffEntries.length);
+          
+          // Log first entry structure to find timestamp property
+          const firstEntry = staffMeasure.staffEntries[0];
+          console.log('[OSMD] First entry keys:', Object.keys(firstEntry || {}));
+          if (firstEntry?.sourceStaffEntry) {
+            console.log('[OSMD] sourceStaffEntry keys:', Object.keys(firstEntry.sourceStaffEntry));
+            console.log('[OSMD] sourceStaffEntry.Timestamp:', firstEntry.sourceStaffEntry.Timestamp);
+          }
+          
+          let entryIndex = 0;
           for (const entry of staffMeasure.staffEntries) {
             if (entry && entry.boundingBox) {
               const entryX = entry.boundingBox.absolutePosition 
                 ? entry.boundingBox.absolutePosition.x 
                 : entry.boundingBox.x;
               if (entryX !== undefined && !isNaN(entryX)) {
-                // Get actual beat position from OSMD timestamp
-                // timestamp is a Fraction - need to check its structure
-                let beatNumber = 0;
-                console.log('[OSMD] Entry timestamp:', entry.timestamp, 
-                  'RealValue:', entry.timestamp?.RealValue,
-                  'Numerator:', entry.timestamp?.Numerator,
-                  'Denominator:', entry.timestamp?.Denominator);
-                if (entry.timestamp && typeof entry.timestamp.RealValue === 'number') {
-                  // Convert fraction to 0-indexed beat (0.0 -> 0, 0.25 -> 1, 0.5 -> 2, 0.75 -> 3)
-                  beatNumber = Math.round(entry.timestamp.RealValue * 4);
+                // Try to get beat from sourceStaffEntry.Timestamp
+                let beatNumber = entryIndex; // Fallback to entry index
+                
+                const sourceEntry = entry.sourceStaffEntry;
+                if (sourceEntry?.Timestamp?.RealValue !== undefined) {
+                  // Get measure start from first entry
+                  const firstSourceEntry = staffMeasure.staffEntries[0]?.sourceStaffEntry;
+                  const measureStart = firstSourceEntry?.Timestamp?.RealValue || 0;
+                  const relativeTimestamp = sourceEntry.Timestamp.RealValue - measureStart;
+                  // Convert whole notes to beats (multiply by 4 for 4/4 time)
+                  beatNumber = Math.round(relativeTimestamp * 4);
+                  console.log('[OSMD] Entry', entryIndex, '- timestamp:', sourceEntry.Timestamp.RealValue,
+                    'measureStart:', measureStart, 'relative:', relativeTimestamp,
+                    'beat:', beatNumber, 'x:', entryX * 10);
+                } else {
+                  console.log('[OSMD] Entry', entryIndex, '- no timestamp, using index as beat, x:', entryX * 10);
                 }
-                console.log('[OSMD] Beat number:', beatNumber, 'at x:', entryX * 10);
                 
                 beatPositions.push({
                   beat: beatNumber,
@@ -388,6 +403,7 @@ export function generateComposerOsmdHtml(
                   firstNoteX = entryX;
                 }
                 lastNoteX = entryX;
+                entryIndex++;
               }
             }
           }
