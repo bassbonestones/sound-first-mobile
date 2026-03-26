@@ -359,17 +359,28 @@ export function generateComposerOsmdHtml(
         let lastNoteX = null;
         
         if (staffMeasure.staffEntries && staffMeasure.staffEntries.length > 0) {
-          let entryIndex = 0;
+          console.log('[OSMD] Measure', i, 'staffEntries:', staffMeasure.staffEntries.length);
           for (const entry of staffMeasure.staffEntries) {
             if (entry && entry.boundingBox) {
               const entryX = entry.boundingBox.absolutePosition 
                 ? entry.boundingBox.absolutePosition.x 
                 : entry.boundingBox.x;
               if (entryX !== undefined && !isNaN(entryX)) {
-                // Use the entry index as the beat position
-                // This works for simple cases with one note per beat
+                // Get actual beat position from OSMD timestamp
+                // timestamp is a Fraction - need to check its structure
+                let beatNumber = 0;
+                console.log('[OSMD] Entry timestamp:', entry.timestamp, 
+                  'RealValue:', entry.timestamp?.RealValue,
+                  'Numerator:', entry.timestamp?.Numerator,
+                  'Denominator:', entry.timestamp?.Denominator);
+                if (entry.timestamp && typeof entry.timestamp.RealValue === 'number') {
+                  // Convert fraction to 0-indexed beat (0.0 -> 0, 0.25 -> 1, 0.5 -> 2, 0.75 -> 3)
+                  beatNumber = Math.round(entry.timestamp.RealValue * 4);
+                }
+                console.log('[OSMD] Beat number:', beatNumber, 'at x:', entryX * 10);
+                
                 beatPositions.push({
-                  beat: entryIndex,
+                  beat: beatNumber,
                   x: entryX * 10
                 });
                 
@@ -377,7 +388,6 @@ export function generateComposerOsmdHtml(
                   firstNoteX = entryX;
                 }
                 lastNoteX = entryX;
-                entryIndex++;
               }
             }
           }

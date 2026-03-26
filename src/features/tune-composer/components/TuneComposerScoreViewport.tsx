@@ -176,61 +176,59 @@ function TuneComposerScoreViewportComponent({
     let xPosition: number;
 
     const targetBeat = chordCursor.beatPosition;
+    const beatsPerMeasure = score.timeSignature.beats;
+
     console.log(
       "[ChordCursor] Looking for beat:",
       targetBeat,
-      "Available beats:",
-      beatPositions?.map((bp) => bp.beat),
+      "beatsPerMeasure:",
+      beatsPerMeasure,
+      "Available positions:",
+      JSON.stringify(beatPositions),
     );
 
-    if (beatPositions && beatPositions.length > 0) {
-      // Find exact beat match or interpolate between beats
-      const exactMatch = beatPositions.find(
-        (bp) => Math.abs(bp.beat - targetBeat) < 0.01,
-      );
+    // Get the actual note x positions
+    const noteStartX = measurePos.noteStartX ?? measurePos.x + 50;
+    const noteEndX = measurePos.noteEndX ?? noteStartX + 100;
+    const numNotes = beatPositions?.length ?? 0;
 
-      if (exactMatch) {
-        console.log(
-          "[ChordCursor] Found exact match for beat",
-          targetBeat,
-          "at x:",
-          exactMatch.x,
-        );
-        xPosition = exactMatch.x;
-      } else {
-        // Find surrounding beats and interpolate
-        const sorted = [...beatPositions].sort((a, b) => a.beat - b.beat);
-        const before = sorted.filter((bp) => bp.beat <= targetBeat).pop();
-        const after = sorted.find((bp) => bp.beat > targetBeat);
+    // Calculate the beat spacing based on the number of notes
+    // For half notes in 4/4: 2 notes covering beats 0 and 2
+    // The span between first and last note covers (beatsPerMeasure - beatsPerMeasure/numNotes) beats
+    // Or simpler: each note covers beatsPerMeasure/numNotes beats
+    const beatsPerNote = numNotes > 0 ? beatsPerMeasure / numNotes : 1;
+    const lastNoteBeat = numNotes > 0 ? (numNotes - 1) * beatsPerNote : 0;
 
-        console.log(
-          "[ChordCursor] Interpolating - before:",
-          before,
-          "after:",
-          after,
-        );
+    console.log(
+      "[ChordCursor] numNotes:",
+      numNotes,
+      "beatsPerNote:",
+      beatsPerNote,
+      "lastNoteBeat:",
+      lastNoteBeat,
+    );
 
-        if (before && after) {
-          // Linear interpolation between beats
-          const fraction =
-            (targetBeat - before.beat) / (after.beat - before.beat);
-          xPosition = before.x + fraction * (after.x - before.x);
-        } else if (before) {
-          xPosition = before.x;
-        } else if (after) {
-          xPosition = after.x;
-        } else {
-          xPosition = measurePos.noteStartX ?? measurePos.x + 50;
-        }
-      }
+    if (targetBeat <= lastNoteBeat && lastNoteBeat > 0) {
+      // Interpolate between noteStartX and noteEndX
+      const fraction = targetBeat / lastNoteBeat;
+      xPosition = noteStartX + fraction * (noteEndX - noteStartX);
+    } else if (lastNoteBeat > 0) {
+      // Beat is after the last note - extrapolate
+      const noteSpacing = (noteEndX - noteStartX) / (numNotes - 1 || 1);
+      const beatsAfterLast = targetBeat - lastNoteBeat;
+      xPosition = noteEndX + (beatsAfterLast / beatsPerNote) * noteSpacing;
     } else {
-      // Fallback to proportional calculation
-      const noteStartX = measurePos.noteStartX ?? measurePos.x + 50;
-      const noteWidth = measurePos.width;
-      const beatsPerMeasure = score.timeSignature.beats;
-      const beatFraction = chordCursor.beatPosition / beatsPerMeasure;
-      xPosition = noteStartX + beatFraction * noteWidth;
+      // Only one note or no notes - use proportional positioning
+      const measureWidth = measurePos.width ?? 100;
+      xPosition = noteStartX + (targetBeat / beatsPerMeasure) * measureWidth;
     }
+
+    console.log(
+      "[ChordCursor] Calculated position - beat:",
+      targetBeat,
+      "x:",
+      xPosition,
+    );
 
     const result = xPosition * osmdZoom;
 
