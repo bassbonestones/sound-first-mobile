@@ -28,6 +28,7 @@ export {
   isValidChordSymbol,
   getChordIntervals,
   getSupportedQualities,
+  generateChordPreviewMusicXml,
 } from "./chordRecognition";
 export type {
   ChordRoot,

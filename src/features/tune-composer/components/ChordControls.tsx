@@ -25,6 +25,7 @@ import {
   getAutocompleteSuggestions,
   spellChord,
 } from "../services";
+import { ChordPreview } from "./ChordPreview";
 import { ProgressionSelector } from "./ProgressionSelector";
 import type { ChordProgression } from "../types";
 
@@ -130,13 +131,19 @@ const QUALITY_SYMBOLS: SymbolButton[] = [
   { label: "sus", insert: "sus4", accessibilityLabel: "Suspended 4" },
 ];
 
-/** Row 3: Extensions */
+/** Row 3: Extensions - grouped by scale degree */
 const EXTENSION_SYMBOLS: SymbolButton[] = [
+  // 9ths
   { label: "9", insert: "9", accessibilityLabel: "9th" },
-  { label: "11", insert: "11", accessibilityLabel: "11th" },
-  { label: "13", insert: "13", accessibilityLabel: "13th" },
   { label: "♭9", insert: "b9", accessibilityLabel: "Flat 9" },
   { label: "♯9", insert: "#9", accessibilityLabel: "Sharp 9" },
+  // 11ths
+  { label: "11", insert: "11", accessibilityLabel: "11th" },
+  { label: "♯11", insert: "#11", accessibilityLabel: "Sharp 11" },
+  // 13ths
+  { label: "13", insert: "13", accessibilityLabel: "13th" },
+  { label: "♭13", insert: "b13", accessibilityLabel: "Flat 13" },
+  // 5ths (less common as alterations in parens)
   { label: "♭5", insert: "b5", accessibilityLabel: "Flat 5" },
   { label: "♯5", insert: "#5", accessibilityLabel: "Sharp 5" },
 ];
@@ -179,6 +186,7 @@ function ChordControlsComponent({
   const [inputText, setInputText] = useState(currentChordSymbol);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const inputRef = useRef<TextInputType>(null);
   // Track if we're selecting a suggestion to avoid blur handler race condition
   const isSelectingSuggestionRef = useRef(false);
@@ -348,14 +356,24 @@ function ChordControlsComponent({
     [inputText, onChordInputChange],
   );
 
-  // Handle chord preview
+  // Handle chord preview - toggle visual preview and optionally play audio
   const handlePreview = useCallback(() => {
-    if (!inputText.trim() || !onPreviewChord) return;
-    const midiNotes = spellChord(inputText.trim());
-    if (midiNotes.length > 0) {
-      onPreviewChord(midiNotes);
+    if (!inputText.trim()) return;
+    // Toggle the visual preview
+    setShowPreview((prev) => !prev);
+    // Also play audio preview if callback provided
+    if (onPreviewChord) {
+      const midiNotes = spellChord(inputText.trim());
+      if (midiNotes.length > 0) {
+        onPreviewChord(midiNotes);
+      }
     }
   }, [inputText, onPreviewChord]);
+
+  // Close preview when input changes
+  useEffect(() => {
+    setShowPreview(false);
+  }, [inputText]);
 
   // Clear input
   const handleClear = useCallback(() => {
@@ -443,18 +461,16 @@ function ChordControlsComponent({
               <Feather name="alert-circle" size={14} color={colors.warning} />
             </View>
           )}
-          {onPreviewChord && (
-            <TouchableOpacity
-              style={[styles.previewButton, !hasInput && styles.buttonDisabled]}
-              onPress={handlePreview}
-              disabled={!hasInput}
-              accessibilityRole={"button" as AccessibilityRole}
-              accessibilityLabel="Preview chord"
-              testID="chord-preview-button"
-            >
-              <Text style={styles.previewButtonText}>?</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={[styles.previewButton, !hasInput && styles.buttonDisabled]}
+            onPress={handlePreview}
+            disabled={!hasInput}
+            accessibilityRole={"button" as AccessibilityRole}
+            accessibilityLabel="Preview chord tones"
+            testID="chord-preview-button"
+          >
+            <Text style={styles.previewButtonText}>?</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.clearButton, !hasInput && styles.buttonDisabled]}
             onPress={handleClear}
@@ -470,6 +486,15 @@ function ChordControlsComponent({
             />
           </TouchableOpacity>
         </View>
+
+        {/* Chord preview mini-staff */}
+        {showPreview && hasInput && (
+          <ChordPreview
+            symbol={inputText.trim()}
+            onClose={() => setShowPreview(false)}
+            testID="chord-preview"
+          />
+        )}
 
         {/* Autocomplete suggestions */}
         {showSuggestions && suggestions.length > 0 && (

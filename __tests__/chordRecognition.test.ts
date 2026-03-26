@@ -12,6 +12,7 @@ import {
   isValidChordSymbol,
   getChordIntervals,
   getSupportedQualities,
+  generateChordPreviewMusicXml,
   type ChordQuality,
 } from "../src/features/tune-composer/services/chordRecognition";
 
@@ -438,6 +439,38 @@ describe("Chord Recognition Service", () => {
       });
     });
 
+    describe("alterations in parentheses", () => {
+      it("should spell Cmaj7(b9) with lowered 9th", () => {
+        const notes = spellChord("Cmaj7(b9)");
+        // C4, E4, G4, B4, Db5 (b9 = 13 semitones from root)
+        expect(notes).toEqual([60, 64, 67, 71, 73]);
+      });
+
+      it("should spell C7(#9) with raised 9th", () => {
+        const notes = spellChord("C7(#9)");
+        // C4, E4, G4, Bb4, D#5 (#9 = 15 semitones)
+        expect(notes).toEqual([60, 64, 67, 70, 75]);
+      });
+
+      it("should spell Cmaj7(#11) with raised 11th", () => {
+        const notes = spellChord("Cmaj7(#11)");
+        // C4, E4, G4, B4, F#5 (#11 = 18 semitones)
+        expect(notes).toEqual([60, 64, 67, 71, 78]);
+      });
+
+      it("should spell Cm7(b13) with lowered 13th", () => {
+        const notes = spellChord("Cm7(b13)");
+        // C4, Eb4, G4, Bb4, Ab5 (b13 = 20 semitones)
+        expect(notes).toEqual([60, 63, 67, 70, 80]);
+      });
+
+      it("should spell C7(b9,#11) with multiple alterations", () => {
+        const notes = spellChord("C7(b9,#11)");
+        // C4, E4, G4, Bb4, Db5, F#5
+        expect(notes).toEqual([60, 64, 67, 70, 73, 78]);
+      });
+    });
+
     describe("invalid input", () => {
       it("should return empty array for unrecognized chord", () => {
         expect(spellChord("Xmaj7")).toEqual([]);
@@ -585,6 +618,108 @@ describe("Chord Recognition Service", () => {
       expect(qualities).toContain("7");
       expect(qualities).toContain("dim7");
       expect(qualities).toContain("m7b5");
+    });
+  });
+
+  describe("generateChordPreviewMusicXml", () => {
+    it("should generate MusicXML for a major triad", () => {
+      const xml = generateChordPreviewMusicXml("C", 60, "treble");
+      expect(xml).toBeTruthy();
+      expect(xml).toContain("<?xml version");
+      expect(xml).toContain("<score-partwise");
+      // C major triad has C, E, G
+      expect(xml).toContain("<step>C</step>");
+      expect(xml).toContain("<step>E</step>");
+      expect(xml).toContain("<step>G</step>");
+    });
+
+    it("should generate MusicXML for a minor 7th chord", () => {
+      const xml = generateChordPreviewMusicXml("Am7", 57, "treble");
+      expect(xml).toBeTruthy();
+      // Verify it's valid MusicXML structure with 4 notes (3 chord tags)
+      expect(xml).toContain("<score-partwise");
+      const chordCount = (xml?.match(/<chord\/>/g) || []).length;
+      expect(chordCount).toBe(3); // m7 is a 4-note chord
+    });
+
+    it("should include <chord/> element for stacked notes after the first", () => {
+      const xml = generateChordPreviewMusicXml("C", 60, "treble");
+      expect(xml).toBeTruthy();
+      // Should have chord elements for E and G
+      const chordCount = (xml?.match(/<chord\/>/g) || []).length;
+      expect(chordCount).toBe(2); // 3-note triad has 2 chord tags
+    });
+
+    it("should use bass clef when specified", () => {
+      const xml = generateChordPreviewMusicXml("C", 48, "bass");
+      expect(xml).toBeTruthy();
+      expect(xml).toContain("<sign>F</sign>");
+      expect(xml).toContain("<line>4</line>");
+    });
+
+    it("should use treble clef by default", () => {
+      const xml = generateChordPreviewMusicXml("C", 60, "treble");
+      expect(xml).toBeTruthy();
+      expect(xml).toContain("<sign>G</sign>");
+      expect(xml).toContain("<line>2</line>");
+    });
+
+    it("should return null for unrecognized chord", () => {
+      const xml = generateChordPreviewMusicXml("XYZ123", 60, "treble");
+      expect(xml).toBeNull();
+    });
+
+    it("should include correct octave information", () => {
+      const xml = generateChordPreviewMusicXml("C", 60, "treble");
+      expect(xml).toBeTruthy();
+      expect(xml).toContain("<octave>4</octave>");
+    });
+
+    it("should handle chords with accidentals", () => {
+      const xmlSharp = generateChordPreviewMusicXml("F#", 66, "treble");
+      expect(xmlSharp).toBeTruthy();
+      expect(xmlSharp).toContain("<score-partwise");
+      // 3-note triad
+      const sharpChordCount = (xmlSharp?.match(/<chord\/>/g) || []).length;
+      expect(sharpChordCount).toBe(2);
+
+      const xmlFlat = generateChordPreviewMusicXml("Bb", 70, "treble");
+      expect(xmlFlat).toBeTruthy();
+      expect(xmlFlat).toContain("<score-partwise");
+      const flatChordCount = (xmlFlat?.match(/<chord\/>/g) || []).length;
+      expect(flatChordCount).toBe(2);
+    });
+
+    it("should generate 4 chord elements for a 7th chord (4 notes, 3 stacked)", () => {
+      const xml = generateChordPreviewMusicXml("Cmaj7", 60, "treble");
+      expect(xml).toBeTruthy();
+      const chordCount = (xml?.match(/<chord\/>/g) || []).length;
+      expect(chordCount).toBe(3); // 4-note chord has 3 chord tags
+    });
+
+    it("should spell #5 as G# not Ab", () => {
+      const xml = generateChordPreviewMusicXml("C(#5)", 60, "treble");
+      expect(xml).toBeTruthy();
+      // #5 should be spelled as G# (step=G, alter=1), not Ab (step=A, alter=-1)
+      expect(xml).toContain("<step>G</step>");
+      expect(xml).toContain("<alter>1</alter>");
+      expect(xml).not.toContain("<step>A</step>\n        <alter>-1</alter>");
+    });
+
+    it("should spell b5 as Gb not F#", () => {
+      const xml = generateChordPreviewMusicXml("C(b5)", 60, "treble");
+      expect(xml).toBeTruthy();
+      // b5 should be spelled as Gb (step=G, alter=-1), not F# (step=F, alter=1)
+      expect(xml).toContain("<step>G</step>");
+      expect(xml).toContain("<alter>-1</alter>");
+    });
+
+    it("should spell #9 as D# not Eb", () => {
+      const xml = generateChordPreviewMusicXml("C7(#9)", 60, "treble");
+      expect(xml).toBeTruthy();
+      // #9 should be spelled as D# (step=D, alter=1), not Eb (step=E, alter=-1)
+      expect(xml).toContain("<step>D</step>");
+      expect(xml).toContain("<alter>1</alter>");
     });
   });
 });
