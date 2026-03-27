@@ -246,6 +246,27 @@ describe("MusicXML Parser", () => {
       expect(result.score?.metadata.tempo?.beatUnit).toBe("quarter");
     });
 
+    it("extracts tempo from sound element when no metronome", async () => {
+      const xmlWithSoundTempo = `<?xml version="1.0"?>
+<score-partwise version="3.1">
+  <part-list><score-part id="P1"><part-name>Music</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>1</divisions></attributes>
+      <direction placement="above">
+        <sound tempo="100"/>
+      </direction>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><type>whole</type></note>
+    </measure>
+  </part>
+</score-partwise>`;
+      const result = await parseMusicXml(xmlWithSoundTempo, sourceInfo);
+
+      expect(result.score?.metadata.tempo).not.toBeNull();
+      expect(result.score?.metadata.tempo?.bpm).toBe(100);
+      expect(result.score?.metadata.tempo?.beatUnit).toBe("quarter");
+    });
+
     it("extracts part name and abbreviation", async () => {
       const result = await parseMusicXml(MUSICXML_WITH_METADATA, sourceInfo);
 

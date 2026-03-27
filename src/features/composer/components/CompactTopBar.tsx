@@ -9,7 +9,7 @@
  * 2. Context-based: Values from ScoreSettingsContext (reduced props)
  */
 
-import React, { memo, useCallback, useState } from "react";
+import React, { memo, useCallback, useState, useEffect } from "react";
 import {
   View,
   TouchableOpacity,
@@ -156,6 +156,11 @@ function CompactTopBarComponent({
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [tempoInput, setTempoInput] = useState(tempo.toString());
+
+  // Sync tempoInput when tempo prop changes (e.g., when loading a new score)
+  useEffect(() => {
+    setTempoInput(tempo.toString());
+  }, [tempo]);
 
   // Handlers
   const handleClefToggle = useCallback(() => {

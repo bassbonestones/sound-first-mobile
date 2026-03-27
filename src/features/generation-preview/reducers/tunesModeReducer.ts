@@ -116,6 +116,8 @@ export function tunesModeReducer(
           ...state.file,
           isLoadingPreview: false,
           previewResponse: action.payload,
+          // Sync tempo from loaded tune (default to 120 if not specified)
+          previewTempo: action.payload.tempo_bpm ?? state.file.previewTempo,
         },
       };
 

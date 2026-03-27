@@ -461,7 +461,7 @@ function extractDirections(measureContent: string): RawDirection[] {
   while ((match = directionRegex.exec(measureContent)) !== null) {
     const dirContent = match[1];
 
-    // Metronome
+    // Metronome (visual tempo marking)
     const metronomeBlock = extractTagBlock(dirContent, "metronome");
     let metronome: { beatUnit: string; perMinute: number } | undefined;
     if (metronomeBlock) {
@@ -469,6 +469,18 @@ function extractDirections(measureContent: string): RawDirection[] {
       const perMinuteStr = extractTagContent(metronomeBlock, "per-minute");
       if (beatUnit && perMinuteStr) {
         metronome = { beatUnit, perMinute: parseInt(perMinuteStr, 10) };
+      }
+    }
+
+    // Sound element (playback tempo) - fallback if no metronome
+    // Format: <sound tempo="100"/> or <sound tempo="100"></sound>
+    if (!metronome) {
+      const soundMatch = dirContent.match(/<sound[^>]*tempo=["'](\d+(?:\.\d+)?)["'][^>]*\/?>/i);
+      if (soundMatch) {
+        const tempo = parseFloat(soundMatch[1]);
+        if (tempo > 0) {
+          metronome = { beatUnit: "quarter", perMinute: Math.round(tempo) };
+        }
       }
     }
 
