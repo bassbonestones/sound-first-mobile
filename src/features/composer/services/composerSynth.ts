@@ -6,6 +6,11 @@
  */
 
 import { Platform } from "react-native";
+import { devWarn, devError } from "../../../utils/devLogger";
+import {
+  createAudioContext,
+  resumeAudioContext,
+} from "../../../screens/Session/components/exercises/shared/audioHelpers";
 
 // =============================================================================
 // Types
@@ -50,25 +55,19 @@ class ComposerSynthesizer {
   async init(): Promise<void> {
     if (this.isInitialized) return;
 
-    // Only works on web for now
+    // Only works on web for now (native support via audioHelpers when available)
     if (Platform.OS !== "web") {
-      console.warn("ComposerSynth: Native audio not implemented yet");
+      devWarn("ComposerSynth: Native audio not implemented yet");
       return;
     }
 
     try {
-      // Create audio context
-      const AudioContextClass =
-        window.AudioContext ||
-        (window as { webkitAudioContext?: typeof AudioContext })
-          .webkitAudioContext;
+      this.audioContext = createAudioContext();
 
-      if (!AudioContextClass) {
-        console.warn("ComposerSynth: Web Audio API not available");
+      if (!this.audioContext) {
+        devWarn("ComposerSynth: Web Audio API not available");
         return;
       }
-
-      this.audioContext = new AudioContextClass();
 
       // Create master gain node
       this.masterGain = this.audioContext.createGain();
@@ -77,7 +76,7 @@ class ComposerSynthesizer {
 
       this.isInitialized = true;
     } catch (error) {
-      console.error("ComposerSynth: Failed to initialize", error);
+      devError("ComposerSynth: Failed to initialize", error);
     }
   }
 
@@ -85,9 +84,7 @@ class ComposerSynthesizer {
    * Resume audio context if suspended (required after user gesture on some browsers).
    */
   async resume(): Promise<void> {
-    if (this.audioContext?.state === "suspended") {
-      await this.audioContext.resume();
-    }
+    await resumeAudioContext(this.audioContext);
   }
 
   /**

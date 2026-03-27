@@ -211,13 +211,15 @@ describe("NaturalAccidentalExercise", () => {
       expect(getByText("✓ Correct!")).toBeTruthy();
     });
 
-    it("advances to next question", () => {
+    it("advances to next question after delay", () => {
       const { getByText } = render(
         <NaturalAccidentalExercise {...defaultProps} />,
       );
       goToQuiz(getByText);
       fireEvent.press(getByText("Cancels a sharp or flat"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       expect(getByText(/Question 2 of 4/)).toBeTruthy();
     });
   });
@@ -232,13 +234,21 @@ describe("NaturalAccidentalExercise", () => {
       fireEvent.press(getByText("Quiz Me →"));
 
       fireEvent.press(getByText("Cancels a sharp or flat"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       fireEvent.press(getByText("Regular F (white key)"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       fireEvent.press(getByText("Regular B (white key)"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       fireEvent.press(getByText("white key / unaltered"));
-      fireEvent.press(getByText("See Results →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
     };
 
     it("shows success with all correct", () => {

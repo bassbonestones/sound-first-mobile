@@ -368,7 +368,7 @@ describe("Fragment2LessonExercise", () => {
       );
       goToSingPhase(getByText);
 
-      expect(getByText("🔊 Hear Again")).toBeTruthy();
+      expect(getByText("🎵 Hear Again")).toBeTruthy();
     });
 
     it("shows singing instruction with scale degrees", () => {
@@ -749,7 +749,7 @@ describe("Fragment2LessonExercise", () => {
       );
       goToPlayPhase(getByText, getAllByText);
 
-      expect(getByText("🔊 Hear Again")).toBeTruthy();
+      expect(getByText("🎵 Hear Again")).toBeTruthy();
     });
 
     it("shows success message on correct play", () => {
@@ -1417,9 +1417,9 @@ describe("Fragment2LessonExercise", () => {
       );
       goToSingPhase(getByText);
 
-      fireEvent.press(getByText("🔊 Hear Again"));
+      fireEvent.press(getByText("🎵 Hear Again"));
 
-      expect(queryByText("🔊 Playing...")).toBeTruthy();
+      expect(queryByText("🎵 Listening...")).toBeTruthy();
     });
 
     it("allows hearing pattern again in Play phase", () => {
@@ -1428,9 +1428,9 @@ describe("Fragment2LessonExercise", () => {
       );
       goToPlayPhase(getByText, getAllByText);
 
-      fireEvent.press(getByText("🔊 Hear Again"));
+      fireEvent.press(getByText("🎵 Hear Again"));
 
-      expect(queryByText("🔊 Playing...")).toBeTruthy();
+      expect(queryByText("🎵 Listening...")).toBeTruthy();
     });
 
     it("allows hearing pattern in Play with Drone phase", () => {
@@ -1442,7 +1442,7 @@ describe("Fragment2LessonExercise", () => {
       fireEvent.press(getByText("🎺 Start with Drone"));
       advanceTimers();
 
-      expect(getByText("🔊 Hear Again")).toBeTruthy();
+      expect(getByText("🎵 Hear Again")).toBeTruthy();
     });
   });
 

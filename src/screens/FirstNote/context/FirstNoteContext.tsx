@@ -1,11 +1,11 @@
 /**
  * FirstNoteContext - State management for FirstNote (Day 0) flow
- * Uses extracted hooks for audio and navigation
+ * Uses useReducer for centralized state management with extracted hooks for audio and navigation
  */
 import React, {
   createContext,
   useContext,
-  useState,
+  useReducer,
   useRef,
   useCallback,
   useEffect,
@@ -14,9 +14,11 @@ import React, {
 } from "react";
 import { devLog, devError } from "../../../utils/devLogger";
 import { parseNoteName, generateSingleNoteMusicXML } from "../utils";
-import { INSTRUMENT_CLEFS, DEFAULT_PITCH_EXPLORER_INDEX } from "../data";
+import { INSTRUMENT_CLEFS } from "../data";
 import { useFirstNoteAudio, useFirstNoteNavigation } from "../hooks";
 import { getBackendUrl } from "../../../api/client";
+import { firstNoteContextReducer } from "./firstNoteContextReducer";
+import { initialFirstNoteContextState } from "./firstNoteContextTypes";
 
 const FirstNoteContext = createContext(null);
 
@@ -53,38 +55,100 @@ export function FirstNoteProvider({
     instrument = "trombone",
   } = route?.params || {};
 
-  // Core state
-  const [stage, setStage] = useState(0);
-  const [subStep, setSubStep] = useState(0);
-  const [pitchExplorerIndex, setPitchExplorerIndex] = useState(
-    DEFAULT_PITCH_EXPLORER_INDEX,
+  // Centralized state management via reducer
+  const [state, dispatch] = useReducer(
+    firstNoteContextReducer,
+    initialFirstNoteContextState,
   );
-  const [accidentalExplorer, setAccidentalExplorer] = useState("natural");
-  const [showSummary, setShowSummary] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
 
-  // Skippable stages (for returning users with a new instrument)
-  const [skippableStages, setSkippableStages] = useState([]);
+  // Destructure state slices for convenience
+  const { flow, explorer, focusCard, ui } = state;
 
-  // Audio UI state
-  const [volume, setVolume] = useState(0);
-  const [pitchAccuracy, setPitchAccuracy] = useState(null);
-  const [focusCardIndex, setFocusCardIndex] = useState(0);
-  const [focusCardRatings, setFocusCardRatings] = useState([]);
-  const [focusStepsDone, setFocusStepsDone] = useState({
-    listen: false,
-    sing: false,
-    imagine: false,
-    play: false,
-  });
-  const [focusActiveStep, setFocusActiveStep] = useState(0);
-  const [rating, setRating] = useState(null);
+  // Wrapper setters that dispatch actions (for backward compatibility with hooks)
+  const setStage = useCallback(
+    (value: number) => dispatch({ type: "SET_STAGE", payload: value }),
+    [],
+  );
+  const setSubStep = useCallback(
+    (value: number) => dispatch({ type: "SET_SUB_STEP", payload: value }),
+    [],
+  );
+  const setPitchExplorerIndex = useCallback(
+    (value: number) =>
+      dispatch({ type: "SET_PITCH_EXPLORER_INDEX", payload: value }),
+    [],
+  );
+  const setAccidentalExplorer = useCallback(
+    (value: "natural" | "sharp" | "flat") =>
+      dispatch({ type: "SET_ACCIDENTAL_EXPLORER", payload: value }),
+    [],
+  );
+  const setShowSummary = useCallback(
+    (value: boolean) => dispatch({ type: "SET_SHOW_SUMMARY", payload: value }),
+    [],
+  );
+  const setIsLoading = useCallback(
+    (value: boolean) => dispatch({ type: "SET_LOADING", payload: value }),
+    [],
+  );
+  const setError = useCallback(
+    (value: string | null) => dispatch({ type: "SET_ERROR", payload: value }),
+    [],
+  );
+  const setSkippableStages = useCallback(
+    (value: number[]) =>
+      dispatch({ type: "SET_SKIPPABLE_STAGES", payload: value }),
+    [],
+  );
+  const setVolume = useCallback(
+    (value: number) => dispatch({ type: "SET_VOLUME", payload: value }),
+    [],
+  );
+  const setPitchAccuracy = useCallback(
+    (value: "correct" | "off" | null) =>
+      dispatch({ type: "SET_PITCH_ACCURACY", payload: value }),
+    [],
+  );
+  const setFocusCardIndex = useCallback(
+    (value: number) =>
+      dispatch({ type: "SET_FOCUS_CARD_INDEX", payload: value }),
+    [],
+  );
+  const setFocusCardRatings = useCallback(
+    (value: number[]) =>
+      dispatch({ type: "SET_FOCUS_CARD_RATINGS", payload: value }),
+    [],
+  );
+  // Supports both direct value and functional updater (like React's useState)
+  type FocusStepsDone = typeof focusCard.focusStepsDone;
+  const setFocusStepsDone = useCallback(
+    (
+      valueOrUpdater:
+        | FocusStepsDone
+        | ((prev: FocusStepsDone) => FocusStepsDone),
+    ) => {
+      const newValue =
+        typeof valueOrUpdater === "function"
+          ? valueOrUpdater(focusCard.focusStepsDone)
+          : valueOrUpdater;
+      dispatch({ type: "SET_FOCUS_STEPS_DONE", payload: newValue });
+    },
+    [focusCard.focusStepsDone],
+  );
+  const setFocusActiveStep = useCallback(
+    (value: number) =>
+      dispatch({ type: "SET_FOCUS_ACTIVE_STEP", payload: value }),
+    [],
+  );
+  const setRating = useCallback(
+    (value: number | null) => dispatch({ type: "SET_RATING", payload: value }),
+    [],
+  );
 
   // Refs
   const gotCorrectPitchRef = useRef(false);
   const focusListenStartedRef = useRef(false);
-  const scrollToEndRef = useRef(null);
+  const scrollToEndRef = useRef<(() => void) | null>(null);
 
   // Scroll helper - call this to scroll the main ScrollView to the end
   const scrollToEnd = useCallback(() => {
@@ -131,8 +195,8 @@ export function FirstNoteProvider({
   const nav = useFirstNoteNavigation({
     userId,
     instrumentId,
-    skippableStages,
-    stage,
+    skippableStages: flow.skippableStages,
+    stage: flow.stage,
     setStage,
     setSubStep,
     setFocusCardIndex,
@@ -147,31 +211,34 @@ export function FirstNoteProvider({
     audio.resetHeardIt();
     setRating(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage, subStep]);
+  }, [flow.stage, flow.subStep]);
 
   // Mark Focus Card listen step as done when audio ends
   useEffect(() => {
-    if (stage === 2 && focusListenStartedRef.current && !audio.isPlaying) {
-      setFocusStepsDone((prev) => ({ ...prev, listen: true }));
+    if (flow.stage === 2 && focusListenStartedRef.current && !audio.isPlaying) {
+      dispatch({ type: "SET_FOCUS_STEP_DONE", payload: "listen" });
       focusListenStartedRef.current = false;
     }
-  }, [stage, audio.isPlaying]);
+  }, [flow.stage, audio.isPlaying]);
 
   // Handle successful pitch match
-  const handlePitchMatch = useCallback((isMatch) => {
-    setPitchAccuracy(isMatch ? "correct" : "off");
-    if (isMatch) {
-      gotCorrectPitchRef.current = true;
-    }
-  }, []);
+  const handlePitchMatch = useCallback(
+    (isMatch: boolean) => {
+      setPitchAccuracy(isMatch ? "correct" : "off");
+      if (isMatch) {
+        gotCorrectPitchRef.current = true;
+      }
+    },
+    [setPitchAccuracy],
+  );
 
   // Handle sound end (for advancing after they play in Stage 1)
   const handleSoundEnd = useCallback(() => {
-    if (stage === 1 && subStep === 2) {
+    if (flow.stage === 1 && flow.subStep === 2) {
       setSubStep(3);
       gotCorrectPitchRef.current = false;
     }
-  }, [stage, subStep]);
+  }, [flow.stage, flow.subStep, setSubStep]);
 
   const value = {
     // Route params
@@ -180,21 +247,21 @@ export function FirstNoteProvider({
     instrument,
     navigation,
 
-    // Core state
-    stage,
+    // Core state (from reducer)
+    stage: flow.stage,
     setStage,
-    subStep,
+    subStep: flow.subStep,
     setSubStep,
-    skippableStages,
-    pitchExplorerIndex,
+    skippableStages: flow.skippableStages,
+    pitchExplorerIndex: explorer.pitchExplorerIndex,
     setPitchExplorerIndex,
-    accidentalExplorer,
+    accidentalExplorer: explorer.accidentalExplorer,
     setAccidentalExplorer,
-    showSummary,
+    showSummary: ui.showSummary,
     setShowSummary,
-    isLoading,
+    isLoading: ui.isLoading,
     setIsLoading,
-    error,
+    error: ui.error,
     setError,
 
     // Audio state (from hook)
@@ -203,20 +270,20 @@ export function FirstNoteProvider({
     showHeardItButton: audio.showHeardItButton,
     setShowHeardItButton: audio.setShowHeardItButton,
 
-    // Audio UI state
-    volume,
+    // Audio UI state (from reducer)
+    volume: ui.volume,
     setVolume,
-    pitchAccuracy,
+    pitchAccuracy: ui.pitchAccuracy,
     setPitchAccuracy,
-    focusCardIndex,
+    focusCardIndex: focusCard.focusCardIndex,
     setFocusCardIndex,
-    focusCardRatings,
+    focusCardRatings: focusCard.focusCardRatings,
     setFocusCardRatings,
-    focusStepsDone,
+    focusStepsDone: focusCard.focusStepsDone,
     setFocusStepsDone,
-    focusActiveStep,
+    focusActiveStep: focusCard.focusActiveStep,
     setFocusActiveStep,
-    rating,
+    rating: ui.rating,
     setRating,
 
     // Derived values

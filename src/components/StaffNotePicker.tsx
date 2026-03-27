@@ -16,6 +16,7 @@ import {
   FLAT_EQUIVALENTS,
   SHARP_EQUIVALENTS,
 } from "../screens/Session/components/exercises/shared";
+import type { ParsedNote } from "../screens/Session/components/exercises/shared";
 
 /**
  * StaffNotePicker - Visual staff-based note selection using real MusicXML rendering
@@ -26,12 +27,6 @@ import {
  * 2. Use +/- buttons to change octave
  * 3. Use "I'll play it" mode to detect pitch from microphone
  */
-
-interface ParsedNote {
-  letter: string;
-  accidental: string;
-  octave: number;
-}
 
 interface MusicXMLPitch {
   step: string;

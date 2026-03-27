@@ -4,6 +4,10 @@
  * Main note entry interface combining duration selection, pitch input,
  * and modifiers. This is the primary interaction area
  * for step-entry music composition.
+ *
+ * Supports two usage modes:
+ * 1. Props-based: All values passed as props (legacy)
+ * 2. Context-based: Values from ComposerStateContext (reduced props)
  */
 
 import React, { memo } from "react";
@@ -13,6 +17,7 @@ import { colors, spacing } from "../../../constants";
 import { DurationSelector } from "./DurationSelector";
 import { PitchSelector } from "./PitchSelector";
 import { ModifierRow } from "./ModifierRow";
+import { useOptionalComposerStateContext } from "../contexts";
 import type { ArticulationType } from "./ModifierRow";
 import type { DurationValue, PitchName, Accidental, Note } from "../types";
 
@@ -21,34 +26,70 @@ import type { DurationValue, PitchName, Accidental, Note } from "../types";
 // =============================================================================
 
 export interface EntryPaletteProps {
-  /** Currently selected duration for new notes */
-  selectedDuration: DurationValue;
-  /** Currently selected note (if any) */
-  selectedNote: Note | null;
-  /** Called when duration is selected */
-  onDurationSelect: (duration: DurationValue) => void;
-  /** Whether dotted mode is active */
+  /**
+   * Currently selected duration for new notes.
+   * If not provided, uses value from ComposerStateContext.
+   */
+  selectedDuration?: DurationValue;
+  /**
+   * Currently selected note (if any).
+   * If not provided, uses value from ComposerStateContext.
+   */
+  selectedNote?: Note | null;
+  /**
+   * Called when duration is selected.
+   * If not provided, uses setDuration from ComposerStateContext.
+   */
+  onDurationSelect?: (duration: DurationValue) => void;
+  /**
+   * Whether dotted mode is active.
+   * If not provided, uses value from ComposerStateContext.
+   */
   dottedMode?: boolean;
-  /** Called when dotted mode is toggled */
+  /**
+   * Called when dotted mode is toggled.
+   * If not provided, uses toggleDottedMode from ComposerStateContext.
+   */
   onToggleDotted?: () => void;
-  /** Current triplet position (1, 2, or 3) if on a triplet note */
+  /**
+   * Current triplet position (1, 2, or 3) if on a triplet note.
+   * If not provided, uses value from ComposerStateContext.
+   */
   tripletPosition?: 1 | 2 | 3;
-  /** Current triplet group type: 'eighth' (only eighths), 'quarter' (only quarters), 'mixed' (both allowed) */
+  /**
+   * Current triplet group type.
+   * If not provided, uses value from ComposerStateContext.
+   */
   tripletGroupType?: "eighth" | "quarter" | "mixed";
-  /** Whether triplets are allowed (only true when beat unit is quarter note) */
+  /**
+   * Whether triplets are allowed (only true when beat unit is quarter note).
+   * If not provided, uses value from ComposerStateContext.
+   */
   tripletsAllowed?: boolean;
-  /** Whether triplets can be started at current position (beat position divisible by 1/3) */
+  /**
+   * Whether triplets can be started at current position.
+   * If not provided, uses value from ComposerStateContext.
+   */
   canStartTriplet?: boolean;
-  /** Called when a pitch is tapped to insert a note */
+  /** Called when a pitch is tapped to insert a note (required) */
   onPitchTap: (pitch: PitchName) => void;
-  /** Called when octave changes */
-  onOctaveChange: (direction: "up" | "down") => void;
-  /** Called when an accidental is applied */
-  onAccidental: (accidental: Accidental) => void;
-  /** Called when rest is inserted */
+  /**
+   * Called when octave changes.
+   * If not provided, uses changeOctave from ComposerStateContext.
+   */
+  onOctaveChange?: (direction: "up" | "down") => void;
+  /**
+   * Called when an accidental is applied.
+   * If not provided, uses applyAccidental from ComposerStateContext.
+   */
+  onAccidental?: (accidental: Accidental) => void;
+  /** Called when rest is inserted (required) */
   onInsertRest: () => void;
-  /** Called when tie is toggled */
-  onToggleTie: () => void;
+  /**
+   * Called when tie is toggled.
+   * If not provided, uses toggleTie from ComposerStateContext.
+   */
+  onToggleTie?: () => void;
   /** Called when an articulation is applied */
   onArticulation?: (articulation: ArticulationType) => void;
   /** Called when articulation is removed */
@@ -68,20 +109,20 @@ export interface EntryPaletteProps {
 // =============================================================================
 
 function EntryPaletteComponent({
-  selectedDuration,
-  selectedNote,
-  onDurationSelect,
-  dottedMode = false,
-  onToggleDotted,
-  tripletPosition,
-  tripletGroupType,
-  tripletsAllowed = true,
-  canStartTriplet = true,
+  selectedDuration: propSelectedDuration,
+  selectedNote: propSelectedNote,
+  onDurationSelect: propOnDurationSelect,
+  dottedMode: propDottedMode,
+  onToggleDotted: propOnToggleDotted,
+  tripletPosition: propTripletPosition,
+  tripletGroupType: propTripletGroupType,
+  tripletsAllowed: propTripletsAllowed,
+  canStartTriplet: propCanStartTriplet,
   onPitchTap,
-  onOctaveChange,
-  onAccidental,
+  onOctaveChange: propOnOctaveChange,
+  onAccidental: propOnAccidental,
   onInsertRest,
-  onToggleTie,
+  onToggleTie: propOnToggleTie,
   onArticulation,
   onRemoveArticulation,
   activeArticulation,
@@ -89,6 +130,26 @@ function EntryPaletteComponent({
   extraRowPadding = 0,
   testID,
 }: EntryPaletteProps): React.ReactElement {
+  // Try to get values from context (returns null if no provider)
+  const context = useOptionalComposerStateContext();
+
+  // Resolve values: props take precedence over context
+  const selectedDuration =
+    propSelectedDuration ?? context?.selectedDuration ?? 4;
+  const selectedNote = propSelectedNote ?? context?.selectedNote ?? null;
+  const onDurationSelect = propOnDurationSelect ?? context?.setDuration;
+  const dottedMode = propDottedMode ?? context?.dottedMode ?? false;
+  const onToggleDotted = propOnToggleDotted ?? context?.toggleDottedMode;
+  const tripletPosition = propTripletPosition ?? context?.tripletPosition;
+  const tripletGroupType = propTripletGroupType ?? context?.tripletGroupType;
+  const tripletsAllowed =
+    propTripletsAllowed ?? context?.tripletsAllowed ?? true;
+  const canStartTriplet =
+    propCanStartTriplet ?? context?.canStartTriplet ?? true;
+  const onOctaveChange = propOnOctaveChange ?? context?.changeOctave;
+  const onAccidental = propOnAccidental ?? context?.applyAccidental;
+  const onToggleTie = propOnToggleTie ?? context?.toggleTie;
+
   const hasSelection = selectedNote !== null;
   const activeAccidental = selectedNote?.accidental;
   const tieActive = selectedNote?.tieStart ?? false;

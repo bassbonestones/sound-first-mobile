@@ -4,6 +4,9 @@
  * Plays a steady beat with count-in.
  * User must play their first note precisely on beat 1.
  * Uses pitch detection to know when the user starts playing.
+ *
+ * State management via useTimingExerciseState hook for consistency
+ * with other timing-based exercises.
  */
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
@@ -20,6 +23,7 @@ import {
   createClickSound,
   midiToNote,
   TIMING_TOLERANCES,
+  useTimingExerciseState,
 } from "./shared";
 import type { ExerciseProps } from "./shared";
 
@@ -36,54 +40,32 @@ export default function StartOnCueExercise({
   onProgress,
   userFirstNote = "F3",
 }: ExerciseProps) {
-  // Config defaults
-  const bpm = config?.bpm || 60;
-  const beatsPerMeasure = config?.beats_per_measure || 4;
-  const masteryStreak = mastery?.correct_streak || 8;
-  const prepBeats = config?.count_in_beats || 4;
-  const timingToleranceMs = config?.timing_tolerance_ms || DEFAULT_TOLERANCE_MS;
-  const targetBeat = config?.target_beat || 1;
-
-  // State
-  const [phase, setPhase] = useState("ready"); // ready | counting | listening | feedback
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentBeat, setCurrentBeat] = useState(0);
-  const [streak, setStreak] = useState(0);
-  const [totalAttempts, setTotalAttempts] = useState(0);
-  const [lastFeedback, setLastFeedback] = useState(null);
-  const [wrongNoteInfo, setWrongNoteInfo] = useState(null); // { detectedNote, direction }
-  const [prepCount, setPrepCount] = useState(prepBeats);
-  const [waitingForEntry, setWaitingForEntry] = useState(false);
-  const [isPlayingNote, setIsPlayingNote] = useState(false);
-
-  // Animation
-  const [pulseAnim] = useState(new Animated.Value(1));
-  const [feedbackOpacity] = useState(new Animated.Value(0));
+  // Use timing exercise state hook for unified state management
+  const timing = useTimingExerciseState({
+    bpm: config?.bpm || 60,
+    beatsPerMeasure: config?.beats_per_measure || 4,
+    prepBeats: config?.count_in_beats || 4,
+    masteryStreak: mastery?.correct_streak || 8,
+    timingToleranceMs: config?.timing_tolerance_ms || DEFAULT_TOLERANCE_MS,
+    targetBeat: config?.target_beat || 1,
+  });
 
   // Create AudioContext immediately (shared between metronome and pitch detection)
   // Using state so we can pass it to usePitchDetection and re-render when it's ready
   const [sharedAudioContext] = useState(() => createAudioContext());
 
-  // Refs
+  // Refs for metronome and timing logic
   const audioContextRef = useRef(sharedAudioContext);
-  const beatIntervalRef = useRef(null);
-  const lastBeatOneTimeRef = useRef(0);
-  const currentBeatRef = useRef(0);
-  const hasEnteredRef = useRef(false);
-  const measureCountRef = useRef(0);
-  const handleEntryRef = useRef(null);
-  const startNewRoundRef = useRef(null);
-  const unmountedRef = useRef(false);
-  const timeoutRefs = useRef([]);
-  const sustainTimerRef = useRef(null);
-  const soundStartTimeRef = useRef(null);
+  const beatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const handleEntryRef = useRef<(() => void) | null>(null);
+  const startNewRoundRef = useRef<(() => void) | null>(null);
+  const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
+  const sustainTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const soundStartTimeRef = useRef<number | null>(null);
 
   // Minimum sustain time to filter out transients
   // Brass instruments need longer for the fundamental to stabilize past attack overtones
   const MIN_SUSTAIN_MS = 150;
-
-  // Beat interval in ms
-  const beatIntervalMs = (60 / bpm) * 1000;
 
   // Calculate target MIDI note from userFirstNote (for pitch comparison)
   // Using MIDI comparison is more reliable than frequency because pitch detection
@@ -139,7 +121,7 @@ export default function StartOnCueExercise({
 
   // Keep pitch detection alive for the entire exercise duration (not toggling per round)
   // This prevents AudioContext from being repeatedly created/destroyed
-  const exerciseActive = phase !== "ready";
+  const exerciseActive = timing.phase !== "ready";
 
   // Pitch detection - to know when user starts playing
   // Don't use onSoundStart - it fires on metronome clicks too
@@ -167,11 +149,15 @@ export default function StartOnCueExercise({
   // Track current isSounding value in a ref (for use in callbacks with stale closures)
   const isSoundingRef = useRef(false);
   // Track current pitch for checking in callbacks
-  const currentPitchRef = useRef(null);
+  const currentPitchRef = useRef<{
+    frequency: number;
+    midiNote: number;
+    noteName: string;
+  } | null>(null);
   // Capture the pitch at sound START time (for validation)
-  const soundStartPitchRef = useRef(null);
+  const soundStartPitchRef = useRef<number | null>(null);
   // Buffer to collect MIDI readings during sustain for averaging (filters out transient overtone detections)
-  const pitchBufferRef = useRef([]);
+  const pitchBufferRef = useRef<number[]>([]);
 
   // Keep isSoundingRef in sync with isSounding
   useEffect(() => {
@@ -194,7 +180,7 @@ export default function StartOnCueExercise({
   // Watch for sustained sound to trigger entry
   // Only respond when we're actually waiting for entry
   useEffect(() => {
-    if (!waitingForEntry || hasEnteredRef.current) {
+    if (!timing.waitingForEntry || timing.hasEnteredRef.current) {
       // Clear timer if not waiting
       if (sustainTimerRef.current) {
         clearTimeout(sustainTimerRef.current);
@@ -216,7 +202,7 @@ export default function StartOnCueExercise({
         );
         wasSoundingAtListenStartRef.current = false; // Reset so we only check once
         // Set soundStartTimeRef to before beat 1 so timing calculation shows "early"
-        soundStartTimeRef.current = lastBeatOneTimeRef.current - 500;
+        soundStartTimeRef.current = timing.lastBeatOneTimeRef.current - 500;
         soundStartPitchRef.current = currentPitchRef.current?.frequency || null; // Capture current pitch frequency
         // Trigger entry immediately - will be marked as early
         handleEntryRef.current?.();
@@ -233,7 +219,7 @@ export default function StartOnCueExercise({
       // New sound started - record time, pitch, and start sustain timer
       if (!soundStartTimeRef.current) {
         const now = Date.now();
-        const timeSinceBeatOne = now - lastBeatOneTimeRef.current;
+        const timeSinceBeatOne = now - timing.lastBeatOneTimeRef.current;
         soundStartTimeRef.current = now;
         // currentPitch is an object with .frequency property
         soundStartPitchRef.current = currentPitchRef.current?.frequency || null;
@@ -247,7 +233,11 @@ export default function StartOnCueExercise({
         );
         sustainTimerRef.current = setTimeout(() => {
           // Sound has been sustained long enough - this is real user input
-          if (waitingForEntry && !hasEnteredRef.current && isSounding) {
+          if (
+            timing.waitingForEntry &&
+            !timing.hasEnteredRef.current &&
+            isSounding
+          ) {
             devLog(
               "[StartOnCueExercise] Sustained long enough, triggering entry",
             );
@@ -273,13 +263,18 @@ export default function StartOnCueExercise({
         waitingForNewSoundRef.current = false;
       }
     }
-  }, [isSounding, waitingForEntry]);
+  }, [
+    isSounding,
+    timing.waitingForEntry,
+    timing.lastBeatOneTimeRef,
+    timing.hasEnteredRef,
+  ]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       devLog("[StartOnCueExercise] Cleanup - stopping metronome and audio");
-      unmountedRef.current = true;
+      timing.unmountedRef.current = true;
       if (beatIntervalRef.current) {
         clearInterval(beatIntervalRef.current);
         beatIntervalRef.current = null;
@@ -300,19 +295,22 @@ export default function StartOnCueExercise({
         }
       }
     };
-  }, [sharedAudioContext]);
+  }, [sharedAudioContext, timing.unmountedRef]);
 
   // Safe setTimeout that tracks refs for cleanup
-  const safeTimeout = useCallback((fn, delay) => {
-    if (unmountedRef.current) return;
-    const id = setTimeout(() => {
-      if (!unmountedRef.current) {
-        fn();
-      }
-    }, delay);
-    timeoutRefs.current.push(id);
-    return id;
-  }, []);
+  const safeTimeout = useCallback(
+    (fn: () => void, delay: number) => {
+      if (timing.unmountedRef.current) return;
+      const id = setTimeout(() => {
+        if (!timing.unmountedRef.current) {
+          fn();
+        }
+      }, delay);
+      timeoutRefs.current.push(id);
+      return id;
+    },
+    [timing.unmountedRef],
+  );
 
   // Play a beat click
   const playBeat = useCallback(async (isAccent = false) => {
@@ -333,8 +331,8 @@ export default function StartOnCueExercise({
   }, []);
 
   // Convert note name to frequency
-  const noteToFrequency = useCallback((noteName) => {
-    const noteMap = {
+  const noteToFrequency = useCallback((noteName: string) => {
+    const noteMap: Record<string, number> = {
       C: 0,
       "C#": 1,
       Db: 1,
@@ -368,11 +366,11 @@ export default function StartOnCueExercise({
     if (
       !audioContextRef.current ||
       audioContextRef.current.state === "closed" ||
-      isPlayingNote
+      timing.isPlayingNote
     )
       return;
 
-    setIsPlayingNote(true);
+    timing.setIsPlayingNote(true);
     const freq = noteToFrequency(userFirstNote);
     const duration = 1.5;
     const attackTime = 0.05; // Smooth fade-in to avoid click
@@ -398,36 +396,14 @@ export default function StartOnCueExercise({
     oscillator.start(now);
     oscillator.stop(now + duration);
 
-    safeTimeout(() => setIsPlayingNote(false), duration * 1000);
-  }, [userFirstNote, noteToFrequency, isPlayingNote, safeTimeout]);
-
-  // Pulse animation
-  const animatePulse = useCallback(
-    (isBeatOne = false) => {
-      const scale = isBeatOne ? 1.3 : 1.15;
-      pulseAnim.setValue(scale);
-      Animated.timing(pulseAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    },
-    [pulseAnim],
-  );
-
-  // Show feedback
-  const showFeedback = useCallback(
-    (feedback) => {
-      setLastFeedback(feedback);
-      feedbackOpacity.setValue(1);
-      Animated.timing(feedbackOpacity, {
-        toValue: 0,
-        duration: 800,
-        useNativeDriver: true,
-      }).start();
-    },
-    [feedbackOpacity],
-  );
+    safeTimeout(() => timing.setIsPlayingNote(false), duration * 1000);
+  }, [
+    userFirstNote,
+    noteToFrequency,
+    timing.isPlayingNote,
+    timing.setIsPlayingNote,
+    safeTimeout,
+  ]);
 
   // Stop metronome
   const stopMetronome = useCallback(() => {
@@ -435,22 +411,22 @@ export default function StartOnCueExercise({
       clearInterval(beatIntervalRef.current);
       beatIntervalRef.current = null;
     }
-    setIsPlaying(false);
-  }, []);
+    timing.setIsPlaying(false);
+  }, [timing.setIsPlaying]);
 
   // Handle when user plays a note
   const handleEntry = useCallback(() => {
-    if (hasEnteredRef.current) return;
-    hasEnteredRef.current = true;
-    setWaitingForEntry(false);
+    if (timing.hasEnteredRef.current) return;
+    timing.hasEnteredRef.current = true;
+    timing.setWaitingForEntry(false);
 
     // Use pitch buffering to filter out transient overtone detections
     // Key insight: brass instruments produce overtones during attack that can briefly dominate
     // The FUNDAMENTAL (lowest pitch) is what the user is actually playing
-    let detectedMidi = null;
+    let detectedMidi: number | null = null;
     if (pitchBufferRef.current.length > 0) {
       // Count votes for each MIDI note
-      const counts = {};
+      const counts: Record<number, number> = {};
       pitchBufferRef.current.forEach((midi) => {
         counts[midi] = (counts[midi] || 0) + 1;
       });
@@ -506,23 +482,21 @@ export default function StartOnCueExercise({
     // If wrong pitch, fail immediately regardless of timing
     if (!isPitchCorrect) {
       stopMetronome();
-      setStreak(0);
-      setTotalAttempts((t) => t + 1);
 
       // Store info about the wrong note for display
       const detectedNoteName = midiToNoteName(detectedMidi);
-      const direction = detectedMidi < targetMidiNote ? "higher" : "lower";
-      setWrongNoteInfo({ detectedNote: detectedNoteName, direction });
-
-      showFeedback("wrong_note");
+      const direction =
+        detectedMidi !== null && detectedMidi < targetMidiNote
+          ? "higher"
+          : "lower";
+      timing.handleWrongNote(detectedNoteName || "?", direction);
 
       onProgress?.({
         streak: 0,
-        masteryRequired: masteryStreak,
-        totalAttempts: totalAttempts + 1,
+        masteryRequired: timing.masteryStreak,
+        totalAttempts: timing.totalAttempts + 1,
       });
 
-      setPhase("feedback");
       safeTimeout(() => {
         startNewRoundRef.current?.();
       }, 1500);
@@ -532,8 +506,8 @@ export default function StartOnCueExercise({
     // Use the ACTUAL sound start time, not current time
     // This compensates for the sustain detection delay
     const entryTime = soundStartTimeRef.current || Date.now();
-    const timeSinceBeatOne = entryTime - lastBeatOneTimeRef.current;
-    const measureDuration = beatsPerMeasure * beatIntervalMs;
+    const timeSinceBeatOne = entryTime - timing.lastBeatOneTimeRef.current;
+    const measureDuration = timing.beatsPerMeasure * timing.beatIntervalMs;
 
     // Calculate distance to nearest beat 1 (handles both early and late)
     // Positive timeSinceBeatOne means after beat 1, negative means before
@@ -543,109 +517,77 @@ export default function StartOnCueExercise({
     const timeToNextBeatOne = measureDuration - positionInMeasure;
 
     devLog(
-      `[Entry] timeSinceBeatOne=${timeSinceBeatOne}ms, positionInMeasure=${positionInMeasure}ms, timeToNextBeatOne=${timeToNextBeatOne}ms, tolerance=${timingToleranceMs}ms`,
+      `[Entry] timeSinceBeatOne=${timeSinceBeatOne}ms, positionInMeasure=${positionInMeasure}ms, timeToNextBeatOne=${timeToNextBeatOne}ms, tolerance=${timing.timingToleranceMs}ms`,
     );
 
     // Check timing - was it close to beat 1?
-    // isNearBeatOne: started AFTER beat 1 but within tolerance (slightly late is OK)
-    // isAnticipatoryBeatOne: started just BEFORE beat 1 (slightly early is OK)
-    //
-    // The key insight: timeSinceBeatOne can be:
-    // - Positive and small (<= tolerance): just after beat 1, good timing
-    // - Negative but small (>= -tolerance): just before beat 1, good anticipation
-    // - Negative and large (< -tolerance): started way too early (e.g., during count-in)
-    // - Positive and large: in the middle of the measure
     const isNearBeatOne =
-      timeSinceBeatOne >= -timingToleranceMs &&
-      timeSinceBeatOne <= timingToleranceMs;
+      timeSinceBeatOne >= -timing.timingToleranceMs &&
+      timeSinceBeatOne <= timing.timingToleranceMs;
 
     // Also check anticipation of the NEXT beat 1 (for when they're close to the end of a measure)
     const isAnticipatoryNextBeatOne =
-      timeToNextBeatOne <= timingToleranceMs &&
-      timeSinceBeatOne >= measureDuration - timingToleranceMs;
+      timeToNextBeatOne <= timing.timingToleranceMs &&
+      timeSinceBeatOne >= measureDuration - timing.timingToleranceMs;
 
     // Stop the current metronome - we'll restart with a new round
     stopMetronome();
-    setWaitingForEntry(false);
-
-    setTotalAttempts((t) => t + 1);
 
     if (isNearBeatOne || isAnticipatoryNextBeatOne) {
       // Success!
-      const newStreak = streak + 1;
-      setStreak(newStreak);
-
       // Calculate how close they were to perfect
       const deviation = isNearBeatOne
         ? Math.abs(timeSinceBeatOne)
         : timeToNextBeatOne;
-      if (deviation <= timingToleranceMs / 2) {
-        showFeedback("perfect");
-      } else {
-        showFeedback("good");
-      }
+      const quality =
+        deviation <= timing.timingToleranceMs / 2 ? "perfect" : "good";
+      timing.handleCorrectEntry(quality);
 
-      // Check mastery
-      if (newStreak >= masteryStreak) {
+      // Check mastery (note: timing.streak was already incremented by handleCorrectEntry)
+      if (timing.streak + 1 >= timing.masteryStreak) {
         safeTimeout(() => {
           onComplete?.({
             success: true,
-            streak: newStreak,
-            totalAttempts: totalAttempts + 1,
-            correctCount: newStreak,
+            streak: timing.streak + 1,
+            totalAttempts: timing.totalAttempts + 1,
+            correctCount: timing.streak + 1,
           });
         }, 1000);
         return;
       }
 
       onProgress?.({
-        streak: newStreak,
-        masteryRequired: masteryStreak,
-        totalAttempts: totalAttempts + 1,
+        streak: timing.streak + 1,
+        masteryRequired: timing.masteryStreak,
+        totalAttempts: timing.totalAttempts + 1,
       });
     } else {
-      // Wrong timing
-      setStreak(0);
-
-      // Determine if early or late
-      if (timeSinceBeatOne < -timingToleranceMs) {
-        // Started way before this beat 1 (e.g., during count-in)
-        showFeedback("early");
-      } else if (timeSinceBeatOne < 0) {
-        // This shouldn't happen due to isNearBeatOne check, but just in case
-        showFeedback("early");
-      } else if (positionInMeasure <= measureDuration / 2) {
-        // In the first half of the measure - they were late after beat 1
-        showFeedback("late");
-      } else {
-        // In the second half - they were early for the next beat 1
-        showFeedback("early");
+      // Wrong timing - determine if early or late
+      let timingResult: "early" | "late" = "late";
+      if (timeSinceBeatOne < -timing.timingToleranceMs) {
+        timingResult = "early";
+      } else if (positionInMeasure > measureDuration / 2) {
+        timingResult = "early";
       }
+      timing.handleIncorrectTiming(timingResult);
 
       onProgress?.({
         streak: 0,
-        masteryRequired: masteryStreak,
-        totalAttempts: totalAttempts + 1,
+        masteryRequired: timing.masteryStreak,
+        totalAttempts: timing.totalAttempts + 1,
       });
     }
 
-    // Show feedback phase briefly, then start new round
-    setPhase("feedback");
+    // Feedback phase is set by the timing hook actions, schedule new round
     safeTimeout(() => {
       startNewRoundRef.current?.();
     }, 1500);
   }, [
-    streak,
-    masteryStreak,
-    totalAttempts,
-    beatsPerMeasure,
-    beatIntervalMs,
-    timingToleranceMs,
+    timing,
     targetMidiNote,
-    frequencyToMidi,
+    midiToNoteName,
     onComplete,
     onProgress,
-    showFeedback,
     stopMetronome,
     safeTimeout,
   ]);
@@ -657,7 +599,7 @@ export default function StartOnCueExercise({
 
   // Start a new round (count-in + listen)
   const startNewRound = useCallback(() => {
-    if (unmountedRef.current) return;
+    if (timing.unmountedRef.current) return;
 
     // Clear any existing metronome interval first
     if (beatIntervalRef.current) {
@@ -673,32 +615,35 @@ export default function StartOnCueExercise({
     soundStartTimeRef.current = null;
     pitchBufferRef.current = []; // Clear pitch buffer for new round
 
-    setPhase("counting");
-    setPrepCount(prepBeats);
-    hasEnteredRef.current = false;
-    measureCountRef.current = 0;
+    timing.setPhase("counting");
+    timing.setPrepCount(timing.prepBeats);
+    timing.hasEnteredRef.current = false;
+    timing.measureCountRef.current = 0;
 
     let beatCount = 0;
 
     // Play first beat
     playBeat(true);
-    animatePulse(true);
+    timing.animatePulse(true);
 
     beatIntervalRef.current = setInterval(() => {
-      if (unmountedRef.current) {
-        clearInterval(beatIntervalRef.current);
+      if (timing.unmountedRef.current) {
+        if (beatIntervalRef.current) {
+          clearInterval(beatIntervalRef.current);
+        }
         return;
       }
       beatCount++;
 
-      if (beatCount < prepBeats) {
+      if (beatCount < timing.prepBeats) {
         // Count-in phase
-        setPrepCount(prepBeats - beatCount);
-        const isBeatOne = beatCount % beatsPerMeasure === 0;
+        timing.setPrepCount(timing.prepBeats - beatCount);
+        const isBeatOne = beatCount % timing.beatsPerMeasure === 0;
         playBeat(isBeatOne);
-        animatePulse(isBeatOne);
-        currentBeatRef.current = (beatCount % beatsPerMeasure) + 1;
-      } else if (beatCount === prepBeats) {
+        timing.animatePulse(isBeatOne);
+        timing.currentBeatRef.current =
+          (beatCount % timing.beatsPerMeasure) + 1;
+      } else if (beatCount === timing.prepBeats) {
         // Transition to listening - this is their beat 1
         // IMPORTANT: Capture isSounding SYNCHRONOUSLY before setting state
         // This way we know if they were already playing BEFORE beat 1
@@ -708,68 +653,61 @@ export default function StartOnCueExercise({
           "[StartOnCueExercise] Starting to listen, isSounding at this moment:",
           isSoundingRef.current,
         );
-        setPhase("listening");
-        setWaitingForEntry(true); // This enables pitch detection via the hook
-        lastBeatOneTimeRef.current = Date.now();
+        timing.setPhase("listening");
+        timing.setWaitingForEntry(true); // This enables pitch detection via the hook
+        timing.lastBeatOneTimeRef.current = Date.now();
         devLog(
           "[StartOnCueExercise] Beat 1 (first listening) at",
-          lastBeatOneTimeRef.current,
+          timing.lastBeatOneTimeRef.current,
         );
-        currentBeatRef.current = 1;
+        timing.currentBeatRef.current = 1;
         playBeat(true);
-        animatePulse(true);
+        timing.animatePulse(true);
       } else {
         // Listening phase - continue metronome
-        const beatInMeasure = ((beatCount - prepBeats) % beatsPerMeasure) + 1;
-        currentBeatRef.current = beatInMeasure;
-        setCurrentBeat(beatInMeasure - 1);
+        const beatInMeasure =
+          ((beatCount - timing.prepBeats) % timing.beatsPerMeasure) + 1;
+        timing.currentBeatRef.current = beatInMeasure;
+        timing.setCurrentBeat(beatInMeasure - 1);
 
         if (beatInMeasure === 1) {
-          lastBeatOneTimeRef.current = Date.now();
+          timing.lastBeatOneTimeRef.current = Date.now();
           devLog(
             "[StartOnCueExercise] Beat 1 (measure",
-            measureCountRef.current + 1,
+            timing.measureCountRef.current + 1,
             ") at",
-            lastBeatOneTimeRef.current,
+            timing.lastBeatOneTimeRef.current,
           );
-          measureCountRef.current++;
+          timing.measureCountRef.current++;
 
           // If they haven't entered after 2 measures, count as missed
-          if (!hasEnteredRef.current && measureCountRef.current >= 2) {
-            hasEnteredRef.current = true;
-            setWaitingForEntry(false);
-            setStreak(0);
-            showFeedback("missed");
+          if (
+            !timing.hasEnteredRef.current &&
+            timing.measureCountRef.current >= 2
+          ) {
+            timing.hasEnteredRef.current = true;
+            timing.handleIncorrectTiming("missed");
+
             onProgress?.({
               streak: 0,
-              masteryRequired: masteryStreak,
-              totalAttempts: totalAttempts + 1,
+              masteryRequired: timing.masteryStreak,
+              totalAttempts: timing.totalAttempts + 1,
             });
-            setTotalAttempts((t) => t + 1);
 
             // Stop and restart
-            clearInterval(beatIntervalRef.current);
+            if (beatIntervalRef.current) {
+              clearInterval(beatIntervalRef.current);
+            }
             safeTimeout(() => startNewRoundRef.current?.(), 1500);
             return;
           }
         }
 
         playBeat(beatInMeasure === 1);
-        animatePulse(beatInMeasure === 1);
+        timing.animatePulse(beatInMeasure === 1);
       }
-    }, beatIntervalMs);
-  }, [
-    prepBeats,
-    beatsPerMeasure,
-    beatIntervalMs,
-    playBeat,
-    animatePulse,
-    showFeedback,
-    masteryStreak,
-    totalAttempts,
-    onProgress,
-    safeTimeout,
-  ]);
+    }, timing.beatIntervalMs);
+  }, [timing, playBeat, onProgress, safeTimeout]);
 
   // Keep ref updated with latest startNewRound
   useEffect(() => {
@@ -778,57 +716,16 @@ export default function StartOnCueExercise({
 
   // Start exercise
   const handleStart = useCallback(() => {
-    setIsPlaying(true);
+    timing.setIsPlaying(true);
     startNewRound();
-  }, [startNewRound]);
-
-  // Feedback helpers
-  const getFeedbackColor = () => {
-    switch (lastFeedback) {
-      case "perfect":
-        return "#4CAF50";
-      case "good":
-        return "#8BC34A";
-      case "early":
-        return "#FF9800";
-      case "late":
-        return "#FF5722";
-      case "missed":
-        return "#f44336";
-      case "wrong_note":
-        return "#9C27B0";
-      default:
-        return "#888";
-    }
-  };
-
-  const getFeedbackText = () => {
-    switch (lastFeedback) {
-      case "perfect":
-        return "Perfect! 🎯";
-      case "good":
-        return "Good!";
-      case "early":
-        return "Too early!";
-      case "late":
-        return "Too late!";
-      case "missed":
-        return "Missed!";
-      case "wrong_note":
-        if (wrongNoteInfo) {
-          return `Wrong note! Heard ${wrongNoteInfo.detectedNote} - play ${wrongNoteInfo.direction}`;
-        }
-        return "Wrong note!";
-      default:
-        return "";
-    }
-  };
+  }, [timing.setIsPlaying, startNewRound]);
 
   // Render beat indicators
   const renderBeatIndicators = () => {
     const indicators = [];
-    for (let i = 0; i < beatsPerMeasure; i++) {
-      const isCurrent = phase === "listening" && currentBeat === i;
+    for (let i = 0; i < timing.beatsPerMeasure; i++) {
+      const isCurrent =
+        timing.phase === "listening" && timing.currentBeat === i;
       const isBeatOne = i === 0;
       indicators.push(
         <View
@@ -852,7 +749,7 @@ export default function StartOnCueExercise({
   };
 
   // Ready screen
-  if (phase === "ready" && !isPlaying) {
+  if (timing.phase === "ready" && !timing.isPlaying) {
     return (
       <View style={styles.container}>
         <View style={styles.readyContent}>
@@ -868,18 +765,18 @@ export default function StartOnCueExercise({
             <Text style={styles.firstNoteValue}>{userFirstNote}</Text>
             <TouchableOpacity
               accessibilityLabel={
-                isPlayingNote ? "Playing note" : "Hear your note"
+                timing.isPlayingNote ? "Playing note" : "Hear your note"
               }
               accessibilityRole="button"
               style={[
                 styles.hearNoteButton,
-                isPlayingNote && styles.hearNoteButtonActive,
+                timing.isPlayingNote && styles.hearNoteButtonActive,
               ]}
               onPress={playTargetNote}
-              disabled={isPlayingNote}
+              disabled={timing.isPlayingNote}
             >
               <Text style={styles.hearNoteButtonText}>
-                {isPlayingNote ? "🔊 Playing..." : "🔊 Hear Your Note"}
+                {timing.isPlayingNote ? "🔊 Playing..." : "🔊 Hear Your Note"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -904,12 +801,12 @@ export default function StartOnCueExercise({
         <View
           style={[
             styles.progressFill,
-            { width: `${(streak / masteryStreak) * 100}%` },
+            { width: `${(timing.streak / timing.masteryStreak) * 100}%` },
           ]}
         />
       </View>
       <Text style={styles.streakText}>
-        {streak} / {masteryStreak} in a row
+        {timing.streak} / {timing.masteryStreak} in a row
       </Text>
 
       {/* Target note + hear button */}
@@ -918,22 +815,22 @@ export default function StartOnCueExercise({
         <Text style={styles.targetNoteValue}>{userFirstNote}</Text>
         <TouchableOpacity
           accessibilityLabel={
-            isPlayingNote ? "Playing note" : "Hear target note"
+            timing.isPlayingNote ? "Playing note" : "Hear target note"
           }
           accessibilityRole="button"
           style={[
             styles.hearNoteSmall,
-            isPlayingNote && styles.hearNoteSmallActive,
+            timing.isPlayingNote && styles.hearNoteSmallActive,
           ]}
           onPress={playTargetNote}
-          disabled={isPlayingNote}
+          disabled={timing.isPlayingNote}
         >
           <Text style={styles.hearNoteSmallText}>🔊</Text>
         </TouchableOpacity>
       </View>
 
       {/* BPM */}
-      <Text style={styles.bpmText}>{bpm} BPM</Text>
+      <Text style={styles.bpmText}>{timing.bpm} BPM</Text>
 
       {/* Beat indicators */}
       <View style={styles.beatIndicators}>{renderBeatIndicators()}</View>
@@ -944,22 +841,22 @@ export default function StartOnCueExercise({
           style={[
             styles.pulseCircle,
             {
-              transform: [{ scale: pulseAnim }],
+              transform: [{ scale: timing.pulseAnim }],
               backgroundColor:
-                phase === "counting"
+                timing.phase === "counting"
                   ? "#444"
-                  : waitingForEntry
+                  : timing.waitingForEntry
                     ? "#9C27B0"
                     : "#666",
             },
           ]}
         >
-          {phase === "counting" ? (
+          {timing.phase === "counting" ? (
             <>
               <Text style={styles.prepText}>Get Ready...</Text>
-              <Text style={styles.prepCountText}>{prepCount}</Text>
+              <Text style={styles.prepCountText}>{timing.prepCount}</Text>
             </>
-          ) : waitingForEntry ? (
+          ) : timing.waitingForEntry ? (
             <>
               <Text style={styles.playIcon}>🎵</Text>
               <Text style={styles.playText}>PLAY NOW!</Text>
@@ -973,7 +870,7 @@ export default function StartOnCueExercise({
         </Animated.View>
 
         {/* Audio detection status - show whenever exercise is active */}
-        {phase !== "ready" && (
+        {timing.phase !== "ready" && (
           <View style={styles.audioStatusContainer}>
             {/* Volume indicator */}
             <View style={styles.volumeBar}>
@@ -1004,17 +901,19 @@ export default function StartOnCueExercise({
       </View>
 
       {/* Feedback overlay */}
-      <Animated.View style={[styles.feedback, { opacity: feedbackOpacity }]}>
-        <Text style={[styles.feedbackText, { color: getFeedbackColor() }]}>
-          {getFeedbackText()}
+      <Animated.View
+        style={[styles.feedback, { opacity: timing.feedbackOpacity }]}
+      >
+        <Text style={[styles.feedbackText, { color: timing.feedbackColor }]}>
+          {timing.feedbackText}
         </Text>
       </Animated.View>
 
       {/* Instructions */}
       <Text style={styles.instruction}>
-        {phase === "counting"
+        {timing.phase === "counting"
           ? "Listen to the count-in..."
-          : waitingForEntry
+          : timing.waitingForEntry
             ? `Play ${userFirstNote} on beat 1!`
             : "Preparing next round..."}
       </Text>

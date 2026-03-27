@@ -126,6 +126,13 @@ describe("useExerciseAudio", () => {
       expect(freq).toBe(440); // Default A4
     });
 
+    it("returns default for unknown note letter", () => {
+      const { result } = renderHook(() => useExerciseAudio());
+      // X4 matches the regex pattern but X is not a valid note
+      const freq = result.current.noteToFrequency("X4");
+      expect(freq).toBe(440); // Default A4
+    });
+
     it("handles lowercase note names", () => {
       const { result } = renderHook(() => useExerciseAudio());
       const freq = result.current.noteToFrequency("c4");

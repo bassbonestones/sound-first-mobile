@@ -12,9 +12,9 @@ import {
   isValidChordSymbol,
   getChordIntervals,
   getSupportedQualities,
-  generateChordPreviewMusicXml,
   type ChordQuality,
 } from "../src/features/tune-composer/services/chordRecognition";
+import { generateChordPreviewMusicXml } from "../src/features/tune-composer/services/chordMusicXmlGenerator";
 
 describe("Chord Recognition Service", () => {
   describe("recognizeChord", () => {

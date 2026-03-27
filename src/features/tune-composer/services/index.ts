@@ -28,8 +28,8 @@ export {
   isValidChordSymbol,
   getChordIntervals,
   getSupportedQualities,
-  generateChordPreviewMusicXml,
 } from "./chordRecognition";
+export { generateChordPreviewMusicXml } from "./chordMusicXmlGenerator";
 export type {
   ChordRoot,
   ChordQuality,
@@ -37,6 +37,9 @@ export type {
   ChordRecognitionResult,
 } from "./chordRecognition";
 export type { MusicXmlGeneratorOptions } from "./tuneComposerMusicXmlGenerator";
+
+export { practiceContentToMusicXml } from "./pitchEventsToMusicXml";
+export type { PracticeContentToMusicXmlOptions } from "./pitchEventsToMusicXml";
 
 // Re-export composer synth for playback (shared service)
 export { composerSynth } from "../../composer/services/composerSynth";

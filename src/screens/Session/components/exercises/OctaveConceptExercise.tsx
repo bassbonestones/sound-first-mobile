@@ -7,13 +7,7 @@
  * - Notes an octave apart share the same letter name
  * - Octaves sound "the same but different"
  */
-import React, {
-  useState,
-  useCallback,
-  useMemo,
-  useRef,
-  useEffect,
-} from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -24,6 +18,7 @@ import {
 } from "react-native";
 import type { LessonExerciseProps } from "./shared";
 import { devWarn } from "../../../../utils/devLogger";
+import { useQuizExerciseState } from "./shared/useQuizExerciseState";
 
 // Audio context for playing notes - works on web, iOS, and Android
 let AudioContextClass = null;
@@ -82,11 +77,13 @@ const OCTAVE_PAIRS = [
 // Quiz questions
 const QUIZ_QUESTIONS = [
   {
+    id: "octave-1",
     question: "Notes that are an octave apart share the same ___.",
     correctAnswer: "Letter name",
     options: ["Letter name", "Frequency", "Volume", "Duration"],
   },
   {
+    id: "octave-2",
     question: "If you play C, then play C an octave higher, they are...",
     correctAnswer: "Both called C",
     options: [
@@ -97,6 +94,7 @@ const QUIZ_QUESTIONS = [
     ],
   },
   {
+    id: "octave-3",
     question: "An octave sounds like...",
     correctAnswer: "The same note, higher/lower",
     options: [
@@ -117,14 +115,26 @@ export default function OctaveConceptExercise({
   sessionState = {},
   onComplete,
   onCancel,
+  onProgress,
 }: LessonExerciseProps) {
   const [phase, setPhase] = useState(PHASES.INTRO);
-  const [quizIndex, setQuizIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [showResult, setShowResult] = useState(false);
   const [currentPairIndex, setCurrentPairIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+
+  // Quiz state via hook
+  const {
+    quiz,
+    currentQuestion,
+    totalQuestions,
+    handleAnswer: handleQuizAnswer,
+    isCorrectAnswer,
+  } = useQuizExerciseState({
+    questions: QUIZ_QUESTIONS,
+    onProgress,
+    onQuizComplete: (passed) => {
+      setPhase(PHASES.RESULT);
+    },
+  });
 
   const audioContextRef = useRef(null);
 
@@ -189,36 +199,13 @@ export default function OctaveConceptExercise({
     [isPlaying, playNote],
   );
 
-  // Handle quiz answer
-  const handleAnswer = useCallback(
-    (answer) => {
-      setSelectedAnswer(answer);
-      setShowResult(true);
-      if (answer === QUIZ_QUESTIONS[quizIndex].correctAnswer) {
-        setScore((s) => s + 1);
-      }
-    },
-    [quizIndex],
-  );
-
-  // Move to next question
-  const handleNext = useCallback(() => {
-    setSelectedAnswer(null);
-    setShowResult(false);
-    if (quizIndex < QUIZ_QUESTIONS.length - 1) {
-      setQuizIndex((i) => i + 1);
-    } else {
-      setPhase(PHASES.RESULT);
-    }
-  }, [quizIndex]);
-
   // Complete exercise
   const handleComplete = useCallback(() => {
-    const passed = score === QUIZ_QUESTIONS.length; // Need 100%
+    const passed = quiz.score === totalQuestions; // Need 100%
     if (onComplete) {
-      onComplete({ success: passed, score });
+      onComplete({ success: passed, score: quiz.score });
     }
-  }, [onComplete, score]);
+  }, [onComplete, quiz.score, totalQuestions]);
 
   const currentPair = OCTAVE_PAIRS[currentPairIndex];
 
@@ -368,7 +355,6 @@ export default function OctaveConceptExercise({
 
   // Quiz phase
   if (phase === PHASES.QUIZ) {
-    const currentQ = QUIZ_QUESTIONS[quizIndex];
     return (
       <View style={styles.container}>
         <View style={styles.progressBar}>
@@ -376,7 +362,7 @@ export default function OctaveConceptExercise({
             style={[
               styles.progressFill,
               {
-                width: `${((quizIndex + 1) / QUIZ_QUESTIONS.length) * 100}%`,
+                width: `${((quiz.currentIndex + 1) / totalQuestions) * 100}%`,
               },
             ]}
           />
@@ -384,17 +370,17 @@ export default function OctaveConceptExercise({
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text style={styles.quizProgress}>
-            Question {quizIndex + 1} of {QUIZ_QUESTIONS.length}
+            Question {quiz.currentIndex + 1} of {totalQuestions}
           </Text>
 
-          <Text style={styles.quizQuestion}>{currentQ.question}</Text>
+          <Text style={styles.quizQuestion}>{currentQuestion?.question}</Text>
 
           <View style={styles.optionsContainer}>
-            {currentQ.options.map((option, idx) => {
-              const isSelected = selectedAnswer === option;
-              const isCorrect = option === currentQ.correctAnswer;
-              const showCorrect = showResult && isCorrect;
-              const showWrong = showResult && isSelected && !isCorrect;
+            {currentQuestion?.options.map((option, idx) => {
+              const isSelected = quiz.selectedAnswer === option;
+              const isCorrect = isCorrectAnswer(option);
+              const showCorrect = quiz.showFeedback && isCorrect;
+              const showWrong = quiz.showFeedback && isSelected && !isCorrect;
 
               return (
                 <TouchableOpacity
@@ -403,10 +389,10 @@ export default function OctaveConceptExercise({
                     styles.optionButton,
                     showCorrect && styles.optionCorrect,
                     showWrong && styles.optionWrong,
-                    isSelected && !showResult && styles.optionSelected,
+                    isSelected && !quiz.showFeedback && styles.optionSelected,
                   ]}
-                  onPress={() => !showResult && handleAnswer(option)}
-                  disabled={showResult}
+                  onPress={() => !quiz.showFeedback && handleQuizAnswer(option)}
+                  disabled={quiz.showFeedback}
                   accessibilityLabel={`Select ${option}`}
                   accessibilityRole="button"
                 >
@@ -423,49 +409,30 @@ export default function OctaveConceptExercise({
             })}
           </View>
 
-          {showResult && (
+          {quiz.showFeedback && (
             <View style={styles.feedbackContainer}>
               <Text
                 style={[
                   styles.feedbackText,
-                  selectedAnswer === currentQ.correctAnswer
+                  isCorrectAnswer(quiz.selectedAnswer as string)
                     ? styles.feedbackCorrect
                     : styles.feedbackWrong,
                 ]}
               >
-                {selectedAnswer === currentQ.correctAnswer
+                {isCorrectAnswer(quiz.selectedAnswer as string)
                   ? "✓ Correct!"
-                  : `✗ The answer is: ${currentQ.correctAnswer}`}
+                  : `✗ The answer is: ${currentQuestion?.correctAnswer}`}
               </Text>
             </View>
           )}
         </ScrollView>
-
-        {showResult && (
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleNext}
-            accessibilityLabel={
-              quizIndex < QUIZ_QUESTIONS.length - 1
-                ? "Next question"
-                : "See results"
-            }
-            accessibilityRole="button"
-          >
-            <Text style={styles.primaryButtonText}>
-              {quizIndex < QUIZ_QUESTIONS.length - 1
-                ? "Next →"
-                : "See Results →"}
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
     );
   }
 
   // Result phase
   if (phase === PHASES.RESULT) {
-    const passed = score === QUIZ_QUESTIONS.length;
+    const passed = quiz.score === totalQuestions;
     return (
       <View style={styles.container}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -474,7 +441,7 @@ export default function OctaveConceptExercise({
             {passed ? "You understand octaves!" : "Let's review"}
           </Text>
           <Text style={styles.resultScore}>
-            {score} / {QUIZ_QUESTIONS.length} correct
+            {quiz.score} / {totalQuestions} correct
           </Text>
 
           <View style={styles.card}>

@@ -14,8 +14,43 @@ export type { ExpressionControlsProps } from "./ExpressionControls";
 export { DynamicsControls } from "./DynamicsControls";
 export type { DynamicsControlsProps } from "./DynamicsControls";
 
-export { ChordControls } from "./ChordControls";
-export type { ChordControlsProps } from "./ChordControls";
+export {
+  ChordControls,
+  ChordControlsBase,
+  ChordControlsConnected,
+} from "./ChordControls";
+export type {
+  ChordControlsProps,
+  ChordControlsConnectedProps,
+} from "./ChordControls";
 
 export { ProgressionSelector } from "./ProgressionSelector";
 export type { ProgressionSelectorProps } from "./ProgressionSelector";
+
+export { PracticeOverChangesControls } from "./PracticeOverChangesControls";
+export type { PracticeOverChangesControlsProps } from "./PracticeOverChangesControls";
+
+export { PracticeScoreViewport } from "./PracticeScoreViewport";
+export type { PracticeScoreViewportProps } from "./PracticeScoreViewport";
+
+// Modals
+export {
+  ClefChangeModal,
+  KeyChangeModal,
+  ChordStyleModal,
+  AddMeasureModal,
+  ImportTuneModal,
+  SaveNewFileModal,
+  RhythmChangeModal,
+  modalStyles,
+} from "./modals";
+export type {
+  ClefChangeModalProps,
+  KeyChangeModalProps,
+  ChordStyleModalProps,
+  ChordStyleSelection,
+  AddMeasureModalProps,
+  ImportTuneModalProps,
+  SaveNewFileModalProps,
+  RhythmChangeModalProps,
+} from "./modals";

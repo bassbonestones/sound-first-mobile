@@ -75,10 +75,17 @@ import {
   midiToOctave,
 } from "../utils/pitchUtils";
 import {
+  getTripletGroupInfo,
+  canStartTripletAtPosition,
+  insertTripletGroup,
+} from "../utils/tripletUtils";
+import {
   useComposerUndo,
   reverseAction,
   reapplyAction,
 } from "./useComposerUndo";
+import { useScoreSettings } from "./useScoreSettings";
+import { useMeasureOperations } from "./useMeasureOperations";
 
 // =============================================================================
 // Return Type
@@ -191,6 +198,40 @@ export function useComposerState(
   }, [state.cursor]);
 
   // ==========================================================================
+  // Helper: Update Score with Dirty Flag
+  // ==========================================================================
+
+  const updateScore = useCallback(
+    (updater: (score: ComposerScore) => ComposerScore) => {
+      setState((prev) => ({
+        ...prev,
+        score: updater(prev.score),
+        isDirty: true,
+      }));
+    },
+    [],
+  );
+
+  // ==========================================================================
+  // Extracted Hooks
+  // ==========================================================================
+
+  const scoreSettings = useScoreSettings({
+    state,
+    setState,
+    undoManager,
+  });
+
+  const measureOperations = useMeasureOperations({
+    state,
+    setState,
+    undoManager,
+    cursorRef,
+    suppressAddMeasurePromptRef,
+    updateScore,
+  });
+
+  // ==========================================================================
   // Derived State
   // ==========================================================================
 
@@ -213,65 +254,18 @@ export function useComposerState(
     return measure.notes[cursor.noteIndex] ?? null;
   }, [score.measures, cursor.measureIndex, cursor.noteIndex]);
 
-  // Calculate triplet group info based on group structure
-  const tripletGroupInfo = useMemo((): {
-    type: "eighth" | "quarter" | "mixed";
-    totalDuration: number;
-  } | null => {
+  // Calculate triplet group info based on group structure (using utility)
+  const tripletGroupInfo = useMemo(() => {
     if (!noteAtCursor?.tripletGroupId) return null;
     const measure = score.measures[cursor.measureIndex];
     if (!measure) return null;
-
-    // Find all notes in this triplet group
-    const groupNotes = measure.notes.filter(
-      (n) => n.tripletGroupId === noteAtCursor.tripletGroupId,
-    );
-
-    // Calculate total duration
-    const totalDuration = groupNotes.reduce(
-      (sum, n) => sum + getNoteDuration(n),
-      0,
-    );
-
-    // Determine group type based on ACTUAL notes (not rests)
-    // Only lock group type when filled with 3 actual notes of the same type
-    const tolerance = 0.001;
-    const actualNotes = groupNotes.filter((n) => n.midi !== null);
-
-    // Check if all actual notes are the same type
-    const allActualAreEighths = actualNotes.every(
-      (n) => Math.abs(getNoteDuration(n) - DURATION.TRIPLET_EIGHTH) < tolerance,
-    );
-    const allActualAreQuarters = actualNotes.every(
-      (n) =>
-        Math.abs(getNoteDuration(n) - DURATION.TRIPLET_QUARTER) < tolerance,
-    );
-
-    // Only lock if 3 actual notes of same type
-    if (actualNotes.length === 3 && allActualAreEighths) {
-      return { type: "eighth", totalDuration };
-    } else if (actualNotes.length === 3 && allActualAreQuarters) {
-      return { type: "quarter", totalDuration };
-    }
-    // Otherwise it's a mixed group (both types allowed)
-    return { type: "mixed", totalDuration };
+    return getTripletGroupInfo(measure.notes, noteAtCursor.tripletGroupId);
   }, [score.measures, cursor.measureIndex, noteAtCursor]);
 
-  // Check if triplets can be started at the current cursor position
-  // Triplets divide beats into thirds, so we can only start a triplet at
-  // positions divisible by 1/3 (i.e., beatPosition * 3 is an integer)
+  // Check if triplets can be started at the current cursor position (using utility)
   const canStartTriplet = useMemo((): boolean => {
-    // If already in a triplet group, triplets are always allowed (continuing the group)
-    if (noteAtCursor?.tripletGroupId) return true;
-
     const measure = score.measures[cursor.measureIndex];
-    if (!measure) return true; // Empty measure, can start triplet
-
-    const beatPosition = getBeatPositionAt(measure, cursor.noteIndex);
-    // Check if beatPosition * 3 is close to an integer
-    const tolerance = 0.001;
-    const beatTimes3 = beatPosition * 3;
-    return Math.abs(beatTimes3 - Math.round(beatTimes3)) < tolerance;
+    return canStartTripletAtPosition(measure, cursor.noteIndex, noteAtCursor);
   }, [score.measures, cursor.measureIndex, cursor.noteIndex, noteAtCursor]);
 
   const currentMeasureValidation = useMemo((): MeasureValidation => {
@@ -294,141 +288,8 @@ export function useComposerState(
   }, [score.measures, score.timeSignature]);
 
   // ==========================================================================
-  // Helper: Update Score with Dirty Flag
-  // ==========================================================================
-
-  const updateScore = useCallback(
-    (updater: (score: ComposerScore) => ComposerScore) => {
-      setState((prev) => ({
-        ...prev,
-        score: updater(prev.score),
-        isDirty: true,
-      }));
-    },
-    [],
-  );
-
-  // ==========================================================================
   // Note Operations
   // ==========================================================================
-
-  /**
-   * Helper to insert a triplet group when starting from a non-triplet note.
-   * Supports both triplet eighth (creates 3 slots) and triplet quarter (creates quarter + 1 eighth rest).
-   */
-  const insertTripletGroup = useCallback(
-    (
-      measureNotes: Note[],
-      noteIndex: number,
-      midi: number | null,
-      accidental: Accidental | undefined,
-      tripletDuration:
-        | typeof DURATION.TRIPLET_EIGHTH
-        | typeof DURATION.TRIPLET_QUARTER,
-      beatPosition: number,
-      timeSignature: TimeSignature,
-    ): {
-      notes: Note[];
-      insertedIndex: number;
-      tripletGroupId: string;
-      cursorAdvance: number;
-    } | null => {
-      const currentNote = measureNotes[noteIndex];
-      if (!currentNote) return null;
-
-      // Generate a unique ID for this triplet group
-      const tripletGroupId = generateId();
-
-      // Always create 1-beat groups when starting fresh
-      // - Quarter triplets: 1-beat mixed group (quarter 2/3 + eighth rest 1/3)
-      // - Eighth triplets: 1-beat group (3 x 1/3)
-      // Pure 2-beat quarter groups (3 x 2/3) would require explicit creation
-      const tripletGroupDuration = 1;
-
-      // Collect notes to replace, starting from current position
-      let durationConsumed = 0;
-      let endIndex = noteIndex;
-      while (
-        endIndex < measureNotes.length &&
-        durationConsumed < tripletGroupDuration - 0.001
-      ) {
-        durationConsumed += getNoteDuration(measureNotes[endIndex]);
-        endIndex++;
-      }
-
-      // If we couldn't consume enough duration, don't insert
-      if (durationConsumed < tripletGroupDuration - 0.001) {
-        return null;
-      }
-
-      // Build the triplet notes based on duration and group type
-      let tripletNotes: Note[];
-      let cursorAdvance: number;
-
-      if (tripletDuration === DURATION.TRIPLET_QUARTER) {
-        // 1-beat mixed group: quarter (2/3) at position 1 + eighth rest (1/3) at position 3
-        const tripletQuarter = createTripletNote(
-          midi,
-          DURATION.TRIPLET_QUARTER,
-          1,
-          tripletGroupId,
-          { accidental },
-        );
-        const tripletRest = createTripletRest(
-          3,
-          tripletGroupId,
-          DURATION.TRIPLET_EIGHTH,
-        );
-        tripletNotes = [tripletQuarter, tripletRest];
-        cursorAdvance = 1; // Move to the eighth rest
-      } else {
-        // Triplet eighth: create 3 slots (entered note + 2 rests) = 1 beat
-        const triplet1 = createTripletNote(
-          midi,
-          DURATION.TRIPLET_EIGHTH,
-          1,
-          tripletGroupId,
-          { accidental },
-        );
-        const triplet2 = createTripletRest(
-          2,
-          tripletGroupId,
-          DURATION.TRIPLET_EIGHTH,
-        );
-        const triplet3 = createTripletRest(
-          3,
-          tripletGroupId,
-          DURATION.TRIPLET_EIGHTH,
-        );
-        tripletNotes = [triplet1, triplet2, triplet3];
-        cursorAdvance = 1; // Move to position 2
-      }
-
-      // Build new notes array
-      const newNotes: Note[] = [
-        ...measureNotes.slice(0, noteIndex),
-        ...tripletNotes,
-      ];
-
-      // If we consumed more than exactly 1 beat, add rests for the remainder
-      const remainder = durationConsumed - tripletGroupDuration;
-      if (remainder > 0.001) {
-        const remainderRests = generateRestsForDuration(remainder);
-        newNotes.push(...remainderRests);
-      }
-
-      // Add remaining notes after the consumed portion
-      newNotes.push(...measureNotes.slice(endIndex));
-
-      return {
-        notes: newNotes,
-        insertedIndex: noteIndex,
-        tripletGroupId,
-        cursorAdvance,
-      };
-    },
-    [],
-  );
 
   const insertNote = useCallback(
     (pitchName: PitchName): boolean => {
@@ -2119,387 +1980,6 @@ export function useComposerState(
   }, []);
 
   // ==========================================================================
-  // Measure Operations
-  // ==========================================================================
-
-  const addMeasure = useCallback(() => {
-    const newMeasure = createMeasure(state.score.timeSignature);
-    // Always add at the END of the score
-    const insertIndex = state.score.measures.length;
-
-    const action = createAddMeasureAction(insertIndex, newMeasure);
-    undoManager.pushAction(action);
-
-    // Move cursor to the first note of the new measure
-    const newCursor = { measureIndex: insertIndex, noteIndex: 0 };
-    cursorRef.current = newCursor;
-
-    setState((prev) => ({
-      ...prev,
-      score: {
-        ...prev.score,
-        measures: [...prev.score.measures, newMeasure],
-        updatedAt: new Date().toISOString(),
-      },
-      cursor: newCursor,
-      selectedNoteId: newMeasure.notes[0]?.id ?? null,
-      isDirty: true,
-    }));
-  }, [state.score.measures.length, state.score.timeSignature, undoManager]);
-
-  const deleteMeasure = useCallback(() => {
-    // Can't delete the last measure
-    if (state.score.measures.length <= 1) return;
-
-    const measureIndex = state.cursor.measureIndex;
-    const deletedMeasure = state.score.measures[measureIndex];
-
-    const action = createDeleteMeasureAction(measureIndex, deletedMeasure);
-    undoManager.pushAction(action);
-
-    // Suppress the "add measure" prompt since we just deleted
-    suppressAddMeasurePromptRef.current = true;
-
-    setState((prev) => {
-      const newMeasures = prev.score.measures.filter(
-        (_, i) => i !== measureIndex,
-      );
-
-      // After deletion, go to the LAST note/rest of the previous measure
-      // (or the first measure if we deleted measure 0)
-      const targetMeasureIndex = measureIndex > 0 ? measureIndex - 1 : 0;
-      const targetMeasure = newMeasures[targetMeasureIndex];
-      const lastNoteIndex = targetMeasure.notes.length - 1;
-      const lastNote = targetMeasure.notes[lastNoteIndex];
-
-      const newCursor = {
-        measureIndex: targetMeasureIndex,
-        noteIndex: Math.max(0, lastNoteIndex),
-      };
-      cursorRef.current = newCursor;
-
-      return {
-        ...prev,
-        score: {
-          ...prev.score,
-          measures: newMeasures,
-          updatedAt: new Date().toISOString(),
-        },
-        cursor: newCursor,
-        selectedNoteId: lastNote?.id || null,
-        isDirty: true,
-      };
-    });
-  }, [state.score.measures.length, state.cursor.measureIndex, undoManager]);
-
-  const deleteLastMeasure = useCallback(() => {
-    // Can't delete the last measure
-    if (state.score.measures.length <= 1) return;
-
-    const measureIndex = state.score.measures.length - 1;
-    const deletedMeasure = state.score.measures[measureIndex];
-
-    const action = createDeleteMeasureAction(measureIndex, deletedMeasure);
-    undoManager.pushAction(action);
-
-    // Suppress the "add measure" prompt since we just deleted
-    suppressAddMeasurePromptRef.current = true;
-
-    setState((prev) => {
-      const newMeasures = prev.score.measures.filter(
-        (_, i) => i !== measureIndex,
-      );
-
-      // If cursor was on the deleted measure, move it to the new last measure
-      const wasOnDeletedMeasure = prev.cursor.measureIndex === measureIndex;
-      const targetMeasureIndex = wasOnDeletedMeasure
-        ? measureIndex - 1
-        : prev.cursor.measureIndex;
-      const targetMeasure = newMeasures[targetMeasureIndex];
-
-      // Keep the same note index if possible, otherwise go to last note
-      const noteIndex = wasOnDeletedMeasure
-        ? Math.max(0, targetMeasure.notes.length - 1)
-        : Math.min(prev.cursor.noteIndex, targetMeasure.notes.length - 1);
-      const targetNote = targetMeasure.notes[noteIndex];
-
-      const newCursor = {
-        measureIndex: targetMeasureIndex,
-        noteIndex,
-      };
-      cursorRef.current = newCursor;
-
-      return {
-        ...prev,
-        score: {
-          ...prev.score,
-          measures: newMeasures,
-          updatedAt: new Date().toISOString(),
-        },
-        cursor: newCursor,
-        selectedNoteId: targetNote?.id || null,
-        isDirty: true,
-      };
-    });
-  }, [state.score.measures.length, state.cursor.measureIndex, undoManager]);
-
-  const fillMeasureWithRests = useCallback(() => {
-    const measure = state.score.measures[state.cursor.measureIndex];
-    if (!measure) return;
-
-    const validation = validateMeasure(measure, state.score.timeSignature);
-    if (validation.isComplete || validation.difference >= 0) return;
-
-    const remaining = -validation.difference;
-    // This is a simplified version - just add one rest of the remaining duration
-    // A full implementation would break it into standard note values
-    const rest = createRest(remaining as DurationValue);
-
-    updateScore((score) => ({
-      ...score,
-      measures: score.measures.map((m, i) =>
-        i === state.cursor.measureIndex
-          ? { ...m, notes: [...m.notes, rest] }
-          : m,
-      ),
-    }));
-  }, [state.score, state.cursor.measureIndex, updateScore]);
-
-  // ==========================================================================
-  // Score Settings
-  // ==========================================================================
-
-  const setClef = useCallback(
-    (clef: Clef) => {
-      const prevClef = state.score.clef;
-      if (clef === prevClef) return;
-
-      undoManager.pushAction({
-        type: "CHANGE_CLEF",
-        previousClef: prevClef,
-        newClef: clef,
-      });
-
-      setState((prev) => ({
-        ...prev,
-        score: { ...prev.score, clef, updatedAt: new Date().toISOString() },
-        selectedOctave: DEFAULT_OCTAVE_MIDI[clef],
-        isDirty: true,
-      }));
-    },
-    [state.score.clef, undoManager],
-  );
-
-  // Check if score has any actual notes (not just rests)
-  const hasActualNotes = useCallback((): boolean => {
-    return state.score.measures.some((measure) =>
-      measure.notes.some((note) => note.midi !== null),
-    );
-  }, [state.score.measures]);
-
-  // Change clef with optional transposition
-  const setClefWithTransposition = useCallback(
-    (clef: Clef, transposeOctaves: number) => {
-      const prevClef = state.score.clef;
-      if (clef === prevClef && transposeOctaves === 0) return;
-
-      // Record the action for undo
-      // Note: For simplicity, we don't track the full transpose in undo
-      // A full implementation would need a complex action type
-      undoManager.pushAction({
-        type: "CHANGE_CLEF",
-        previousClef: prevClef,
-        newClef: clef,
-      });
-
-      setState((prev) => {
-        // Transpose all notes by the specified octaves
-        const semitoneShift = transposeOctaves * 12;
-        const newMeasures = prev.score.measures.map((measure) => ({
-          ...measure,
-          notes: measure.notes.map((note) => {
-            if (note.midi === null) return note; // Keep rests unchanged
-            const newMidi = note.midi + semitoneShift;
-            // Clamp to valid MIDI range (0-127)
-            if (newMidi < 0 || newMidi > 127) return note;
-            return { ...note, midi: newMidi };
-          }),
-        }));
-
-        return {
-          ...prev,
-          score: {
-            ...prev.score,
-            clef,
-            measures: newMeasures,
-            updatedAt: new Date().toISOString(),
-          },
-          selectedOctave: DEFAULT_OCTAVE_MIDI[clef],
-          isDirty: true,
-        };
-      });
-    },
-    [state.score.clef, undoManager],
-  );
-
-  const setKeySignature = useCallback(
-    (key: KeySignature) => {
-      const prevKey = state.score.keySignature;
-      if (key === prevKey) return;
-
-      undoManager.pushAction({
-        type: "CHANGE_KEY_SIGNATURE",
-        previousKey: prevKey,
-        newKey: key,
-      });
-
-      updateScore((score) => ({ ...score, keySignature: key }));
-    },
-    [state.score.keySignature, undoManager, updateScore],
-  );
-
-  // Change key signature with transposition
-  const setKeySignatureWithTransposition = useCallback(
-    (key: KeySignature, transposeSemitones: number) => {
-      const prevKey = state.score.keySignature;
-      if (key === prevKey && transposeSemitones === 0) return;
-
-      undoManager.pushAction({
-        type: "CHANGE_KEY_SIGNATURE",
-        previousKey: prevKey,
-        newKey: key,
-      });
-
-      setState((prev) => {
-        const newMeasures = prev.score.measures.map((measure) => ({
-          ...measure,
-          notes: measure.notes.map((note) => {
-            if (note.midi === null) return note; // Keep rests unchanged
-
-            if (transposeSemitones === 0) {
-              // Keep pitch, just recalculate accidental for new key
-              const newAccidental = getAccidentalForMidi(note.midi, key);
-              return {
-                ...note,
-                accidental: newAccidental,
-              };
-            }
-
-            // Use function-preserving transposition
-            // This preserves the note's scale degree and alteration when changing keys
-            const transposed = transposeNoteByFunction(
-              note.midi,
-              note.accidental,
-              prev.score.keySignature,
-              key,
-              transposeSemitones,
-            );
-
-            // Clamp to valid MIDI range (0-127)
-            if (transposed.midi < 0 || transposed.midi > 127) return note;
-
-            return {
-              ...note,
-              midi: transposed.midi,
-              accidental: transposed.accidental,
-            };
-          }),
-        }));
-
-        return {
-          ...prev,
-          score: {
-            ...prev.score,
-            keySignature: key,
-            measures: newMeasures,
-            updatedAt: new Date().toISOString(),
-          },
-          isDirty: true,
-        };
-      });
-    },
-    [state.score.keySignature, undoManager],
-  );
-
-  const setTimeSignature = useCallback(
-    (timeSig: TimeSignature): boolean => {
-      // Disallow changing time signature if there are actual notes
-      // (This is a lightweight tool - no re-barring/reflow support)
-      if (hasActualNotes()) {
-        return false;
-      }
-
-      const prevTimeSig = state.score.timeSignature;
-      if (
-        timeSig.beats === prevTimeSig.beats &&
-        timeSig.beatUnit === prevTimeSig.beatUnit
-      ) {
-        return true; // No change needed
-      }
-
-      undoManager.pushAction({
-        type: "CHANGE_TIME_SIGNATURE",
-        previousTimeSig: prevTimeSig,
-        newTimeSig: timeSig,
-      });
-
-      // Recreate measures with new time signature (pre-filled with appropriate rests)
-      setState((prev) => {
-        const newMeasures = prev.score.measures.map(() =>
-          createMeasure(timeSig),
-        );
-        return {
-          ...prev,
-          score: {
-            ...prev.score,
-            timeSignature: timeSig,
-            measures: newMeasures,
-            updatedAt: new Date().toISOString(),
-          },
-          cursor: { measureIndex: 0, noteIndex: 0 },
-          selectedNoteId: newMeasures[0]?.notes[0]?.id ?? null,
-          isDirty: true,
-        };
-      });
-
-      return true;
-    },
-    [state.score.timeSignature, undoManager, hasActualNotes],
-  );
-
-  const setTempo = useCallback(
-    (tempo: number) => {
-      const prevTempo = state.score.tempo;
-      if (tempo === prevTempo) return;
-
-      undoManager.pushAction({
-        type: "CHANGE_TEMPO",
-        previousTempo: prevTempo,
-        newTempo: tempo,
-      });
-
-      updateScore((score) => ({ ...score, tempo }));
-    },
-    [state.score.tempo, undoManager, updateScore],
-  );
-
-  const setTitle = useCallback(
-    (title: string) => {
-      const prevTitle = state.score.title;
-      if (title === prevTitle) return;
-
-      undoManager.pushAction({
-        type: "CHANGE_TITLE",
-        previousTitle: prevTitle,
-        newTitle: title,
-      });
-
-      updateScore((score) => ({ ...score, title }));
-    },
-    [state.score.title, undoManager, updateScore],
-  );
-
-  // ==========================================================================
   // Undo/Redo
   // ==========================================================================
 
@@ -2636,20 +2116,21 @@ export function useComposerState(
     clearSelection,
 
     // Measure Operations
-    addMeasure,
-    deleteMeasure,
-    deleteLastMeasure,
-    fillMeasureWithRests,
+    addMeasure: measureOperations.addMeasure,
+    deleteMeasure: measureOperations.deleteMeasure,
+    deleteLastMeasure: measureOperations.deleteLastMeasure,
+    fillMeasureWithRests: measureOperations.fillMeasureWithRests,
 
     // Score Settings
-    setClef,
-    setClefWithTransposition,
-    hasActualNotes,
-    setKeySignature,
-    setKeySignatureWithTransposition,
-    setTimeSignature,
-    setTempo,
-    setTitle,
+    setClef: scoreSettings.setClef,
+    setClefWithTransposition: scoreSettings.setClefWithTransposition,
+    hasActualNotes: scoreSettings.hasActualNotes,
+    setKeySignature: scoreSettings.setKeySignature,
+    setKeySignatureWithTransposition:
+      scoreSettings.setKeySignatureWithTransposition,
+    setTimeSignature: scoreSettings.setTimeSignature,
+    setTempo: scoreSettings.setTempo,
+    setTitle: scoreSettings.setTitle,
 
     // Undo/Redo
     canUndo: undoManager.canUndo,

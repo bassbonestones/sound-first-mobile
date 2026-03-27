@@ -18,6 +18,7 @@ import {
 import type { LessonExerciseProps } from "./shared";
 import { devWarn } from "../../../../utils/devLogger";
 import MiniKeyboard from "./shared/MiniKeyboard";
+import { useQuizExerciseState } from "./shared/useQuizExerciseState";
 
 // Audio context
 // Audio context - works on web, iOS, and Android
@@ -86,6 +87,7 @@ const SHARP_EXAMPLES = [
 // Quiz questions
 const QUIZ_QUESTIONS = [
   {
+    id: "sharp-definition",
     question: "What does a sharp (♯) do to a note?",
     correctAnswer: "Raises it by a half step",
     options: [
@@ -96,6 +98,7 @@ const QUIZ_QUESTIONS = [
     ],
   },
   {
+    id: "f-sharp-relationship",
     question: "F♯ is _____ than F.",
     correctAnswer: "one half step higher",
     options: [
@@ -106,11 +109,13 @@ const QUIZ_QUESTIONS = [
     ],
   },
   {
+    id: "sharp-opposite",
     question: "Sharp is the OPPOSITE of...",
     correctAnswer: "flat",
     options: ["natural", "flat", "loud", "fast"],
   },
   {
+    id: "keyboard-direction",
     question: "On a keyboard, a sharp moves you...",
     correctAnswer: "one key to the right",
     options: [
@@ -131,18 +136,31 @@ export default function SharpAccidentalExercise({
   sessionState = {},
   onComplete,
   onCancel,
+  onProgress,
 }: LessonExerciseProps) {
   const [phase, setPhase] = useState(PHASES.INTRO);
-  const [quizIndex, setQuizIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [showResult, setShowResult] = useState(false);
   const [highlightedNotes, setHighlightedNotes] = useState([]);
   const [highlightSharp, setHighlightSharp] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentExample, setCurrentExample] = useState(0);
 
   const audioContextRef = useRef(null);
+
+  const totalQuestions = QUIZ_QUESTIONS.length;
+
+  // Quiz state management
+  const {
+    quiz,
+    currentQuestion,
+    handleAnswer: handleQuizAnswer,
+    isCorrectAnswer,
+  } = useQuizExerciseState({
+    questions: QUIZ_QUESTIONS,
+    onProgress,
+    onQuizComplete: () => {
+      setPhase(PHASES.RESULT);
+    },
+  });
 
   // Initialize audio
   useEffect(() => {
@@ -212,36 +230,13 @@ export default function SharpAccidentalExercise({
     [isPlaying, playNote],
   );
 
-  // Handle quiz answer
-  const handleAnswer = useCallback(
-    (answer) => {
-      setSelectedAnswer(answer);
-      setShowResult(true);
-      if (answer === QUIZ_QUESTIONS[quizIndex].correctAnswer) {
-        setScore((s) => s + 1);
-      }
-    },
-    [quizIndex],
-  );
-
-  // Next question
-  const handleNext = useCallback(() => {
-    setSelectedAnswer(null);
-    setShowResult(false);
-    if (quizIndex < QUIZ_QUESTIONS.length - 1) {
-      setQuizIndex((i) => i + 1);
-    } else {
-      setPhase(PHASES.RESULT);
-    }
-  }, [quizIndex]);
-
   // Complete exercise
   const handleComplete = useCallback(() => {
-    const passed = score === QUIZ_QUESTIONS.length; // 100% required
+    const passed = quiz.score === totalQuestions; // 100% required
     if (onComplete) {
-      onComplete({ success: passed, score });
+      onComplete({ success: passed, score: quiz.score });
     }
-  }, [onComplete, score]);
+  }, [onComplete, quiz.score, totalQuestions]);
 
   // ============================================================
   // RENDER PHASES
@@ -544,7 +539,7 @@ export default function SharpAccidentalExercise({
 
   // Quiz phase
   if (phase === PHASES.QUIZ) {
-    const currentQ = QUIZ_QUESTIONS[quizIndex];
+    if (!currentQuestion) return null;
 
     return (
       <View style={styles.container}>
@@ -552,24 +547,24 @@ export default function SharpAccidentalExercise({
           <View
             style={[
               styles.progressFill,
-              { width: `${((quizIndex + 1) / QUIZ_QUESTIONS.length) * 100}%` },
+              { width: `${((quiz.currentIndex + 1) / totalQuestions) * 100}%` },
             ]}
           />
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text style={styles.quizProgress}>
-            Question {quizIndex + 1} of {QUIZ_QUESTIONS.length}
+            Question {quiz.currentIndex + 1} of {totalQuestions}
           </Text>
 
-          <Text style={styles.quizQuestion}>{currentQ.question}</Text>
+          <Text style={styles.quizQuestion}>{currentQuestion.question}</Text>
 
           <View style={styles.optionsContainer}>
-            {currentQ.options.map((option, idx) => {
-              const isSelected = selectedAnswer === option;
-              const isCorrect = option === currentQ.correctAnswer;
-              const showCorrect = showResult && isCorrect;
-              const showWrong = showResult && isSelected && !isCorrect;
+            {currentQuestion.options.map((option, idx) => {
+              const isSelected = quiz.selectedAnswer === option;
+              const isCorrect = isCorrectAnswer(option);
+              const showCorrect = quiz.showFeedback && isCorrect;
+              const showWrong = quiz.showFeedback && isSelected && !isCorrect;
 
               return (
                 <TouchableOpacity
@@ -578,10 +573,10 @@ export default function SharpAccidentalExercise({
                     styles.optionButton,
                     showCorrect && styles.optionCorrect,
                     showWrong && styles.optionWrong,
-                    isSelected && !showResult && styles.optionSelected,
+                    isSelected && !quiz.showFeedback && styles.optionSelected,
                   ]}
-                  onPress={() => !showResult && handleAnswer(option)}
-                  disabled={showResult}
+                  onPress={() => !quiz.showFeedback && handleQuizAnswer(option)}
+                  disabled={quiz.showFeedback}
                   accessibilityLabel={`Select answer: ${option}`}
                   accessibilityRole="button"
                 >
@@ -598,49 +593,30 @@ export default function SharpAccidentalExercise({
             })}
           </View>
 
-          {showResult && (
+          {quiz.showFeedback && (
             <View style={styles.feedbackContainer}>
               <Text
                 style={[
                   styles.feedbackText,
-                  selectedAnswer === currentQ.correctAnswer
+                  isCorrectAnswer(quiz.selectedAnswer)
                     ? styles.feedbackCorrect
                     : styles.feedbackWrong,
                 ]}
               >
-                {selectedAnswer === currentQ.correctAnswer
+                {isCorrectAnswer(quiz.selectedAnswer)
                   ? "✓ Correct!"
-                  : `✗ The answer is: ${currentQ.correctAnswer}`}
+                  : `✗ The answer is: ${currentQuestion.correctAnswer}`}
               </Text>
             </View>
           )}
         </ScrollView>
-
-        {showResult && (
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleNext}
-            accessibilityLabel={
-              quizIndex < QUIZ_QUESTIONS.length - 1
-                ? "Go to next question"
-                : "See results"
-            }
-            accessibilityRole="button"
-          >
-            <Text style={styles.primaryButtonText}>
-              {quizIndex < QUIZ_QUESTIONS.length - 1
-                ? "Next →"
-                : "See Results →"}
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
     );
   }
 
   // Result phase
   if (phase === PHASES.RESULT) {
-    const passed = score === QUIZ_QUESTIONS.length;
+    const passed = quiz.score === totalQuestions;
 
     return (
       <View style={styles.container}>
@@ -650,7 +626,7 @@ export default function SharpAccidentalExercise({
             {passed ? "You understand sharps!" : "Let's review"}
           </Text>
           <Text style={styles.resultScore}>
-            {score} / {QUIZ_QUESTIONS.length} correct
+            {quiz.score} / {totalQuestions} correct
           </Text>
 
           <View style={styles.card}>

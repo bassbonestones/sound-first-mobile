@@ -11,13 +11,7 @@
  * Optimized for small screens (320x568 minimum).
  */
 
-import React, {
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-  useMemo,
-} from "react";
+import React, { useCallback, useEffect, useRef, useMemo } from "react";
 import {
   View,
   StyleSheet,
@@ -30,8 +24,6 @@ import {
   Text,
   TextInput,
   ScrollView,
-  Modal,
-  Pressable,
   PanResponder,
   GestureResponderEvent,
   PanResponderGestureState,
@@ -46,7 +38,12 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../constants";
-import { useTuneComposerState, useTuneComposerPlayback } from "../hooks";
+import {
+  useTuneComposerState,
+  useTuneComposerPlayback,
+  usePracticeOverChanges,
+  useTuneComposerScreen,
+} from "../hooks";
 import {
   CompactTopBar,
   EntryPalette,
@@ -58,8 +55,22 @@ import {
   LyricsControls,
   ExpressionControls,
   DynamicsControls,
-  ChordControls,
+  ChordControlsConnected,
+  PracticeOverChangesControls,
+  PracticeScoreViewport,
+  ClefChangeModal,
+  KeyChangeModal,
+  ChordStyleModal,
+  AddMeasureModal,
+  ImportTuneModal,
+  SaveNewFileModal,
+  RhythmChangeModal,
 } from "../components";
+import {
+  ChordProgressionProvider,
+  ChordModeProvider,
+  PlaybackProvider,
+} from "../contexts";
 import {
   tuneComposerStorageService,
   createAutosaveHandler,
@@ -130,11 +141,53 @@ function TuneComposerScreenContent({
   // Get scoreId from props or route params
   const scoreId = propScoreId ?? route.params?.scoreId;
 
-  // Loading state
-  const [isLoading, setIsLoading] = useState(!!scoreId);
-  const [initialScore, setInitialScore] = useState<
-    TuneComposerScore | undefined
-  >(undefined);
+  // Screen-level state (loading, zoom, modals, import, file IO, etc)
+  const screenState = useTuneComposerScreen(scoreId);
+  const {
+    // Loading
+    isLoading,
+    initialScore,
+    setIsLoading,
+    setInitialScore,
+    // Zoom
+    zoom,
+    setZoom,
+    // Modals
+    clefChangeModal,
+    keyChangeModal,
+    chordStyleModalVisible,
+    showAddMeasureModal,
+    showImportModal,
+    showSaveNewModal,
+    showClefChangeModal,
+    hideClefChangeModal,
+    showKeyChangeModal,
+    hideKeyChangeModal,
+    setChordStyleModalVisible,
+    setShowAddMeasureModal,
+    setShowImportModal,
+    setShowSaveNewModal,
+    // Import
+    previewFiles,
+    isLoadingFiles,
+    isImporting,
+    setPreviewFiles,
+    setIsLoadingFiles,
+    setIsImporting,
+    // File
+    currentFilename,
+    isSaving,
+    newFilename,
+    setCurrentFilename,
+    setIsSaving,
+    setNewFilename,
+    // Processing
+    isInferringChords,
+    setIsInferringChords,
+    // Mode
+    isProgressionEditMode,
+    toggleProgressionEditMode,
+  } = screenState;
 
   // Composer state
   const composerState = useTuneComposerState(initialScore);
@@ -146,50 +199,14 @@ function TuneComposerScreenContent({
     // currentEvent available for future playback cursor highlighting
   } = useTuneComposerPlayback(composerState.score);
 
+  // Practice over changes
+  const practice = usePracticeOverChanges(composerState.score);
+
   // Autosave handler
   const autosaveRef = useRef(createAutosaveHandler(30000));
 
-  // Zoom state
-  const [zoom, setZoom] = useState(1.0);
-
-  // Clef change modal state (needed for web where Alert.alert doesn't work)
-  const [clefChangeModal, setClefChangeModal] = useState<{
-    visible: boolean;
-    targetClef: Clef;
-  }>({ visible: false, targetClef: "treble" });
-
-  // Key change modal state
-  const [keyChangeModal, setKeyChangeModal] = useState<{
-    visible: boolean;
-    targetKey: KeySignature;
-  }>({ visible: false, targetKey: 0 });
-
-  // Chord style modal state (for web where Alert.alert with buttons doesn't work)
-  const [chordStyleModalVisible, setChordStyleModalVisible] = useState(false);
-
-  // Add measure prompt modal state
-  const [showAddMeasureModal, setShowAddMeasureModal] = useState(false);
+  // Add measure prompt - track previous state for auto-show
   const prevIsAtLastMeasureEnd = useRef(false);
-
-  // Import picker modal state
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [previewFiles, setPreviewFiles] = useState<string[]>([]);
-  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-
-  // Current imported filename (for save functionality)
-  const [currentFilename, setCurrentFilename] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Save new modal state
-  const [showSaveNewModal, setShowSaveNewModal] = useState(false);
-  const [newFilename, setNewFilename] = useState("");
-
-  // Chord inference state
-  const [isInferringChords, setIsInferringChords] = useState(false);
-
-  // Progression edit mode state
-  const [isProgressionEditMode, setIsProgressionEditMode] = useState(false);
 
   // Load existing score or check for autosave recovery
   useEffect(() => {
@@ -281,7 +298,7 @@ function TuneComposerScreenContent({
       }
 
       // Show custom modal for transposition options (works on web + native)
-      setClefChangeModal({ visible: true, targetClef: newClef });
+      showClefChangeModal(newClef);
     },
     [composerState],
   );
@@ -293,15 +310,15 @@ function TuneComposerScreenContent({
         clefChangeModal.targetClef,
         octaves,
       );
-      setClefChangeModal({ visible: false, targetClef: "treble" });
+      hideClefChangeModal();
     },
-    [composerState, clefChangeModal.targetClef],
+    [composerState, clefChangeModal.targetClef, hideClefChangeModal],
   );
 
   // Cancel clef change modal
   const handleClefChangeCancel = useCallback(() => {
-    setClefChangeModal({ visible: false, targetClef: "treble" });
-  }, []);
+    hideClefChangeModal();
+  }, [hideClefChangeModal]);
 
   // Time signature change (UI prevents this when notes exist, so no check needed here)
   const handleTimeSignatureChange = useCallback(
@@ -324,7 +341,7 @@ function TuneComposerScreenContent({
       }
 
       // Show custom modal for transposition options
-      setKeyChangeModal({ visible: true, targetKey: key });
+      showKeyChangeModal(key);
     },
     [composerState],
   );
@@ -361,15 +378,15 @@ function TuneComposerScreenContent({
         keyChangeModal.targetKey,
         semitones,
       );
-      setKeyChangeModal({ visible: false, targetKey: 0 });
+      hideKeyChangeModal();
     },
-    [composerState, keyChangeModal.targetKey],
+    [composerState, keyChangeModal.targetKey, hideKeyChangeModal],
   );
 
   // Cancel key change modal
   const handleKeyChangeCancel = useCallback(() => {
-    setKeyChangeModal({ visible: false, targetKey: 0 });
-  }, []);
+    hideKeyChangeModal();
+  }, [hideKeyChangeModal]);
 
   // Tempo change
   const handleTempoChange = useCallback(
@@ -1048,29 +1065,32 @@ function TuneComposerScreenContent({
         />
 
         {/* Score Viewport with swipe gestures - fixed at top */}
-        <View
-          style={[styles.viewportWrapper, { height: viewportHeight }]}
-          {...panResponder.panHandlers}
+        <PlaybackProvider
+          playbackState={playback.state}
+          playbackMeasureIndex={playback.position.measureIndex}
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onStop={handleStop}
         >
-          <TuneComposerScoreViewport
-            score={composerState.score}
-            cursor={composerState.cursor}
-            selectedNoteId={highlightedNoteId}
-            chordCursor={
-              composerState.chordMode ? composerState.chordCursor : null
-            }
-            onNoteTap={handleScoreTap}
-            playbackState={playback.state}
-            playbackMeasureIndex={playback.position.measureIndex}
-            onPlay={handlePlay}
-            onPause={handlePause}
-            onStop={handleStop}
-            zoom={zoom}
-            onZoomChange={setZoom}
-            showZoomControls={false}
-            testID="composer-viewport"
-          />
-        </View>
+          <View
+            style={[styles.viewportWrapper, { height: viewportHeight }]}
+            {...panResponder.panHandlers}
+          >
+            <TuneComposerScoreViewport
+              score={composerState.score}
+              cursor={composerState.cursor}
+              selectedNoteId={highlightedNoteId}
+              chordCursor={
+                composerState.chordMode ? composerState.chordCursor : null
+              }
+              onNoteTap={handleScoreTap}
+              zoom={zoom}
+              onZoomChange={setZoom}
+              showZoomControls={false}
+              testID="composer-viewport"
+            />
+          </View>
+        </PlaybackProvider>
 
         {/* Scrollable controls section */}
         <ScrollView
@@ -1296,12 +1316,11 @@ function TuneComposerScreenContent({
             />
 
             {/* Chord Controls */}
-            <ChordControls
+            <ChordModeProvider
               chordModeActive={composerState.chordMode}
               onToggleChordMode={composerState.toggleChordMode}
               currentChordSymbol={composerState.currentChordSymbol}
               onSetChord={composerState.setChordAtCursor}
-              onChordInputChange={composerState.setChordAtCursor}
               onRemoveChord={composerState.removeChordAtCursor}
               onNextBeat={composerState.moveChordCursorNext}
               onPrevBeat={composerState.moveChordCursorPrev}
@@ -1319,25 +1338,66 @@ function TuneComposerScreenContent({
               onInferChords={handleInferChords}
               isInferring={isInferringChords}
               onClearChords={handleClearChords}
-              progressions={composerState.chordProgressions}
-              activeProgressionId={composerState.activeProgression?.id}
-              onSelectProgression={composerState.selectProgression}
-              onCreateProgression={composerState.createProgression}
-              onDuplicateProgression={(sourceId, newName) => {
-                composerState.duplicateProgression(
-                  sourceId,
-                  newName ?? "New Progression",
-                );
-              }}
-              onDeleteProgression={composerState.deleteProgression}
-              onRenameProgression={composerState.renameProgression}
-              isProgressionEditMode={isProgressionEditMode}
-              onToggleProgressionEditMode={() =>
-                setIsProgressionEditMode(!isProgressionEditMode)
-              }
               disabled={isPlaying}
-              testID="chord-controls"
+            >
+              <ChordProgressionProvider
+                progressions={composerState.chordProgressions}
+                activeProgressionId={composerState.activeProgression?.id}
+                onSelectProgression={composerState.selectProgression}
+                onCreateProgression={composerState.createProgression}
+                onDuplicateProgression={(sourceId, newName) => {
+                  composerState.duplicateProgression(
+                    sourceId,
+                    newName ?? "New Progression",
+                  );
+                }}
+                onDeleteProgression={composerState.deleteProgression}
+                onRenameProgression={composerState.renameProgression}
+                isEditMode={isProgressionEditMode}
+                onToggleEditMode={toggleProgressionEditMode}
+                disabled={isPlaying}
+              >
+                <ChordControlsConnected
+                  onChordInputChange={composerState.setChordAtCursor}
+                  testID="chord-controls"
+                />
+              </ChordProgressionProvider>
+            </ChordModeProvider>
+
+            {/* Practice Over Changes Controls */}
+            <PracticeOverChangesControls
+              practiceActive={practice.practiceState.isActive}
+              onTogglePracticeMode={practice.togglePracticeMode}
+              practiceState={practice.practiceState}
+              hasChords={practice.hasChords}
+              tuneTempo={composerState.score.tempo}
+              effectiveTempo={practice.effectiveTempo}
+              onSetContentType={practice.setContentType}
+              onSetPattern={practice.setPattern}
+              onSetRhythm={practice.setRhythm}
+              onSetTempoOverride={practice.setTempoOverride}
+              onSetRange={practice.setRange}
+              onGenerate={practice.generate}
+              onClear={practice.clearGenerated}
+              hasGeneratedContent={practice.hasGeneratedContent}
+              disabled={isPlaying}
+              testID="practice-controls"
             />
+
+            {/* Practice Score Viewport (when content is generated) */}
+            {practice.hasGeneratedContent && (
+              <PracticeScoreViewport
+                segments={practice.practiceState.segments}
+                events={practice.practiceState.events}
+                totalBeats={practice.practiceState.totalBeats}
+                title={`${practice.practiceState.contentType === "scales" ? "Scales" : practice.practiceState.contentType === "arpeggios" ? "Arpeggios" : "Guide Tones"} Over Changes`}
+                timeSignature={composerState.score.timeSignature}
+                keySignature={composerState.score.keySignature}
+                clef={composerState.score.clef}
+                tempo={practice.effectiveTempo}
+                testID="practice-viewport"
+              />
+            )}
 
             {/* Playback Panel */}
             <View
@@ -1518,436 +1578,73 @@ function TuneComposerScreenContent({
         </View>
 
         {/* Clef Change Transposition Modal */}
-        <Modal
+        <ClefChangeModal
           visible={clefChangeModal.visible}
-          transparent
-          animationType="fade"
-          onRequestClose={handleClefChangeCancel}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={handleClefChangeCancel}
-          >
-            <View
-              style={styles.modalContent}
-              onStartShouldSetResponder={() => true}
-            >
-              <Text style={styles.modalTitle}>Transpose Notes?</Text>
-              <Text style={styles.modalMessage}>
-                You have notes on the staff. How would you like to transpose
-                them when switching to{" "}
-                {clefChangeModal.targetClef === "bass" ? "bass" : "treble"}{" "}
-                clef?
-              </Text>
-              {clefChangeModal.targetClef === "bass" ? (
-                <>
-                  <TouchableOpacity
-                    style={styles.modalOption}
-                    onPress={() => handleClefTranspose(0)}
-                  >
-                    <Text style={styles.modalOptionText}>No Transpose</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.modalOption}
-                    onPress={() => handleClefTranspose(-1)}
-                  >
-                    <Text style={styles.modalOptionText}>Octave Down</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.modalOption}
-                    onPress={() => handleClefTranspose(-2)}
-                  >
-                    <Text style={styles.modalOptionText}>2 Octaves Down</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <>
-                  <TouchableOpacity
-                    style={styles.modalOption}
-                    onPress={() => handleClefTranspose(0)}
-                  >
-                    <Text style={styles.modalOptionText}>No Transpose</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.modalOption}
-                    onPress={() => handleClefTranspose(1)}
-                  >
-                    <Text style={styles.modalOptionText}>Octave Up</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.modalOption}
-                    onPress={() => handleClefTranspose(2)}
-                  >
-                    <Text style={styles.modalOptionText}>2 Octaves Up</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={handleClefChangeCancel}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Modal>
+          targetClef={clefChangeModal.targetClef}
+          onSelectTranspose={handleClefTranspose}
+          onCancel={handleClefChangeCancel}
+        />
 
         {/* Key Change Transposition Modal */}
-        <Modal
+        <KeyChangeModal
           visible={keyChangeModal.visible}
-          transparent
-          animationType="fade"
-          onRequestClose={handleKeyChangeCancel}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={handleKeyChangeCancel}
-          >
-            <View
-              style={styles.modalContent}
-              onStartShouldSetResponder={() => true}
-            >
-              <Text style={styles.modalTitle}>Transpose Notes?</Text>
-              <Text style={styles.modalMessage}>
-                You have notes on the staff. How would you like to handle them
-                when changing key?
-              </Text>
-              <TouchableOpacity
-                style={styles.modalOption}
-                onPress={() => handleKeyTranspose(0)}
-              >
-                <Text style={styles.modalOptionText}>Keep Pitch</Text>
-              </TouchableOpacity>
-              {(() => {
-                const { down, up } = getKeyTransposeIntervals(
-                  keyChangeModal.targetKey,
-                );
-                return (
-                  <>
-                    <TouchableOpacity
-                      style={styles.modalOption}
-                      onPress={() => handleKeyTranspose(up)}
-                    >
-                      <Text style={styles.modalOptionText}>Transpose Up</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.modalOption}
-                      onPress={() => handleKeyTranspose(down)}
-                    >
-                      <Text style={styles.modalOptionText}>Transpose Down</Text>
-                    </TouchableOpacity>
-                  </>
-                );
-              })()}
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={handleKeyChangeCancel}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Modal>
+          upInterval={getKeyTransposeIntervals(keyChangeModal.targetKey).up}
+          downInterval={getKeyTransposeIntervals(keyChangeModal.targetKey).down}
+          onSelectTranspose={handleKeyTranspose}
+          onCancel={handleKeyChangeCancel}
+        />
 
         {/* Chord Style Selection Modal */}
-        <Modal
+        <ChordStyleModal
           visible={chordStyleModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setChordStyleModalVisible(false)}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setChordStyleModalVisible(false)}
-          >
-            <View
-              style={styles.modalContent}
-              onStartShouldSetResponder={() => true}
-            >
-              <Text style={styles.modalTitle}>Choose Chord Style</Text>
-              <Text style={styles.modalMessage}>
-                Select the harmony style for your melody:
-              </Text>
-              <TouchableOpacity
-                style={styles.modalOption}
-                onPress={() => {
-                  setChordStyleModalVisible(false);
-                  performInferChords(false, 1);
-                }}
-              >
-                <Text style={styles.modalOptionText}>Simple (Triads)</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalOption}
-                onPress={() => {
-                  setChordStyleModalVisible(false);
-                  performInferChords(true, 1);
-                }}
-              >
-                <Text style={styles.modalOptionText}>Jazz (7th Chords)</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalOption}
-                onPress={() => {
-                  setChordStyleModalVisible(false);
-                  performInferChords(true, 2);
-                }}
-              >
-                <Text style={styles.modalOptionText}>
-                  Dense (2 per measure)
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={() => setChordStyleModalVisible(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Modal>
+          onSelect={(selection) => {
+            setChordStyleModalVisible(false);
+            performInferChords(
+              selection.useJazzChords,
+              selection.chordsPerMeasure,
+            );
+          }}
+          onCancel={() => setChordStyleModalVisible(false)}
+        />
 
         {/* Add Measure Prompt Modal */}
-        <Modal
+        <AddMeasureModal
           visible={showAddMeasureModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowAddMeasureModal(false)}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setShowAddMeasureModal(false)}
-          >
-            <View
-              style={styles.modalContent}
-              onStartShouldSetResponder={() => true}
-            >
-              <Text style={styles.modalTitle}>Add New Measure?</Text>
-              <Text style={styles.modalMessage}>
-                You've reached the end of the last measure. Would you like to
-                add another measure?
-              </Text>
-              <TouchableOpacity
-                style={styles.modalOption}
-                onPress={() => {
-                  composerState.addMeasure();
-                  setShowAddMeasureModal(false);
-                }}
-                testID="add-measure-confirm"
-              >
-                <Text style={styles.modalOptionText}>Add Measure at End</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={() => setShowAddMeasureModal(false)}
-                testID="add-measure-cancel"
-              >
-                <Text style={styles.modalCancelText}>No Thanks</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Modal>
+          onConfirm={() => {
+            composerState.addMeasure();
+            setShowAddMeasureModal(false);
+          }}
+          onCancel={() => setShowAddMeasureModal(false)}
+        />
 
         {/* Import Tune Modal */}
-        <Modal
+        <ImportTuneModal
           visible={showImportModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowImportModal(false)}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => !isImporting && setShowImportModal(false)}
-          >
-            <View
-              style={[styles.modalContent, styles.importModalContent]}
-              onStartShouldSetResponder={() => true}
-            >
-              <Text style={styles.modalTitle}>Import Tune</Text>
-              <Text style={styles.modalMessage}>
-                Select a tune from the preview folder to load into the composer.
-              </Text>
-
-              {isLoadingFiles ? (
-                <ActivityIndicator
-                  size="small"
-                  color={colors.primary}
-                  style={{ marginVertical: spacing.md }}
-                />
-              ) : previewFiles.length === 0 ? (
-                <Text style={styles.emptyMessage}>
-                  No files available. Add MusicXML files to
-                  resources/materials/pending/
-                </Text>
-              ) : (
-                <ScrollView
-                  style={styles.fileList}
-                  showsVerticalScrollIndicator={true}
-                >
-                  {previewFiles.map((filename) => (
-                    <TouchableOpacity
-                      key={filename}
-                      style={styles.fileOption}
-                      onPress={() => handleImportFile(filename)}
-                      disabled={isImporting}
-                    >
-                      <Feather
-                        name="music"
-                        size={16}
-                        color={colors.primary}
-                        style={{ marginRight: spacing.sm }}
-                      />
-                      <Text
-                        style={[
-                          styles.fileOptionText,
-                          isImporting && styles.textDisabled,
-                        ]}
-                        numberOfLines={2}
-                      >
-                        {formatFilename(filename)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              )}
-
-              {isImporting && (
-                <View style={styles.importingOverlay}>
-                  <ActivityIndicator size="small" color={colors.white} />
-                  <Text style={styles.importingText}>Loading...</Text>
-                </View>
-              )}
-
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={() => setShowImportModal(false)}
-                disabled={isImporting}
-              >
-                <Text
-                  style={[
-                    styles.modalCancelText,
-                    isImporting && styles.textDisabled,
-                  ]}
-                >
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Modal>
+          files={previewFiles}
+          isLoadingFiles={isLoadingFiles}
+          isImporting={isImporting}
+          onSelectFile={handleImportFile}
+          onCancel={() => setShowImportModal(false)}
+        />
 
         {/* Save New File Modal */}
-        <Modal
+        <SaveNewFileModal
           visible={showSaveNewModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => !isSaving && setShowSaveNewModal(false)}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => !isSaving && setShowSaveNewModal(false)}
-          >
-            <View
-              style={[styles.modalContent, styles.saveNewModalContent]}
-              onStartShouldSetResponder={() => true}
-            >
-              <Text style={styles.modalTitle}>Save New File</Text>
-              <Text style={styles.modalMessage}>
-                Enter a filename for the new tune (will be saved in beginner/).
-              </Text>
-
-              <TextInput
-                style={styles.filenameInput}
-                value={newFilename}
-                onChangeText={setNewFilename}
-                placeholder="my_tune"
-                placeholderTextColor={colors.textSecondary}
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!isSaving}
-                testID="save-new-filename-input"
-              />
-
-              <View style={styles.saveNewModalButtons}>
-                <TouchableOpacity
-                  style={styles.modalCancel}
-                  onPress={() => setShowSaveNewModal(false)}
-                  disabled={isSaving}
-                >
-                  <Text
-                    style={[
-                      styles.modalCancelText,
-                      isSaving && styles.textDisabled,
-                    ]}
-                  >
-                    Cancel
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.saveNewConfirmButton,
-                    isSaving && styles.saveNewConfirmButtonDisabled,
-                  ]}
-                  onPress={handleConfirmSaveNew}
-                  disabled={isSaving}
-                >
-                  <Text
-                    style={[
-                      styles.saveNewConfirmButtonText,
-                      isSaving && styles.textDisabled,
-                    ]}
-                  >
-                    {isSaving ? "Creating..." : "Create"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Pressable>
-        </Modal>
+          filename={newFilename}
+          onFilenameChange={setNewFilename}
+          isSaving={isSaving}
+          onConfirm={handleConfirmSaveNew}
+          onCancel={() => setShowSaveNewModal(false)}
+        />
 
         {/* Rhythm Change Confirmation Modal */}
-        <Modal
+        <RhythmChangeModal
           visible={!!composerState.pendingRhythmChange}
-          transparent
-          animationType="fade"
-          onRequestClose={composerState.cancelRhythmChange}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={composerState.cancelRhythmChange}
-          >
-            <View
-              style={styles.modalContent}
-              onStartShouldSetResponder={() => true}
-            >
-              <Text style={styles.modalTitle}>Clear Chords & Lyrics?</Text>
-              <Text style={styles.modalMessage}>
-                This measure has{" "}
-                {composerState.pendingRhythmChange?.hasChords &&
-                composerState.pendingRhythmChange?.hasLyrics
-                  ? "chords and lyrics"
-                  : composerState.pendingRhythmChange?.hasChords
-                    ? "chords"
-                    : "lyrics"}
-                . Changing the rhythm will remove them from this measure.
-              </Text>
-              <TouchableOpacity
-                style={styles.modalOption}
-                onPress={composerState.confirmRhythmChange}
-              >
-                <Text style={styles.modalOptionText}>
-                  Clear & Change Rhythm
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalOption, styles.modalCancelOption]}
-                onPress={composerState.cancelRhythmChange}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Modal>
+          hasChords={composerState.pendingRhythmChange?.hasChords ?? false}
+          hasLyrics={composerState.pendingRhythmChange?.hasLyrics ?? false}
+          onConfirm={composerState.confirmRhythmChange}
+          onCancel={composerState.cancelRhythmChange}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -2144,85 +1841,6 @@ const styles = StyleSheet.create({
   saveNewButtonTextDisabled: {
     color: colors.textSecondary,
   },
-  saveNewModalContent: {
-    width: "90%",
-    maxWidth: 360,
-  },
-  saveNewModalButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: spacing.md,
-  },
-  filenameInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: spacing.sm,
-    fontSize: 16,
-    color: colors.textPrimary,
-    backgroundColor: colors.background,
-    marginTop: spacing.sm,
-  },
-  saveNewConfirmButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: 8,
-  },
-  saveNewConfirmButtonDisabled: {
-    opacity: 0.5,
-  },
-  saveNewConfirmButtonText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  // Clef change modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: spacing.lg,
-    width: "85%",
-    maxWidth: 320,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-    textAlign: "center",
-  },
-  modalMessage: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: spacing.md,
-    textAlign: "center",
-  },
-  modalOption: {
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  modalOptionText: {
-    fontSize: 16,
-    color: colors.primary,
-    textAlign: "center",
-  },
-  modalCancel: {
-    paddingVertical: spacing.md,
-    marginTop: spacing.sm,
-  },
-  modalCancelText: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: "center",
-  },
   // Import button styles
   importButton: {
     flexDirection: "row",
@@ -2255,52 +1873,6 @@ const styles = StyleSheet.create({
   },
   deleteFileButtonDisabled: {
     borderColor: colors.textSecondary,
-    opacity: 0.5,
-  },
-  // Import modal styles
-  importModalContent: {
-    maxHeight: "70%",
-  },
-  fileList: {
-    maxHeight: 300,
-    marginVertical: spacing.sm,
-  },
-  fileOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  fileOptionText: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.textPrimary,
-  },
-  emptyMessage: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: "center",
-    marginVertical: spacing.lg,
-    paddingHorizontal: spacing.md,
-  },
-  importingOverlay: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 6,
-    marginVertical: spacing.sm,
-  },
-  importingText: {
-    color: colors.white,
-    fontSize: 14,
-    marginLeft: spacing.sm,
-  },
-  textDisabled: {
     opacity: 0.5,
   },
 });

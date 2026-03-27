@@ -264,7 +264,7 @@ export function Stage2Content() {
 
                   // Move to next card or final summary
                   if (focusCardIndex < DAY0_FOCUS_CARDS.length - 1) {
-                    setFocusCardIndex((prev) => prev + 1);
+                    setFocusCardIndex(focusCardIndex + 1);
                     resetSteps();
                   }
                   // If last card, allCardsComplete will be true on next render

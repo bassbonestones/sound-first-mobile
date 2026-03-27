@@ -16,6 +16,7 @@ import {
   Platform,
 } from "react-native";
 import type { LessonExerciseProps } from "./shared";
+import { useQuizExerciseState } from "./shared/useQuizExerciseState";
 import { devWarn } from "../../../../utils/devLogger";
 import MiniKeyboard from "./shared/MiniKeyboard";
 
@@ -85,6 +86,7 @@ const FLAT_EXAMPLES = [
 // Quiz questions
 const QUIZ_QUESTIONS = [
   {
+    id: "flat_purpose",
     question: "What does a flat (♭) do to a note?",
     correctAnswer: "Lowers it by a half step",
     options: [
@@ -95,6 +97,7 @@ const QUIZ_QUESTIONS = [
     ],
   },
   {
+    id: "d_flat_comparison",
     question: "D♭ is _____ than D.",
     correctAnswer: "one half step lower",
     options: [
@@ -105,6 +108,7 @@ const QUIZ_QUESTIONS = [
     ],
   },
   {
+    id: "keyboard_direction",
     question: "On a keyboard, a flat moves you...",
     correctAnswer: "one key to the left",
     options: [
@@ -115,6 +119,7 @@ const QUIZ_QUESTIONS = [
     ],
   },
   {
+    id: "e_flat_location",
     question: "Which note is E♭?",
     correctAnswer: "The black key just left of E",
     options: [
@@ -135,16 +140,29 @@ export default function FlatAccidentalExercise({
   sessionState = {},
   onComplete,
   onCancel,
+  onProgress,
 }: LessonExerciseProps) {
   const [phase, setPhase] = useState(PHASES.INTRO);
-  const [quizIndex, setQuizIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [showResult, setShowResult] = useState(false);
   const [highlightedNotes, setHighlightedNotes] = useState([]);
   const [highlightFlat, setHighlightFlat] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentExample, setCurrentExample] = useState(0);
+
+  // Use shared quiz hook for quiz state management
+  const {
+    quiz,
+    currentQuestion,
+    totalQuestions,
+    handleAnswer: handleQuizAnswer,
+    resetQuiz,
+    isCorrectAnswer,
+  } = useQuizExerciseState({
+    questions: QUIZ_QUESTIONS,
+    onProgress,
+    onQuizComplete: (passed) => {
+      setPhase(PHASES.RESULT);
+    },
+  });
 
   const audioContextRef = useRef(null);
 
@@ -216,36 +234,13 @@ export default function FlatAccidentalExercise({
     [isPlaying, playNote],
   );
 
-  // Handle quiz answer
-  const handleAnswer = useCallback(
-    (answer) => {
-      setSelectedAnswer(answer);
-      setShowResult(true);
-      if (answer === QUIZ_QUESTIONS[quizIndex].correctAnswer) {
-        setScore((s) => s + 1);
-      }
-    },
-    [quizIndex],
-  );
-
-  // Next question
-  const handleNext = useCallback(() => {
-    setSelectedAnswer(null);
-    setShowResult(false);
-    if (quizIndex < QUIZ_QUESTIONS.length - 1) {
-      setQuizIndex((i) => i + 1);
-    } else {
-      setPhase(PHASES.RESULT);
-    }
-  }, [quizIndex]);
-
   // Complete exercise
   const handleComplete = useCallback(() => {
-    const passed = score === QUIZ_QUESTIONS.length; // 100% required
+    const passed = quiz.score === totalQuestions; // 100% required
     if (onComplete) {
-      onComplete({ success: passed, score });
+      onComplete({ success: passed, score: quiz.score });
     }
-  }, [onComplete, score]);
+  }, [onComplete, quiz.score, totalQuestions]);
 
   // ============================================================
   // RENDER PHASES
@@ -480,7 +475,7 @@ export default function FlatAccidentalExercise({
 
   // Quiz phase
   if (phase === PHASES.QUIZ) {
-    const currentQ = QUIZ_QUESTIONS[quizIndex];
+    if (!currentQuestion) return null;
 
     return (
       <View style={styles.container}>
@@ -488,24 +483,24 @@ export default function FlatAccidentalExercise({
           <View
             style={[
               styles.progressFill,
-              { width: `${((quizIndex + 1) / QUIZ_QUESTIONS.length) * 100}%` },
+              { width: `${((quiz.currentIndex + 1) / totalQuestions) * 100}%` },
             ]}
           />
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text style={styles.quizProgress}>
-            Question {quizIndex + 1} of {QUIZ_QUESTIONS.length}
+            Question {quiz.currentIndex + 1} of {totalQuestions}
           </Text>
 
-          <Text style={styles.quizQuestion}>{currentQ.question}</Text>
+          <Text style={styles.quizQuestion}>{currentQuestion.question}</Text>
 
           <View style={styles.optionsContainer}>
-            {currentQ.options.map((option, idx) => {
-              const isSelected = selectedAnswer === option;
-              const isCorrect = option === currentQ.correctAnswer;
-              const showCorrect = showResult && isCorrect;
-              const showWrong = showResult && isSelected && !isCorrect;
+            {currentQuestion.options.map((option, idx) => {
+              const isSelected = quiz.selectedAnswer === option;
+              const isCorrect = isCorrectAnswer(option);
+              const showCorrect = quiz.showFeedback && isCorrect;
+              const showWrong = quiz.showFeedback && isSelected && !isCorrect;
 
               return (
                 <TouchableOpacity
@@ -514,10 +509,10 @@ export default function FlatAccidentalExercise({
                     styles.optionButton,
                     showCorrect && styles.optionCorrect,
                     showWrong && styles.optionWrong,
-                    isSelected && !showResult && styles.optionSelected,
+                    isSelected && !quiz.showFeedback && styles.optionSelected,
                   ]}
-                  onPress={() => !showResult && handleAnswer(option)}
-                  disabled={showResult}
+                  onPress={() => !quiz.showFeedback && handleQuizAnswer(option)}
+                  disabled={quiz.showFeedback}
                 >
                   <Text
                     style={[
@@ -532,45 +527,30 @@ export default function FlatAccidentalExercise({
             })}
           </View>
 
-          {showResult && (
+          {quiz.showFeedback && (
             <View style={styles.feedbackContainer}>
               <Text
                 style={[
                   styles.feedbackText,
-                  selectedAnswer === currentQ.correctAnswer
+                  isCorrectAnswer(quiz.selectedAnswer)
                     ? styles.feedbackCorrect
                     : styles.feedbackWrong,
                 ]}
               >
-                {selectedAnswer === currentQ.correctAnswer
+                {isCorrectAnswer(quiz.selectedAnswer)
                   ? "✓ Correct!"
-                  : `✗ The answer is: ${currentQ.correctAnswer}`}
+                  : `✗ The answer is: ${currentQuestion.correctAnswer}`}
               </Text>
             </View>
           )}
         </ScrollView>
-
-        {showResult && (
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleNext}
-            accessibilityLabel="Next step"
-            accessibilityRole="button"
-          >
-            <Text style={styles.primaryButtonText}>
-              {quizIndex < QUIZ_QUESTIONS.length - 1
-                ? "Next →"
-                : "See Results →"}
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
     );
   }
 
   // Result phase
   if (phase === PHASES.RESULT) {
-    const passed = score === QUIZ_QUESTIONS.length;
+    const passed = quiz.score === totalQuestions;
 
     return (
       <View style={styles.container}>
@@ -580,7 +560,7 @@ export default function FlatAccidentalExercise({
             {passed ? "You understand flats!" : "Let's review"}
           </Text>
           <Text style={styles.resultScore}>
-            {score} / {QUIZ_QUESTIONS.length} correct
+            {quiz.score} / {totalQuestions} correct
           </Text>
 
           <View style={styles.card}>

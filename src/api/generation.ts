@@ -410,3 +410,89 @@ export async function getRhythmTypes(): Promise<string[]> {
 export async function getKeys(): Promise<string[]> {
   return api.get<string[]>("/generate/keys");
 }
+
+// =============================================================================
+// Chord Progression Generation (Practice Over Changes)
+// =============================================================================
+
+/** Content type for chord progression generation */
+export type ChordProgressionContentType =
+  | "scales"
+  | "arpeggios"
+  | "guide_tones";
+
+/** A chord event with duration */
+export interface ChordEvent {
+  /** Chord symbol (e.g., 'Cmaj7', 'G7', 'Dm7b5', 'C/E') */
+  symbol: string;
+  /** Duration of chord in beats */
+  duration_beats: number;
+}
+
+/** Request for generating content over a chord progression */
+export interface ChordProgressionRequest {
+  /** Type of content to generate over each chord */
+  content_type: ChordProgressionContentType;
+  /** Chord progression with durations */
+  chords: ChordEvent[];
+  /** Pattern algorithm to apply (optional) */
+  pattern?: string;
+  /** Rhythm/duration template */
+  rhythm?: RhythmType;
+  /** Lowest playable MIDI note */
+  range_low_midi?: number;
+  /** Highest playable MIDI note */
+  range_high_midi?: number;
+  /** Dynamic contour to apply */
+  dynamics?: DynamicType;
+  /** Articulation style */
+  articulation?: ArticulationType;
+}
+
+/** Generated content for a single chord */
+export interface ChordSegmentResponse {
+  /** The chord this segment is for */
+  chord_symbol: string;
+  /** Scale type used (for scales content_type) */
+  scale_used?: string;
+  /** Duration of this segment in beats */
+  duration_beats: number;
+  /** Pitch events in this segment */
+  events: PitchEvent[];
+}
+
+/** Response for chord progression generation */
+export interface ChordProgressionResponse {
+  /** Type of content generated */
+  content_type: ChordProgressionContentType;
+  /** Generated content per chord */
+  segments: ChordSegmentResponse[];
+  /** Total duration in beats */
+  total_beats: number;
+  /** All pitch events in chronological order */
+  events: PitchEvent[];
+}
+
+/**
+ * Generate musical content over a chord progression.
+ *
+ * @param request - Chord progression and generation parameters
+ * @returns ChordProgressionResponse with pitch events for each chord
+ * @throws Error if generation fails
+ *
+ * @example
+ * const response = await generateOverChanges({
+ *   content_type: "scales",
+ *   chords: [
+ *     { symbol: "Dm7", duration_beats: 4 },
+ *     { symbol: "G7", duration_beats: 4 },
+ *     { symbol: "Cmaj7", duration_beats: 4 },
+ *   ],
+ *   rhythm: "eighth_notes",
+ * });
+ */
+export async function generateOverChanges(
+  request: ChordProgressionRequest,
+): Promise<ChordProgressionResponse> {
+  return api.post<ChordProgressionResponse>("/generate/over-changes", request);
+}

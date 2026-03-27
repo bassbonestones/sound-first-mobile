@@ -4,6 +4,10 @@
  * Controls for entering and editing chord symbols.
  * Provides a text input with symbol palette buttons, autocomplete suggestions,
  * and chord preview functionality.
+ *
+ * Uses ChordModeContext to eliminate prop drilling. The connected version
+ * (ChordControlsConnected) reads from context, while ChordControlsBase
+ * accepts props directly for flexibility.
  */
 
 import React, { memo, useState, useCallback, useEffect, useRef } from "react";
@@ -26,13 +30,24 @@ import {
   spellChord,
 } from "../services";
 import { ChordPreview } from "./ChordPreview";
-import { ProgressionSelector } from "./ProgressionSelector";
-import type { ChordProgression } from "../types";
+import { ProgressionSelectorConnected } from "./ProgressionSelector";
+import { useChordModeOptional } from "../contexts";
 
 // =============================================================================
 // Types
 // =============================================================================
 
+/** Props for the connected version (uses context) */
+export interface ChordControlsConnectedProps {
+  /** Optional callback for live chord input changes (called on every keystroke) */
+  onChordInputChange?: (text: string) => void;
+  /** Optional callback when chord preview is requested */
+  onPreviewChord?: (midiNotes: number[]) => void;
+  /** Test ID for testing */
+  testID?: string;
+}
+
+/** Props for the base version (no context, all props required) */
 export interface ChordControlsProps {
   /** Whether chord entry mode is currently active */
   chordModeActive: boolean;
@@ -75,25 +90,6 @@ export interface ChordControlsProps {
   isInferring?: boolean;
   /** Callback to clear all chords from current progression */
   onClearChords?: () => void;
-  // Progression management props
-  /** All available progressions */
-  progressions?: ChordProgression[];
-  /** ID of the currently active progression */
-  activeProgressionId?: string;
-  /** Callback when a progression is selected */
-  onSelectProgression?: (id: string) => void;
-  /** Callback to create a new progression */
-  onCreateProgression?: (name: string) => void;
-  /** Callback to duplicate a progression */
-  onDuplicateProgression?: (sourceId: string, newName?: string) => void;
-  /** Callback to delete a progression */
-  onDeleteProgression?: (id: string) => void;
-  /** Callback to rename a progression */
-  onRenameProgression?: (id: string, newName: string) => void;
-  /** Whether progression edit mode is active */
-  isProgressionEditMode?: boolean;
-  /** Callback to toggle progression edit mode */
-  onToggleProgressionEditMode?: () => void;
   /** Test ID for testing */
   testID?: string;
 }
@@ -172,15 +168,6 @@ function ChordControlsComponent({
   onInferChords,
   isInferring = false,
   onClearChords,
-  progressions,
-  activeProgressionId,
-  onSelectProgression,
-  onCreateProgression,
-  onDuplicateProgression,
-  onDeleteProgression,
-  onRenameProgression,
-  isProgressionEditMode = false,
-  onToggleProgressionEditMode,
   testID,
 }: ChordControlsProps): React.ReactElement {
   const [inputText, setInputText] = useState(currentChordSymbol);
@@ -418,26 +405,8 @@ function ChordControlsComponent({
           </Text>
         </View>
 
-        {/* Progression selector */}
-        {progressions &&
-          onSelectProgression &&
-          onCreateProgression &&
-          onDuplicateProgression &&
-          onToggleProgressionEditMode && (
-            <ProgressionSelector
-              progressions={progressions}
-              activeProgressionId={activeProgressionId}
-              onSelectProgression={onSelectProgression}
-              onCreateProgression={onCreateProgression}
-              onDuplicateProgression={onDuplicateProgression}
-              onDeleteProgression={onDeleteProgression}
-              onRenameProgression={onRenameProgression}
-              isEditMode={isProgressionEditMode}
-              onToggleEditMode={onToggleProgressionEditMode}
-              disabled={disabled}
-              testID="progression-selector"
-            />
-          )}
+        {/* Progression selector - uses ChordProgressionContext */}
+        <ProgressionSelectorConnected testID="progression-selector" />
 
         {/* Chord input row */}
         <View style={styles.inputRow}>
@@ -1016,4 +985,57 @@ const styles = StyleSheet.create({
 // Export
 // =============================================================================
 
+/** Base component that accepts all props directly */
+export const ChordControlsBase = memo(ChordControlsComponent);
+
+/**
+ * Connected component that uses ChordModeContext.
+ * Must be used within a ChordModeProvider.
+ */
+function ChordControlsConnectedComponent({
+  onChordInputChange,
+  onPreviewChord,
+  testID,
+}: ChordControlsConnectedProps): React.ReactElement {
+  const context = useChordModeOptional();
+
+  if (!context) {
+    throw new Error(
+      "ChordControlsConnected must be used within a ChordModeProvider",
+    );
+  }
+
+  return (
+    <ChordControlsBase
+      chordModeActive={context.chordModeActive}
+      onToggleChordMode={context.toggleChordMode}
+      currentChordSymbol={context.currentChordSymbol}
+      onSetChord={context.setChord}
+      onRemoveChord={context.removeChord}
+      onNextBeat={context.moveNext}
+      onPrevBeat={context.movePrev}
+      canGoPrev={context.canGoPrev}
+      canGoNext={context.canGoNext}
+      currentPosition={context.currentPosition}
+      hasSelection={context.hasSelection}
+      disabled={context.disabled}
+      onChordInputChange={onChordInputChange}
+      onPreviewChord={onPreviewChord}
+      showChordSymbols={context.showChordSymbols}
+      onToggleVisibility={context.toggleVisibility}
+      onInferChords={context.inferChords}
+      isInferring={context.isInferring}
+      onClearChords={context.clearChords}
+      testID={testID}
+    />
+  );
+}
+
+export const ChordControlsConnected = memo(ChordControlsConnectedComponent);
+
+/**
+ * Default export - the connected version for easy migration.
+ * For the base version without context, use ChordControlsBase.
+ * @deprecated Use ChordControlsConnected with ChordModeProvider for reduced prop drilling
+ */
 export const ChordControls = memo(ChordControlsComponent);

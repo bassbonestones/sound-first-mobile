@@ -219,18 +219,13 @@ describe("OctaveConceptExercise", () => {
       expect(getByText(/✗ The answer is: Letter name/)).toBeTruthy();
     });
 
-    it("shows next button after answering", () => {
+    it("proceeds to next question after delay", () => {
       const { getByText } = render(<OctaveConceptExercise {...defaultProps} />);
       goToQuiz(getByText);
       fireEvent.press(getByText("Letter name"));
-      expect(getByText("Next →")).toBeTruthy();
-    });
-
-    it("proceeds to next question", () => {
-      const { getByText } = render(<OctaveConceptExercise {...defaultProps} />);
-      goToQuiz(getByText);
-      fireEvent.press(getByText("Letter name"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       expect(getByText("Question 2 of 3")).toBeTruthy();
     });
 
@@ -238,22 +233,31 @@ describe("OctaveConceptExercise", () => {
       const { getByText } = render(<OctaveConceptExercise {...defaultProps} />);
       goToQuiz(getByText);
       fireEvent.press(getByText("Letter name"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       expect(getByText(/If you play C/)).toBeTruthy();
     });
 
-    it("shows See Results button on last question", () => {
+    it("proceeds to results after last question", () => {
       const { getByText } = render(<OctaveConceptExercise {...defaultProps} />);
       goToQuiz(getByText);
       // Q1
       fireEvent.press(getByText("Letter name"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       // Q2
       fireEvent.press(getByText("Both called C"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       // Q3
       fireEvent.press(getByText("The same note, higher/lower"));
-      expect(getByText("See Results →")).toBeTruthy();
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
+      expect(getByText("You understand octaves!")).toBeTruthy();
     });
   });
 
@@ -269,11 +273,17 @@ describe("OctaveConceptExercise", () => {
       fireEvent.press(getByText("Got it! Quiz me →"));
       // Answer all 3 questions
       fireEvent.press(getByText(allCorrect ? "Letter name" : "Frequency"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       fireEvent.press(getByText("Both called C"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       fireEvent.press(getByText("The same note, higher/lower"));
-      fireEvent.press(getByText("See Results →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
     };
 
     it("shows perfect score title", () => {

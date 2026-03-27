@@ -29,6 +29,8 @@ import {
 } from "react-native";
 
 import { colors } from "../constants";
+import { devError } from "../utils/devLogger";
+import type { WebViewRef } from "../types/webview";
 
 // Conditionally import WebView
 let WebView: typeof import("react-native-webview").WebView | null = null;
@@ -176,7 +178,7 @@ function generateScoreHtml(options: {
         try {
           eval(event.data.script);
         } catch (e) {
-          console.error('Script execution error:', e);
+          devError('Script execution error:', e);
         }
       }
     });
@@ -244,7 +246,7 @@ function generateScoreHtml(options: {
 
         sendMessage('rendered');
       } catch (e) {
-        console.error('Render error:', e);
+        devError('Render error:', e);
         sendMessage('error', 'Failed to render: ' + e.message);
       }
     };
@@ -287,7 +289,7 @@ function generateScoreHtml(options: {
           zoom: currentZoom,
         });
       } catch (e) {
-        console.error('Error calculating measure positions:', e);
+        devError('Error calculating measure positions:', e);
       }
     }
 
@@ -379,7 +381,7 @@ function generateScoreHtml(options: {
           });
         }
       } catch (e) {
-        console.error('Error highlighting note:', e);
+        devError('Error highlighting note:', e);
       }
     };
 
@@ -406,8 +408,7 @@ function ScoreViewportComponent({
   onError,
   testID,
 }: ScoreViewportProps): React.ReactElement {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const webViewRef = useRef<any>(null);
+  const webViewRef = useRef<WebViewRef | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const [isLoading, setIsLoading] = useState(true);

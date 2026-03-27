@@ -6,36 +6,100 @@ import { useState } from "react";
 import { Platform } from "react-native";
 import { baseUrl } from "../../../../../api/client";
 
+// =============================================================================
+// Types
+// =============================================================================
+
+/** Upload step states */
+export type UploadStep = "select" | "preview" | "saving";
+
+/** Preview data returned from analysis endpoint */
+export interface UploadPreview {
+  title?: string;
+  key_center?: string;
+  time_signature?: string;
+  measure_count?: number;
+  note_count?: number;
+  capabilities?: string[];
+}
+
+/** Upload result from save endpoint */
+export interface UploadResult {
+  material_id: number;
+  title: string;
+  message?: string;
+}
+
+/** Return type for useUpload hook */
+export interface UseUploadReturn {
+  // Modal state
+  showModal: boolean;
+  openModal: () => void;
+  closeModal: () => void;
+
+  // Upload flow state
+  step: UploadStep;
+  setStep: (step: UploadStep) => void;
+  fileName: string;
+  fileContent: string;
+  title: string;
+  setTitle: (title: string) => void;
+  keyCenter: string;
+  setKeyCenter: (key: string) => void;
+  preview: UploadPreview | null;
+  error: string | null;
+  saving: boolean;
+
+  // Content setters
+  setFileName: (name: string) => void;
+  setContent: (content: string) => void;
+
+  // Actions
+  handleFilePick: () => Promise<void>;
+  analyzeFile: () => Promise<UploadPreview | null>;
+  confirmUpload: () => Promise<UploadResult | null>;
+}
+
+/** Callback for successful upload */
+export type OnUploadSuccess = (result: UploadResult) => void;
+
+// =============================================================================
+// Constants
+// =============================================================================
+
 /**
  * Upload step states
- * @type {Object}
  */
-export const UPLOAD_STEPS = {
+export const UPLOAD_STEPS: Record<string, UploadStep> = {
   SELECT: "select",
   PREVIEW: "preview",
   SAVING: "saving",
 };
 
+// =============================================================================
+// Hook
+// =============================================================================
+
 /**
  * Hook for managing MusicXML upload workflow
- * @param {Function} onSuccess - Callback after successful upload
- * @returns {Object} Upload state and functions
+ * @param onSuccess - Callback after successful upload
+ * @returns Upload state and functions
  */
-export function useUpload(onSuccess) {
+export function useUpload(onSuccess?: OnUploadSuccess): UseUploadReturn {
   const [showModal, setShowModal] = useState(false);
-  const [step, setStep] = useState(UPLOAD_STEPS.SELECT);
+  const [step, setStep] = useState<UploadStep>(UPLOAD_STEPS.SELECT);
   const [fileName, setFileName] = useState("");
   const [fileContent, setFileContent] = useState("");
   const [title, setTitle] = useState("");
   const [keyCenter, setKeyCenter] = useState("");
-  const [preview, setPreview] = useState(null);
-  const [error, setError] = useState(null);
+  const [preview, setPreview] = useState<UploadPreview | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   /**
    * Open the upload modal and reset state
    */
-  const openModal = () => {
+  const openModal = (): void => {
     setShowModal(true);
     setStep(UPLOAD_STEPS.SELECT);
     setFileName("");
@@ -49,7 +113,7 @@ export function useUpload(onSuccess) {
   /**
    * Close the upload modal
    */
-  const closeModal = () => {
+  const closeModal = (): void => {
     setShowModal(false);
   };
 
@@ -57,13 +121,14 @@ export function useUpload(onSuccess) {
    * Handle file selection (web only - uses file input)
    * On mobile, user should paste content directly
    */
-  const handleFilePick = async () => {
+  const handleFilePick = async (): Promise<void> => {
     if (Platform.OS === "web") {
       const input = document.createElement("input");
       input.type = "file";
       input.accept = ".xml,.musicxml";
-      input.onchange = async (e) => {
-        const file = e.target.files[0];
+      input.onchange = async (e: Event) => {
+        const target = e.target as HTMLInputElement;
+        const file = target.files?.[0];
         if (file) {
           setFileName(file.name);
           const content = await file.text();
@@ -81,9 +146,9 @@ export function useUpload(onSuccess) {
 
   /**
    * Analyze uploaded file content before saving
-   * @returns {Object|null} Preview data or null on error
+   * @returns Preview data or null on error
    */
-  const analyzeFile = async () => {
+  const analyzeFile = async (): Promise<UploadPreview | null> => {
     if (!fileContent) {
       setError("Please select or paste a MusicXML file first");
       return null;
@@ -116,9 +181,10 @@ export function useUpload(onSuccess) {
         setTitle(previewData.title);
       }
 
-      return previewData;
+      return previewData as UploadPreview;
     } catch (err) {
-      setError(err.message);
+      const message = err instanceof Error ? err.message : "Analysis failed";
+      setError(message);
       setStep(UPLOAD_STEPS.SELECT);
       return null;
     }
@@ -126,9 +192,9 @@ export function useUpload(onSuccess) {
 
   /**
    * Confirm and save the uploaded material
-   * @returns {Object|null} Result with material_id or null on error
+   * @returns Result with material_id or null on error
    */
-  const confirmUpload = async () => {
+  const confirmUpload = async (): Promise<UploadResult | null> => {
     if (!preview) return null;
 
     setSaving(true);
@@ -155,12 +221,13 @@ export function useUpload(onSuccess) {
 
       // Call success callback if provided
       if (onSuccess) {
-        onSuccess(result);
+        onSuccess(result as UploadResult);
       }
 
-      return result;
+      return result as UploadResult;
     } catch (err) {
-      setError(err.message);
+      const message = err instanceof Error ? err.message : "Upload failed";
+      setError(message);
       return null;
     } finally {
       setSaving(false);
@@ -169,9 +236,9 @@ export function useUpload(onSuccess) {
 
   /**
    * Set file content directly (for paste input)
-   * @param {string} content - MusicXML content
+   * @param content - MusicXML content
    */
-  const setContent = (content) => {
+  const setContent = (content: string): void => {
     setFileContent(content);
     if (!fileName) {
       setFileName("pasted-content.musicxml");

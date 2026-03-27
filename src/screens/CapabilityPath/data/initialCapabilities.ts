@@ -3,7 +3,28 @@
  * All 177 capabilities with teaching order, type, and notes
  */
 
-export const INITIAL_DATA = [
+// =============================================================================
+// Types
+// =============================================================================
+
+/** Capability data row for curriculum planning */
+export interface InitialCapability {
+  id: number;
+  capability: string;
+  display_name: string;
+  category: string;
+  teaching_order: number;
+  type: string;
+  mastery_count: number;
+  teaching_materials: string;
+  notes: string;
+}
+
+// =============================================================================
+// Data
+// =============================================================================
+
+export const INITIAL_DATA: InitialCapability[] = [
   {
     id: 1,
     capability: "notation_staff",
@@ -1953,13 +1974,21 @@ export const INITIAL_DATA = [
   },
 ];
 
-// CSV utility functions
-export const parseCSV = (csvString) => {
+// =============================================================================
+// CSV Utilities
+// =============================================================================
+
+/**
+ * Parse CSV string into capability objects
+ * @param csvString - CSV content with headers
+ * @returns Array of parsed capability objects
+ */
+export const parseCSV = (csvString: string): InitialCapability[] => {
   const lines = csvString.trim().split("\n");
   const headers = lines[0].split(",");
 
   return lines.slice(1).map((line) => {
-    const values = [];
+    const values: string[] = [];
     let current = "";
     let inQuotes = false;
 
@@ -1976,9 +2005,9 @@ export const parseCSV = (csvString) => {
     }
     values.push(current);
 
-    const obj = {};
+    const obj: Record<string, string | number> = {};
     headers.forEach((header, i) => {
-      let value = values[i] || "";
+      const value = values[i] || "";
       if (
         header === "id" ||
         header === "teaching_order" ||
@@ -1989,12 +2018,17 @@ export const parseCSV = (csvString) => {
         obj[header] = value;
       }
     });
-    return obj;
+    return obj as InitialCapability;
   });
 };
 
-export const toCSV = (data) => {
-  const headers = [
+/**
+ * Convert capability array to CSV string
+ * @param data - Array of capability objects
+ * @returns CSV string with headers
+ */
+export const toCSV = (data: InitialCapability[]): string => {
+  const headers: (keyof InitialCapability)[] = [
     "id",
     "capability",
     "display_name",
@@ -2009,11 +2043,11 @@ export const toCSV = (data) => {
 
   data.forEach((item) => {
     const values = headers.map((h) => {
-      let val = item[h] ?? "";
+      let val: string | number = item[h] ?? "";
       if (typeof val === "string" && (val.includes(",") || val.includes('"'))) {
         val = `"${val.replace(/"/g, '""')}"`;
       }
-      return val;
+      return String(val);
     });
     lines.push(values.join(","));
   });

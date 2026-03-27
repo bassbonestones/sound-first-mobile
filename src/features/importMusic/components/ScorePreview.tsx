@@ -34,8 +34,13 @@ import {
 import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../constants";
+import { devLog, devError } from "../../../utils/devLogger";
+import type { WebViewRef } from "../../../types/webview";
 import { generateOsmdHtml } from "./scorePreviewHtml";
-import type { HighlightedMeasure, WebViewMessage } from "./scorePreviewTypes";
+import type {
+  HighlightedMeasure,
+  WebViewMessage,
+} from "../types/scorePreviewTypes";
 
 // Conditionally import WebView only on native platforms
 let WebView: typeof import("react-native-webview").WebView | null = null;
@@ -69,7 +74,7 @@ const webIframeVisibleStyle: React.CSSProperties = {
 };
 
 // Re-export types for external use
-export type { HighlightedMeasure } from "./scorePreviewTypes";
+export type { HighlightedMeasure } from "../types/scorePreviewTypes";
 
 // ============================================================================
 // Types
@@ -169,8 +174,7 @@ function ScorePreviewInner(
   }: ScorePreviewProps,
   ref: React.ForwardedRef<ScorePreviewRef>,
 ): React.ReactElement {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const webViewRef = useRef<any>(null);
+  const webViewRef = useRef<WebViewRef | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const hasSentMusicXml = useRef(false);
   const currentMusicXmlRef = useRef(musicXml);
@@ -246,9 +250,9 @@ function ScorePreviewInner(
             message: string;
           };
           if (level === "error") {
-            console.error("[WebView]", logMessage);
+            devError("[WebView]", logMessage);
           } else {
-            console.log("[WebView]", logMessage);
+            devLog("[WebView]", logMessage);
           }
           break;
         }

@@ -30,7 +30,11 @@ import type {
 
 const STORAGE_KEY = "tuneMastery";
 
-// Default tune list for seeding
+/**
+ * Default tune library for TuneMastery system
+ * These tunes are seeded when a user first starts practicing.
+ * Ordered roughly by difficulty: folk songs → jazz standards → classical excerpts
+ */
 export const DEFAULT_TUNES = [
   "Hot Cross Buns",
   "Mary Had a Little Lamb",
@@ -91,7 +95,10 @@ export const DEFAULT_TUNES = [
   "Flight of the Bumblebee",
 ];
 
-// All 12 keys
+/**
+ * All 12 musical keys for tune transposition
+ * Uses flats for enharmonic equivalents (Bb not A#, Db not C#, etc.)
+ */
 export const ALL_KEYS: MusicalKey[] = [
   "A",
   "Bb",

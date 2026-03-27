@@ -4,19 +4,8 @@
  * Uses Web Audio API / react-native-audio-api to generate sine wave tones
  */
 import { useRef, useCallback, useEffect, useMemo } from "react";
-import { Platform } from "react-native";
 import { devLog, devWarn } from "../utils/devLogger";
-
-// Cross-platform AudioContext
-let NativeAudioContext: typeof AudioContext | null = null;
-if (Platform.OS !== "web") {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    NativeAudioContext = require("react-native-audio-api").AudioContext;
-  } catch (e) {
-    devWarn("react-native-audio-api not available");
-  }
-}
+import { createAudioContext } from "../screens/Session/components/exercises/shared/audioHelpers";
 
 // Standard concert pitch
 const CONCERT_A = 440;
@@ -162,20 +151,10 @@ export default function useExerciseAudio(): UseExerciseAudioReturn {
   const audioContextRef = useRef<AudioContext | null>(null);
   const activeOscillatorsRef = useRef<OscillatorRef[]>([]);
 
-  // Initialize audio context
+  // Initialize audio context using shared utility
   const initAudio = useCallback((): AudioContext | null => {
     if (audioContextRef.current) return audioContextRef.current;
-
-    if (Platform.OS === "web") {
-      const AudioContextClass =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext })
-          .webkitAudioContext;
-      audioContextRef.current = new AudioContextClass();
-    } else if (NativeAudioContext) {
-      audioContextRef.current = new NativeAudioContext();
-    }
-
+    audioContextRef.current = createAudioContext();
     return audioContextRef.current;
   }, []);
 

@@ -426,5 +426,157 @@ describe("tunerChallenge", () => {
       };
       expect(getChallengeProgressColor(state)).toBe("#888");
     });
+
+    it("returns red when failed", () => {
+      const state = {
+        ...createInitialChallengeState(),
+        status: "failed" as const,
+      };
+      expect(getChallengeProgressColor(state)).toBe("#F44336");
+    });
+
+    it("returns yellow when in grace period", () => {
+      const state = {
+        ...createInitialChallengeState(),
+        status: "holding" as const,
+        graceStartTime: Date.now(),
+      };
+      expect(getChallengeProgressColor(state)).toBe("#FFC107");
+    });
+  });
+
+  describe("getChallengeStatusText edge cases", () => {
+    it("returns failed message", () => {
+      const state = {
+        ...createInitialChallengeState(),
+        status: "failed" as const,
+      };
+      expect(getChallengeStatusText(state)).toContain("Failed");
+    });
+
+    it("returns grace period warning", () => {
+      const state = {
+        ...createInitialChallengeState(),
+        status: "holding" as const,
+        graceStartTime: Date.now(),
+        progress: 0.5,
+      };
+      expect(getChallengeStatusText(state)).toContain("Get back in tune");
+    });
+
+    it("returns empty string for waiting without target", () => {
+      const state = {
+        ...createInitialChallengeState(),
+        status: "waiting" as const,
+        target: null,
+      };
+      expect(getChallengeStatusText(state)).toBe("");
+    });
+  });
+
+  // ===========================================
+  // Grace Period and Edge Cases
+  // ===========================================
+
+  describe("updateChallengeState edge cases", () => {
+    it("maintains state when no note detected during holding", () => {
+      let state = createInitialChallengeState();
+      state = startChallenge(state, createChallengeTarget("C4"));
+
+      // Start holding
+      const now = 1000;
+      state = updateChallengeState(state, "C4", 0, now);
+      expect(state.status).toBe("holding");
+
+      // No note detected - state should not change
+      const noNoteState = updateChallengeState(
+        state,
+        null as any,
+        0,
+        now + 100,
+      );
+      expect(noNoteState.status).toBe("holding");
+    });
+
+    it("handles correct note but outside tolerance with grace period", () => {
+      let state = createInitialChallengeState();
+      const target = createChallengeTarget("C4", "medium"); // tolerance = 5
+      state = startChallenge(state, target);
+
+      // Start holding within tolerance
+      const now = 1000;
+      state = updateChallengeState(state, "C4", 3, now);
+      expect(state.status).toBe("holding");
+
+      // Move outside tolerance (cents = 10, target tolerance = 5)
+      // This should trigger grace period
+      state = updateChallengeState(state, "C4", 10, now + 100);
+      // Should still be in holding status during grace
+      expect(state.status).toBe("holding");
+    });
+
+    it("fails when grace period expires", () => {
+      let state = createInitialChallengeState();
+      const target = createChallengeTarget("C4", "medium");
+      state = startChallenge(state, target);
+
+      // Start holding
+      const now = 1000;
+      state = updateChallengeState(state, "C4", 3, now);
+
+      // Go outside tolerance - start grace
+      state = updateChallengeState(state, "C4", 10, now + 100);
+
+      // Wait for grace period to expire (500ms grace period)
+      state = updateChallengeState(state, "C4", 10, now + 700);
+      expect(state.status).toBe("failed");
+    });
+
+    it("fails immediately when grace already used", () => {
+      let state = createInitialChallengeState();
+      const target = createChallengeTarget("C4", "medium");
+      state = startChallenge(state, target);
+
+      // Start holding
+      const now = 1000;
+      state = updateChallengeState(state, "C4", 3, now);
+
+      // Go outside tolerance briefly - use grace
+      state = updateChallengeState(state, "C4", 10, now + 100);
+
+      // Return to tolerance
+      state = updateChallengeState(state, "C4", 3, now + 200);
+
+      // Mark grace as used
+      state = { ...state, graceUsed: true };
+
+      // Go outside tolerance again - should fail immediately since grace used
+      state = updateChallengeState(state, "C4", 10, now + 300);
+      expect(state.status).toBe("failed");
+    });
+
+    it("returns unchanged state when status is success", () => {
+      let state = createInitialChallengeState();
+      state = {
+        ...state,
+        status: "success",
+        target: createChallengeTarget("C4"),
+      };
+
+      const unchanged = updateChallengeState(state, "D4", 0, Date.now());
+      expect(unchanged.status).toBe("success");
+    });
+
+    it("returns unchanged state when status is failed", () => {
+      let state = createInitialChallengeState();
+      state = {
+        ...state,
+        status: "failed",
+        target: createChallengeTarget("C4"),
+      };
+
+      const unchanged = updateChallengeState(state, "C4", 0, Date.now());
+      expect(unchanged.status).toBe("failed");
+    });
   });
 });

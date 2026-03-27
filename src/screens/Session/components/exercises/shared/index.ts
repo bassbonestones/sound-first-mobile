@@ -98,4 +98,124 @@ export type { UseExerciseAudioContextReturn } from "./useExerciseAudioContext";
 
 // MiniKeyboard Component
 export { default as MiniKeyboard } from "./MiniKeyboard";
+
+// Timing Exercise State Hook
+export { useTimingExerciseState } from "./useTimingExerciseState";
+export type {
+  TimingExercisePhase,
+  TimingFeedback,
+  WrongNoteInfo,
+  TimingExerciseConfig,
+  TimingProgressUpdate,
+  TimingCompletionResult,
+  TimingExerciseStateReturn,
+} from "./useTimingExerciseState";
+
+// Lesson Exercise State Hook
+export { useLessonExerciseState } from "./useLessonExerciseState";
+export type {
+  LessonExerciseStateConfig,
+  LessonExerciseStateReturn,
+  PerformanceResult,
+  PatternConfig,
+  ProgressState,
+  PhaseConfig,
+} from "./useLessonExerciseState";
+
+// Fragment2 Audio Hook
+export { useFragment2Audio } from "./useFragment2Audio";
+export type {
+  Fragment2AudioConfig,
+  Fragment2AudioReturn,
+} from "./useFragment2Audio";
+
+// Quiz Exercise State Hook
+export { useQuizExerciseState } from "./useQuizExerciseState";
+export type {
+  QuizQuestion,
+  QuizState,
+  QuizConfig,
+  QuizExerciseState,
+} from "./useQuizExerciseState";
+
+// Lesson Exercise Audio Hook
+export { useLessonExerciseAudio } from "./useLessonExerciseAudio";
+export type {
+  LessonExerciseAudioConfig,
+  LessonExerciseAudioReturn,
+  NoteConfig,
+  CountInConfig,
+  PatternNote,
+  PitchTrackingRefs,
+  PerformanceAnalysis,
+} from "./useLessonExerciseAudio";
+
+// Lesson UI Components
+export {
+  LessonBeatIndicator,
+  LessonAttestationModal,
+  LessonFocusCard,
+  LessonFocusCardMini,
+  LessonPhaseProgress,
+  LessonNotationToggle,
+  LessonResultDisplay,
+  LessonSuccessDisplay,
+  // Style exports for customization
+  lessonBeatStyles,
+  lessonModalStyles,
+  lessonFocusStyles,
+  lessonMiniStyles,
+  lessonProgressStyles,
+  lessonNotationStyles,
+  lessonResultStyles,
+  lessonSuccessStyles,
+} from "./LessonComponents";
+export type {
+  LessonBeatIndicatorProps,
+  LessonAttestationModalProps,
+  LessonFocusCardProps,
+  LessonFocusCardMiniProps,
+  LessonPhaseProgressProps,
+  LessonNotationToggleProps,
+  LessonResultDisplayProps,
+  LessonSuccessDisplayProps,
+  FocusCardData,
+  PatternProgressItem,
+} from "./LessonComponents";
 export type { MiniKeyboardProps } from "./MiniKeyboard";
+
+// Base Lesson Exercise Component
+export { BaseLessonExercise, baseExerciseStyles } from "./BaseLessonExercise";
+export type {
+  LessonExerciseConfig,
+  AudioConfig,
+  NoteGenerationConfig,
+  PhaseRenderProps,
+  CustomRenderers,
+  BaseLessonExerciseProps,
+} from "./BaseLessonExercise";
+
+// Rest Lesson Types (unified types for rest exercises)
+export { getDefaultInstructions } from "./RestLessonTypes";
+export type {
+  RestType,
+  BeatConfig,
+  RestLessonNoteInfo,
+  RestSymbolType,
+  RestFocusCard,
+  RestMiniCard,
+  RestThresholds,
+  RestNotationConfig,
+  RestPhaseInstructions,
+  RestLessonConfig,
+} from "./RestLessonTypes";
+
+// Rest Lesson Audio Hook
+export { useRestLessonAudio } from "./useRestLessonAudio";
+export type {
+  RestAudioConfig,
+  PlaybackState,
+  PerformanceRefs,
+  PerformanceAnalysis,
+  UseRestLessonAudioReturn,
+} from "./useRestLessonAudio";

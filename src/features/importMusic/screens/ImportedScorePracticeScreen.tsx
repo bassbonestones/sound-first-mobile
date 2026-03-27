@@ -37,6 +37,7 @@ import { Feather } from "@expo/vector-icons";
 import * as ScreenOrientation from "expo-screen-orientation";
 
 import { colors, spacing } from "../../../constants";
+import { devWarn } from "../../../utils/devLogger";
 import {
   ScorePreview,
   PitchFeedback,
@@ -279,7 +280,7 @@ export function ImportedScorePracticeScreen({
       ScreenOrientation.lockAsync(
         ScreenOrientation.OrientationLock.LANDSCAPE,
       ).catch((error) => {
-        console.warn("Failed to lock orientation:", error);
+        devWarn("Failed to lock orientation:", error);
       });
 
       return () => {

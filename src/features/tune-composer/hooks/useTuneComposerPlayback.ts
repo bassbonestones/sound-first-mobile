@@ -8,6 +8,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 
 import type { Note, TuneComposerScore } from "../types";
+import { getNoteDuration } from "../types";
 // Re-use the composer synth service
 import { composerSynth } from "../../composer/services/composerSynth";
 
@@ -166,7 +167,7 @@ export function useTuneComposerPlayback(
         const firstNote = getNoteAtPosition(position);
         if (firstNote) {
           const secondsPerBeat = getSecondsPerBeat(tempo);
-          const noteDuration = firstNote.duration * secondsPerBeat;
+          const noteDuration = getNoteDuration(firstNote) * secondsPerBeat;
           composerSynth.playNote(firstNote.midi, noteDuration * 1000);
           lastPlayedPositionRef.current = `${position.measureIndex}-${position.noteIndex}`;
         }
@@ -188,7 +189,7 @@ export function useTuneComposerPlayback(
       }
 
       const secondsPerBeat = getSecondsPerBeat(tempo);
-      const noteDuration = currentNote.duration * secondsPerBeat;
+      const noteDuration = getNoteDuration(currentNote) * secondsPerBeat;
 
       setCurrentEvent({
         note: currentNote,
@@ -206,7 +207,7 @@ export function useTuneComposerPlayback(
 
           const nextNote = getNoteAtPosition(nextPos);
           if (nextNote) {
-            const nextDuration = nextNote.duration * secondsPerBeat;
+            const nextDuration = getNoteDuration(nextNote) * secondsPerBeat;
             composerSynth.playNote(nextNote.midi, nextDuration * 1000);
             lastPlayedPositionRef.current = `${nextPos.measureIndex}-${nextPos.noteIndex}`;
           }
@@ -216,7 +217,7 @@ export function useTuneComposerPlayback(
 
           const firstNote = getNoteAtPosition(INITIAL_POSITION);
           if (firstNote) {
-            const firstDuration = firstNote.duration * secondsPerBeat;
+            const firstDuration = getNoteDuration(firstNote) * secondsPerBeat;
             composerSynth.playNote(firstNote.midi, firstDuration * 1000);
             lastPlayedPositionRef.current = `0-0`;
           }

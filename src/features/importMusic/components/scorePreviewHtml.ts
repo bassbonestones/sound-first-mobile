@@ -10,7 +10,7 @@
  * @see https://opensheetmusicdisplay.org/
  */
 
-import type { HighlightedMeasure } from "./scorePreviewTypes";
+import type { HighlightedMeasure } from "../types/scorePreviewTypes";
 
 // ============================================================================
 // Types

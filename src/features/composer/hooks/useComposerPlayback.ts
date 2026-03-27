@@ -8,7 +8,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 
 import type { ComposerScore, Note } from "../types";
-import { getBeatsPerMeasure } from "../types";
+import { getBeatsPerMeasure, getNoteDuration } from "../types";
 import { composerSynth } from "../services/composerSynth";
 
 // =============================================================================
@@ -207,7 +207,7 @@ export function useComposerPlayback(
         const firstNote = getNoteAtPosition(position);
         if (firstNote) {
           const secondsPerBeat = getSecondsPerBeat(tempo);
-          const noteDuration = firstNote.duration * secondsPerBeat;
+          const noteDuration = getNoteDuration(firstNote) * secondsPerBeat;
           composerSynth.playNote(firstNote.midi, noteDuration * 1000);
           lastPlayedPositionRef.current = `${position.measureIndex}-${position.noteIndex}`;
         }
@@ -233,7 +233,7 @@ export function useComposerPlayback(
 
       // Calculate duration of current note in seconds
       const secondsPerBeat = getSecondsPerBeat(tempo);
-      const noteDuration = currentNote.duration * secondsPerBeat;
+      const noteDuration = getNoteDuration(currentNote) * secondsPerBeat;
 
       // Emit current event
       setCurrentEvent({
@@ -255,7 +255,7 @@ export function useComposerPlayback(
           // Play the next note
           const nextNote = getNoteAtPosition(nextPos);
           if (nextNote) {
-            const nextDuration = nextNote.duration * secondsPerBeat;
+            const nextDuration = getNoteDuration(nextNote) * secondsPerBeat;
             composerSynth.playNote(nextNote.midi, nextDuration * 1000);
             lastPlayedPositionRef.current = `${nextPos.measureIndex}-${nextPos.noteIndex}`;
           }
@@ -267,7 +267,7 @@ export function useComposerPlayback(
           // Play the first note
           const firstNote = getNoteAtPosition(INITIAL_POSITION);
           if (firstNote) {
-            const firstDuration = firstNote.duration * secondsPerBeat;
+            const firstDuration = getNoteDuration(firstNote) * secondsPerBeat;
             composerSynth.playNote(firstNote.midi, firstDuration * 1000);
             lastPlayedPositionRef.current = `0-0`;
           }

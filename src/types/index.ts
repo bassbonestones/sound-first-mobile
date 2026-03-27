@@ -7,6 +7,12 @@
 // API types
 export * from "./api";
 
+// Audio types
+export * from "./audio";
+
+// WebView types
+export * from "./webview";
+
 // Domain models
 export * from "./capability";
 export * from "./focusCard";

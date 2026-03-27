@@ -1,5 +1,9 @@
 /**
- * QuarterNoteLessonExercise - Teaches the quarter note concept
+ * QuarterNoteLessonExercise - Refactored to use shared hooks
+ *
+ * Uses:
+ * - useLessonExerciseState for phase/UI state management
+ * - useLessonExerciseAudio for audio playback and pitch tracking
  *
  * Flow: Focus Card → Listen → Sing → Imagine → Play → Feedback
  * Key concepts:
@@ -8,19 +12,12 @@
  * - Note head is FILLED/SOLID (not hollow like whole/half)
  * - The note ends right on beat 2
  */
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-} from "react";
+import React, { useEffect, useMemo, useCallback, useRef } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  Platform,
   ScrollView,
   Modal,
 } from "react-native";
@@ -30,128 +27,28 @@ import {
   parseNoteName,
   noteToMidi,
   midiToFrequency,
-  noteToFrequency,
-  createAudioContext,
-  createClickSound,
   LESSON_PHASES as PHASE,
   PITCH_DETECTION_OPTIONS,
 } from "./shared";
 import type { ExerciseProps } from "./shared";
-import { devLog, devWarn } from "../../../../utils/devLogger";
+import { useLessonExerciseState } from "./shared/useLessonExerciseState";
+import { useLessonExerciseAudio } from "./shared/useLessonExerciseAudio";
+import {
+  generateQuarterNoteMusicXML,
+  QUARTER_NOTE_CONFIG,
+} from "./configs/quarterNoteConfig";
+import { devWarn } from "../../../../utils/devLogger";
 
 // For notation display
-let NotationDisplay = null;
+let NotationDisplay: React.ComponentType<{
+  musicxml: string | null;
+  width: number;
+  height: number;
+}> | null = null;
 try {
   NotationDisplay = require("../../../../components/NotationDisplay").default;
-} catch (e) {
+} catch (_e) {
   devWarn("NotationDisplay not available");
-}
-
-// Generate MusicXML for a single quarter note
-function generateQuarterNoteMusicXML(noteName, clef = "treble") {
-  const parsed = parseNoteName(noteName);
-  if (!parsed) return null;
-
-  let alter = 0;
-  let accidentalName = "natural";
-  if (parsed.accidental === "b") {
-    alter = -1;
-    accidentalName = "flat";
-  } else if (parsed.accidental === "#") {
-    alter = 1;
-    accidentalName = "sharp";
-  }
-
-  const clefSign = clef === "bass" ? "F" : "G";
-  const clefLine = clef === "bass" ? "4" : "2";
-  const alterXML = alter !== 0 ? `        <alter>${alter}</alter>\n` : "";
-  const accidentalXML =
-    alter !== 0 ? `        <accidental>${accidentalName}</accidental>\n` : "";
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
-<score-partwise version="3.1">
-  <part-list>
-    <score-part id="P1">
-      <part-name></part-name>
-    </score-part>
-  </part-list>
-  <part id="P1">
-    <measure number="1">
-      <attributes>
-        <divisions>1</divisions>
-        <time>
-          <beats>4</beats>
-          <beat-type>4</beat-type>
-        </time>
-        <key>
-          <fifths>0</fifths>
-        </key>
-        <clef>
-          <sign>${clefSign}</sign>
-          <line>${clefLine}</line>
-        </clef>
-      </attributes>
-      <note>
-        <pitch>
-          <step>${parsed.letter}</step>
-${alterXML}          <octave>${parsed.octave}</octave>
-        </pitch>
-        <duration>1</duration>
-        <type>quarter</type>
-${accidentalXML}      </note>
-      <note>
-        <rest/>
-        <duration>1</duration>
-        <type>quarter</type>
-      </note>
-      <note>
-        <rest/>
-        <duration>1</duration>
-        <type>quarter</type>
-      </note>
-      <note>
-        <rest/>
-        <duration>1</duration>
-        <type>quarter</type>
-      </note>
-    </measure>
-  </part>
-</score-partwise>`;
-}
-
-// Create a softer subdivision click for eighth notes
-function createSubdivisionClick(audioContext) {
-  const sampleRate = audioContext.sampleRate;
-  const duration = 0.02;
-  const bufferSize = Math.floor(sampleRate * duration);
-  const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
-  const data = buffer.getChannelData(0);
-
-  for (let i = 0; i < bufferSize; i++) {
-    data[i] = Math.random() * 2 - 1;
-  }
-
-  const source = audioContext.createBufferSource();
-  source.buffer = buffer;
-
-  const filter = audioContext.createBiquadFilter();
-  filter.type = "highpass";
-  filter.frequency.value = 2000; // Higher pitch for subdivision
-  filter.Q.value = 0.5;
-
-  const gainNode = audioContext.createGain();
-  gainNode.gain.setValueAtTime(0.25, audioContext.currentTime); // Softer
-  gainNode.gain.exponentialRampToValueAtTime(
-    0.001,
-    audioContext.currentTime + duration,
-  );
-
-  source.connect(filter);
-  filter.connect(gainNode);
-  gainNode.connect(audioContext.destination);
-
-  source.start(audioContext.currentTime);
 }
 
 export default function QuarterNoteLessonExercise({
@@ -160,58 +57,32 @@ export default function QuarterNoteLessonExercise({
   onComplete,
   onProgress,
   userFirstNote = "F3",
-}: ExerciseProps) {
-  // State
-  const [phase, setPhase] = useState(PHASE.FOCUS_CARD);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentBeat, setCurrentBeat] = useState(0);
-  const [isSubdivision, setIsSubdivision] = useState(false);
-  const [showNotation, setShowNotation] = useState(false);
-  const [singResult, setSingResult] = useState(null);
-  const [playResult, setPlayResult] = useState(null);
-  const [successfulRounds, setSuccessfulRounds] = useState(0);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [hasHeardPattern, setHasHeardPattern] = useState(false);
-  const [soundingOnBeats, setSoundingOnBeats] = useState([false, false]);
-  const [singAttempts, setSingAttempts] = useState(0);
-  const [playAttempts, setPlayAttempts] = useState(0);
-  const [showAttestModal, setShowAttestModal] = useState(false);
-  const [attestPhase, setAttestPhase] = useState(null);
-
-  // Refs
-  const audioContextRef = useRef(null);
-  const beatIntervalRef = useRef(null);
-  const samplingIntervalRef = useRef(null);
-  const oscillatorRef = useRef(null);
-  const oscillator2Ref = useRef(null);
-  const gainNodeRef = useRef(null);
-  const unmountedRef = useRef(false);
-  const isSoundingRef = useRef(false);
-  const hasHitTargetPitchRef = useRef(false);
-  const onPitchCountRef = useRef(0);
-  const totalSoundingCountRef = useRef(0);
-  // Beat 1 should have sound, beat 2 should not (note ends on 2)
-  const soundingOnBeatsRef = useRef([0, 0]);
-  const startedEarlyRef = useRef(false);
-  const scrollViewRef = useRef(null);
-
-  // Store onComplete callback
-  const onCompleteRef = useRef(null);
-
+}: ExerciseProps): React.JSX.Element {
+  // ---------------------------------------------------------------------------
   // Config
-  const bpm = config?.bpm || 60;
-  const masteryStreak = mastery?.correct_streak || 3;
-  const clef = config?.clef || "treble";
+  // ---------------------------------------------------------------------------
+  const bpm =
+    ((config as Record<string, unknown>)?.bpm as number) ??
+    QUARTER_NOTE_CONFIG.defaultTempo;
+  const masteryStreak =
+    ((mastery as Record<string, unknown>)?.correct_streak as number) ?? 3;
+  const clef =
+    ((config as Record<string, unknown>)?.clef as "treble" | "bass") ??
+    "treble";
 
-  // Parse note info
+  // ---------------------------------------------------------------------------
+  // Note Info
+  // ---------------------------------------------------------------------------
   const noteInfo = useMemo(() => {
     const parsed = parseNoteName(userFirstNote);
-    return parsed || { letter: "F", accidental: "", octave: 3 };
+    return parsed ?? { letter: "F", accidental: "", octave: 3 };
   }, [userFirstNote]);
 
+  const targetMidi = useMemo(() => noteToMidi(userFirstNote), [userFirstNote]);
+
   const targetFrequency = useMemo(
-    () => noteToFrequency(userFirstNote),
-    [userFirstNote],
+    () => midiToFrequency(targetMidi),
+    [targetMidi],
   );
 
   // Generate MusicXML
@@ -220,524 +91,206 @@ export default function QuarterNoteLessonExercise({
     [userFirstNote, clef],
   );
 
-  // Pitch detection
+  // ---------------------------------------------------------------------------
+  // State Hook
+  // ---------------------------------------------------------------------------
+  const exercise = useLessonExerciseState({
+    masteryStreak,
+    focusCards: [
+      {
+        category: "rhythm",
+        name: "Quarter Note",
+        description: "A quarter note lasts for 1 beat.",
+        cue: "The note ends right on beat 2.",
+      },
+    ],
+  });
+
+  // ---------------------------------------------------------------------------
+  // Audio Hook
+  // ---------------------------------------------------------------------------
+  const audio = useLessonExerciseAudio({
+    tempo: bpm,
+    noteConfig: {
+      beatsPerNote: QUARTER_NOTE_CONFIG.beatsPerNote,
+      includeSubdivision: QUARTER_NOTE_CONFIG.hasSubdivision,
+    },
+  });
+
+  // ---------------------------------------------------------------------------
+  // Pitch Detection
+  // ---------------------------------------------------------------------------
+  const isPitchActive =
+    (exercise.phase === PHASE.SING && !exercise.singResult) ||
+    (exercise.phase === PHASE.PLAY && !exercise.playResult);
+
   const { currentPitch, volume, isSounding } = usePitchDetection({
-    enabled:
-      (phase === PHASE.SING && !singResult) ||
-      (phase === PHASE.PLAY && !playResult),
+    enabled: isPitchActive,
     ...PITCH_DETECTION_OPTIONS,
   });
 
-  // Track pitch accuracy
-  const targetMidi = useMemo(() => noteToMidi(userFirstNote), [userFirstNote]);
-
+  // Sync isSounding to tracking ref
   useEffect(() => {
-    if (!isSounding || !currentPitch?.noteName) return;
+    audio.trackingRefs.isSounding.current = isSounding;
+  }, [isSounding, audio.trackingRefs.isSounding]);
+
+  // Track pitch during active phases
+  useEffect(() => {
+    if (!isSounding || !currentPitch?.noteName || !isPitchActive) return;
 
     const detectedMidi = noteToMidi(currentPitch.noteName);
     if (detectedMidi === null) return;
 
-    const pitchDiff = Math.abs(detectedMidi - targetMidi);
+    audio.trackingRefs.totalSoundingCount.current += 1;
 
+    // For singing: allow octave variance
+    const pitchDiff = Math.abs(detectedMidi - targetMidi);
     const isOnPitch =
-      phase === PHASE.SING
+      exercise.phase === PHASE.SING
         ? pitchDiff % 12 <= 1 || pitchDiff % 12 >= 11
         : pitchDiff <= 1;
 
-    totalSoundingCountRef.current += 1;
     if (isOnPitch) {
-      hasHitTargetPitchRef.current = true;
-      onPitchCountRef.current += 1;
+      audio.trackingRefs.hasHitTargetPitch.current = true;
+      audio.trackingRefs.onPitchCount.current += 1;
     }
-  }, [currentPitch?.noteName, isSounding, targetMidi, phase]);
+  }, [
+    currentPitch?.noteName,
+    isSounding,
+    isPitchActive,
+    targetMidi,
+    exercise.phase,
+    audio.trackingRefs,
+  ]);
 
-  useEffect(() => {
-    isSoundingRef.current = isSounding;
-  }, [isSounding]);
-
-  // Reset tracking when phase changes
-  useEffect(() => {
-    hasHitTargetPitchRef.current = false;
-    onPitchCountRef.current = 0;
-    totalSoundingCountRef.current = 0;
-    soundingOnBeatsRef.current = [0, 0];
-    startedEarlyRef.current = false;
-    setSoundingOnBeats([false, false]);
-  }, [phase]);
-
+  // Detected note name for display
   const detectedNoteName = useMemo(() => {
     if (!currentPitch?.noteName || !isSounding) return null;
     return currentPitch.noteName;
   }, [currentPitch?.noteName, isSounding]);
 
-  // Initialize audio context
-  useEffect(() => {
-    audioContextRef.current = createAudioContext();
+  // ---------------------------------------------------------------------------
+  // Refs
+  // ---------------------------------------------------------------------------
+  const scrollViewRef = useRef<ScrollView>(null);
 
-    return () => {
-      unmountedRef.current = true;
-      if (beatIntervalRef.current) {
-        clearInterval(beatIntervalRef.current);
-      }
-      if (samplingIntervalRef.current) {
-        clearInterval(samplingIntervalRef.current);
-      }
-      if (oscillatorRef.current) {
-        try {
-          oscillatorRef.current.stop();
-        } catch (e) {}
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    setShowNotation(false);
-  }, [phase]);
-
-  // Play a quarter note with metronome clicks
-  const playQuarterNote = useCallback(
-    (onComplete) => {
-      const ctx = audioContextRef.current;
-      if (!ctx || isPlaying) return;
-
-      onCompleteRef.current =
-        typeof onComplete === "function" ? onComplete : null;
-
-      setIsPlaying(true);
-      setCurrentBeat(-4);
-      setIsSubdivision(false);
-
-      const beatMs = (60 / bpm) * 1000;
-      const eighthMs = beatMs / 2;
-      let beat = -4;
-      let isAnd = true; // First interval tick is subdivision after initial beat
-
-      const playNote = () => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        const now = ctx.currentTime;
-        const duration = (beatMs * 1) / 1000; // 1 beat
-
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(targetFrequency, now);
-
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.5, now + 0.02);
-        gain.gain.setValueAtTime(0.4, now + duration - 0.05);
-        gain.gain.linearRampToValueAtTime(0, now + duration);
-
-        const osc2 = ctx.createOscillator();
-        osc2.frequency.setValueAtTime(targetFrequency * 2, now);
-        const gain2 = ctx.createGain();
-        gain2.gain.setValueAtTime(0.15, now);
-        gain2.gain.linearRampToValueAtTime(0, now + duration);
-
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc2.connect(gain2);
-        gain2.connect(ctx.destination);
-
-        osc.start(now);
-        osc.stop(now + duration + 0.05);
-        osc2.start(now);
-        osc2.stop(now + duration + 0.05);
-
-        oscillatorRef.current = osc;
-        oscillator2Ref.current = osc2;
-        gainNodeRef.current = gain;
-      };
-
-      createClickSound(ctx, true);
-      setIsSubdivision(false);
-
-      beatIntervalRef.current = setInterval(() => {
-        if (unmountedRef.current) {
-          clearInterval(beatIntervalRef.current);
-          return;
-        }
-
-        if (isAnd) {
-          // This is the "&" subdivision
-          createSubdivisionClick(ctx);
-          setIsSubdivision(true);
-          isAnd = false;
-        } else {
-          // This is a main beat
-          beat++;
-          if (beat === 0) beat = 1;
-          setIsSubdivision(false);
-
-          if (beat >= -3 && beat <= -1) {
-            createClickSound(ctx, false);
-            setCurrentBeat(beat);
-          } else if (beat === 1) {
-            createClickSound(ctx, true);
-            playNote();
-            setCurrentBeat(1);
-          } else if (beat === 2) {
-            // The next beat - note ends here
-            createClickSound(ctx, false);
-            setCurrentBeat(2);
-          } else {
-            clearInterval(beatIntervalRef.current);
-            beatIntervalRef.current = null;
-            setIsPlaying(false);
-            setCurrentBeat(0);
-            setIsSubdivision(false);
-            if (onCompleteRef.current) {
-              onCompleteRef.current();
-              onCompleteRef.current = null;
-            }
-            return;
-          }
-          isAnd = true; // Next tick will be subdivision
-        }
-      }, eighthMs);
-    },
-    [bpm, targetFrequency, isPlaying],
-  );
-
-  // Stop playback
-  const stopPlayback = useCallback(() => {
-    if (beatIntervalRef.current) {
-      clearInterval(beatIntervalRef.current);
-      beatIntervalRef.current = null;
-    }
-    if (samplingIntervalRef.current) {
-      clearInterval(samplingIntervalRef.current);
-      samplingIntervalRef.current = null;
-    }
-    if (oscillatorRef.current) {
-      try {
-        oscillatorRef.current.stop();
-      } catch (e) {}
-    }
-    if (oscillator2Ref.current) {
-      try {
-        oscillator2Ref.current.stop();
-      } catch (e) {}
-    }
-    setIsPlaying(false);
-    setCurrentBeat(0);
-  }, []);
-
-  // Play just metronome clicks for sing/play phases
-  const playMetronomeOnly = useCallback(
-    (onComplete) => {
-      const ctx = audioContextRef.current;
-      if (!ctx || isPlaying) return;
-
-      onCompleteRef.current =
-        typeof onComplete === "function" ? onComplete : null;
-
-      setIsPlaying(true);
-      setCurrentBeat(-4);
-      setIsSubdivision(false);
-      soundingOnBeatsRef.current = [0, 0];
-      startedEarlyRef.current = false;
-      setSoundingOnBeats([false, false]);
-
-      const beatMs = (60 / bpm) * 1000;
-      const eighthMs = beatMs / 2;
-      let beat = -4;
-      let isAnd = true; // First interval tick is subdivision after initial beat
-
-      let beatSoundingSamples = { beat: 0, samples: 0, soundingCount: 0 };
-      let earlySoundingSamples = 0;
-      let samplesBeforeChecking = 3;
-
-      const samplingInterval = setInterval(() => {
-        if (samplesBeforeChecking > 0) {
-          samplesBeforeChecking--;
-          return;
-        }
-
-        if (beat >= -4 && beat <= -1) {
-          if (isSoundingRef.current) {
-            earlySoundingSamples++;
-            if (earlySoundingSamples >= 3) {
-              startedEarlyRef.current = true;
-            }
-          } else {
-            earlySoundingSamples = 0;
-          }
-        }
-        if (beat >= 1 && beat <= 2) {
-          if (beatSoundingSamples.beat !== beat) {
-            if (
-              beatSoundingSamples.beat >= 1 &&
-              beatSoundingSamples.samples > 0
-            ) {
-              const percentage =
-                beatSoundingSamples.soundingCount / beatSoundingSamples.samples;
-              const idx = beatSoundingSamples.beat - 1;
-              soundingOnBeatsRef.current[idx] = Math.max(
-                soundingOnBeatsRef.current[idx],
-                percentage,
-              );
-            }
-            beatSoundingSamples = { beat, samples: 0, soundingCount: 0 };
-          }
-          beatSoundingSamples.samples++;
-          if (isSoundingRef.current) {
-            beatSoundingSamples.soundingCount++;
-          }
-        }
-      }, 50);
-      samplingIntervalRef.current = samplingInterval;
-
-      createClickSound(ctx, true);
-      setIsSubdivision(false);
-
-      beatIntervalRef.current = setInterval(() => {
-        if (unmountedRef.current) {
-          clearInterval(beatIntervalRef.current);
-          clearInterval(samplingInterval);
-          return;
-        }
-
-        if (isAnd) {
-          // This is the "&" subdivision
-          createSubdivisionClick(ctx);
-          setIsSubdivision(true);
-          isAnd = false;
-        } else {
-          // This is a main beat
-          beat++;
-          if (beat === 0) beat = 1;
-          setIsSubdivision(false);
-
-          if (beat >= -3 && beat <= -1) {
-            createClickSound(ctx, false);
-            setCurrentBeat(beat);
-          } else if (beat === 1) {
-            createClickSound(ctx, true);
-            setCurrentBeat(1);
-          } else if (beat === 2) {
-            createClickSound(ctx, false);
-            setCurrentBeat(2);
-          } else {
-            if (
-              beatSoundingSamples.beat >= 1 &&
-              beatSoundingSamples.samples > 0
-            ) {
-              const percentage =
-                beatSoundingSamples.soundingCount / beatSoundingSamples.samples;
-              const idx = beatSoundingSamples.beat - 1;
-              soundingOnBeatsRef.current[idx] = Math.max(
-                soundingOnBeatsRef.current[idx],
-                percentage,
-              );
-            }
-            clearInterval(beatIntervalRef.current);
-            clearInterval(samplingInterval);
-            beatIntervalRef.current = null;
-            samplingIntervalRef.current = null;
-            setIsPlaying(false);
-            setCurrentBeat(0);
-            setIsSubdivision(false);
-            setSoundingOnBeats([...soundingOnBeatsRef.current]);
-            if (onCompleteRef.current) {
-              onCompleteRef.current();
-              onCompleteRef.current = null;
-            }
-            return;
-          }
-          isAnd = true; // Next tick will be subdivision
-        }
-      }, eighthMs);
-    },
-    [bpm, isPlaying],
-  );
-
-  // Analyze performance
-  const analyzePerformance = useCallback(() => {
-    const totalCount = totalSoundingCountRef.current;
-    const pitchCount = onPitchCountRef.current;
-    const hitTarget = hasHitTargetPitchRef.current;
-
-    const beatSoundPct = soundingOnBeatsRef.current;
-    const startedEarly = startedEarlyRef.current;
-    devLog("[QuarterNoteLesson] analyzePerformance:", {
-      totalCount,
-      pitchCount,
-      hitTarget,
-      beatSoundPct,
-      startedEarly,
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
+  const handlePlayPattern = useCallback(() => {
+    const notes = [{ midiOrFreq: targetFrequency, isMidi: false }];
+    audio.playPattern(notes, () => {
+      exercise.setHasHeardPattern(true);
     });
+  }, [audio, targetFrequency, exercise]);
 
-    if (totalCount === 0) {
-      return {
-        success: false,
-        pitchOk: false,
-        rhythmOk: false,
-        message: "No sound detected",
-      };
-    }
-    const successRatio = pitchCount / totalCount;
-    const pitchOk = hitTarget && successRatio >= 0.3;
-
-    const SUSTAIN_THRESHOLD = 0.65; // Quarter note is short, so lower threshold
-    const STOP_THRESHOLD = 0.5;
-
-    const startedOnBeatOne = beatSoundPct[0] >= SUSTAIN_THRESHOLD;
-    const stoppedOnBeatTwo = beatSoundPct[1] < STOP_THRESHOLD;
-
-    const rhythmOk = startedOnBeatOne && !startedEarly && stoppedOnBeatTwo;
-
-    const success = pitchOk && rhythmOk;
-
-    let message = "Great!";
-    if (!pitchOk && !rhythmOk) {
-      message = "Try to match the pitch and play for 1 beat";
-    } else if (!pitchOk) {
-      message = "Good rhythm! Try to match the pitch better";
-    } else if (startedEarly) {
-      message = "Wait for beat ONE to start";
-    } else if (!startedOnBeatOne) {
-      message = "Start right on beat ONE (not late)";
-    } else if (!stoppedOnBeatTwo) {
-      message = "Stop right on beat 2 - you held too long";
-    }
-
-    return { success, pitchOk, rhythmOk, message };
-  }, []);
-
-  const handleDoneSinging = useCallback(() => {
-    const result = analyzePerformance();
-    setSingResult(result);
-    if (!result.success) {
-      setSingAttempts((prev) => prev + 1);
-    }
-  }, [analyzePerformance]);
+  const handleStartSing = useCallback(() => {
+    audio.resetTrackingRefs(1);
+    audio.playMetronomeOnly(1, () => {
+      const result = audio.analyzePerformance([targetMidi], "sing");
+      exercise.setSingResult(result);
+      if (!result.success) {
+        exercise.incrementSingAttempts();
+      } else {
+        exercise.resetSingAttempts();
+      }
+    });
+  }, [audio, targetMidi, exercise]);
 
   const handleTrySingAgain = useCallback(() => {
-    setSingResult(null);
-    hasHitTargetPitchRef.current = false;
-    onPitchCountRef.current = 0;
-    totalSoundingCountRef.current = 0;
-    soundingOnBeatsRef.current = [0, 0];
-    startedEarlyRef.current = false;
-    setSoundingOnBeats([false, false]);
-    setTimeout(() => {
-      playMetronomeOnly(handleDoneSinging);
-    }, 100);
-  }, [playMetronomeOnly, handleDoneSinging]);
+    exercise.setSingResult(null);
+    audio.resetTrackingRefs(1);
+    setTimeout(() => handleStartSing(), 100);
+  }, [exercise, audio, handleStartSing]);
 
-  const handleDoneImagining = useCallback(() => {
-    stopPlayback();
-    hasHitTargetPitchRef.current = false;
-    onPitchCountRef.current = 0;
-    totalSoundingCountRef.current = 0;
-    soundingOnBeatsRef.current = [0, 0];
-    startedEarlyRef.current = false;
-    setSoundingOnBeats([false, false]);
-    setPhase(PHASE.PLAY);
-  }, [stopPlayback]);
-
-  const handleDonePlaying = useCallback(() => {
-    const result = analyzePerformance();
-    setPlayResult(result);
-    if (!result.success) {
-      setPlayAttempts((prev) => prev + 1);
-    }
-  }, [analyzePerformance]);
+  const handleStartPlay = useCallback(() => {
+    audio.resetTrackingRefs(1);
+    audio.playMetronomeOnly(1, () => {
+      const result = audio.analyzePerformance([targetMidi], "play");
+      exercise.setPlayResult(result);
+      if (!result.success) {
+        exercise.incrementPlayAttempts();
+      } else {
+        exercise.resetPlayAttempts();
+      }
+    });
+  }, [audio, targetMidi, exercise]);
 
   const handleTryPlayAgain = useCallback(() => {
-    setPlayResult(null);
-    hasHitTargetPitchRef.current = false;
-    onPitchCountRef.current = 0;
-    totalSoundingCountRef.current = 0;
-    soundingOnBeatsRef.current = [0, 0];
-    startedEarlyRef.current = false;
-    setSoundingOnBeats([false, false]);
-    setTimeout(() => {
-      playMetronomeOnly(handleDonePlaying);
-    }, 100);
-  }, [playMetronomeOnly, handleDonePlaying]);
+    exercise.setPlayResult(null);
+    audio.resetTrackingRefs(1);
+    setTimeout(() => handleStartPlay(), 100);
+  }, [exercise, audio, handleStartPlay]);
 
-  const handleContinue = useCallback(() => {
-    setSingResult(null);
-    setPlayResult(null);
-    hasHitTargetPitchRef.current = false;
-    onPitchCountRef.current = 0;
-    totalSoundingCountRef.current = 0;
-    soundingOnBeatsRef.current = [0, 0];
-    startedEarlyRef.current = false;
-    setSoundingOnBeats([false, false]);
-    setHasHeardPattern(false);
-    setSingAttempts(0);
-    setPlayAttempts(0);
-    setPhase(PHASE.LISTEN);
-  }, []);
-
-  const handleAttestConfirm = useCallback(() => {
-    setShowAttestModal(false);
-    if (attestPhase === "sing") {
-      setSingResult({ success: true, attested: true });
-    } else if (attestPhase === "play") {
-      setPlayResult({ success: true, attested: true });
+  const handleFeedbackContinue = useCallback(() => {
+    exercise.incrementSuccessfulRounds();
+    if (exercise.successfulRounds + 1 >= masteryStreak) {
+      exercise.setShowSuccess(true);
+    } else {
+      exercise.resetForNewRound();
+      exercise.setPhase(PHASE.LISTEN);
     }
-    setAttestPhase(null);
-  }, [attestPhase]);
+  }, [exercise, masteryStreak]);
 
-  const handleShowAttestModal = useCallback((phase) => {
-    setAttestPhase(phase);
-    setShowAttestModal(true);
-  }, []);
+  const handleComplete = useCallback(() => {
+    onComplete({
+      success: true,
+      details: {
+        capability: "quarter_note",
+        rounds: exercise.successfulRounds + 1,
+      },
+    });
+  }, [onComplete, exercise.successfulRounds]);
 
+  // Progress reporting
   useEffect(() => {
     onProgress?.({
-      streak: successfulRounds,
+      streak: exercise.successfulRounds,
       masteryRequired: masteryStreak,
     });
-  }, [successfulRounds, masteryStreak, onProgress]);
+  }, [exercise.successfulRounds, masteryStreak, onProgress]);
 
-  const memoizedNotation = useMemo(() => {
-    if (!NotationDisplay) return null;
-    return (
-      <NotationDisplay
-        musicxml={musicXML}
-        width={320}
-        height={200}
-        showTimeSignature={true}
-      />
-    );
-  }, [musicXML]);
-
-  // Compute cursor position (single quarter note - cursor on when beat >= 1)
-  const cursorNoteIndex = useMemo(() => {
-    if (!showNotation || currentBeat < 1) return null;
-    return 0; // Single note
-  }, [showNotation, currentBeat]);
-
-  // Scroll to top when notation is opened
+  // ---------------------------------------------------------------------------
+  // Scroll to top when notation opens
+  // ---------------------------------------------------------------------------
   const handleShowNotation = useCallback(() => {
-    setShowNotation(true);
+    exercise.setShowNotation(true);
     setTimeout(() => {
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     }, 100);
-  }, []);
+  }, [exercise]);
 
+  // ---------------------------------------------------------------------------
+  // Memoized Notation
+  // ---------------------------------------------------------------------------
+  const memoizedNotation = useMemo(() => {
+    if (!NotationDisplay || !musicXML) return null;
+    return <NotationDisplay musicxml={musicXML} width={320} height={200} />;
+  }, [musicXML]);
+
+  // Cursor position for highlighting (single note at position ~105)
+  const cursorNoteIndex = useMemo(() => {
+    if (!exercise.showNotation || audio.currentBeat < 1) return null;
+    return 0;
+  }, [exercise.showNotation, audio.currentBeat]);
+
+  // ---------------------------------------------------------------------------
+  // Notation Toggle Renderer
+  // ---------------------------------------------------------------------------
   const renderNotationToggle = () => {
     if (!NotationDisplay) return null;
 
-    // Single quarter note highlight position
     const highlightLeft = cursorNoteIndex !== null ? 105 : null;
     const highlightWidth = 60;
 
     return (
       <View style={styles.notationContainer}>
-        {!showNotation ? (
+        {!exercise.showNotation ? (
           <TouchableOpacity
-            accessibilityLabel="Show notation"
-            accessibilityRole="button"
             style={styles.showNotationButton}
             onPress={handleShowNotation}
+            accessibilityLabel="Show notation"
+            accessibilityRole="button"
           >
             <Text style={styles.showNotationText}>Show Notation 📝</Text>
           </TouchableOpacity>
@@ -747,21 +300,20 @@ export default function QuarterNoteLessonExercise({
               style={[styles.notationWrapper, styles.notationWrapperRelative]}
             >
               {memoizedNotation}
-              {/* Green highlight overlay */}
               {highlightLeft !== null && (
                 <View
                   style={[
                     styles.highlightOverlay,
-                    { left: highlightLeft, width: highlightWidth },
+                    { left: highlightLeft, width: highlightWidth, height: 120 },
                   ]}
                 />
               )}
             </View>
             <TouchableOpacity
+              style={styles.hideNotationButton}
+              onPress={() => exercise.setShowNotation(false)}
               accessibilityLabel="Hide notation"
               accessibilityRole="button"
-              style={styles.hideNotationButton}
-              onPress={() => setShowNotation(false)}
             >
               <Text style={styles.hideNotationText}>Hide Notation</Text>
             </TouchableOpacity>
@@ -771,133 +323,138 @@ export default function QuarterNoteLessonExercise({
     );
   };
 
-  const renderFocusCardMini = () => {
-    return (
-      <View style={styles.focusCardMini}>
-        <View style={styles.focusCardMiniLeft}>
-          <View style={styles.quarterNoteSymbolMini}>
-            <View style={styles.quarterNoteOvalMini} />
-            <View style={styles.quarterNoteStemMini} />
-          </View>
-        </View>
-        <View style={styles.focusCardMiniRight}>
-          <Text style={styles.focusCardMiniTitle}>Quarter Note</Text>
-          <Text style={styles.focusCardMiniText}>1 beat → ends on beat 2</Text>
+  // ---------------------------------------------------------------------------
+  // Focus Card Mini Renderer (Quarter note has filled head)
+  // ---------------------------------------------------------------------------
+  const renderFocusCardMini = () => (
+    <View style={styles.focusCardMini}>
+      <View style={styles.focusCardMiniLeft}>
+        <View style={styles.quarterNoteSymbolMini}>
+          <View style={styles.quarterNoteOvalMini} />
+          <View style={styles.quarterNoteStemMini} />
         </View>
       </View>
-    );
-  };
+      <View style={styles.focusCardMiniRight}>
+        <Text style={styles.focusCardMiniTitle}>Quarter Note</Text>
+        <Text style={styles.focusCardMiniText}>1 beat → ends on beat 2</Text>
+      </View>
+    </View>
+  );
 
-  // Beat indicator for quarter note (1 beat + stop on 2) with eighth note subdivision
-  const BeatIndicator = () => {
-    const isInCountIn = currentBeat < 0;
-
-    return (
-      <View style={styles.beatIndicatorContainer}>
-        <View style={styles.countInRow}>
-          <Text style={styles.countInLabel}>Count in:</Text>
-          <View style={styles.countInBeats}>
-            {[-4, -3, -2, -1].map((beat, index) => (
-              <React.Fragment key={beat}>
-                <View
-                  style={[
-                    styles.countInDot,
-                    beat <= currentBeat &&
-                      currentBeat < 0 &&
-                      styles.countInDotActive,
-                    beat === -4 && styles.countInDotAccent,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.countInNumber,
-                      beat <= currentBeat &&
-                        currentBeat < 0 &&
-                        styles.countInNumberActive,
-                    ]}
-                  >
-                    {index + 1}
-                  </Text>
-                </View>
-              </React.Fragment>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.singRow}>
-          <Text style={styles.singLabel}>Play:</Text>
-          <View style={styles.beatIndicator}>
+  // ---------------------------------------------------------------------------
+  // Beat Indicator Renderer (1 beat + stop on 2)
+  // ---------------------------------------------------------------------------
+  const BeatIndicator = () => (
+    <View style={styles.beatIndicatorContainer}>
+      <View style={styles.countInRow}>
+        <Text style={styles.countInLabel}>Count in:</Text>
+        <View style={styles.countInBeats}>
+          {[-4, -3, -2, -1].map((beat, index) => (
             <View
+              key={beat}
               style={[
-                styles.beatDot,
-                styles.beatDotAccent,
-                currentBeat >= 1 && currentBeat > 0 && styles.beatDotActive,
+                styles.countInDot,
+                beat <= audio.currentBeat &&
+                  audio.currentBeat < 0 &&
+                  styles.countInDotActive,
+                beat === -4 && styles.countInDotAccent,
               ]}
             >
               <Text
                 style={[
-                  styles.beatNumber,
-                  currentBeat >= 1 &&
-                    currentBeat > 0 &&
-                    styles.beatNumberActive,
+                  styles.countInNumber,
+                  beat <= audio.currentBeat &&
+                    audio.currentBeat < 0 &&
+                    styles.countInNumberActive,
                 ]}
               >
-                1
+                {index + 1}
               </Text>
             </View>
-            <View
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.singRow}>
+        <Text style={styles.singLabel}>Play:</Text>
+        <View style={styles.beatIndicator}>
+          {/* Beat 1 - the note starts here */}
+          <View
+            style={[
+              styles.beatDot,
+              styles.beatDotAccent,
+              audio.currentBeat >= 1 &&
+                audio.currentBeat > 0 &&
+                styles.beatDotActive,
+            ]}
+          >
+            <Text
               style={[
-                styles.beatDot,
-                styles.beatDotStop,
-                currentBeat === 2 && styles.beatDotStopActive,
+                styles.beatNumber,
+                audio.currentBeat >= 1 &&
+                  audio.currentBeat > 0 &&
+                  styles.beatNumberActive,
               ]}
             >
-              <Text
-                style={[
-                  styles.beatNumber,
-                  currentBeat === 2 && styles.beatNumberStopActive,
-                ]}
-              >
-                2
-              </Text>
-            </View>
+              1
+            </Text>
+          </View>
+          {/* Beat 2 - the note stops here */}
+          <View
+            style={[
+              styles.beatDot,
+              styles.beatDotStop,
+              audio.currentBeat === 2 && styles.beatDotStopActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.beatNumber,
+                audio.currentBeat === 2 && styles.beatNumberStopActive,
+              ]}
+            >
+              2
+            </Text>
           </View>
         </View>
       </View>
-    );
-  };
+    </View>
+  );
 
+  // ---------------------------------------------------------------------------
   // Attestation Modal
+  // ---------------------------------------------------------------------------
   const attestationModal = useMemo(
     () => (
       <Modal
-        visible={showAttestModal}
+        visible={exercise.showAttestModal}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowAttestModal(false)}
+        onRequestClose={exercise.closeAttestModal}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Confirm</Text>
             <Text style={styles.modalText}>
-              I attest that I {attestPhase === "sing" ? "sang" : "played"} this
+              I attest that I{" "}
+              {exercise.attestPhase === "sing" ? "sang" : "played"} this
               correctly, but due to background noise or technical issues it was
               not able to register.
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={exercise.closeAttestModal}
                 accessibilityLabel="Cancel"
                 accessibilityRole="button"
-                style={styles.modalCancelButton}
-                onPress={() => setShowAttestModal(false)}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                accessibilityLabel="Confirm"
-                accessibilityRole="button"
                 style={styles.modalConfirmButton}
-                onPress={handleAttestConfirm}
+                onPress={exercise.confirmAttestation}
+                accessibilityLabel="Confirm attestation"
+                accessibilityRole="button"
               >
                 <Text style={styles.modalConfirmText}>Confirm</Text>
               </TouchableOpacity>
@@ -906,11 +463,15 @@ export default function QuarterNoteLessonExercise({
         </View>
       </Modal>
     ),
-    [showAttestModal, attestPhase, handleAttestConfirm],
+    [exercise.showAttestModal, exercise.attestPhase, exercise.closeAttestModal, exercise.confirmAttestation],
   );
 
+  // ===========================================================================
+  // PHASE RENDERS
+  // ===========================================================================
+
   // FOCUS CARD PHASE
-  if (phase === PHASE.FOCUS_CARD) {
+  if (exercise.phase === PHASE.FOCUS_CARD) {
     return (
       <View style={styles.container}>
         <ScrollView
@@ -954,7 +515,9 @@ export default function QuarterNoteLessonExercise({
                 </View>
               </View>
             </View>
-            <Text style={styles.focusCardMnemonic}>Count: 1 - (2) stop!</Text>
+            <Text style={styles.focusCardMnemonic}>
+              Count: 1 - (2) stop!
+            </Text>
           </View>
 
           {/* Show actual notation */}
@@ -966,12 +529,12 @@ export default function QuarterNoteLessonExercise({
 
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
-            accessibilityLabel="Got it, continue"
-            accessibilityRole="button"
             style={styles.primaryButton}
-            onPress={() => setPhase(PHASE.LISTEN)}
+            onPress={() => exercise.setPhase(PHASE.LISTEN)}
+            accessibilityLabel="Begin exercise"
+            accessibilityRole="button"
           >
-            <Text style={styles.primaryButtonText}>Got It →</Text>
+            <Text style={styles.primaryButtonText}>Begin →</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -979,7 +542,7 @@ export default function QuarterNoteLessonExercise({
   }
 
   // LISTEN PHASE
-  if (phase === PHASE.LISTEN) {
+  if (exercise.phase === PHASE.LISTEN) {
     return (
       <View style={styles.container}>
         <ScrollView
@@ -1000,58 +563,52 @@ export default function QuarterNoteLessonExercise({
           </Text>
 
           {/* Show notation at top when open */}
-          {showNotation && renderNotationToggle()}
+          {exercise.showNotation && renderNotationToggle()}
 
-          {isPlaying && <BeatIndicator />}
+          {audio.isPlaying && <BeatIndicator />}
 
           {/* Show notation button at bottom when closed */}
-          {!showNotation && renderNotationToggle()}
+          {!exercise.showNotation && renderNotationToggle()}
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>
-          {!hasHeardPattern ? (
+          {!exercise.hasHeardPattern ? (
             <TouchableOpacity
-              accessibilityLabel={
-                isPlaying ? "Playing pattern" : "Hear pattern"
-              }
+              style={[styles.primaryButton, audio.isPlaying && styles.buttonDisabled]}
+              onPress={handlePlayPattern}
+              disabled={audio.isPlaying}
+              accessibilityLabel="Hear the pattern"
               accessibilityRole="button"
-              style={[styles.primaryButton, isPlaying && styles.buttonDisabled]}
-              onPress={() => {
-                playQuarterNote(() => setHasHeardPattern(true));
-              }}
-              disabled={isPlaying}
             >
               <Text style={styles.primaryButtonText}>
-                {isPlaying ? "🔊 Playing..." : "🔊 Hear Pattern"}
+                {audio.isPlaying ? "🎵 Listening..." : "🎵 Play Pattern"}
               </Text>
             </TouchableOpacity>
           ) : (
             <>
               <TouchableOpacity
-                accessibilityLabel={
-                  isPlaying ? "Playing pattern" : "Hear again"
-                }
-                accessibilityRole="button"
                 style={[
                   styles.secondaryButton,
-                  isPlaying && styles.buttonDisabled,
+                  audio.isPlaying && styles.buttonDisabled,
                 ]}
-                onPress={playQuarterNote}
-                disabled={isPlaying}
+                onPress={handlePlayPattern}
+                disabled={audio.isPlaying}
+                accessibilityLabel="Hear pattern again"
+                accessibilityRole="button"
               >
                 <Text style={styles.secondaryButtonText}>
-                  {isPlaying ? "🔊 Playing..." : "🔊 Hear Again"}
+                  {audio.isPlaying ? "🎵 Listening..." : "🎵 Hear Again"}
                 </Text>
               </TouchableOpacity>
-              {!isPlaying && (
+              {!audio.isPlaying && (
                 <TouchableOpacity
-                  accessibilityLabel="I heard it, continue"
-                  accessibilityRole="button"
                   style={[styles.primaryButton, { marginTop: 8 }]}
                   onPress={() => {
-                    stopPlayback();
-                    setPhase(PHASE.SING);
+                    audio.stopPlayback();
+                    exercise.setPhase(PHASE.SING);
                   }}
+                  accessibilityLabel="Continue to singing"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.primaryButtonText}>I Heard It →</Text>
                 </TouchableOpacity>
@@ -1064,7 +621,7 @@ export default function QuarterNoteLessonExercise({
   }
 
   // SING PHASE
-  if (phase === PHASE.SING) {
+  if (exercise.phase === PHASE.SING) {
     return (
       <View style={styles.container}>
         <ScrollView
@@ -1085,11 +642,11 @@ export default function QuarterNoteLessonExercise({
           </Text>
 
           {/* Show notation at top when open */}
-          {showNotation && renderNotationToggle()}
+          {exercise.showNotation && renderNotationToggle()}
 
-          {isPlaying && <BeatIndicator />}
+          {audio.isPlaying && <BeatIndicator />}
 
-          {!singResult && (
+          {!exercise.singResult && (
             <View style={styles.volumeContainer}>
               <CircularVolumeIndicator volume={volume} size={120} />
               {isSounding && detectedNoteName && (
@@ -1100,37 +657,37 @@ export default function QuarterNoteLessonExercise({
             </View>
           )}
 
-          {singResult && (
+          {exercise.singResult && (
             <Text
               style={
-                singResult.success ? styles.successText : styles.feedbackError
+                exercise.singResult.success ? styles.successText : styles.feedbackError
               }
             >
-              {singResult.success ? "✓ Great!" : singResult.message}
+              {exercise.singResult.success ? "✓ Great!" : exercise.singResult.message}
             </Text>
           )}
 
           {/* Show notation button at bottom when closed */}
-          {!showNotation && renderNotationToggle()}
+          {!exercise.showNotation && renderNotationToggle()}
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>
-          {singResult && !singResult.success ? (
+          {exercise.singResult && !exercise.singResult.success ? (
             <>
               <TouchableOpacity
-                accessibilityLabel="Try singing again"
-                accessibilityRole="button"
                 style={styles.primaryButton}
                 onPress={handleTrySingAgain}
+                accessibilityLabel="Try again"
+                accessibilityRole="button"
               >
                 <Text style={styles.primaryButtonText}>Try Again</Text>
               </TouchableOpacity>
-              {singAttempts >= 3 && (
+              {exercise.singAttempts >= 3 && (
                 <TouchableOpacity
-                  accessibilityLabel="I did it correctly, attest"
-                  accessibilityRole="button"
                   style={[styles.tertiaryButton, { marginTop: 8 }]}
-                  onPress={() => handleShowAttestModal("sing")}
+                  onPress={() => exercise.openAttestModal("sing")}
+                  accessibilityLabel="Attest correct performance"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.tertiaryButtonText}>
                     I did it correctly →
@@ -1138,51 +695,57 @@ export default function QuarterNoteLessonExercise({
                 </TouchableOpacity>
               )}
             </>
-          ) : singResult?.success ? (
+          ) : exercise.singResult?.success ? (
             <>
               <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[
                     styles.secondaryButton,
                     { flex: 1 },
-                    isPlaying && styles.buttonDisabled,
+                    audio.isPlaying && styles.buttonDisabled,
                   ]}
-                  onPress={playQuarterNote}
-                  disabled={isPlaying}
+                  onPress={handlePlayPattern}
+                  disabled={audio.isPlaying}
+                  accessibilityLabel="Hear pattern again"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.secondaryButtonText}>
-                    {isPlaying ? "🔊 Playing..." : "🔊 Hear Again"}
+                    {audio.isPlaying ? "🎵 Listening..." : "🎵 Hear Again"}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[
                     styles.secondaryButton,
                     { flex: 1 },
-                    isPlaying && styles.buttonDisabled,
+                    audio.isPlaying && styles.buttonDisabled,
                   ]}
-                  onPress={() => {
-                    handleTrySingAgain();
-                  }}
-                  disabled={isPlaying}
+                  onPress={handleTrySingAgain}
+                  disabled={audio.isPlaying}
+                  accessibilityLabel="Sing again"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.secondaryButtonText}>🎤 Sing Again</Text>
                 </TouchableOpacity>
               </View>
               <TouchableOpacity
                 style={[styles.primaryButton, { marginTop: 8 }]}
-                onPress={() => setPhase(PHASE.IMAGINE)}
+                onPress={() => exercise.setPhase(PHASE.IMAGINE)}
+                accessibilityLabel="Continue to imagining"
+                accessibilityRole="button"
               >
                 <Text style={styles.primaryButtonText}>Continue →</Text>
               </TouchableOpacity>
             </>
           ) : (
             <TouchableOpacity
-              style={[styles.primaryButton, isPlaying && styles.buttonDisabled]}
-              onPress={() => playMetronomeOnly(handleDoneSinging)}
-              disabled={isPlaying}
+              style={[styles.primaryButton, audio.isPlaying && styles.buttonDisabled]}
+              onPress={handleStartSing}
+              disabled={audio.isPlaying}
+              accessibilityLabel="Start singing"
+              accessibilityRole="button"
             >
               <Text style={styles.primaryButtonText}>
-                {isPlaying ? "🎤 Sing Now..." : "🎤 Start Singing"}
+                {audio.isPlaying ? "🎤 Sing Now..." : "🎤 Start Singing"}
               </Text>
             </TouchableOpacity>
           )}
@@ -1193,7 +756,7 @@ export default function QuarterNoteLessonExercise({
   }
 
   // IMAGINE PHASE
-  if (phase === PHASE.IMAGINE) {
+  if (exercise.phase === PHASE.IMAGINE) {
     return (
       <View style={styles.container}>
         <ScrollView
@@ -1214,31 +777,40 @@ export default function QuarterNoteLessonExercise({
           </Text>
 
           {/* Show notation at top when open */}
-          {showNotation && renderNotationToggle()}
+          {exercise.showNotation && renderNotationToggle()}
 
-          {isPlaying && <BeatIndicator />}
+          {audio.isPlaying && <BeatIndicator />}
 
           <View style={styles.imagineVisual}>
+            <Text style={styles.imagineEmoji}>🎵</Text>
             <Text style={styles.imagineHint}>Hear: 1 - (2) stop</Text>
           </View>
 
           {/* Show notation button at bottom when closed */}
-          {!showNotation && renderNotationToggle()}
+          {!exercise.showNotation && renderNotationToggle()}
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
-            style={[styles.secondaryButton, isPlaying && styles.buttonDisabled]}
-            onPress={playMetronomeOnly}
-            disabled={isPlaying}
+            style={[styles.secondaryButton, audio.isPlaying && styles.buttonDisabled]}
+            onPress={() => audio.playMetronomeOnly(1, () => {})}
+            disabled={audio.isPlaying}
+            accessibilityLabel="Count with metronome clicks"
+            accessibilityRole="button"
           >
             <Text style={styles.secondaryButtonText}>
-              {isPlaying ? "🥁 Counting..." : "🥁 Count with Clicks"}
+              {audio.isPlaying ? "🥁 Counting..." : "🥁 Count with Clicks"}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.primaryButton, { marginTop: 8 }]}
-            onPress={handleDoneImagining}
+            onPress={() => {
+              audio.stopPlayback();
+              audio.resetTrackingRefs(1);
+              exercise.setPhase(PHASE.PLAY);
+            }}
+            accessibilityLabel="Continue after imagining"
+            accessibilityRole="button"
           >
             <Text style={styles.primaryButtonText}>I Imagined It →</Text>
           </TouchableOpacity>
@@ -1248,7 +820,7 @@ export default function QuarterNoteLessonExercise({
   }
 
   // PLAY PHASE
-  if (phase === PHASE.PLAY) {
+  if (exercise.phase === PHASE.PLAY) {
     return (
       <View style={styles.container}>
         <ScrollView
@@ -1269,11 +841,11 @@ export default function QuarterNoteLessonExercise({
           </Text>
 
           {/* Show notation at top when open */}
-          {showNotation && renderNotationToggle()}
+          {exercise.showNotation && renderNotationToggle()}
 
-          {isPlaying && <BeatIndicator />}
+          {audio.isPlaying && <BeatIndicator />}
 
-          {!playResult && (
+          {!exercise.playResult && (
             <View style={styles.volumeContainer}>
               <CircularVolumeIndicator volume={volume} size={120} />
               {isSounding && detectedNoteName && (
@@ -1284,33 +856,37 @@ export default function QuarterNoteLessonExercise({
             </View>
           )}
 
-          {playResult && (
+          {exercise.playResult && (
             <Text
               style={
-                playResult.success ? styles.successText : styles.feedbackError
+                exercise.playResult.success ? styles.successText : styles.feedbackError
               }
             >
-              {playResult.success ? "✓ Great!" : playResult.message}
+              {exercise.playResult.success ? "✓ Great!" : exercise.playResult.message}
             </Text>
           )}
 
           {/* Show notation button at bottom when closed */}
-          {!showNotation && renderNotationToggle()}
+          {!exercise.showNotation && renderNotationToggle()}
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>
-          {playResult && !playResult.success ? (
+          {exercise.playResult && !exercise.playResult.success ? (
             <>
               <TouchableOpacity
                 style={styles.primaryButton}
                 onPress={handleTryPlayAgain}
+                accessibilityLabel="Try again"
+                accessibilityRole="button"
               >
                 <Text style={styles.primaryButtonText}>Try Again</Text>
               </TouchableOpacity>
-              {playAttempts >= 3 && (
+              {exercise.playAttempts >= 3 && (
                 <TouchableOpacity
                   style={[styles.tertiaryButton, { marginTop: 8 }]}
-                  onPress={() => handleShowAttestModal("play")}
+                  onPress={() => exercise.openAttestModal("play")}
+                  accessibilityLabel="Attest correct performance"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.tertiaryButtonText}>
                     I did it correctly →
@@ -1318,32 +894,34 @@ export default function QuarterNoteLessonExercise({
                 </TouchableOpacity>
               )}
             </>
-          ) : playResult?.success ? (
+          ) : exercise.playResult?.success ? (
             <>
               <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[
                     styles.secondaryButton,
                     { flex: 1 },
-                    isPlaying && styles.buttonDisabled,
+                    audio.isPlaying && styles.buttonDisabled,
                   ]}
-                  onPress={playQuarterNote}
-                  disabled={isPlaying}
+                  onPress={handlePlayPattern}
+                  disabled={audio.isPlaying}
+                  accessibilityLabel="Hear pattern again"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.secondaryButtonText}>
-                    {isPlaying ? "🔊 Playing..." : "🔊 Hear Again"}
+                    {audio.isPlaying ? "🎵 Listening..." : "🎵 Hear Again"}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[
                     styles.secondaryButton,
                     { flex: 1 },
-                    isPlaying && styles.buttonDisabled,
+                    audio.isPlaying && styles.buttonDisabled,
                   ]}
-                  onPress={() => {
-                    handleTryPlayAgain();
-                  }}
-                  disabled={isPlaying}
+                  onPress={handleTryPlayAgain}
+                  disabled={audio.isPlaying}
+                  accessibilityLabel="Play again"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.secondaryButtonText}>🎵 Play Again</Text>
                 </TouchableOpacity>
@@ -1351,33 +929,37 @@ export default function QuarterNoteLessonExercise({
               <TouchableOpacity
                 style={[styles.primaryButton, { marginTop: 8 }]}
                 onPress={() => {
-                  if (successfulRounds + 1 >= masteryStreak) {
-                    setShowSuccess(true);
+                  if (exercise.successfulRounds + 1 >= masteryStreak) {
+                    exercise.setShowSuccess(true);
                     setTimeout(() => {
                       onComplete?.({
                         success: true,
-                        streak: successfulRounds + 1,
-                        totalAttempts: successfulRounds + 1,
-                        correctCount: successfulRounds + 1,
+                        streak: exercise.successfulRounds + 1,
+                        totalAttempts: exercise.successfulRounds + 1,
+                        correctCount: exercise.successfulRounds + 1,
                       });
                     }, 1500);
                   } else {
-                    setSuccessfulRounds(successfulRounds + 1);
-                    setPhase(PHASE.FEEDBACK);
+                    exercise.incrementSuccessfulRounds();
+                    exercise.setPhase(PHASE.FEEDBACK);
                   }
                 }}
+                accessibilityLabel="Continue"
+                accessibilityRole="button"
               >
                 <Text style={styles.primaryButtonText}>Continue →</Text>
               </TouchableOpacity>
             </>
           ) : (
             <TouchableOpacity
-              style={[styles.primaryButton, isPlaying && styles.buttonDisabled]}
-              onPress={() => playMetronomeOnly(handleDonePlaying)}
-              disabled={isPlaying}
+              style={[styles.primaryButton, audio.isPlaying && styles.buttonDisabled]}
+              onPress={handleStartPlay}
+              disabled={audio.isPlaying}
+              accessibilityLabel="Start playing"
+              accessibilityRole="button"
             >
               <Text style={styles.primaryButtonText}>
-                {isPlaying ? "🎵 Play Now..." : "🎵 Start Playing"}
+                {audio.isPlaying ? "🎺 Play Now..." : "🎺 Start Playing"}
               </Text>
             </TouchableOpacity>
           )}
@@ -1388,10 +970,8 @@ export default function QuarterNoteLessonExercise({
   }
 
   // FEEDBACK PHASE
-  if (phase === PHASE.FEEDBACK) {
-    const overallSuccess = singResult?.success && playResult?.success;
-
-    if (showSuccess) {
+  if (exercise.phase === PHASE.FEEDBACK) {
+    if (exercise.showSuccess) {
       return (
         <View style={styles.container}>
           <View style={styles.successContainer}>
@@ -1411,64 +991,51 @@ export default function QuarterNoteLessonExercise({
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
-          <Text style={styles.phaseTitle}>
-            {overallSuccess ? "Nice Work!" : "Keep Practicing"}
+          {renderFocusCardMini()}
+
+          <Text style={styles.phaseTitle}>Nice Work!</Text>
+          <Text style={styles.instruction}>
+            Round {exercise.successfulRounds} of {masteryStreak} complete!
           </Text>
 
-          <View style={styles.resultsSummary}>
-            <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>Sing:</Text>
-              <Text
-                style={
-                  singResult?.success ? styles.resultSuccess : styles.resultFail
-                }
-              >
-                {singResult?.success ? "✓" : "✗"}
-              </Text>
-            </View>
-            <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>Play:</Text>
-              <Text
-                style={
-                  playResult?.success ? styles.resultSuccess : styles.resultFail
-                }
-              >
-                {playResult?.success ? "✓" : "✗"}
-              </Text>
-            </View>
-          </View>
-
-          <Text style={styles.progressText}>
-            Progress: {successfulRounds} / {masteryStreak}
-          </Text>
-
-          <View style={styles.reminderBox}>
-            <Text style={styles.reminderTitle}>Remember:</Text>
-            <Text style={styles.reminderText}>
-              A quarter note = 1 beat{"\n"}
-              Has a stem + filled head{"\n"}
-              Short and quick!
-            </Text>
+          <View style={styles.progressDots}>
+            {Array.from({ length: masteryStreak }).map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.progressDot,
+                  i < exercise.successfulRounds && styles.progressDotComplete,
+                ]}
+              />
+            ))}
           </View>
         </ScrollView>
 
         <View style={styles.fixedBottomButtons}>
           <TouchableOpacity
             style={styles.primaryButton}
-            onPress={handleContinue}
+            onPress={handleFeedbackContinue}
+            accessibilityLabel="Continue to next round"
+            accessibilityRole="button"
           >
-            <Text style={styles.primaryButtonText}>
-              {overallSuccess ? "Next Round →" : "Try Again →"}
-            </Text>
+            <Text style={styles.primaryButtonText}>Next Round →</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   }
 
-  return null;
+  // Fallback
+  return (
+    <View style={styles.container}>
+      <Text style={styles.phaseTitle}>Unknown Phase</Text>
+    </View>
+  );
 }
 
+// ===========================================================================
+// STYLES
+// ===========================================================================
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1479,7 +1046,40 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 100,
+  },
+  fixedBottomButtons: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    backgroundColor: "#1a1410",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.1)",
+  },
+
+  // Phase title and content
+  phaseTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#fff",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  noteDisplay: {
+    fontSize: 48,
+    fontWeight: "bold",
+    color: "#4CAF50",
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  instruction: {
+    fontSize: 16,
+    color: "#ccc",
+    textAlign: "center",
+    marginBottom: 16,
+    lineHeight: 24,
   },
 
   // Focus Card
@@ -1490,6 +1090,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#3b2c1a",
+    marginBottom: 20,
   },
   focusCardTitle: {
     fontSize: 28,
@@ -1497,76 +1098,49 @@ const styles = StyleSheet.create({
     color: "#f5e6d3",
     marginBottom: 16,
   },
-  quarterNoteSymbol: {
-    marginBottom: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-    width: 60,
-    height: 80,
-  },
-  quarterNoteOval: {
-    width: 28,
-    height: 22,
-    borderRadius: 14,
-    backgroundColor: "#d4a574",
-    transform: [{ rotate: "-15deg" }],
-    position: "absolute",
-    bottom: 0,
-    left: 8,
-  },
-  quarterNoteStem: {
-    width: 4,
-    height: 50,
-    backgroundColor: "#d4a574",
-    position: "absolute",
-    right: 24,
-    bottom: 14,
-  },
   focusCardDescription: {
-    fontSize: 20,
-    color: "#c4b5a0",
+    fontSize: 18,
+    color: "#fff",
     textAlign: "center",
-    lineHeight: 28,
+    marginTop: 16,
   },
   focusCardDivider: {
-    width: "80%",
-    height: 1,
-    backgroundColor: "#3b2c1a",
-    marginVertical: 20,
+    width: 60,
+    height: 2,
+    backgroundColor: "#4CAF50",
+    marginVertical: 16,
   },
   focusCardCue: {
-    fontSize: 18,
-    color: "#d4a574",
-    fontStyle: "italic",
+    fontSize: 16,
+    color: "#4CAF50",
+    fontWeight: "600",
     textAlign: "center",
-    marginBottom: 12,
   },
   focusCardDetail: {
-    fontSize: 16,
-    color: "#a69580",
+    fontSize: 14,
+    color: "#aaa",
     textAlign: "center",
     marginTop: 8,
   },
   focusCardMnemonic: {
     fontSize: 18,
-    color: "#d4a574",
+    color: "#FFD700",
+    fontWeight: "bold",
     textAlign: "center",
     marginTop: 16,
-    fontWeight: "600",
   },
 
-  // Comparison box
+  // Comparison box (half vs quarter)
   comparisonBox: {
-    backgroundColor: "#1a1410",
+    backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 12,
     padding: 16,
     marginTop: 20,
     width: "100%",
   },
   comparisonTitle: {
+    color: "#aaa",
     fontSize: 14,
-    color: "#8a7a6a",
     textAlign: "center",
     marginBottom: 12,
   },
@@ -1578,150 +1152,214 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   noteCompareContainer: {
-    width: 28,
+    width: 30,
     height: 50,
-    position: "relative",
+    alignItems: "center",
+    justifyContent: "flex-end",
   },
   halfNoteHeadCompare: {
-    width: 24,
-    height: 18,
-    borderRadius: 12,
-    borderWidth: 3,
-    borderColor: "#8a7a6a",
+    width: 20,
+    height: 14,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "#fff",
     backgroundColor: "transparent",
-    transform: [{ rotate: "-15deg" }],
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-  },
-  quarterNoteHeadCompare: {
-    width: 24,
-    height: 18,
-    borderRadius: 12,
-    backgroundColor: "#d4a574",
-    transform: [{ rotate: "-15deg" }],
-    position: "absolute",
-    bottom: 0,
-    left: 0,
   },
   noteStemCompare: {
-    width: 3,
-    height: 36,
-    backgroundColor: "#8a7a6a",
+    width: 2,
+    height: 30,
+    backgroundColor: "#fff",
     position: "absolute",
     right: 4,
-    bottom: 12,
+    bottom: 7,
+  },
+  quarterNoteHeadCompare: {
+    width: 20,
+    height: 14,
+    borderRadius: 10,
+    backgroundColor: "#fff",
   },
   quarterNoteStemCompare: {
-    width: 3,
-    height: 36,
-    backgroundColor: "#d4a574",
+    width: 2,
+    height: 30,
+    backgroundColor: "#fff",
     position: "absolute",
     right: 4,
-    bottom: 12,
+    bottom: 7,
   },
   comparisonLabel: {
+    color: "#fff",
     fontSize: 12,
-    color: "#c4b5a0",
     marginTop: 8,
   },
   comparisonDetail: {
+    color: "#888",
     fontSize: 10,
-    color: "#8a7a6a",
-    fontStyle: "italic",
   },
 
-  // Notation preview on focus card
-  notationPreview: {
-    marginTop: 20,
+  // Quarter Note Symbol (FILLED head)
+  quarterNoteSymbol: {
     alignItems: "center",
+    justifyContent: "center",
   },
-  notationPreviewLabel: {
-    fontSize: 16,
-    color: "#c4b5a0",
-    marginBottom: 12,
+  quarterNoteOval: {
+    width: 40,
+    height: 28,
+    borderRadius: 20,
+    backgroundColor: "#fff",
+  },
+  quarterNoteStem: {
+    width: 3,
+    height: 50,
+    backgroundColor: "#fff",
+    position: "absolute",
+    right: -1,
+    bottom: 14,
   },
 
   // Focus Card Mini
   focusCardMini: {
     flexDirection: "row",
-    backgroundColor: "#2d241a",
-    borderRadius: 12,
+    backgroundColor: "rgba(76, 175, 80, 0.1)",
+    borderRadius: 8,
     padding: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#3b2c1a",
+    marginBottom: 16,
     alignItems: "center",
   },
   focusCardMiniLeft: {
     marginRight: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  quarterNoteSymbolMini: {
-    width: 24,
-    height: 40,
-    position: "relative",
-  },
-  quarterNoteOvalMini: {
-    width: 14,
-    height: 11,
-    borderRadius: 7,
-    backgroundColor: "#d4a574",
-    transform: [{ rotate: "-15deg" }],
-    position: "absolute",
-    bottom: 0,
-    left: 2,
-  },
-  quarterNoteStemMini: {
-    width: 2,
-    height: 28,
-    backgroundColor: "#d4a574",
-    position: "absolute",
-    right: 7,
-    bottom: 8,
   },
   focusCardMiniRight: {
     flex: 1,
   },
   focusCardMiniTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#f5e6d3",
-    marginBottom: 2,
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#4CAF50",
   },
   focusCardMiniText: {
-    fontSize: 14,
-    color: "#c4b5a0",
+    fontSize: 12,
+    color: "#aaa",
   },
-
-  // Phase content
-  phaseTitle: {
-    fontSize: 24,
-    fontWeight: "600",
-    color: "#f5e6d3",
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  noteDisplay: {
-    fontSize: 48,
-    fontWeight: "700",
-    color: "#d4a574",
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  instruction: {
-    fontSize: 18,
-    color: "#c4b5a0",
-    textAlign: "center",
-    lineHeight: 26,
-    marginBottom: 24,
-  },
-
-  // Beat indicator
-  beatIndicatorContainer: {
-    marginVertical: 16,
+  quarterNoteSymbolMini: {
     alignItems: "center",
+    justifyContent: "center",
+    width: 24,
+    height: 40,
+  },
+  quarterNoteOvalMini: {
+    width: 16,
+    height: 11,
+    borderRadius: 8,
+    backgroundColor: "#fff",
+  },
+  quarterNoteStemMini: {
+    width: 2,
+    height: 20,
+    backgroundColor: "#fff",
+    position: "absolute",
+    right: 3,
+    bottom: 6,
+  },
+
+  // Buttons
+  primaryButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  primaryButtonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  secondaryButton: {
+    backgroundColor: "rgba(76, 175, 80, 0.2)",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+  },
+  secondaryButtonText: {
+    color: "#4CAF50",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  tertiaryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  tertiaryButtonText: {
+    color: "#888",
+    fontSize: 14,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  // Notation
+  notationContainer: {
+    alignItems: "center",
+    marginVertical: 12,
+  },
+  notationWrapper: {
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    padding: 8,
+    overflow: "hidden",
+  },
+  notationWrapperRelative: {
+    position: "relative",
+  },
+  showNotationButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  showNotationText: {
+    color: "#aaa",
+    fontSize: 14,
+  },
+  hideNotationButton: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  hideNotationText: {
+    color: "#888",
+    fontSize: 12,
+  },
+  highlightOverlay: {
+    position: "absolute",
+    top: 20,
+    backgroundColor: "rgba(76, 175, 80, 0.2)",
+    borderRadius: 4,
+  },
+  notationPreview: {
+    alignItems: "center",
+    marginTop: 16,
+  },
+  notationPreviewLabel: {
+    color: "#888",
+    fontSize: 14,
+    marginBottom: 8,
+  },
+
+  // Beat Indicator
+  beatIndicatorContainer: {
+    alignItems: "center",
+    marginVertical: 16,
   },
   countInRow: {
     flexDirection: "row",
@@ -1729,153 +1367,109 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   countInLabel: {
-    fontSize: 14,
-    color: "#8a7a6a",
-    marginRight: 12,
-    width: 60,
+    color: "#888",
+    fontSize: 12,
+    marginRight: 8,
   },
   countInBeats: {
     flexDirection: "row",
     gap: 8,
   },
   countInDot: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#2d241a",
-    borderWidth: 2,
-    borderColor: "#3b2c1a",
-    justifyContent: "center",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.1)",
     alignItems: "center",
+    justifyContent: "center",
   },
   countInDotActive: {
-    backgroundColor: "#8a7a6a",
-    borderColor: "#8a7a6a",
+    backgroundColor: "rgba(255, 193, 7, 0.3)",
   },
   countInDotAccent: {
-    borderColor: "#a89a8a",
+    borderWidth: 2,
+    borderColor: "#FFC107",
   },
   countInNumber: {
+    color: "#666",
     fontSize: 14,
-    fontWeight: "600",
-    color: "#555",
+    fontWeight: "bold",
   },
   countInNumberActive: {
-    color: "#1a1410",
+    color: "#FFC107",
   },
   singRow: {
     flexDirection: "row",
     alignItems: "center",
   },
   singLabel: {
-    fontSize: 14,
-    color: "#d4a574",
-    marginRight: 12,
-    width: 60,
-    fontWeight: "600",
+    color: "#888",
+    fontSize: 12,
+    marginRight: 8,
   },
   beatIndicator: {
     flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
     gap: 8,
   },
   beatDot: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#2d241a",
-    borderWidth: 2,
-    borderColor: "#3b2c1a",
-    justifyContent: "center",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.1)",
     alignItems: "center",
+    justifyContent: "center",
   },
   beatDotActive: {
-    backgroundColor: "#d4a574",
-    borderColor: "#d4a574",
+    backgroundColor: "rgba(76, 175, 80, 0.4)",
   },
   beatDotAccent: {
-    borderColor: "#f5e6d3",
+    borderWidth: 2,
+    borderColor: "#4CAF50",
   },
   beatDotStop: {
-    borderColor: "#e57373",
+    borderWidth: 2,
+    borderColor: "#F44336",
+    borderStyle: "dashed",
   },
   beatDotStopActive: {
-    backgroundColor: "#e57373",
-    borderColor: "#e57373",
+    backgroundColor: "rgba(244, 67, 54, 0.3)",
   },
   beatNumber: {
-    fontSize: 18,
-    fontWeight: "600",
     color: "#666",
+    fontSize: 16,
+    fontWeight: "bold",
   },
   beatNumberActive: {
-    color: "#1a1410",
+    color: "#4CAF50",
   },
   beatNumberStopActive: {
-    color: "#fff",
-  },
-  // Subdivision dots (eighth notes)
-  subdivisionDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: "#2d241a",
-    borderWidth: 1,
-    borderColor: "#3b2c1a",
-    marginHorizontal: 4,
-    alignSelf: "center",
-  },
-  subdivisionDotActive: {
-    backgroundColor: "#8b7355",
-    borderColor: "#8b7355",
+    color: "#F44336",
   },
 
-  // Volume/visualizer
+  // Volume indicator
   volumeContainer: {
     alignItems: "center",
-    marginVertical: 24,
+    marginVertical: 16,
   },
   hearingText: {
-    fontSize: 16,
-    color: "#d4a574",
-    marginTop: 12,
+    color: "#4CAF50",
+    fontSize: 14,
+    marginTop: 8,
   },
 
-  // Notation
-  notationContainer: {
-    alignItems: "center",
-    marginTop: 16,
+  // Feedback
+  successText: {
+    fontSize: 24,
+    color: "#4CAF50",
+    fontWeight: "bold",
+    textAlign: "center",
+    marginVertical: 16,
   },
-  showNotationButton: {
-    padding: 12,
-    backgroundColor: "#2d241a",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#3b2c1a",
-  },
-  showNotationText: {
-    fontSize: 14,
-    color: "#d4a574",
-  },
-  notationWrapper: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 8,
-    minHeight: 200,
-    overflow: "visible",
-  },
-  hideNotationButton: {
-    padding: 12,
-    backgroundColor: "#2d241a",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#3b2c1a",
-  },
-  hideNotationText: {
-    fontSize: 14,
-    color: "#d4a574",
+  feedbackError: {
+    fontSize: 16,
+    color: "#FF9800",
+    textAlign: "center",
+    marginVertical: 16,
   },
 
   // Imagine phase
@@ -1884,235 +1478,106 @@ const styles = StyleSheet.create({
     marginVertical: 24,
   },
   imagineEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  imagineHint: {
-    fontSize: 20,
-    color: "#d4a574",
-    fontWeight: "600",
-  },
-
-  // Feedback
-  successText: {
-    fontSize: 24,
-    color: "#4CAF50",
-    fontWeight: "600",
-    textAlign: "center",
-    marginVertical: 16,
-  },
-  feedbackError: {
-    fontSize: 18,
-    color: "#ff6b6b",
-    textAlign: "center",
-    marginVertical: 16,
-  },
-
-  // Results summary
-  resultsSummary: {
-    backgroundColor: "#2d241a",
-    borderRadius: 12,
-    padding: 20,
-    marginVertical: 16,
-  },
-  resultRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  resultLabel: {
-    fontSize: 18,
-    color: "#c4b5a0",
-  },
-  resultSuccess: {
-    fontSize: 24,
-    color: "#4CAF50",
-    fontWeight: "700",
-  },
-  resultFail: {
-    fontSize: 24,
-    color: "#ff6b6b",
-    fontWeight: "700",
-  },
-  progressText: {
-    fontSize: 16,
-    color: "#888",
-    textAlign: "center",
-    marginVertical: 12,
-  },
-
-  // Reminder box
-  reminderBox: {
-    backgroundColor: "#2d241a",
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 16,
-    borderLeftWidth: 3,
-    borderLeftColor: "#d4a574",
-  },
-  reminderTitle: {
-    fontSize: 14,
-    color: "#d4a574",
-    fontWeight: "600",
+    fontSize: 48,
     marginBottom: 8,
   },
-  reminderText: {
-    fontSize: 16,
-    color: "#c4b5a0",
-    lineHeight: 24,
-  },
-
-  // Success screen
-  successContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 40,
-  },
-  successEmoji: {
-    fontSize: 80,
-    marginBottom: 24,
-  },
-  successTitle: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: "#4CAF50",
-    marginBottom: 12,
-  },
-  successSubtitle: {
-    fontSize: 18,
-    color: "#c4b5a0",
-    textAlign: "center",
-  },
-
-  // Buttons
-  fixedBottomButtons: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingBottom: 24,
-    backgroundColor: "#1a1410",
-    borderTopWidth: 1,
-    borderTopColor: "#3b2c1a",
-  },
-  primaryButton: {
-    backgroundColor: "#4CAF50",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    alignItems: "center",
-    minWidth: 200,
-    alignSelf: "center",
-  },
-  primaryButtonText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#fff",
-  },
-  secondaryButton: {
-    backgroundColor: "#d4a574",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    alignItems: "center",
-    minWidth: 200,
-    alignSelf: "center",
-  },
-  secondaryButtonText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#1a1410",
-  },
-  tertiaryButton: {
-    backgroundColor: "transparent",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    alignSelf: "center",
-  },
-  tertiaryButtonText: {
+  imagineHint: {
+    color: "#888",
     fontSize: 14,
-    color: "#8a7a6a",
-  },
-  buttonDisabled: {
-    opacity: 0.5,
   },
 
-  // Modal styles
+  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: "rgba(0,0,0,0.7)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
   },
   modalContent: {
-    backgroundColor: "#2d241a",
+    backgroundColor: "#2a2a4e",
     borderRadius: 16,
     padding: 24,
+    width: "85%",
     maxWidth: 340,
-    borderWidth: 1,
-    borderColor: "#3b2c1a",
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: "700",
-    color: "#f5e6d3",
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 12,
     textAlign: "center",
-    marginBottom: 16,
   },
   modalText: {
-    fontSize: 16,
-    color: "#c4b5a0",
+    fontSize: 14,
+    color: "#ccc",
     textAlign: "center",
-    lineHeight: 24,
     marginBottom: 24,
+    lineHeight: 20,
   },
   modalButtons: {
     flexDirection: "row",
+    justifyContent: "space-between",
     gap: 12,
   },
   modalCancelButton: {
     flex: 1,
-    backgroundColor: "#3b2c1a",
-    paddingVertical: 14,
-    borderRadius: 10,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.1)",
     alignItems: "center",
   },
   modalCancelText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#c4b5a0",
+    color: "#888",
+    fontSize: 14,
   },
   modalConfirmButton: {
     flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
     backgroundColor: "#4CAF50",
-    paddingVertical: 14,
-    borderRadius: 10,
     alignItems: "center",
   },
   modalConfirmText: {
-    fontSize: 16,
-    fontWeight: "600",
     color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
   },
-  // Extra styles for inline conversions
-  buttonRow: {
+
+  // Success
+  successContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  successEmoji: {
+    fontSize: 80,
+    marginBottom: 16,
+  },
+  successTitle: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#4CAF50",
+    marginBottom: 8,
+  },
+  successSubtitle: {
+    fontSize: 18,
+    color: "#ccc",
+  },
+
+  // Progress dots
+  progressDots: {
     flexDirection: "row",
-    gap: 8,
+    justifyContent: "center",
+    gap: 12,
+    marginTop: 24,
   },
-  notationWrapperRelative: {
-    position: "relative",
+  progressDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
-  highlightOverlay: {
-    position: "absolute",
-    top: 40,
-    height: 120,
-    backgroundColor: "rgba(76, 175, 80, 0.25)",
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: "rgba(76, 175, 80, 0.6)",
-    pointerEvents: "none",
+  progressDotComplete: {
+    backgroundColor: "#4CAF50",
   },
 });

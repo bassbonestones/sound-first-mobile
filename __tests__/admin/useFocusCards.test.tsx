@@ -377,6 +377,35 @@ describe("useFocusCards", () => {
       expect(response.error).toBe("Network error");
     });
 
+    it("successfully updates a focus card", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockFocusCards),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockFocusCards),
+        });
+
+      const { result } = renderHook(() => useFocusCards());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.updateFocusCard(1, { name: "Updated" });
+      });
+
+      expect(response.success).toBe(true);
+    });
+
     it("handles updateFocusCard API error", async () => {
       (global.fetch as jest.Mock)
         .mockResolvedValueOnce({
@@ -424,6 +453,35 @@ describe("useFocusCards", () => {
 
       expect(response.success).toBe(false);
       expect(response.error).toBe("Connection lost");
+    });
+
+    it("successfully deletes a focus card", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockFocusCards),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve([]),
+        });
+
+      const { result } = renderHook(() => useFocusCards());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.deleteFocusCard(1);
+      });
+
+      expect(response.success).toBe(true);
     });
 
     it("handles deleteFocusCard API error", async () => {

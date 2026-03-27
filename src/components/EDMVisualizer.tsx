@@ -7,6 +7,7 @@ import {
   ViewStyle,
   StyleProp,
 } from "react-native";
+import type { PitchAccuracy } from "../types/audio";
 
 /**
  * EDMVisualizer - Exciting audio-reactive visualization
@@ -17,8 +18,6 @@ import {
  * - Pulsing/bouncing animations
  * - Color changes based on pitch accuracy
  */
-
-type PitchAccuracy = "correct" | "off" | "listening" | null;
 
 interface ColorScheme {
   primary: string;

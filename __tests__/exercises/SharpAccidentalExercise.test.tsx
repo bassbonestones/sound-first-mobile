@@ -313,7 +313,9 @@ describe("SharpAccidentalExercise", () => {
       );
       goToQuiz(getByText);
       fireEvent.press(getByText("Raises it by a half step"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       expect(getByText(/Question 2 of 4/)).toBeTruthy();
     });
   });
@@ -330,13 +332,21 @@ describe("SharpAccidentalExercise", () => {
       fireEvent.press(getByText("Quiz Me →"));
 
       fireEvent.press(getByText("Raises it by a half step"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       fireEvent.press(getByText("one half step higher"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       fireEvent.press(getByText("flat"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       fireEvent.press(getByText("one key to the right"));
-      fireEvent.press(getByText("See Results →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
     };
 
     it("shows success with all correct", () => {

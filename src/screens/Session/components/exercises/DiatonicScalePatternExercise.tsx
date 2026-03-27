@@ -17,6 +17,7 @@ import {
   Platform,
 } from "react-native";
 import type { LessonExerciseProps } from "./shared";
+import { useQuizExerciseState } from "./shared/useQuizExerciseState";
 import { devWarn } from "../../../../utils/devLogger";
 
 // Audio context
@@ -75,6 +76,7 @@ const PATTERN_LABELS = [
 // Quiz questions
 const QUIZ_QUESTIONS = [
   {
+    id: "pattern",
     question: "The major scale pattern is:",
     correctAnswer: "W-W-H-W-W-W-H",
     options: [
@@ -85,16 +87,19 @@ const QUIZ_QUESTIONS = [
     ],
   },
   {
+    id: "mi-fa",
     question: "MI to FA is a:",
     correctAnswer: "Half step",
     options: ["Whole step", "Half step", "Two whole steps", "No step"],
   },
   {
+    id: "ti-do",
     question: "TI to DO is a:",
     correctAnswer: "Half step",
     options: ["Whole step", "Half step", "Two whole steps", "No step"],
   },
   {
+    id: "half-count",
     question: "How many half steps are in the major scale pattern?",
     correctAnswer: "2",
     options: ["1", "2", "3", "4"],
@@ -217,16 +222,33 @@ export default function DiatonicScalePatternExercise({
   sessionState = {},
   onComplete,
   onCancel,
+  onProgress,
 }: LessonExerciseProps) {
   const [phase, setPhase] = useState(PHASES.INTRO);
   const [currentStep, setCurrentStep] = useState(-1);
-  const [quizIndex, setQuizIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [showResult, setShowResult] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasPlayedOnPhase, setHasPlayedOnPhase] = useState(false);
   const [intervalsPlayed, setIntervalsPlayed] = useState(new Set());
+
+  const totalQuestions = QUIZ_QUESTIONS.length;
+
+  const handleQuizComplete = useCallback(
+    (passed: boolean, finalScore: number) => {
+      setPhase(PHASES.RESULT);
+    },
+    [],
+  );
+
+  const {
+    quiz,
+    currentQuestion,
+    handleAnswer: handleQuizAnswer,
+    isCorrectAnswer,
+  } = useQuizExerciseState({
+    questions: QUIZ_QUESTIONS,
+    onProgress,
+    onQuizComplete: handleQuizComplete,
+  });
 
   const audioContextRef = useRef(null);
 
@@ -302,33 +324,12 @@ export default function DiatonicScalePatternExercise({
     [isPlaying, playNote],
   );
 
-  const handleAnswer = useCallback(
-    (answer) => {
-      setSelectedAnswer(answer);
-      setShowResult(true);
-      if (answer === QUIZ_QUESTIONS[quizIndex].correctAnswer) {
-        setScore((s) => s + 1);
-      }
-    },
-    [quizIndex],
-  );
-
-  const handleNext = useCallback(() => {
-    setSelectedAnswer(null);
-    setShowResult(false);
-    if (quizIndex < QUIZ_QUESTIONS.length - 1) {
-      setQuizIndex((i) => i + 1);
-    } else {
-      setPhase(PHASES.RESULT);
-    }
-  }, [quizIndex]);
-
   const handleComplete = useCallback(() => {
-    const passed = score === QUIZ_QUESTIONS.length;
+    const passed = quiz.score === totalQuestions;
     if (onComplete) {
-      onComplete({ success: passed, score });
+      onComplete({ success: passed, score: quiz.score });
     }
-  }, [onComplete, score]);
+  }, [onComplete, quiz.score, totalQuestions]);
 
   // ============================================================
   // RENDER PHASES
@@ -587,7 +588,7 @@ export default function DiatonicScalePatternExercise({
   }
 
   if (phase === PHASES.QUIZ) {
-    const currentQ = QUIZ_QUESTIONS[quizIndex];
+    if (!currentQuestion) return null;
 
     return (
       <View style={styles.container}>
@@ -595,24 +596,24 @@ export default function DiatonicScalePatternExercise({
           <View
             style={[
               styles.progressFill,
-              { width: `${((quizIndex + 1) / QUIZ_QUESTIONS.length) * 100}%` },
+              { width: `${((quiz.currentIndex + 1) / totalQuestions) * 100}%` },
             ]}
           />
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text style={styles.quizProgress}>
-            Question {quizIndex + 1} of {QUIZ_QUESTIONS.length}
+            Question {quiz.currentIndex + 1} of {totalQuestions}
           </Text>
 
-          <Text style={styles.quizQuestion}>{currentQ.question}</Text>
+          <Text style={styles.quizQuestion}>{currentQuestion.question}</Text>
 
           <View style={styles.optionsContainer}>
-            {currentQ.options.map((option, idx) => {
-              const isSelected = selectedAnswer === option;
-              const isCorrect = option === currentQ.correctAnswer;
-              const showCorrect = showResult && isCorrect;
-              const showWrong = showResult && isSelected && !isCorrect;
+            {currentQuestion.options.map((option, idx) => {
+              const isSelected = quiz.selectedAnswer === option;
+              const isCorrect = isCorrectAnswer(option);
+              const showCorrect = quiz.showFeedback && isCorrect;
+              const showWrong = quiz.showFeedback && isSelected && !isCorrect;
 
               return (
                 <TouchableOpacity
@@ -621,10 +622,10 @@ export default function DiatonicScalePatternExercise({
                     styles.optionButton,
                     showCorrect && styles.optionCorrect,
                     showWrong && styles.optionWrong,
-                    isSelected && !showResult && styles.optionSelected,
+                    isSelected && !quiz.showFeedback && styles.optionSelected,
                   ]}
-                  onPress={() => !showResult && handleAnswer(option)}
-                  disabled={showResult}
+                  onPress={() => !quiz.showFeedback && handleQuizAnswer(option)}
+                  disabled={quiz.showFeedback}
                   accessibilityLabel={`Select ${option}`}
                   accessibilityRole="button"
                 >
@@ -641,48 +642,29 @@ export default function DiatonicScalePatternExercise({
             })}
           </View>
 
-          {showResult && (
+          {quiz.showFeedback && (
             <View style={styles.feedbackContainer}>
               <Text
                 style={[
                   styles.feedbackText,
-                  selectedAnswer === currentQ.correctAnswer
+                  isCorrectAnswer(quiz.selectedAnswer!)
                     ? styles.feedbackCorrect
                     : styles.feedbackWrong,
                 ]}
               >
-                {selectedAnswer === currentQ.correctAnswer
+                {isCorrectAnswer(quiz.selectedAnswer!)
                   ? "✓ Correct!"
-                  : `✗ The answer is: ${currentQ.correctAnswer}`}
+                  : `✗ The answer is: ${currentQuestion.correctAnswer}`}
               </Text>
             </View>
           )}
         </ScrollView>
-
-        {showResult && (
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleNext}
-            accessibilityLabel={
-              quizIndex < QUIZ_QUESTIONS.length - 1
-                ? "Next question"
-                : "See results"
-            }
-            accessibilityRole="button"
-          >
-            <Text style={styles.primaryButtonText}>
-              {quizIndex < QUIZ_QUESTIONS.length - 1
-                ? "Next →"
-                : "See Results →"}
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
     );
   }
 
   if (phase === PHASES.RESULT) {
-    const passed = score === QUIZ_QUESTIONS.length;
+    const passed = quiz.score === totalQuestions;
 
     return (
       <View style={styles.container}>
@@ -692,7 +674,7 @@ export default function DiatonicScalePatternExercise({
             {passed ? "You know the pattern!" : "Let's review"}
           </Text>
           <Text style={styles.resultScore}>
-            {score} / {QUIZ_QUESTIONS.length} correct
+            {quiz.score} / {totalQuestions} correct
           </Text>
 
           <View style={styles.card}>

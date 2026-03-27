@@ -154,14 +154,14 @@ describe("WholeNoteLessonExercise", () => {
       const { getByText } = render(
         <WholeNoteLessonExercise {...defaultProps} />,
       );
-      expect(getByText("Got It →")).toBeTruthy();
+      expect(getByText("Begin →")).toBeTruthy();
     });
 
     it("transitions to Listen phase when Got It is pressed", () => {
       const { getByText, queryByText } = render(
         <WholeNoteLessonExercise {...defaultProps} />,
       );
-      fireEvent.press(getByText("Got It →"));
+      fireEvent.press(getByText("Begin →"));
       expect(queryByText("A whole note lasts for 4 beats.")).toBeNull();
       expect(getByText("Listen")).toBeTruthy();
     });
@@ -170,14 +170,14 @@ describe("WholeNoteLessonExercise", () => {
       const { getByLabelText } = render(
         <WholeNoteLessonExercise {...defaultProps} />,
       );
-      expect(getByLabelText("Got it, continue to listen phase")).toBeTruthy();
+      expect(getByLabelText("Begin exercise")).toBeTruthy();
     });
   });
 
   // ========== LISTEN PHASE ==========
   describe("Listen Phase", () => {
     const goToListenPhase = (getByText: (text: string) => unknown) => {
-      fireEvent.press(getByText("Got It →") as never);
+      fireEvent.press(getByText("Begin →") as never);
     };
 
     it("renders listen phase title", () => {
@@ -211,7 +211,7 @@ describe("WholeNoteLessonExercise", () => {
         <WholeNoteLessonExercise {...defaultProps} />,
       );
       goToListenPhase(getByText);
-      expect(getByText("🔊 Hear Pattern")).toBeTruthy();
+      expect(getByText("🎵 Play Pattern")).toBeTruthy();
     });
 
     it("shows mini focus card reminder", () => {
@@ -247,8 +247,8 @@ describe("WholeNoteLessonExercise", () => {
         <WholeNoteLessonExercise {...defaultProps} />,
       );
       goToListenPhase(getByText);
-      fireEvent.press(getByText("🔊 Hear Pattern"));
-      expect(getByText("🔊 Playing...")).toBeTruthy();
+      fireEvent.press(getByText("🎵 Play Pattern"));
+      expect(getByText("🎵 Listening...")).toBeTruthy();
     });
 
     it('shows "I Heard It" button after hearing pattern', () => {
@@ -256,7 +256,7 @@ describe("WholeNoteLessonExercise", () => {
         <WholeNoteLessonExercise {...defaultProps} />,
       );
       goToListenPhase(getByText);
-      fireEvent.press(getByText("🔊 Hear Pattern"));
+      fireEvent.press(getByText("🎵 Play Pattern"));
 
       // Advance through playback (count-in + 5 beats + 1)
       act(() => {
@@ -271,13 +271,13 @@ describe("WholeNoteLessonExercise", () => {
         <WholeNoteLessonExercise {...defaultProps} />,
       );
       goToListenPhase(getByText);
-      fireEvent.press(getByText("🔊 Hear Pattern"));
+      fireEvent.press(getByText("🎵 Play Pattern"));
 
       act(() => {
         jest.advanceTimersByTime(10000);
       });
 
-      expect(getByText("🔊 Hear Again")).toBeTruthy();
+      expect(getByText("🎵 Hear Again")).toBeTruthy();
     });
 
     it("transitions to Sing phase when I Heard It is pressed", () => {
@@ -285,7 +285,7 @@ describe("WholeNoteLessonExercise", () => {
         <WholeNoteLessonExercise {...defaultProps} />,
       );
       goToListenPhase(getByText);
-      fireEvent.press(getByText("🔊 Hear Pattern"));
+      fireEvent.press(getByText("🎵 Play Pattern"));
 
       act(() => {
         jest.advanceTimersByTime(10000);
@@ -308,8 +308,8 @@ describe("WholeNoteLessonExercise", () => {
   // ========== SING PHASE ==========
   describe("Sing Phase", () => {
     const goToSingPhase = (getByText: (text: string) => unknown) => {
-      fireEvent.press(getByText("Got It →") as never);
-      fireEvent.press(getByText("🔊 Hear Pattern") as never);
+      fireEvent.press(getByText("Begin →") as never);
+      fireEvent.press(getByText("🎵 Play Pattern") as never);
       act(() => {
         jest.advanceTimersByTime(10000);
       });
@@ -439,9 +439,9 @@ describe("WholeNoteLessonExercise", () => {
       getAllByText: (text: string) => unknown[],
     ) => {
       // Go through Focus Card
-      fireEvent.press(getByText("Got It →") as never);
+      fireEvent.press(getByText("Begin →") as never);
       // Listen phase
-      fireEvent.press(getByText("🔊 Hear Pattern") as never);
+      fireEvent.press(getByText("🎵 Play Pattern") as never);
       act(() => {
         jest.advanceTimersByTime(10000);
       });
@@ -533,8 +533,8 @@ describe("WholeNoteLessonExercise", () => {
       getByText: (text: string) => unknown,
       getAllByText: (text: string) => unknown[],
     ) => {
-      fireEvent.press(getByText("Got It →") as never);
-      fireEvent.press(getByText("🔊 Hear Pattern") as never);
+      fireEvent.press(getByText("Begin →") as never);
+      fireEvent.press(getByText("🎵 Play Pattern") as never);
       act(() => {
         jest.advanceTimersByTime(10000);
       });
@@ -583,8 +583,8 @@ describe("WholeNoteLessonExercise", () => {
   // ========== ATTESTATION MODAL ==========
   describe("Attestation Modal", () => {
     const goToSingWithFailures = (getByText: (text: string) => unknown) => {
-      fireEvent.press(getByText("Got It →") as never);
-      fireEvent.press(getByText("🔊 Hear Pattern") as never);
+      fireEvent.press(getByText("Begin →") as never);
+      fireEvent.press(getByText("🎵 Play Pattern") as never);
       act(() => {
         jest.advanceTimersByTime(10000);
       });
@@ -648,8 +648,8 @@ describe("WholeNoteLessonExercise", () => {
       const { getByText } = render(
         <WholeNoteLessonExercise {...defaultProps} />,
       );
-      fireEvent.press(getByText("Got It →"));
-      fireEvent.press(getByText("🔊 Hear Pattern"));
+      fireEvent.press(getByText("Begin →"));
+      fireEvent.press(getByText("🎵 Play Pattern"));
       expect(getByText("Count in:")).toBeTruthy();
     });
 
@@ -657,8 +657,8 @@ describe("WholeNoteLessonExercise", () => {
       const { getByText } = render(
         <WholeNoteLessonExercise {...defaultProps} />,
       );
-      fireEvent.press(getByText("Got It →"));
-      fireEvent.press(getByText("🔊 Hear Pattern"));
+      fireEvent.press(getByText("Begin →"));
+      fireEvent.press(getByText("🎵 Play Pattern"));
       expect(getByText("Sing:")).toBeTruthy();
     });
   });
@@ -669,7 +669,7 @@ describe("WholeNoteLessonExercise", () => {
       const { getByText } = render(
         <WholeNoteLessonExercise {...defaultProps} userFirstNote="C4" />,
       );
-      fireEvent.press(getByText("Got It →"));
+      fireEvent.press(getByText("Begin →"));
       fireEvent.press(getByText("Show Notation 📝"));
       // WebView should be rendered with musicxml
       expect(getByText("Hide Notation")).toBeTruthy();
@@ -679,7 +679,7 @@ describe("WholeNoteLessonExercise", () => {
       const { getByText, getAllByText } = render(
         <WholeNoteLessonExercise {...defaultProps} userFirstNote="Bb3" />,
       );
-      fireEvent.press(getByText("Got It →"));
+      fireEvent.press(getByText("Begin →"));
       // Note display shows "B\nb" in a single text node
       expect(getByText(/B\s*b/)).toBeTruthy();
     });
@@ -688,7 +688,7 @@ describe("WholeNoteLessonExercise", () => {
       const { getByText } = render(
         <WholeNoteLessonExercise {...defaultProps} userFirstNote="F#4" />,
       );
-      fireEvent.press(getByText("Got It →"));
+      fireEvent.press(getByText("Begin →"));
       // Note display shows "F\n#" in a single text node
       expect(getByText(/F\s*#/)).toBeTruthy();
     });
@@ -755,8 +755,8 @@ describe("WholeNoteLessonExercise", () => {
       const { getByText, unmount } = render(
         <WholeNoteLessonExercise {...defaultProps} />,
       );
-      fireEvent.press(getByText("Got It →"));
-      fireEvent.press(getByText("🔊 Hear Pattern"));
+      fireEvent.press(getByText("Begin →"));
+      fireEvent.press(getByText("🎵 Play Pattern"));
       unmount();
       // Should not throw
     });
@@ -768,14 +768,14 @@ describe("WholeNoteLessonExercise", () => {
       const { getByLabelText } = render(
         <WholeNoteLessonExercise {...defaultProps} />,
       );
-      expect(getByLabelText("Got it, continue to listen phase")).toBeTruthy();
+      expect(getByLabelText("Begin exercise")).toBeTruthy();
     });
 
     it("has accessibility labels on notation toggle", () => {
       const { getByText, getByLabelText } = render(
         <WholeNoteLessonExercise {...defaultProps} />,
       );
-      fireEvent.press(getByText("Got It →"));
+      fireEvent.press(getByText("Begin →"));
       expect(getByLabelText("Show notation")).toBeTruthy();
     });
 
@@ -783,8 +783,8 @@ describe("WholeNoteLessonExercise", () => {
       const { getByText, getByLabelText } = render(
         <WholeNoteLessonExercise {...defaultProps} />,
       );
-      fireEvent.press(getByText("Got It →"));
-      expect(getByLabelText("Hear pattern")).toBeTruthy();
+      fireEvent.press(getByText("Begin →"));
+      expect(getByLabelText("Play pattern")).toBeTruthy();
     });
   });
 
@@ -813,7 +813,7 @@ describe("WholeNoteLessonExercise", () => {
         />,
       );
       // Should use default F3
-      fireEvent.press(getByText("Got It →"));
+      fireEvent.press(getByText("Begin →"));
       expect(getByText("F")).toBeTruthy();
     });
 

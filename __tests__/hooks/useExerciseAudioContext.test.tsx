@@ -167,4 +167,75 @@ describe("useExerciseAudioContext", () => {
       expect(result.current.audioContextRef).toHaveProperty("current");
     });
   });
+
+  // ==========================================================================
+  // ERROR HANDLING TESTS
+  // ==========================================================================
+  describe("Error Handling", () => {
+    it("handles resume failure gracefully", async () => {
+      mockAudioContext.state = "suspended";
+      mockAudioContext.resume.mockRejectedValueOnce(new Error("Resume failed"));
+
+      const { result } = renderHook(() => useExerciseAudioContext());
+
+      // Wait for the rejection to be processed
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      });
+
+      // Should still have an audio context
+      expect(result.current.audioContextRef.current).toBeTruthy();
+    });
+
+    it("handles audio context creation failure", async () => {
+      // Temporarily make AudioContext throw an error
+      const { AudioContext: MockAudioContext } = jest.requireMock(
+        "react-native-audio-api",
+      );
+      const originalImpl =
+        MockAudioContext.getMockImplementation?.() || (() => mockAudioContext);
+
+      MockAudioContext.mockImplementationOnce(() => {
+        throw new Error("AudioContext creation failed");
+      });
+
+      const { result } = renderHook(() => useExerciseAudioContext());
+
+      // Wait for error to be processed
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      // Should have an error
+      expect(result.current.audioError).toBeTruthy();
+      expect(result.current.audioError?.message).toBe(
+        "AudioContext creation failed",
+      );
+
+      // Restore
+      MockAudioContext.mockImplementation(originalImpl);
+    });
+
+    it("handles non-Error objects in catch block", async () => {
+      const { AudioContext: MockAudioContext } = jest.requireMock(
+        "react-native-audio-api",
+      );
+
+      MockAudioContext.mockImplementationOnce(() => {
+        throw "String error instead of Error object";
+      });
+
+      const { result } = renderHook(() => useExerciseAudioContext());
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      // Should convert string to Error
+      expect(result.current.audioError).toBeTruthy();
+      expect(result.current.audioError?.message).toBe(
+        "String error instead of Error object",
+      );
+    });
+  });
 });

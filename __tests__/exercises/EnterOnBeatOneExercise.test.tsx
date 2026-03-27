@@ -8,32 +8,36 @@
 import React from "react";
 import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
 
-// Mock createAudioContext and createClickSound
-jest.mock("../../src/screens/Session/components/exercises/shared", () => ({
-  ...jest.requireActual(
-    "../../src/screens/Session/components/exercises/shared",
-  ),
-  createAudioContext: jest.fn(() => ({
-    close: jest.fn(),
-    currentTime: 0,
-    createOscillator: jest.fn(() => ({
-      connect: jest.fn(),
-      frequency: { value: 440 },
-      start: jest.fn(),
-      stop: jest.fn(),
+// Mock audio utilities from shared module
+jest.mock(
+  "../../src/screens/Session/components/exercises/shared/audioHelpers",
+  () => ({
+    getAudioContextClass: jest.fn(() => undefined),
+    createAudioContext: jest.fn(() => ({
+      close: jest.fn(),
+      currentTime: 0,
+      createOscillator: jest.fn(() => ({
+        connect: jest.fn(),
+        frequency: { value: 440 },
+        start: jest.fn(),
+        stop: jest.fn(),
+      })),
+      createGain: jest.fn(() => ({
+        connect: jest.fn(),
+        gain: {
+          value: 1,
+          setValueAtTime: jest.fn(),
+          exponentialRampToValueAtTime: jest.fn(),
+        },
+      })),
+      destination: {},
     })),
-    createGain: jest.fn(() => ({
-      connect: jest.fn(),
-      gain: {
-        value: 1,
-        setValueAtTime: jest.fn(),
-        exponentialRampToValueAtTime: jest.fn(),
-      },
-    })),
-    destination: {},
-  })),
-  createClickSound: jest.fn(),
-}));
+    createClickSound: jest.fn(),
+    playTone: jest.fn(),
+    playNote: jest.fn(),
+    cleanupAudioContext: jest.fn(),
+  }),
+);
 
 // Mock devLogger
 jest.mock("../../src/utils/devLogger", () => ({

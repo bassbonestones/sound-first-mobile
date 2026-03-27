@@ -149,7 +149,7 @@ export async function runImportPipeline(
       return await runOmrPath(input.asset, state, updateStatus, options);
     }
   } catch (error) {
-    console.error("[importOrchestrator] Pipeline error:", error);
+    devError("[importOrchestrator] Pipeline error:", error);
     const importError = mapNativeError(error);
     return createFailedResult(state, importError);
   }

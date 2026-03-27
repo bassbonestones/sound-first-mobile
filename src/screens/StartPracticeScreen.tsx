@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,13 @@ import {
   StyleSheet,
 } from "react-native";
 import { DevNavMenu } from "../components/DevNavMenu";
+
+// Helper to blur active element before navigation (fixes aria-hidden focus issue on web)
+const blurActiveElement = () => {
+  if (Platform.OS === "web" && document.activeElement) {
+    (document.activeElement as HTMLElement).blur();
+  }
+};
 
 interface StartPracticeScreenProps {
   navigation: {
@@ -49,6 +56,15 @@ export default function StartPracticeScreen({
   const [showFatigue5Modal, setShowFatigue5Modal] = useState(false);
   const durations = [10, 20, 30, 45, 60];
 
+  // Navigation wrapper that blurs first on web
+  const navigateTo = useCallback(
+    (screen: string, params?: Record<string, unknown>) => {
+      blurActiveElement();
+      navigation.navigate(screen, params);
+    },
+    [navigation],
+  );
+
   const handleFatigueSelect = (f) => {
     setFatigue(f);
     if (f === 5) {
@@ -60,7 +76,7 @@ export default function StartPracticeScreen({
     if (fatigue === 5) {
       setShowFatigue5Modal(true);
     } else {
-      navigation.navigate("Session", {
+      navigateTo("Session", {
         duration,
         fatigue,
         instrumentId,
@@ -81,7 +97,7 @@ export default function StartPracticeScreen({
         break;
       case "cooldown":
         // Navigate with cooldown mode flag
-        navigation.navigate("Session", {
+        navigateTo("Session", {
           duration: Math.min(duration, 15), // Cap at 15 min for cooldown
           fatigue: 5,
           cooldownMode: true,
@@ -91,7 +107,7 @@ export default function StartPracticeScreen({
         break;
       case "ear_only":
         // Navigate with ear-only mode flag
-        navigation.navigate("Session", {
+        navigateTo("Session", {
           duration: Math.min(duration, 20),
           fatigue: 5,
           earOnlyMode: true,
@@ -264,7 +280,7 @@ export default function StartPracticeScreen({
       {/* Fixed bottom buttons */}
       <View style={styles.bottomButtons}>
         <TouchableOpacity
-          onPress={() => navigation.navigate("History")}
+          onPress={() => navigateTo("History")}
           style={styles.secondaryButton}
           accessibilityLabel="View practice history"
           accessibilityRole="button"
@@ -272,7 +288,7 @@ export default function StartPracticeScreen({
           <Text style={styles.secondaryButtonText}>Practice History</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={() => navigation.navigate("SelfDirected")}
+          onPress={() => navigateTo("SelfDirected")}
           style={styles.secondaryButton}
           accessibilityLabel="Self-directed practice mode"
           accessibilityRole="button"

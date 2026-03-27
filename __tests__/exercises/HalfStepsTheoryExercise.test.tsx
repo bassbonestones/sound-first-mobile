@@ -309,13 +309,15 @@ describe("HalfStepsTheoryExercise", () => {
       expect(getByText(/✗ The answer is: smallest/)).toBeTruthy();
     });
 
-    it("advances to next question when Next pressed", () => {
+    it("auto-advances to next question after delay", () => {
       const { getByText } = render(
         <HalfStepsTheoryExercise {...defaultProps} />,
       );
       goToQuiz(getByText);
       fireEvent.press(getByText("smallest")); // Answer first question
-      fireEvent.press(getByText("Next →")); // Go to next
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      }); // Auto-advance
       expect(getByText(/Question 2 of 4/)).toBeTruthy();
     });
 
@@ -325,7 +327,9 @@ describe("HalfStepsTheoryExercise", () => {
       );
       goToQuiz(getByText);
       fireEvent.press(getByText("smallest"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       expect(getByText(/E to F is a half step/)).toBeTruthy();
     });
   });
@@ -345,34 +349,50 @@ describe("HalfStepsTheoryExercise", () => {
       goToQuiz(getByText);
       // Q1: smallest
       fireEvent.press(getByText("smallest"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       // Q2: adjacent keys
       fireEvent.press(
         getByText("They're adjacent keys with no black key between"),
       );
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       // Q3: C to D is NOT a half step
       fireEvent.press(getByText("C to D"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       // Q4: 12 half steps in octave
       fireEvent.press(getByText("12"));
-      fireEvent.press(getByText("See Results →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
     };
 
     const completeQuizAllWrong = (getByText: Function) => {
       goToQuiz(getByText);
       // Q1: wrong answer
       fireEvent.press(getByText("largest"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       // Q2: wrong answer
       fireEvent.press(getByText("They're far apart on the keyboard"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       // Q3: wrong answer
       fireEvent.press(getByText("E to F"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       // Q4: wrong answer
       fireEvent.press(getByText("7"));
-      fireEvent.press(getByText("See Results →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
     };
 
     it("shows success message with all correct", () => {

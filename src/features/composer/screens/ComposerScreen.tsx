@@ -15,7 +15,6 @@ import React, {
 } from "react";
 import {
   View,
-  StyleSheet,
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
@@ -40,6 +39,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../constants";
+import { composerScreenStyles as styles } from "./composerScreenStyles";
 import { useComposerState, useComposerPlayback } from "../hooks";
 import {
   CompactTopBar,
@@ -47,6 +47,11 @@ import {
   EntryPalette,
   CompactControls,
 } from "../components";
+import {
+  ComposerStateProvider,
+  ScoreSettingsProvider,
+  PlaybackProvider,
+} from "../contexts";
 import {
   composerStorageService,
   createAutosaveHandler,
@@ -580,255 +585,264 @@ function ComposerScreenContent({
         style={styles.content}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {/* Compact Top Bar */}
-        <CompactTopBar
+        <ScoreSettingsProvider
           title={composerState.score.title || ""}
-          onTitleChange={handleTitleChange}
+          setTitle={handleTitleChange}
           clef={composerState.score.clef}
-          onClefChange={handleClefChange}
+          setClef={handleClefChange}
           timeSignature={composerState.score.timeSignature}
-          onTimeSignatureChange={handleTimeSignatureChange}
+          setTimeSignature={handleTimeSignatureChange}
           timeSignatureLocked={composerState.hasActualNotes()}
           keySignature={composerState.score.keySignature}
-          onKeySignatureChange={handleKeySignatureChange}
+          setKeySignature={handleKeySignatureChange}
           tempo={composerState.score.tempo}
-          onTempoChange={handleTempoChange}
-          zoom={zoom}
-          onZoomChange={setZoom}
-          onClearScore={composerState.clearScore}
-          onBack={handleBack}
-          disabled={isPlaying}
-          testID="composer-topbar"
-        />
-
-        {/* Score Viewport with swipe gestures */}
-        <View
-          style={[styles.viewportWrapper, { height: viewportHeight }]}
-          {...panResponder.panHandlers}
+          setTempo={handleTempoChange}
+          clearScore={composerState.clearScore}
         >
-          <ComposerScoreViewport
-            score={composerState.score}
-            cursor={composerState.cursor}
-            selectedNoteId={highlightedNoteId}
-            onNoteTap={handleScoreTap}
-            playbackState={playback.state}
-            playbackMeasureIndex={playback.position.measureIndex}
-            onPlay={handlePlay}
-            onPause={handlePause}
-            onStop={handleStop}
+          {/* Compact Top Bar */}
+          <CompactTopBar
             zoom={zoom}
             onZoomChange={setZoom}
-            showZoomControls={false}
-            testID="composer-viewport"
-          />
-        </View>
-
-        <View style={styles.controlsContainer}>
-          {/* Entry Palette - 3 rows get extraRowPadding each */}
-          <EntryPalette
-            selectedDuration={composerState.state.selectedDuration}
-            selectedNote={composerState.selectedNote}
-            onDurationSelect={composerState.setDuration}
-            dottedMode={composerState.dottedMode}
-            onToggleDotted={composerState.toggleDottedMode}
-            tripletPosition={composerState.tripletPosition}
-            tripletGroupType={composerState.tripletGroupType}
-            tripletsAllowed={composerState.score.timeSignature.beatUnit === 4}
-            canStartTriplet={composerState.canStartTriplet}
-            onPitchTap={handlePitchEnter}
-            onOctaveChange={composerState.changeOctave}
-            onAccidental={composerState.applyAccidental}
-            onInsertRest={handleRestEnter}
-            onToggleTie={composerState.toggleTie}
+            onBack={handleBack}
             disabled={isPlaying}
-            extraRowPadding={rowExtraPadding}
-            testID="composer-palette"
+            testID="composer-topbar"
           />
+        </ScoreSettingsProvider>
 
-          {/* Compact Controls Row */}
+        {/* Score Viewport with swipe gestures */}
+        <PlaybackProvider
+          playbackState={playback.state}
+          playbackMeasureIndex={playback.position.measureIndex}
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onStop={handleStop}
+        >
           <View
-            style={[
-              styles.compactControlsRow,
-              { paddingVertical: 4 + rowExtraPadding / 2 },
-            ]}
+            style={[styles.viewportWrapper, { height: viewportHeight }]}
+            {...panResponder.panHandlers}
           >
-            {/* Pitch up/down buttons */}
-            <View style={styles.pitchButtons}>
-              <TouchableOpacity
-                style={[
-                  styles.pitchButton,
-                  (!hasSelection || isPlaying) && styles.buttonDisabled,
-                ]}
-                onPress={handleUp}
-                disabled={!hasSelection || isPlaying}
-                accessibilityLabel="Pitch up"
-              >
-                <Feather
-                  name="chevron-up"
-                  size={22}
-                  color={
-                    hasSelection && !isPlaying
-                      ? colors.textPrimary
-                      : colors.textSecondary
-                  }
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.pitchButton,
-                  (!hasSelection || isPlaying) && styles.buttonDisabled,
-                ]}
-                onPress={handleDown}
-                disabled={!hasSelection || isPlaying}
-                accessibilityLabel="Pitch down"
-              >
-                <Feather
-                  name="chevron-down"
-                  size={22}
-                  color={
-                    hasSelection && !isPlaying
-                      ? colors.textPrimary
-                      : colors.textSecondary
-                  }
-                />
-              </TouchableOpacity>
-            </View>
+            <ComposerScoreViewport
+              score={composerState.score}
+              cursor={composerState.cursor}
+              selectedNoteId={highlightedNoteId}
+              onNoteTap={handleScoreTap}
+              zoom={zoom}
+              onZoomChange={setZoom}
+              showZoomControls={false}
+              testID="composer-viewport"
+            />
+          </View>
+        </PlaybackProvider>
 
-            {/* Compact measure controls with overflow menu */}
-            <CompactControls
-              currentMeasure={composerState.cursor.measureIndex + 1}
-              totalMeasures={composerState.score.measures.length}
-              validation={measureValidation}
-              onDelete={handleDelete}
-              onAddMeasure={handleAddMeasure}
-              onDeleteMeasure={handleDeleteMeasure}
-              onDeleteLastMeasure={handleDeleteLastMeasure}
-              onFillWithRests={handleFillWithRests}
-              hasSelection={hasSelection}
-              canDeleteMeasure={canDeleteMeasure}
+        <ComposerStateProvider
+          selectedDuration={composerState.state.selectedDuration}
+          setDuration={composerState.setDuration}
+          dottedMode={composerState.dottedMode}
+          toggleDottedMode={composerState.toggleDottedMode}
+          tripletPosition={composerState.tripletPosition}
+          tripletGroupType={composerState.tripletGroupType}
+          canStartTriplet={composerState.canStartTriplet}
+          selectedNote={composerState.selectedNote}
+          changeOctave={composerState.changeOctave}
+          applyAccidental={composerState.applyAccidental}
+          toggleTie={composerState.toggleTie}
+          timeSignature={composerState.score.timeSignature}
+        >
+          <View style={styles.controlsContainer}>
+            {/* Entry Palette - 3 rows get extraRowPadding each */}
+            <EntryPalette
+              onPitchTap={handlePitchEnter}
+              onInsertRest={handleRestEnter}
               disabled={isPlaying}
-              testID="composer-controls"
+              extraRowPadding={rowExtraPadding}
+              testID="composer-palette"
             />
 
-            {/* Nav arrows for precise control */}
-            <View style={styles.navButtons}>
-              <TouchableOpacity
-                style={[
-                  styles.navButton,
-                  (!canGoLeft || isPlaying) && styles.buttonDisabled,
-                ]}
-                onPress={handleLeft}
-                disabled={!canGoLeft || isPlaying}
-                accessibilityLabel="Previous"
-              >
-                <Feather
-                  name="chevron-left"
-                  size={22}
-                  color={
-                    canGoLeft && !isPlaying
-                      ? colors.textPrimary
-                      : colors.textSecondary
-                  }
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.navButton,
-                  (!canGoRight || isPlaying) && styles.buttonDisabled,
-                ]}
-                onPress={handleRight}
-                disabled={!canGoRight || isPlaying}
-                accessibilityLabel="Next"
-              >
-                <Feather
-                  name="chevron-right"
-                  size={22}
-                  color={
-                    canGoRight && !isPlaying
-                      ? colors.textPrimary
-                      : colors.textSecondary
-                  }
-                />
-              </TouchableOpacity>
+            {/* Compact Controls Row */}
+            <View
+              style={[
+                styles.compactControlsRow,
+                { paddingVertical: 4 + rowExtraPadding / 2 },
+              ]}
+            >
+              {/* Pitch up/down buttons */}
+              <View style={styles.pitchButtons}>
+                <TouchableOpacity
+                  style={[
+                    styles.pitchButton,
+                    (!hasSelection || isPlaying) && styles.buttonDisabled,
+                  ]}
+                  onPress={handleUp}
+                  disabled={!hasSelection || isPlaying}
+                  accessibilityLabel="Pitch up"
+                >
+                  <Feather
+                    name="chevron-up"
+                    size={22}
+                    color={
+                      hasSelection && !isPlaying
+                        ? colors.textPrimary
+                        : colors.textSecondary
+                    }
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.pitchButton,
+                    (!hasSelection || isPlaying) && styles.buttonDisabled,
+                  ]}
+                  onPress={handleDown}
+                  disabled={!hasSelection || isPlaying}
+                  accessibilityLabel="Pitch down"
+                >
+                  <Feather
+                    name="chevron-down"
+                    size={22}
+                    color={
+                      hasSelection && !isPlaying
+                        ? colors.textPrimary
+                        : colors.textSecondary
+                    }
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* Compact measure controls with overflow menu */}
+              <CompactControls
+                currentMeasure={composerState.cursor.measureIndex + 1}
+                totalMeasures={composerState.score.measures.length}
+                validation={measureValidation}
+                onDelete={handleDelete}
+                onAddMeasure={handleAddMeasure}
+                onDeleteMeasure={handleDeleteMeasure}
+                onDeleteLastMeasure={handleDeleteLastMeasure}
+                onFillWithRests={handleFillWithRests}
+                hasSelection={hasSelection}
+                canDeleteMeasure={canDeleteMeasure}
+                disabled={isPlaying}
+                testID="composer-controls"
+              />
+
+              {/* Nav arrows for precise control */}
+              <View style={styles.navButtons}>
+                <TouchableOpacity
+                  style={[
+                    styles.navButton,
+                    (!canGoLeft || isPlaying) && styles.buttonDisabled,
+                  ]}
+                  onPress={handleLeft}
+                  disabled={!canGoLeft || isPlaying}
+                  accessibilityLabel="Previous"
+                >
+                  <Feather
+                    name="chevron-left"
+                    size={22}
+                    color={
+                      canGoLeft && !isPlaying
+                        ? colors.textPrimary
+                        : colors.textSecondary
+                    }
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.navButton,
+                    (!canGoRight || isPlaying) && styles.buttonDisabled,
+                  ]}
+                  onPress={handleRight}
+                  disabled={!canGoRight || isPlaying}
+                  accessibilityLabel="Next"
+                >
+                  <Feather
+                    name="chevron-right"
+                    size={22}
+                    color={
+                      canGoRight && !isPlaying
+                        ? colors.textPrimary
+                        : colors.textSecondary
+                    }
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
+        </ComposerStateProvider>
 
-          {/* Playback Panel */}
-          <View
+        {/* Playback Panel */}
+        <View
+          style={[
+            styles.playbackPanel,
+            { paddingVertical: spacing.sm + rowExtraPadding / 2 },
+          ]}
+        >
+          <TouchableOpacity
             style={[
-              styles.playbackPanel,
-              { paddingVertical: spacing.sm + rowExtraPadding / 2 },
+              styles.transportButton,
+              playback.state === "stopped" && styles.buttonDisabled,
             ]}
+            onPress={handleStop}
+            disabled={playback.state === "stopped"}
+            accessibilityLabel="Stop"
+            accessibilityRole="button"
           >
-            <TouchableOpacity
-              style={[
-                styles.transportButton,
-                playback.state === "stopped" && styles.buttonDisabled,
-              ]}
-              onPress={handleStop}
-              disabled={playback.state === "stopped"}
-              accessibilityLabel="Stop"
-              accessibilityRole="button"
-            >
-              <Feather
-                name="square"
-                size={18}
-                color={
-                  playback.state !== "stopped"
-                    ? colors.error
-                    : colors.textSecondary
-                }
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.transportButton,
-                playback.state !== "playing" && styles.buttonDisabled,
-              ]}
-              onPress={handlePause}
-              disabled={playback.state !== "playing"}
-              accessibilityLabel="Pause"
-              accessibilityRole="button"
-            >
-              <Feather
-                name="pause"
-                size={18}
-                color={
-                  playback.state === "playing"
-                    ? colors.textPrimary
-                    : colors.textSecondary
-                }
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.transportButton, styles.playTransportButton]}
-              onPress={handlePlay}
-              disabled={isPlaying}
-              accessibilityLabel="Play"
-              accessibilityRole="button"
-            >
-              <Feather
-                name="play"
-                size={20}
-                color={isPlaying ? colors.textSecondary : colors.white}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.transportButton,
-                playback.repeat && styles.repeatActive,
-              ]}
-              onPress={playbackActions.toggleRepeat}
-              accessibilityLabel={playback.repeat ? "Repeat on" : "Repeat off"}
-              accessibilityRole="button"
-            >
-              <Feather
-                name="repeat"
-                size={18}
-                color={playback.repeat ? colors.primary : colors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
+            <Feather
+              name="square"
+              size={18}
+              color={
+                playback.state !== "stopped"
+                  ? colors.error
+                  : colors.textSecondary
+              }
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.transportButton,
+              playback.state !== "playing" && styles.buttonDisabled,
+            ]}
+            onPress={handlePause}
+            disabled={playback.state !== "playing"}
+            accessibilityLabel="Pause"
+            accessibilityRole="button"
+          >
+            <Feather
+              name="pause"
+              size={18}
+              color={
+                playback.state === "playing"
+                  ? colors.textPrimary
+                  : colors.textSecondary
+              }
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.transportButton, styles.playTransportButton]}
+            onPress={handlePlay}
+            disabled={isPlaying}
+            accessibilityLabel="Play"
+            accessibilityRole="button"
+          >
+            <Feather
+              name="play"
+              size={20}
+              color={isPlaying ? colors.textSecondary : colors.white}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.transportButton,
+              playback.repeat && styles.repeatActive,
+            ]}
+            onPress={playbackActions.toggleRepeat}
+            accessibilityLabel={playback.repeat ? "Repeat on" : "Repeat off"}
+            accessibilityRole="button"
+          >
+            <Feather
+              name="repeat"
+              size={18}
+              color={playback.repeat ? colors.primary : colors.textSecondary}
+            />
+          </TouchableOpacity>
         </View>
 
         {/* Action Buttons - pinned to bottom with fixed 7px below */}
@@ -1060,198 +1074,4 @@ export function ComposerScreen(props: ComposerScreenProps): React.ReactElement {
   );
 }
 
-// =============================================================================
-// Styles
-// =============================================================================
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    flex: 1,
-  },
-  controlsContainer: {
-    // No flex - stacks components at their natural heights
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.background,
-  },
-  // Viewport
-  viewportWrapper: {
-    minHeight: 120,
-    position: "relative",
-  },
-  buttonDisabled: {
-    opacity: 0.4,
-  },
-  // Compact controls row
-  compactControlsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 4,
-    paddingHorizontal: spacing.sm,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  pitchButtons: {
-    flexDirection: "row",
-    gap: 4,
-  },
-  pitchButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.background,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  navButtons: {
-    flexDirection: "row",
-    gap: 4,
-  },
-  navButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.background,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  // Playback panel
-  playbackPanel: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    gap: 12,
-  },
-  transportButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.background,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  playTransportButton: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  repeatActive: {
-    backgroundColor: colors.primaryLight,
-    borderColor: colors.primary,
-  },
-  // Action buttons - pinned to bottom
-  actionRow: {
-    flexDirection: "row",
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  saveButton: {
-    flex: 1,
-    marginRight: spacing.sm,
-    minHeight: 44,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  saveButtonText: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  practiceButton: {
-    flex: 1,
-    marginLeft: spacing.sm,
-    minHeight: 44,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.primary,
-    borderRadius: 6,
-  },
-  practiceButtonDisabled: {
-    backgroundColor: colors.textSecondary,
-    opacity: 0.5,
-  },
-  practiceButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  saveButtonDisabled: {
-    borderColor: colors.textSecondary,
-    opacity: 0.5,
-  },
-  saveButtonTextDisabled: {
-    color: colors.textSecondary,
-  },
-  // Clef change modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: spacing.lg,
-    width: "85%",
-    maxWidth: 320,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-    textAlign: "center",
-  },
-  modalMessage: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: spacing.md,
-    textAlign: "center",
-  },
-  modalOption: {
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  modalOptionText: {
-    fontSize: 16,
-    color: colors.primary,
-    textAlign: "center",
-  },
-  modalCancel: {
-    paddingVertical: spacing.md,
-    marginTop: spacing.sm,
-  },
-  modalCancelText: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: "center",
-  },
-});
+// Note: Styles have been extracted to composerScreenStyles.ts

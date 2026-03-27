@@ -26,6 +26,7 @@ import {
   ScrollView,
 } from "react-native";
 import type { ExerciseProps } from "./shared";
+import { useQuizExerciseState, QuizQuestion } from "./shared";
 import { devWarn } from "../../../../utils/devLogger";
 
 // For notation display
@@ -49,7 +50,7 @@ const PHASES = {
 };
 
 // Quiz questions - fixed order for this module
-const QUIZ_QUESTIONS = [
+const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: "valid_measure",
     type: "yes_no",
@@ -191,15 +192,24 @@ export default function TimeSignature44Exercise({
   onProgress,
   clef = "treble",
 }: ExerciseProps) {
+  // Phase state (for intro phases, separate from quiz)
   const [phase, setPhase] = useState(PHASES.INTRO_1);
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [correctCount, setCorrectCount] = useState(0);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [quizPassed, setQuizPassed] = useState(false);
 
-  // Current question data
-  const question = QUIZ_QUESTIONS[currentQuestion];
+  // Quiz state via shared hook
+  const {
+    quiz,
+    currentQuestion,
+    totalQuestions,
+    handleAnswer: handleQuizAnswer,
+    resetQuiz,
+    isCorrectAnswer,
+  } = useQuizExerciseState({
+    questions: QUIZ_QUESTIONS,
+    onProgress,
+    onQuizComplete: (passed) => {
+      setPhase(PHASES.RESULT);
+    },
+  });
 
   // Generate MusicXML examples
   const wholeNoteExample = useMemo(
@@ -212,66 +222,21 @@ export default function TimeSignature44Exercise({
     [clef],
   );
 
-  // Handle answer selection
-  const handleAnswer = useCallback(
-    (answer) => {
-      if (showFeedback) return;
-      setSelectedAnswer(answer);
-      setShowFeedback(true);
-
-      const isCorrect =
-        answer === question.correctAnswer ||
-        (typeof question.correctAnswer === "number" &&
-          answer === question.correctAnswer);
-
-      if (isCorrect) {
-        setCorrectCount((prev) => prev + 1);
-      }
-
-      // After a delay, move to next question or result
-      setTimeout(() => {
-        setShowFeedback(false);
-        setSelectedAnswer(null);
-
-        if (currentQuestion < QUIZ_QUESTIONS.length - 1) {
-          // More questions
-          setCurrentQuestion((prev) => prev + 1);
-          onProgress?.({
-            current: currentQuestion + 1,
-            total: QUIZ_QUESTIONS.length,
-            correct: correctCount + (isCorrect ? 1 : 0),
-          });
-        } else {
-          // Quiz complete
-          const finalCorrect = correctCount + (isCorrect ? 1 : 0);
-          const passed = finalCorrect === QUIZ_QUESTIONS.length;
-          setQuizPassed(passed);
-          setPhase(PHASES.RESULT);
-        }
-      }, 2000);
-    },
-    [showFeedback, question, currentQuestion, correctCount, onProgress],
-  );
-
-  // Handle restart
+  // Handle restart - reset quiz and go back to intro
   const handleRestart = useCallback(() => {
-    setCurrentQuestion(0);
-    setSelectedAnswer(null);
-    setCorrectCount(0);
-    setShowFeedback(false);
-    setQuizPassed(false);
+    resetQuiz();
     setPhase(PHASES.INTRO_1);
-  }, []);
+  }, [resetQuiz]);
 
   // Handle completion
   const handleComplete = useCallback(() => {
     onComplete?.({
       success: true,
-      streak: QUIZ_QUESTIONS.length,
-      totalAttempts: QUIZ_QUESTIONS.length,
-      correctCount: QUIZ_QUESTIONS.length,
+      streak: totalQuestions,
+      totalAttempts: totalQuestions,
+      correctCount: totalQuestions,
     });
-  }, [onComplete]);
+  }, [onComplete, totalQuestions]);
 
   // ============================================================
   // INTRO PHASE 1 - What 4/4 Means
@@ -488,11 +453,9 @@ export default function TimeSignature44Exercise({
   // ============================================================
   // QUIZ PHASE
   // ============================================================
-  if (phase === PHASES.QUIZ) {
+  if (phase === PHASES.QUIZ && currentQuestion) {
     const isCorrect =
-      selectedAnswer === question.correctAnswer ||
-      (typeof question.correctAnswer === "number" &&
-        selectedAnswer === question.correctAnswer);
+      quiz.selectedAnswer !== null && isCorrectAnswer(quiz.selectedAnswer);
 
     return (
       <View style={styles.container}>
@@ -503,7 +466,7 @@ export default function TimeSignature44Exercise({
           {/* Progress indicator */}
           <View style={styles.progressBar}>
             <Text style={styles.progressText}>
-              Question {currentQuestion + 1} of {QUIZ_QUESTIONS.length}
+              Question {quiz.currentIndex + 1} of {totalQuestions}
             </Text>
             <View style={styles.progressDots}>
               {QUIZ_QUESTIONS.map((_, i) => (
@@ -511,7 +474,7 @@ export default function TimeSignature44Exercise({
                   key={i}
                   style={[
                     styles.progressDot,
-                    i <= currentQuestion && styles.progressDotActive,
+                    i <= quiz.currentIndex && styles.progressDotActive,
                   ]}
                 />
               ))}
@@ -519,7 +482,7 @@ export default function TimeSignature44Exercise({
           </View>
 
           {/* Show notation for the "two whole notes" question */}
-          {question.id === "valid_measure" &&
+          {currentQuestion.id === "valid_measure" &&
             NotationDisplay &&
             twoWholeNotesExample && (
               <View style={styles.quizNotationWrapper}>
@@ -533,32 +496,33 @@ export default function TimeSignature44Exercise({
             )}
 
           {/* Show 4/4 for other questions */}
-          {question.id !== "valid_measure" && question.id !== "common_time" && (
-            <View style={styles.timeSignatureDisplay}>
-              <Text style={styles.timeSignatureTop}>4</Text>
-              <View style={styles.timeSignatureLine} />
-              <Text style={styles.timeSignatureBottom}>4</Text>
-            </View>
-          )}
+          {currentQuestion.id !== "valid_measure" &&
+            currentQuestion.id !== "common_time" && (
+              <View style={styles.timeSignatureDisplay}>
+                <Text style={styles.timeSignatureTop}>4</Text>
+                <View style={styles.timeSignatureLine} />
+                <Text style={styles.timeSignatureBottom}>4</Text>
+              </View>
+            )}
 
           {/* Hint for valid_measure question */}
-          {question.hint && (
-            <Text style={styles.hintText}>{question.hint}</Text>
+          {currentQuestion.hint && (
+            <Text style={styles.hintText}>{currentQuestion.hint}</Text>
           )}
 
           {/* Question */}
-          <Text style={styles.questionText}>{question.question}</Text>
+          <Text style={styles.questionText}>{currentQuestion.question}</Text>
 
           {/* Answer options */}
           <View style={styles.optionsContainer}>
-            {question.options.map((option, index) => {
-              const isSelected = selectedAnswer === option;
-              const isCorrectOption = option === question.correctAnswer;
+            {currentQuestion.options.map((option, index) => {
+              const isSelected = quiz.selectedAnswer === option;
+              const isCorrectOption = option === currentQuestion.correctAnswer;
 
               let optionStyle = styles.optionButton;
               let textStyle = styles.optionText;
 
-              if (showFeedback) {
+              if (quiz.showFeedback) {
                 if (isCorrectOption) {
                   optionStyle = [styles.optionButton, styles.optionCorrect];
                   textStyle = [styles.optionText, styles.optionTextCorrect];
@@ -572,7 +536,7 @@ export default function TimeSignature44Exercise({
 
               // Special styling for "C" option
               const displayOption =
-                question.id === "common_time" && option === "C"
+                currentQuestion.id === "common_time" && option === "C"
                   ? option
                   : option;
 
@@ -582,8 +546,8 @@ export default function TimeSignature44Exercise({
                   accessibilityLabel={`Select ${option}`}
                   accessibilityRole="button"
                   style={optionStyle}
-                  onPress={() => handleAnswer(option)}
-                  disabled={showFeedback}
+                  onPress={() => handleQuizAnswer(option)}
+                  disabled={quiz.showFeedback}
                 >
                   <Text style={textStyle}>{displayOption}</Text>
                 </TouchableOpacity>
@@ -592,7 +556,7 @@ export default function TimeSignature44Exercise({
           </View>
 
           {/* Feedback */}
-          {showFeedback && (
+          {quiz.showFeedback && (
             <View style={styles.feedbackContainer}>
               <Text
                 style={
@@ -602,7 +566,7 @@ export default function TimeSignature44Exercise({
                 {isCorrect ? "✓ Correct!" : "✗ Not quite"}
               </Text>
               <Text style={styles.feedbackExplanation}>
-                {question.explanation}
+                {currentQuestion.explanation}
               </Text>
             </View>
           )}
@@ -615,14 +579,14 @@ export default function TimeSignature44Exercise({
   // RESULT PHASE
   // ============================================================
   if (phase === PHASES.RESULT) {
-    if (quizPassed) {
+    if (quiz.passed) {
       return (
         <View style={styles.container}>
           <View style={styles.resultContainer}>
             <Text style={styles.resultEmoji}>🎉</Text>
             <Text style={styles.resultTitle}>Perfect!</Text>
             <Text style={styles.resultSubtitle}>
-              You got all {QUIZ_QUESTIONS.length} questions correct!
+              You got all {totalQuestions} questions correct!
             </Text>
             <Text style={styles.resultDetail}>
               You now understand 4/4 time!
@@ -648,7 +612,7 @@ export default function TimeSignature44Exercise({
             <Text style={styles.resultEmoji}>📚</Text>
             <Text style={styles.resultTitle}>Keep Learning</Text>
             <Text style={styles.resultSubtitle}>
-              You got {correctCount} out of {QUIZ_QUESTIONS.length} correct.
+              You got {quiz.score} out of {totalQuestions} correct.
             </Text>
             <Text style={styles.resultDetail}>
               Review the material and try again!

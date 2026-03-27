@@ -284,6 +284,36 @@ describe("useMaterials", () => {
 
       expect(detailedMaterial).toEqual(mockMaterials[0]);
     });
+
+    it("returns original material when response is not ok", async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ materials: mockMaterials }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 404,
+          json: () => Promise.resolve({ error: "Not found" }),
+        });
+
+      const { result } = renderHook(() => useMaterials());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let detailedMaterial: any;
+      await act(async () => {
+        detailedMaterial = await result.current.fetchMaterialDetail(
+          mockMaterials[0],
+        );
+      });
+
+      // Should return original material without analysis
+      expect(detailedMaterial).toEqual(mockMaterials[0]);
+      expect(detailedMaterial.analysis).toBeUndefined();
+    });
   });
 
   // ==========================================================================

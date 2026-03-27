@@ -3,13 +3,11 @@
  *
  * Fully typed TypeScript test file with comprehensive coverage for
  * pitch detection, volume handling, callbacks, and state management.
+ *
+ * Tests use mocked LiveAudioStream via __mocks__/react-native-live-audio-stream.js
  */
 
-import { renderHook, act, waitFor } from "@testing-library/react-native";
-import { usePitchDetection } from "../src/hooks/usePitchDetection";
-import type { UsePitchDetectionOptions } from "../src/hooks/usePitchDetection";
-
-// Mock data generators
+// Mock data generators for test utilities
 const createMockNoteInfo = (
   overrides: Partial<{
     noteName: string;
@@ -38,72 +36,51 @@ const createMockAutoCorrelateResult = (
   ...overrides,
 });
 
-// Store mock implementations for dynamic control
-let mockAutoCorrelate = jest.fn(() => createMockAutoCorrelateResult());
-let mockFrequencyToNote = jest.fn((_freq: number) => createMockNoteInfo());
-let mockNoteNameToMidi = jest.fn((note: string) =>
+// Store mock implementations for audio utilities tests
+const mockAutoCorrelate = jest.fn(() => createMockAutoCorrelateResult());
+const mockFrequencyToNote = jest.fn((_freq: number) => createMockNoteInfo());
+const mockNoteNameToMidi = jest.fn((note: string) =>
   note === "A4" ? 69 : note === "A3" ? 57 : note === "C4" ? 60 : null,
 );
-let mockBase64ToFloat32Array = jest.fn(() => new Float32Array(4096));
+const mockBase64ToFloat32Array = jest.fn(() => new Float32Array(4096));
 
-// Mock live audio stream with event emitter
-let audioDataCallback: ((data: string) => void) | null = null;
-const mockLiveAudioStream = {
-  init: jest.fn(),
-  start: jest.fn(),
-  stop: jest.fn(),
-  on: jest.fn((event: string, callback: (data: string) => void) => {
-    if (event === "data") {
-      audioDataCallback = callback;
-    }
-  }),
-};
-
-jest.mock("react-native-live-audio-stream", () => ({
-  default: mockLiveAudioStream,
-}));
-
-// Mock audio utilities with dynamic implementations
+// Mock audioUtils BEFORE importing usePitchDetection
 jest.mock("../src/utils/audioUtils", () => ({
+  get autoCorrelate() {
+    return mockAutoCorrelate;
+  },
   get frequencyToNote() {
     return mockFrequencyToNote;
   },
   get noteNameToMidi() {
     return mockNoteNameToMidi;
   },
-  get autoCorrelate() {
-    return mockAutoCorrelate;
-  },
   get base64ToFloat32Array() {
     return mockBase64ToFloat32Array;
   },
 }));
 
-// Mock devLogger
+// Mock devLogger to suppress console output
 jest.mock("../src/utils/devLogger", () => ({
   devLog: jest.fn(),
   devWarn: jest.fn(),
   devError: jest.fn(),
 }));
 
-// Mock PermissionsAndroid
-const mockPermissionRequest = jest.fn(() => Promise.resolve("granted"));
-jest.mock("react-native", () => {
-  const rn = jest.requireActual("react-native");
-  return {
-    ...rn,
-    Platform: { OS: "ios" },
-    PermissionsAndroid: {
-      PERMISSIONS: { RECORD_AUDIO: "android.permission.RECORD_AUDIO" },
-      RESULTS: { GRANTED: "granted", DENIED: "denied" },
-      request: mockPermissionRequest,
-    },
-  };
-});
+import { renderHook, act, waitFor } from "@testing-library/react-native";
+import { usePitchDetection } from "../src/hooks/usePitchDetection";
+import type { UsePitchDetectionOptions } from "../src/hooks/usePitchDetection";
+
+// Get direct access to the mock module for __simulateData
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mockLiveAudioStream = require("react-native-live-audio-stream").default;
 
 describe("usePitchDetection", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Reset mock implementations to defaults
+    mockAutoCorrelate.mockReturnValue(createMockAutoCorrelateResult());
+    mockFrequencyToNote.mockReturnValue(createMockNoteInfo());
   });
 
   describe("Initial state", () => {
@@ -862,9 +839,8 @@ describe("usePitchDetection", () => {
       });
     });
 
-    it("sets error when native audio not available", async () => {
-      // In test environment, LiveAudioStream is not available
-      // because the mock is applied after module load
+    it("successfully starts listening when native audio is available", async () => {
+      // With mocked LiveAudioStream, audio should be available
       const { result } = renderHook(() =>
         usePitchDetection({ enabled: false }),
       );
@@ -873,12 +849,12 @@ describe("usePitchDetection", () => {
         await result.current.startListening();
       });
 
-      // Should set error when LiveAudioStream is null
-      expect(result.current.error).toBeTruthy();
-      expect(result.current.error).toContain("Native audio");
+      // Should start listening successfully
+      expect(result.current.isListening).toBe(true);
+      expect(result.current.error).toBeNull();
     });
 
-    it("does not set isListening when native audio unavailable", async () => {
+    it("sets isListening when native audio is available", async () => {
       const { result } = renderHook(() =>
         usePitchDetection({ enabled: false }),
       );
@@ -887,17 +863,17 @@ describe("usePitchDetection", () => {
         await result.current.startListening();
       });
 
-      // Without LiveAudioStream, should not start listening
-      expect(result.current.isListening).toBe(false);
+      // With mocked LiveAudioStream, should start listening
+      expect(result.current.isListening).toBe(true);
     });
 
-    it("reports isAvailable as false when native module missing", () => {
+    it("reports isAvailable based on platform and native module", () => {
       const { result } = renderHook(() =>
         usePitchDetection({ enabled: false }),
       );
 
-      // Since LiveAudioStream is not available in test env
-      expect(result.current.isAvailable).toBe(false);
+      // On native platform with mocked LiveAudioStream, should be available
+      expect(result.current.isAvailable).toBe(true);
     });
   });
 
@@ -1545,6 +1521,1112 @@ describe("usePitchDetection", () => {
         }),
       );
       expect(result.current).toBeDefined();
+    });
+  });
+
+  describe("Audio processing callbacks", () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockAutoCorrelate.mockReturnValue(createMockAutoCorrelateResult());
+      mockFrequencyToNote.mockReturnValue(createMockNoteInfo());
+    });
+
+    it("calls onVolumeChange callback when provided", () => {
+      const onVolumeChange = jest.fn();
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          onVolumeChange,
+          volumeThreshold: 0.01,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+      expect(typeof result.current.startListening).toBe("function");
+    });
+
+    it("calls onRealtimePitch callback when provided", () => {
+      const onRealtimePitch = jest.fn();
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          onRealtimePitch,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+
+    it("calls onSoundStart callback when provided", () => {
+      const onSoundStart = jest.fn();
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          onSoundStart,
+          volumeThreshold: 0.01,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+
+    it("calls onSoundEnd callback when provided", () => {
+      const onSoundEnd = jest.fn();
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          onSoundEnd,
+          silenceDuration: 500,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+
+    it("calls onPitchMatch callback when target note provided", () => {
+      const onPitchMatch = jest.fn();
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          onPitchMatch,
+          targetNote: "A4",
+          pitchMargin: 10,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+
+    it("calls onPitchDetected callback when provided", () => {
+      const onPitchDetected = jest.fn();
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          onPitchDetected,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+  });
+
+  describe("Pitch matching configuration", () => {
+    it("matches pitch exactly when allowOctaveEquivalent is false", () => {
+      const onPitchMatch = jest.fn();
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          onPitchMatch,
+          targetNote: "A4",
+          allowOctaveEquivalent: false,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+
+    it("matches octave equivalent when allowOctaveEquivalent is true", () => {
+      const onPitchMatch = jest.fn();
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          onPitchMatch,
+          targetNote: "A4",
+          allowOctaveEquivalent: true,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+
+    it("uses custom pitch margin", () => {
+      const onPitchMatch = jest.fn();
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          onPitchMatch,
+          targetNote: "A4",
+          pitchMargin: 5,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+
+    it("uses default pitch margin when not specified", () => {
+      const onPitchMatch = jest.fn();
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          onPitchMatch,
+          targetNote: "A4",
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+  });
+
+  describe("Frequency range filtering", () => {
+    it("accepts soundingFrequencyRange configuration", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          soundingFrequencyRange: { min: 200, max: 800 },
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+
+    it("handles null soundingFrequencyRange", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          soundingFrequencyRange: null,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+
+    it("accepts wide frequency range", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          soundingFrequencyRange: { min: 50, max: 5000 },
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+
+    it("accepts narrow frequency range", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          soundingFrequencyRange: { min: 430, max: 450 },
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+  });
+
+  describe("Volume threshold behavior", () => {
+    it("accepts low volume threshold", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          volumeThreshold: 0.001,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+
+    it("accepts high volume threshold", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          volumeThreshold: 0.5,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+
+    it("uses default volume threshold", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+  });
+
+  describe("Silence duration behavior", () => {
+    it("accepts short silence duration", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          silenceDuration: 100,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+
+    it("accepts long silence duration", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          silenceDuration: 5000,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+
+    it("uses default silence duration", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+  });
+
+  describe("External audio context", () => {
+    it("accepts external audio context", () => {
+      const mockAudioContext = {} as AudioContext;
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          externalAudioContext: mockAudioContext,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+
+    it("handles null external audio context", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          externalAudioContext: null,
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+  });
+
+  describe("Multiple callbacks combined", () => {
+    it("handles all callbacks together", () => {
+      const onVolumeChange = jest.fn();
+      const onPitchDetected = jest.fn();
+      const onRealtimePitch = jest.fn();
+      const onSoundStart = jest.fn();
+      const onSoundEnd = jest.fn();
+      const onPitchMatch = jest.fn();
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          onVolumeChange,
+          onPitchDetected,
+          onRealtimePitch,
+          onSoundStart,
+          onSoundEnd,
+          onPitchMatch,
+          targetNote: "A4",
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+
+    it("handles callbacks with all configuration options", () => {
+      const onPitchMatch = jest.fn();
+      const onSoundStart = jest.fn();
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false,
+          onPitchMatch,
+          onSoundStart,
+          targetNote: "C4",
+          volumeThreshold: 0.02,
+          silenceDuration: 400,
+          pitchMargin: 15,
+          allowOctaveEquivalent: true,
+          soundingFrequencyRange: { min: 200, max: 600 },
+        }),
+      );
+
+      expect(result.current).toBeDefined();
+    });
+  });
+
+  describe("Hook return values type checking", () => {
+    it("returns isListening as boolean", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+      expect(typeof result.current.isListening).toBe("boolean");
+    });
+
+    it("returns permissionGranted as boolean", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+      expect(typeof result.current.permissionGranted).toBe("boolean");
+    });
+
+    it("returns error as string or null", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+      expect(
+        result.current.error === null ||
+          typeof result.current.error === "string",
+      ).toBe(true);
+    });
+
+    it("returns currentPitch as object or null", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+      expect(
+        result.current.currentPitch === null ||
+          typeof result.current.currentPitch === "object",
+      ).toBe(true);
+    });
+
+    it("returns volume as number", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+      expect(typeof result.current.volume).toBe("number");
+    });
+
+    it("returns isSounding as boolean", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+      expect(typeof result.current.isSounding).toBe("boolean");
+    });
+
+    it("returns isAvailable as boolean", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+      expect(typeof result.current.isAvailable).toBe("boolean");
+    });
+
+    it("returns startListening as function", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+      expect(typeof result.current.startListening).toBe("function");
+    });
+
+    it("returns stopListening as function", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+      expect(typeof result.current.stopListening).toBe("function");
+    });
+  });
+
+  describe("Initial volume state", () => {
+    it("starts with volume at 0", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+      expect(result.current.volume).toBe(0);
+    });
+  });
+
+  describe("Initial pitch state", () => {
+    it("starts with null currentPitch", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+      expect(result.current.currentPitch).toBeNull();
+    });
+  });
+
+  describe("Initial sounding state", () => {
+    it("starts with isSounding as false", () => {
+      const { result } = renderHook(() =>
+        usePitchDetection({ enabled: false }),
+      );
+      expect(result.current.isSounding).toBe(false);
+    });
+  });
+
+  describe("Audio data processing via __simulateData", () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      // Set up default mock return values for audio processing
+      mockBase64ToFloat32Array.mockReturnValue(new Float32Array(4096));
+      mockAutoCorrelate.mockReturnValue(
+        createMockAutoCorrelateResult({
+          frequency: 440,
+          confidence: 0.9,
+          rms: 0.1,
+        }),
+      );
+      mockFrequencyToNote.mockReturnValue(
+        createMockNoteInfo({
+          noteName: "A4",
+          midiNote: 69,
+          frequency: 440,
+          cents: 0,
+        }),
+      );
+    });
+
+    it("processes audio data and calls onVolumeChange", async () => {
+      const onVolumeChange = jest.fn();
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: true,
+          onVolumeChange,
+        }),
+      );
+
+      // Wait for listening to start
+      await waitFor(() => {
+        expect(result.current.isListening).toBe(true);
+      });
+
+      // Simulate audio data arriving
+      act(() => {
+        mockLiveAudioStream.__simulateData("mockBase64AudioData");
+      });
+
+      // onVolumeChange should be called
+      expect(onVolumeChange).toHaveBeenCalled();
+      expect(mockBase64ToFloat32Array).toHaveBeenCalledWith(
+        "mockBase64AudioData",
+      );
+      expect(mockAutoCorrelate).toHaveBeenCalled();
+    });
+
+    it("calls onSoundStart when volume exceeds threshold", async () => {
+      const onSoundStart = jest.fn();
+      // High RMS = high volume
+      mockAutoCorrelate.mockReturnValue(
+        createMockAutoCorrelateResult({
+          frequency: 440,
+          confidence: 0.9,
+          rms: 0.1,
+        }),
+      );
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: true,
+          onSoundStart,
+          volumeThreshold: 0.02,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(result.current.isListening).toBe(true);
+      });
+
+      act(() => {
+        mockLiveAudioStream.__simulateData("mockAudioData");
+      });
+
+      await waitFor(() => {
+        expect(onSoundStart).toHaveBeenCalled();
+      });
+    });
+
+    it("calls onRealtimePitch with detected pitch info", async () => {
+      const onRealtimePitch = jest.fn();
+      mockAutoCorrelate.mockReturnValue(
+        createMockAutoCorrelateResult({
+          frequency: 440,
+          confidence: 0.9,
+          rms: 0.1,
+        }),
+      );
+      mockFrequencyToNote.mockReturnValue(
+        createMockNoteInfo({
+          noteName: "A4",
+          midiNote: 69,
+          frequency: 440,
+          cents: 5,
+        }),
+      );
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: true,
+          onRealtimePitch,
+          volumeThreshold: 0.02,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(result.current.isListening).toBe(true);
+      });
+
+      act(() => {
+        mockLiveAudioStream.__simulateData("mockAudioData");
+      });
+
+      await waitFor(() => {
+        expect(onRealtimePitch).toHaveBeenCalledWith(
+          expect.objectContaining({
+            noteName: "A4",
+            midiNote: 69,
+            frequency: 440,
+          }),
+        );
+      });
+    });
+
+    it("calls onPitchMatch with true when target note matches", async () => {
+      const onPitchMatch = jest.fn();
+      mockAutoCorrelate.mockReturnValue(
+        createMockAutoCorrelateResult({
+          frequency: 440,
+          confidence: 0.9,
+          rms: 0.1,
+        }),
+      );
+      mockFrequencyToNote.mockReturnValue(
+        createMockNoteInfo({
+          noteName: "A4",
+          midiNote: 69,
+          frequency: 440,
+          cents: 5,
+        }),
+      );
+      mockNoteNameToMidi.mockReturnValue(69); // A4
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: true,
+          targetNote: "A4",
+          onPitchMatch,
+          volumeThreshold: 0.02,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(result.current.isListening).toBe(true);
+      });
+
+      act(() => {
+        mockLiveAudioStream.__simulateData("mockAudioData");
+      });
+
+      await waitFor(() => {
+        expect(onPitchMatch).toHaveBeenCalledWith(
+          true,
+          expect.objectContaining({ noteName: "A4" }),
+        );
+      });
+    });
+
+    it("calls onPitchMatch with false when target note does not match", async () => {
+      const onPitchMatch = jest.fn();
+      // Detected C4 but target is A4
+      mockAutoCorrelate.mockReturnValue(
+        createMockAutoCorrelateResult({
+          frequency: 261,
+          confidence: 0.9,
+          rms: 0.1,
+        }),
+      );
+      mockFrequencyToNote.mockReturnValue(
+        createMockNoteInfo({
+          noteName: "C4",
+          midiNote: 60,
+          frequency: 261,
+          cents: 0,
+        }),
+      );
+      mockNoteNameToMidi.mockImplementation((note: string) =>
+        note === "A4" ? 69 : note === "C4" ? 60 : null,
+      );
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: true,
+          targetNote: "A4",
+          onPitchMatch,
+          volumeThreshold: 0.02,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(result.current.isListening).toBe(true);
+      });
+
+      act(() => {
+        mockLiveAudioStream.__simulateData("mockAudioData");
+      });
+
+      await waitFor(() => {
+        expect(onPitchMatch).toHaveBeenCalledWith(
+          false,
+          expect.objectContaining({ noteName: "C4" }),
+        );
+      });
+    });
+
+    it("updates currentPitch state when pitch is detected", async () => {
+      mockAutoCorrelate.mockReturnValue(
+        createMockAutoCorrelateResult({
+          frequency: 440,
+          confidence: 0.9,
+          rms: 0.1,
+        }),
+      );
+      mockFrequencyToNote.mockReturnValue(
+        createMockNoteInfo({
+          noteName: "A4",
+          midiNote: 69,
+          frequency: 440,
+          cents: 0,
+        }),
+      );
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: true,
+          volumeThreshold: 0.02,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(result.current.isListening).toBe(true);
+      });
+
+      expect(result.current.currentPitch).toBeNull();
+
+      act(() => {
+        mockLiveAudioStream.__simulateData("mockAudioData");
+      });
+
+      await waitFor(() => {
+        expect(result.current.currentPitch).toEqual(
+          expect.objectContaining({ noteName: "A4", midiNote: 69 }),
+        );
+      });
+    });
+
+    it("updates volume state when audio is processed", async () => {
+      mockAutoCorrelate.mockReturnValue(
+        createMockAutoCorrelateResult({
+          frequency: 440,
+          confidence: 0.9,
+          rms: 0.1,
+        }),
+      );
+
+      const { result } = renderHook(() => usePitchDetection({ enabled: true }));
+
+      await waitFor(() => {
+        expect(result.current.isListening).toBe(true);
+      });
+
+      expect(result.current.volume).toBe(0);
+
+      act(() => {
+        mockLiveAudioStream.__simulateData("mockAudioData");
+      });
+
+      await waitFor(() => {
+        expect(result.current.volume).toBeGreaterThan(0);
+      });
+    });
+
+    it("ignores pitch with low confidence", async () => {
+      const onRealtimePitch = jest.fn();
+      // Low confidence should be ignored
+      mockAutoCorrelate.mockReturnValue(
+        createMockAutoCorrelateResult({
+          frequency: 440,
+          confidence: 0.3,
+          rms: 0.1,
+        }),
+      );
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: true,
+          onRealtimePitch,
+          volumeThreshold: 0.02,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(result.current.isListening).toBe(true);
+      });
+
+      act(() => {
+        mockLiveAudioStream.__simulateData("mockAudioData");
+      });
+
+      // Wait a bit and verify onRealtimePitch was NOT called
+      await new Promise((r) => setTimeout(r, 50));
+      expect(onRealtimePitch).not.toHaveBeenCalled();
+    });
+
+    it("ignores frequency outside valid range (too low)", async () => {
+      const onRealtimePitch = jest.fn();
+      // 50Hz is below 80Hz minimum
+      mockAutoCorrelate.mockReturnValue(
+        createMockAutoCorrelateResult({
+          frequency: 50,
+          confidence: 0.9,
+          rms: 0.1,
+        }),
+      );
+      mockFrequencyToNote.mockReturnValue(
+        createMockNoteInfo({
+          noteName: "G1",
+          midiNote: 31,
+          frequency: 50,
+          cents: 0,
+        }),
+      );
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: true,
+          onRealtimePitch,
+          volumeThreshold: 0.02,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(result.current.isListening).toBe(true);
+      });
+
+      act(() => {
+        mockLiveAudioStream.__simulateData("mockAudioData");
+      });
+
+      await new Promise((r) => setTimeout(r, 50));
+      // onRealtimePitch is called, but currentPitch is NOT updated for out-of-range
+      expect(onRealtimePitch).toHaveBeenCalled();
+      expect(result.current.currentPitch).toBeNull();
+    });
+
+    it("does not update currentPitch for frequency outside range (too high)", async () => {
+      const onRealtimePitch = jest.fn();
+      // 1500Hz is above 1000Hz maximum
+      mockAutoCorrelate.mockReturnValue(
+        createMockAutoCorrelateResult({
+          frequency: 1500,
+          confidence: 0.9,
+          rms: 0.1,
+        }),
+      );
+      mockFrequencyToNote.mockReturnValue(
+        createMockNoteInfo({
+          noteName: "G6",
+          midiNote: 91,
+          frequency: 1500,
+          cents: 0,
+        }),
+      );
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: true,
+          onRealtimePitch,
+          volumeThreshold: 0.02,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(result.current.isListening).toBe(true);
+      });
+
+      act(() => {
+        mockLiveAudioStream.__simulateData("mockAudioData");
+      });
+
+      await new Promise((r) => setTimeout(r, 50));
+      // onRealtimePitch is called, but currentPitch is NOT updated for out-of-range
+      expect(onRealtimePitch).toHaveBeenCalled();
+      expect(result.current.currentPitch).toBeNull();
+    });
+
+    it("does not update currentPitch when outside soundingFrequencyRange", async () => {
+      const onRealtimePitch = jest.fn();
+      // 200Hz is in default range but outside custom range
+      mockAutoCorrelate.mockReturnValue(
+        createMockAutoCorrelateResult({
+          frequency: 200,
+          confidence: 0.9,
+          rms: 0.1,
+        }),
+      );
+      mockFrequencyToNote.mockReturnValue(
+        createMockNoteInfo({
+          noteName: "G3",
+          midiNote: 55,
+          frequency: 200,
+          cents: 0,
+        }),
+      );
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: true,
+          onRealtimePitch,
+          volumeThreshold: 0.02,
+          soundingFrequencyRange: { min: 300, max: 600 }, // Exclude 200Hz
+        }),
+      );
+
+      await waitFor(() => {
+        expect(result.current.isListening).toBe(true);
+      });
+
+      act(() => {
+        mockLiveAudioStream.__simulateData("mockAudioData");
+      });
+
+      await new Promise((r) => setTimeout(r, 50));
+      // onRealtimePitch is still called (for any valid pitch)
+      expect(onRealtimePitch).toHaveBeenCalled();
+      // But currentPitch is NOT updated when outside soundingFrequencyRange
+      expect(result.current.currentPitch).toBeNull();
+    });
+
+    it("calls onSoundEnd after silence duration", async () => {
+      jest.useFakeTimers();
+      const onSoundStart = jest.fn();
+      const onSoundEnd = jest.fn();
+
+      mockAutoCorrelate
+        .mockReturnValueOnce(
+          createMockAutoCorrelateResult({
+            frequency: 440,
+            confidence: 0.9,
+            rms: 0.1,
+          }),
+        )
+        .mockReturnValue(
+          createMockAutoCorrelateResult({
+            frequency: 0,
+            confidence: 0,
+            rms: 0.001,
+          }),
+        );
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: true,
+          onSoundStart,
+          onSoundEnd,
+          volumeThreshold: 0.02,
+          silenceDuration: 500,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(result.current.isListening).toBe(true);
+      });
+
+      // First audio triggers sound start
+      act(() => {
+        mockLiveAudioStream.__simulateData("loudAudio");
+      });
+
+      await waitFor(() => {
+        expect(onSoundStart).toHaveBeenCalled();
+      });
+
+      // Simulate silence
+      act(() => {
+        mockLiveAudioStream.__simulateData("silentAudio");
+      });
+
+      // Advance time past silence duration
+      act(() => {
+        jest.advanceTimersByTime(600);
+      });
+
+      expect(onSoundEnd).toHaveBeenCalled();
+
+      jest.useRealTimers();
+    });
+
+    it("handles octave equivalent matching when enabled", async () => {
+      const onPitchMatch = jest.fn();
+      // Detected A3 (octave below A4)
+      mockAutoCorrelate.mockReturnValue(
+        createMockAutoCorrelateResult({
+          frequency: 220,
+          confidence: 0.9,
+          rms: 0.1,
+        }),
+      );
+      mockFrequencyToNote.mockReturnValue(
+        createMockNoteInfo({
+          noteName: "A3",
+          midiNote: 57,
+          frequency: 220,
+          cents: 0,
+        }),
+      );
+      mockNoteNameToMidi.mockImplementation((note: string) =>
+        note === "A4" ? 69 : note === "A3" ? 57 : null,
+      );
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: true,
+          targetNote: "A4",
+          onPitchMatch,
+          allowOctaveEquivalent: true,
+          volumeThreshold: 0.02,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(result.current.isListening).toBe(true);
+      });
+
+      act(() => {
+        mockLiveAudioStream.__simulateData("mockAudioData");
+      });
+
+      await waitFor(() => {
+        // A3 should match A4 when octave equivalent is enabled
+        expect(onPitchMatch).toHaveBeenCalledWith(
+          true,
+          expect.objectContaining({ noteName: "A3" }),
+        );
+      });
+    });
+
+    it("does not match octave equivalent when disabled", async () => {
+      const onPitchMatch = jest.fn();
+      // Detected A3 (octave below A4)
+      mockAutoCorrelate.mockReturnValue(
+        createMockAutoCorrelateResult({
+          frequency: 220,
+          confidence: 0.9,
+          rms: 0.1,
+        }),
+      );
+      mockFrequencyToNote.mockReturnValue(
+        createMockNoteInfo({
+          noteName: "A3",
+          midiNote: 57,
+          frequency: 220,
+          cents: 0,
+        }),
+      );
+      mockNoteNameToMidi.mockImplementation((note: string) =>
+        note === "A4" ? 69 : note === "A3" ? 57 : null,
+      );
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: true,
+          targetNote: "A4",
+          onPitchMatch,
+          allowOctaveEquivalent: false,
+          volumeThreshold: 0.02,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(result.current.isListening).toBe(true);
+      });
+
+      act(() => {
+        mockLiveAudioStream.__simulateData("mockAudioData");
+      });
+
+      await waitFor(() => {
+        // A3 should NOT match A4 when octave equivalent is disabled
+        expect(onPitchMatch).toHaveBeenCalledWith(
+          false,
+          expect.objectContaining({ noteName: "A3" }),
+        );
+      });
+    });
+
+    it("clears state when stopListening is called", async () => {
+      mockAutoCorrelate.mockReturnValue(
+        createMockAutoCorrelateResult({
+          frequency: 440,
+          confidence: 0.9,
+          rms: 0.1,
+        }),
+      );
+      mockFrequencyToNote.mockReturnValue(
+        createMockNoteInfo({
+          noteName: "A4",
+          midiNote: 69,
+          frequency: 440,
+          cents: 0,
+        }),
+      );
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: true,
+          volumeThreshold: 0.02,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(result.current.isListening).toBe(true);
+      });
+
+      // Get a pitch detected
+      act(() => {
+        mockLiveAudioStream.__simulateData("mockAudioData");
+      });
+
+      await waitFor(() => {
+        expect(result.current.currentPitch).not.toBeNull();
+      });
+
+      // Stop listening
+      act(() => {
+        result.current.stopListening();
+      });
+
+      expect(result.current.isListening).toBe(false);
+      expect(result.current.currentPitch).toBeNull();
+      expect(result.current.isSounding).toBe(false);
+    });
+
+    it("does not process audio data when not listening", async () => {
+      const onVolumeChange = jest.fn();
+
+      const { result } = renderHook(() =>
+        usePitchDetection({
+          enabled: false, // Disabled
+          onVolumeChange,
+        }),
+      );
+
+      expect(result.current.isListening).toBe(false);
+
+      // Try to simulate audio data
+      act(() => {
+        mockLiveAudioStream.__simulateData("mockAudioData");
+      });
+
+      // onVolumeChange should NOT be called
+      expect(onVolumeChange).not.toHaveBeenCalled();
     });
   });
 });

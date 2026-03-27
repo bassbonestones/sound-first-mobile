@@ -159,6 +159,35 @@ export function playNote(
 }
 
 /**
+ * Resume a suspended audio context
+ * Browsers suspend AudioContext until user interaction
+ */
+export async function resumeAudioContext(
+  audioContext: AudioContextType | null,
+): Promise<boolean> {
+  if (!audioContext) return false;
+  if (audioContext.state === "suspended") {
+    try {
+      await audioContext.resume();
+      return true;
+    } catch (error) {
+      devWarn("Failed to resume audio context:", error);
+      return false;
+    }
+  }
+  return audioContext.state === "running";
+}
+
+/**
+ * Check if audio context is available and running
+ */
+export function isAudioContextReady(
+  audioContext: AudioContextType | null,
+): boolean {
+  return audioContext?.state === "running";
+}
+
+/**
  * Clean up an audio context (for component unmount)
  */
 export async function cleanupAudioContext(

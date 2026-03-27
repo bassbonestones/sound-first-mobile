@@ -329,17 +329,19 @@ describe("WholeStepsTheoryExercise", () => {
       );
       goToQuiz(getByText);
       fireEvent.press(getByText("1")); // Wrong answer
-      // Should show some indication of incorrect
-      expect(getByText(/Next/)).toBeTruthy();
+      // Should show incorrect feedback
+      expect(getByText(/✗ The answer is/)).toBeTruthy();
     });
 
-    it("advances to next question when Next pressed", () => {
+    it("auto-advances to next question after feedback delay", () => {
       const { getByText } = render(
         <WholeStepsTheoryExercise {...defaultProps} />,
       );
       goToQuiz(getByText);
       fireEvent.press(getByText("2")); // Answer first question
-      fireEvent.press(getByText(/See Results|Next →/)); // Go to next
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      }); // Auto-advance
       expect(getByText(/Question 2 of/)).toBeTruthy();
     });
 
@@ -349,22 +351,24 @@ describe("WholeStepsTheoryExercise", () => {
       );
       goToQuiz(getByText);
 
-      // Answer all 4 questions
+      // Answer all 4 questions with auto-advance
       const answers = [
         "2",
         "It skips one key (C#)",
         "G to A",
         "There's no key between them",
       ];
-      answers.forEach((answer, index) => {
+      answers.forEach((answer) => {
         fireEvent.press(getByText(answer));
-        if (index < answers.length - 1) {
-          fireEvent.press(getByText(/Next/));
-        }
+        act(() => {
+          jest.advanceTimersByTime(2000);
+        });
       });
 
       // Should transition to result phase
-      expect(getByText(/Result|Complete|Score/i)).toBeTruthy();
+      expect(
+        getByText(/You understand whole steps|Let's review/i),
+      ).toBeTruthy();
     });
   });
 
@@ -391,11 +395,11 @@ describe("WholeStepsTheoryExercise", () => {
       ];
 
       const answers = allCorrect ? correctAnswers : wrongAnswers;
-      answers.forEach((answer, index) => {
+      answers.forEach((answer) => {
         fireEvent.press(getByText(answer));
-        if (index < answers.length - 1) {
-          fireEvent.press(getByText(/Next/));
-        }
+        act(() => {
+          jest.advanceTimersByTime(2000);
+        });
       });
     };
 
@@ -404,8 +408,6 @@ describe("WholeStepsTheoryExercise", () => {
         <WholeStepsTheoryExercise {...defaultProps} />,
       );
       completeQuiz(getByText);
-      // Navigate to result by pressing See Results on last question
-      fireEvent.press(getByText(/See Results/));
       expect(
         getByText(/You understand whole steps|Let's review/i),
       ).toBeTruthy();
@@ -416,7 +418,6 @@ describe("WholeStepsTheoryExercise", () => {
         <WholeStepsTheoryExercise {...defaultProps} />,
       );
       completeQuiz(getByText, true);
-      fireEvent.press(getByText(/See Results/));
       expect(getByText(/4 \/ 4 correct/)).toBeTruthy();
     });
 
@@ -425,7 +426,6 @@ describe("WholeStepsTheoryExercise", () => {
         <WholeStepsTheoryExercise {...defaultProps} />,
       );
       completeQuiz(getByText);
-      fireEvent.press(getByText(/See Results/));
       expect(getByText(/Continue →/)).toBeTruthy();
     });
 
@@ -434,7 +434,6 @@ describe("WholeStepsTheoryExercise", () => {
         <WholeStepsTheoryExercise {...defaultProps} />,
       );
       completeQuiz(getByText, true);
-      fireEvent.press(getByText(/See Results/));
       fireEvent.press(getByText(/Continue|Finish|Done/));
       expect(mockOnComplete).toHaveBeenCalledWith(
         expect.objectContaining({ success: true, score: 4 }),
@@ -446,7 +445,6 @@ describe("WholeStepsTheoryExercise", () => {
         <WholeStepsTheoryExercise {...defaultProps} />,
       );
       completeQuiz(getByText, false);
-      fireEvent.press(getByText(/See Results/));
       fireEvent.press(getByText(/Continue|Finish|Done|Try Again/));
       expect(mockOnComplete).toHaveBeenCalledWith(
         expect.objectContaining({ success: false }),

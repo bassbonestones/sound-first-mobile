@@ -16,6 +16,7 @@ import {
   Platform,
 } from "react-native";
 import type { LessonExerciseProps } from "./shared";
+import { useQuizExerciseState } from "./shared/useQuizExerciseState";
 import { devWarn } from "../../../../utils/devLogger";
 
 // Audio context
@@ -70,6 +71,7 @@ const NOTE_FREQUENCIES = {
 // Quiz questions
 const QUIZ_QUESTIONS = [
   {
+    id: "natural_sign_purpose",
     question: "What does the natural sign (♮) do?",
     correctAnswer: "Cancels a sharp or flat",
     options: [
@@ -80,6 +82,7 @@ const QUIZ_QUESTIONS = [
     ],
   },
   {
+    id: "f_sharp_to_natural",
     question: "If you see F# then F♮, the F♮ is...",
     correctAnswer: "Regular F (white key)",
     options: [
@@ -90,6 +93,7 @@ const QUIZ_QUESTIONS = [
     ],
   },
   {
+    id: "b_flat_to_natural",
     question: "B♭ followed by B♮ means play...",
     correctAnswer: "Regular B (white key)",
     options: [
@@ -100,6 +104,7 @@ const QUIZ_QUESTIONS = [
     ],
   },
   {
+    id: "natural_state",
     question: "The natural sign returns a note to its _____ state.",
     correctAnswer: "white key / unaltered",
     options: ["black key", "white key / unaltered", "sharped", "flatted"],
@@ -115,13 +120,26 @@ export default function NaturalAccidentalExercise({
   sessionState = {},
   onComplete,
   onCancel,
+  onProgress,
 }: LessonExerciseProps) {
   const [phase, setPhase] = useState(PHASES.INTRO);
-  const [quizIndex, setQuizIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [showResult, setShowResult] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+
+  // Use shared quiz hook for quiz state management
+  const {
+    quiz,
+    currentQuestion,
+    totalQuestions,
+    handleAnswer: handleQuizAnswer,
+    resetQuiz,
+    isCorrectAnswer,
+  } = useQuizExerciseState({
+    questions: QUIZ_QUESTIONS,
+    onProgress,
+    onQuizComplete: (passed) => {
+      setPhase(PHASES.RESULT);
+    },
+  });
 
   const audioContextRef = useRef(null);
 
@@ -180,36 +198,13 @@ export default function NaturalAccidentalExercise({
     [isPlaying, playNote],
   );
 
-  // Handle quiz answer
-  const handleAnswer = useCallback(
-    (answer) => {
-      setSelectedAnswer(answer);
-      setShowResult(true);
-      if (answer === QUIZ_QUESTIONS[quizIndex].correctAnswer) {
-        setScore((s) => s + 1);
-      }
-    },
-    [quizIndex],
-  );
-
-  // Next question
-  const handleNext = useCallback(() => {
-    setSelectedAnswer(null);
-    setShowResult(false);
-    if (quizIndex < QUIZ_QUESTIONS.length - 1) {
-      setQuizIndex((i) => i + 1);
-    } else {
-      setPhase(PHASES.RESULT);
-    }
-  }, [quizIndex]);
-
   // Complete exercise
   const handleComplete = useCallback(() => {
-    const passed = score === QUIZ_QUESTIONS.length; // 100% required
+    const passed = quiz.score === totalQuestions; // 100% required
     if (onComplete) {
-      onComplete({ success: passed, score });
+      onComplete({ success: passed, score: quiz.score });
     }
-  }, [onComplete, score]);
+  }, [onComplete, quiz.score, totalQuestions]);
 
   // ============================================================
   // RENDER PHASES
@@ -364,7 +359,7 @@ export default function NaturalAccidentalExercise({
 
   // Quiz phase
   if (phase === PHASES.QUIZ) {
-    const currentQ = QUIZ_QUESTIONS[quizIndex];
+    if (!currentQuestion) return null;
 
     return (
       <View style={styles.container}>
@@ -372,24 +367,24 @@ export default function NaturalAccidentalExercise({
           <View
             style={[
               styles.progressFill,
-              { width: `${((quizIndex + 1) / QUIZ_QUESTIONS.length) * 100}%` },
+              { width: `${((quiz.currentIndex + 1) / totalQuestions) * 100}%` },
             ]}
           />
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text style={styles.quizProgress}>
-            Question {quizIndex + 1} of {QUIZ_QUESTIONS.length}
+            Question {quiz.currentIndex + 1} of {totalQuestions}
           </Text>
 
-          <Text style={styles.quizQuestion}>{currentQ.question}</Text>
+          <Text style={styles.quizQuestion}>{currentQuestion.question}</Text>
 
           <View style={styles.optionsContainer}>
-            {currentQ.options.map((option, idx) => {
-              const isSelected = selectedAnswer === option;
-              const isCorrect = option === currentQ.correctAnswer;
-              const showCorrect = showResult && isCorrect;
-              const showWrong = showResult && isSelected && !isCorrect;
+            {currentQuestion.options.map((option, idx) => {
+              const isSelected = quiz.selectedAnswer === option;
+              const isCorrect = isCorrectAnswer(option);
+              const showCorrect = quiz.showFeedback && isCorrect;
+              const showWrong = quiz.showFeedback && isSelected && !isCorrect;
 
               return (
                 <TouchableOpacity
@@ -398,10 +393,10 @@ export default function NaturalAccidentalExercise({
                     styles.optionButton,
                     showCorrect && styles.optionCorrect,
                     showWrong && styles.optionWrong,
-                    isSelected && !showResult && styles.optionSelected,
+                    isSelected && !quiz.showFeedback && styles.optionSelected,
                   ]}
-                  onPress={() => !showResult && handleAnswer(option)}
-                  disabled={showResult}
+                  onPress={() => !quiz.showFeedback && handleQuizAnswer(option)}
+                  disabled={quiz.showFeedback}
                 >
                   <Text
                     style={[
@@ -416,45 +411,30 @@ export default function NaturalAccidentalExercise({
             })}
           </View>
 
-          {showResult && (
+          {quiz.showFeedback && (
             <View style={styles.feedbackContainer}>
               <Text
                 style={[
                   styles.feedbackText,
-                  selectedAnswer === currentQ.correctAnswer
+                  isCorrectAnswer(quiz.selectedAnswer)
                     ? styles.feedbackCorrect
                     : styles.feedbackWrong,
                 ]}
               >
-                {selectedAnswer === currentQ.correctAnswer
+                {isCorrectAnswer(quiz.selectedAnswer)
                   ? "✓ Correct!"
-                  : `✗ The answer is: ${currentQ.correctAnswer}`}
+                  : `✗ The answer is: ${currentQuestion.correctAnswer}`}
               </Text>
             </View>
           )}
         </ScrollView>
-
-        {showResult && (
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleNext}
-            accessibilityLabel="Next step"
-            accessibilityRole="button"
-          >
-            <Text style={styles.primaryButtonText}>
-              {quizIndex < QUIZ_QUESTIONS.length - 1
-                ? "Next →"
-                : "See Results →"}
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
     );
   }
 
   // Result phase
   if (phase === PHASES.RESULT) {
-    const passed = score === QUIZ_QUESTIONS.length;
+    const passed = quiz.score === totalQuestions;
 
     return (
       <View style={styles.container}>
@@ -464,7 +444,7 @@ export default function NaturalAccidentalExercise({
             {passed ? "You understand naturals!" : "Let's review"}
           </Text>
           <Text style={styles.resultScore}>
-            {score} / {QUIZ_QUESTIONS.length} correct
+            {quiz.score} / {totalQuestions} correct
           </Text>
 
           <View style={styles.card}>

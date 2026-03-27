@@ -15,6 +15,7 @@ jest.mock("../src/features/composer/services/composerSynth", () => ({
     init: jest.fn().mockResolvedValue(undefined),
     resume: jest.fn().mockResolvedValue(undefined),
     playNote: jest.fn(),
+    stopAll: jest.fn(),
   },
 }));
 

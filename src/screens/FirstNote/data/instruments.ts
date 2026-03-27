@@ -1,7 +1,22 @@
 /**
+ * Instrument data for FirstNote flow
+ */
+
+// =============================================================================
+// Types
+// =============================================================================
+
+/** Clef type for instruments */
+export type InstrumentClef = "treble" | "bass" | "both" | "alto";
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+/**
  * Instrument to clef mapping
  */
-export const INSTRUMENT_CLEFS = {
+export const INSTRUMENT_CLEFS: Record<string, InstrumentClef> = {
   piano: "both",
   trumpet: "treble",
   trombone: "bass",
@@ -37,9 +52,11 @@ export const BASS_CLEF_INSTRUMENTS = [
 
 /**
  * Get the clef type for an instrument
- * @param {string} instrument - The instrument name
- * @returns {string} The clef type (treble, bass, both, or alto)
+ * @param instrument - The instrument name
+ * @returns The clef type (treble, bass, both, or alto)
  */
-export function getClefForInstrument(instrument) {
-  return INSTRUMENT_CLEFS[instrument?.toLowerCase()] || "treble";
+export function getClefForInstrument(
+  instrument: string | undefined | null,
+): InstrumentClef {
+  return INSTRUMENT_CLEFS[instrument?.toLowerCase() ?? ""] ?? "treble";
 }

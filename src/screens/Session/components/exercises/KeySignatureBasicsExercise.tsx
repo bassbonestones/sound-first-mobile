@@ -7,13 +7,7 @@
  * - Key signatures tell us what scale the music is based on
  * - No sharps/flats = C major (or A minor)
  */
-import React, {
-  useState,
-  useCallback,
-  useRef,
-  useEffect,
-  useMemo,
-} from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -24,6 +18,7 @@ import {
 } from "react-native";
 import NotationDisplay from "../../../../components/NotationDisplay";
 import type { LessonExerciseProps } from "./shared";
+import { useQuizExerciseState } from "./shared/useQuizExerciseState";
 import { devWarn } from "../../../../utils/devLogger";
 
 // Audio context - works on web, iOS, and Android
@@ -123,6 +118,7 @@ function generateKeySignatureMusicXML(fifths, clef = "treble") {
 // Quiz questions
 const QUIZ_QUESTIONS = [
   {
+    id: "key_sig_purpose",
     question: "A key signature tells us:",
     correctAnswer: "Which sharps/flats to play throughout the piece",
     options: [
@@ -133,6 +129,7 @@ const QUIZ_QUESTIONS = [
     ],
   },
   {
+    id: "sharp_applies_to",
     question: "If a key signature has F#, you play F# for:",
     correctAnswer: "Every F in the entire piece",
     options: [
@@ -143,11 +140,13 @@ const QUIZ_QUESTIONS = [
     ],
   },
   {
+    id: "c_major",
     question: "C Major has:",
     correctAnswer: "No sharps or flats",
     options: ["1 sharp", "1 flat", "No sharps or flats", "2 sharps"],
   },
   {
+    id: "g_major",
     question: "G Major has:",
     correctAnswer: "1 sharp (F#)",
     options: ["No sharps or flats", "1 sharp (F#)", "1 flat (B♭)", "2 sharps"],
@@ -228,42 +227,34 @@ export default function KeySignatureBasicsExercise({
   sessionState = {},
   onComplete,
   onCancel,
+  onProgress,
   clef = "treble",
 }: LessonExerciseProps & { clef?: string }) {
   const [phase, setPhase] = useState(PHASES.INTRO);
-  const [quizIndex, setQuizIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [showResult, setShowResult] = useState(false);
   const [currentExample, setCurrentExample] = useState(0);
 
-  const handleAnswer = useCallback(
-    (answer) => {
-      setSelectedAnswer(answer);
-      setShowResult(true);
-      if (answer === QUIZ_QUESTIONS[quizIndex].correctAnswer) {
-        setScore((s) => s + 1);
-      }
-    },
-    [quizIndex],
-  );
-
-  const handleNext = useCallback(() => {
-    setSelectedAnswer(null);
-    setShowResult(false);
-    if (quizIndex < QUIZ_QUESTIONS.length - 1) {
-      setQuizIndex((i) => i + 1);
-    } else {
+  // Use shared quiz hook for quiz state management
+  const {
+    quiz,
+    currentQuestion,
+    totalQuestions,
+    handleAnswer: handleQuizAnswer,
+    resetQuiz,
+    isCorrectAnswer,
+  } = useQuizExerciseState({
+    questions: QUIZ_QUESTIONS,
+    onProgress,
+    onQuizComplete: (passed) => {
       setPhase(PHASES.RESULT);
-    }
-  }, [quizIndex]);
+    },
+  });
 
   const handleComplete = useCallback(() => {
-    const passed = score === QUIZ_QUESTIONS.length;
+    const passed = quiz.score === totalQuestions;
     if (onComplete) {
-      onComplete({ success: passed, score });
+      onComplete({ success: passed, score: quiz.score });
     }
-  }, [onComplete, score]);
+  }, [onComplete, quiz.score, totalQuestions]);
 
   // ============================================================
   // RENDER PHASES
@@ -461,33 +452,32 @@ export default function KeySignatureBasicsExercise({
     );
   }
 
-  if (phase === PHASES.QUIZ) {
-    const currentQ = QUIZ_QUESTIONS[quizIndex];
-
+  if (phase === PHASES.QUIZ && currentQuestion) {
     return (
       <View style={styles.container}>
         <View style={styles.progressBar}>
           <View
             style={[
               styles.progressFill,
-              { width: `${((quizIndex + 1) / QUIZ_QUESTIONS.length) * 100}%` },
+              { width: `${((quiz.currentIndex + 1) / totalQuestions) * 100}%` },
             ]}
           />
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text style={styles.quizProgress}>
-            Question {quizIndex + 1} of {QUIZ_QUESTIONS.length}
+            Question {quiz.currentIndex + 1} of {totalQuestions}
           </Text>
 
-          <Text style={styles.quizQuestion}>{currentQ.question}</Text>
+          <Text style={styles.quizQuestion}>{currentQuestion.question}</Text>
 
           <View style={styles.optionsContainer}>
-            {currentQ.options.map((option, idx) => {
-              const isSelected = selectedAnswer === option;
-              const isCorrect = option === currentQ.correctAnswer;
-              const showCorrect = showResult && isCorrect;
-              const showWrong = showResult && isSelected && !isCorrect;
+            {currentQuestion.options.map((option, idx) => {
+              const isSelected = quiz.selectedAnswer === option;
+              const isCorrectOption = isCorrectAnswer(option);
+              const showCorrect = quiz.showFeedback && isCorrectOption;
+              const showWrong =
+                quiz.showFeedback && isSelected && !isCorrectOption;
 
               return (
                 <TouchableOpacity
@@ -496,10 +486,12 @@ export default function KeySignatureBasicsExercise({
                     styles.optionButton,
                     showCorrect && styles.optionCorrect,
                     showWrong && styles.optionWrong,
-                    isSelected && !showResult && styles.optionSelected,
+                    isSelected && !quiz.showFeedback && styles.optionSelected,
                   ]}
-                  onPress={() => !showResult && handleAnswer(option)}
-                  disabled={showResult}
+                  onPress={() => handleQuizAnswer(option)}
+                  disabled={quiz.showFeedback}
+                  accessibilityLabel={`Select ${option}`}
+                  accessibilityRole="button"
                 >
                   <Text
                     style={[
@@ -514,44 +506,29 @@ export default function KeySignatureBasicsExercise({
             })}
           </View>
 
-          {showResult && (
+          {quiz.showFeedback && (
             <View style={styles.feedbackContainer}>
               <Text
                 style={[
                   styles.feedbackText,
-                  selectedAnswer === currentQ.correctAnswer
+                  isCorrectAnswer(quiz.selectedAnswer)
                     ? styles.feedbackCorrect
                     : styles.feedbackWrong,
                 ]}
               >
-                {selectedAnswer === currentQ.correctAnswer
+                {isCorrectAnswer(quiz.selectedAnswer)
                   ? "✓ Correct!"
-                  : `✗ The answer is: ${currentQ.correctAnswer}`}
+                  : `✗ The answer is: ${currentQuestion.correctAnswer}`}
               </Text>
             </View>
           )}
         </ScrollView>
-
-        {showResult && (
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleNext}
-            accessibilityLabel="Next step"
-            accessibilityRole="button"
-          >
-            <Text style={styles.primaryButtonText}>
-              {quizIndex < QUIZ_QUESTIONS.length - 1
-                ? "Next →"
-                : "See Results →"}
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
     );
   }
 
   if (phase === PHASES.RESULT) {
-    const passed = score === QUIZ_QUESTIONS.length;
+    const passed = quiz.score === totalQuestions;
 
     return (
       <View style={styles.container}>
@@ -561,7 +538,7 @@ export default function KeySignatureBasicsExercise({
             {passed ? "You understand key signatures!" : "Let's review"}
           </Text>
           <Text style={styles.resultScore}>
-            {score} / {QUIZ_QUESTIONS.length} correct
+            {quiz.score} / {totalQuestions} correct
           </Text>
 
           <View style={styles.card}>

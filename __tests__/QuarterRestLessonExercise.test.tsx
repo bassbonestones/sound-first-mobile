@@ -136,37 +136,35 @@ describe("QuarterRestLessonExercise", () => {
   describe("Focus Card Phase", () => {
     it("renders focus card with quarter rest title", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       expect(getByText("Quarter Rest")).toBeTruthy();
     });
 
     it("shows duration explanation (1 beat)", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       expect(getByText("A quarter rest = 1 beat of silence.")).toBeTruthy();
     });
 
     it("shows visual cue about shape", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       expect(getByText("It has a squiggly, zigzag shape.")).toBeTruthy();
     });
 
     it("shows lightning bolt description", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
-      expect(
-        getByText('Sometimes called "lightning bolt" rest')
-      ).toBeTruthy();
+      expect(getByText('Sometimes called "lightning bolt" rest')).toBeTruthy();
     });
 
     it("shows rest family comparison", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       expect(getByText("Rest family:")).toBeTruthy();
       expect(getByText("Whole")).toBeTruthy();
@@ -176,45 +174,45 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows notation preview label", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       expect(
-        getByText("On the staff (note-rest-note-rest pattern):")
+        getByText("On the staff (note-rest-note-rest pattern):"),
       ).toBeTruthy();
     });
 
     it("shows Got It button", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
-      expect(getByText("Got It →")).toBeTruthy();
+      expect(getByText("Begin →")).toBeTruthy();
     });
 
     it("advances to Listen phase on Got It press", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
-      fireEvent.press(getByText("Got It →"));
+      fireEvent.press(getByText("Begin →"));
       expect(getByText("Listen")).toBeTruthy();
     });
 
     it("has accessibility label on Got It button", () => {
       const { getByLabelText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
-      expect(getByLabelText("Continue to listen phase")).toBeTruthy();
+      expect(getByLabelText("Begin exercise")).toBeTruthy();
     });
   });
 
   // ===== LISTEN PHASE TESTS =====
   describe("Listen Phase", () => {
     const goToListenPhase = (getByText: (text: string) => unknown) => {
-      fireEvent.press(getByText("Got It →") as never);
+      fireEvent.press(getByText("Begin →") as never);
     };
 
     it("shows Listen phase title", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToListenPhase(getByText);
       expect(getByText("Listen")).toBeTruthy();
@@ -222,7 +220,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("displays target note", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToListenPhase(getByText);
       expect(getByText("F")).toBeTruthy();
@@ -230,26 +228,26 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows listen instruction with alternating pattern", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToListenPhase(getByText);
       expect(getByText(/note-rest-note-rest \(repeat\)/)).toBeTruthy();
       expect(
-        getByText(/Each beat alternates between sound and silence/)
+        getByText(/Each beat alternates between sound and silence/),
       ).toBeTruthy();
     });
 
     it("shows Hear Pattern button initially", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToListenPhase(getByText);
-      expect(getByText("🔊 Hear Pattern")).toBeTruthy();
+      expect(getByText("🎵 Hear the Pattern")).toBeTruthy();
     });
 
     it("shows mini focus card", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToListenPhase(getByText);
       expect(getByText("1 beat silence")).toBeTruthy();
@@ -257,19 +255,19 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows playing state when pattern is played", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToListenPhase(getByText);
-      fireEvent.press(getByText("🔊 Hear Pattern"));
-      expect(getByText("🔊 Playing...")).toBeTruthy();
+      fireEvent.press(getByText("🎵 Hear the Pattern"));
+      expect(getByText("🎵 Listening...")).toBeTruthy();
     });
 
     it("shows I Heard It after pattern completes", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToListenPhase(getByText);
-      fireEvent.press(getByText("🔊 Hear Pattern"));
+      fireEvent.press(getByText("🎵 Hear the Pattern"));
       act(() => {
         jest.advanceTimersByTime(20000);
       });
@@ -278,19 +276,19 @@ describe("QuarterRestLessonExercise", () => {
 
     it("allows hearing pattern again", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToListenPhase(getByText);
-      fireEvent.press(getByText("🔊 Hear Pattern"));
+      fireEvent.press(getByText("🎵 Hear the Pattern"));
       act(() => {
         jest.advanceTimersByTime(20000);
       });
-      expect(getByText("🔊 Hear Again")).toBeTruthy();
+      expect(getByText("🎵 Hear Again")).toBeTruthy();
     });
 
     it("shows notation toggle button", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToListenPhase(getByText);
       expect(getByText("Show Notation 📝")).toBeTruthy();
@@ -298,7 +296,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("renders with different notes - flat", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} userFirstNote="Bb3" />
+        <QuarterRestLessonExercise {...defaultProps} userFirstNote="Bb3" />,
       );
       goToListenPhase(getByText);
       expect(getByText(/B\s*b/)).toBeTruthy();
@@ -306,7 +304,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("renders with different notes - sharp", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} userFirstNote="F#3" />
+        <QuarterRestLessonExercise {...defaultProps} userFirstNote="F#3" />,
       );
       goToListenPhase(getByText);
       expect(getByText(/F\s*#/)).toBeTruthy();
@@ -316,8 +314,8 @@ describe("QuarterRestLessonExercise", () => {
   // ===== SING PHASE TESTS =====
   describe("Sing Phase", () => {
     const goToSingPhase = (getByText: (text: string) => unknown) => {
-      fireEvent.press(getByText("Got It →") as never);
-      fireEvent.press(getByText("🔊 Hear Pattern") as never);
+      fireEvent.press(getByText("Begin →") as never);
+      fireEvent.press(getByText("🎵 Hear the Pattern") as never);
       act(() => {
         jest.advanceTimersByTime(20000);
       });
@@ -326,7 +324,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows Sing phase title", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToSingPhase(getByText);
       expect(getByText("Sing")).toBeTruthy();
@@ -334,18 +332,18 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows singing instruction with beat numbers", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToSingPhase(getByText);
       expect(
-        getByText(/note \(1\) - rest \(2\) - note \(3\) - rest \(4\)/)
+        getByText(/note \(1\) - rest \(2\) - note \(3\) - rest \(4\)/),
       ).toBeTruthy();
       expect(getByText(/Be silent on the even beats!/)).toBeTruthy();
     });
 
     it("shows Start Singing button", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToSingPhase(getByText);
       expect(getByText("🎤 Start Singing")).toBeTruthy();
@@ -353,7 +351,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows Sing Now when singing starts", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToSingPhase(getByText);
       fireEvent.press(getByText("🎤 Start Singing"));
@@ -362,7 +360,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows Try Again on failed attempt", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToSingPhase(getByText);
       fireEvent.press(getByText("🎤 Start Singing"));
@@ -374,7 +372,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows attestation button after 3 failed attempts", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToSingPhase(getByText);
 
@@ -408,7 +406,7 @@ describe("QuarterRestLessonExercise", () => {
       });
 
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToSingPhase(getByText);
       expect(getByText(/Hearing/)).toBeTruthy();
@@ -419,10 +417,10 @@ describe("QuarterRestLessonExercise", () => {
   describe("Imagine Phase", () => {
     const goToImaginePhase = (
       getByText: (text: string) => unknown,
-      getAllByText: (text: string) => unknown[]
+      getAllByText: (text: string) => unknown[],
     ) => {
-      fireEvent.press(getByText("Got It →") as never);
-      fireEvent.press(getByText("🔊 Hear Pattern") as never);
+      fireEvent.press(getByText("Begin →") as never);
+      fireEvent.press(getByText("🎵 Hear the Pattern") as never);
       act(() => {
         jest.advanceTimersByTime(20000);
       });
@@ -449,7 +447,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows Imagine phase title", () => {
       const { getByText, getAllByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToImaginePhase(getByText, getAllByText);
       expect(getByText("Imagine")).toBeTruthy();
@@ -457,18 +455,16 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows imagination instruction", () => {
       const { getByText, getAllByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToImaginePhase(getByText, getAllByText);
       expect(getByText(/Imagine playing: note-rest-note-rest/)).toBeTruthy();
-      expect(
-        getByText(/Feel the alternating sound and silence/)
-      ).toBeTruthy();
+      expect(getByText(/Feel the alternating sound and silence/)).toBeTruthy();
     });
 
     it("shows Play - Rest - Play - Rest hint", () => {
       const { getByText, getAllByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToImaginePhase(getByText, getAllByText);
       expect(getByText("Play - Rest - Play - Rest")).toBeTruthy();
@@ -476,7 +472,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows Count with Clicks button", () => {
       const { getByText, getAllByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToImaginePhase(getByText, getAllByText);
       expect(getByText("🥁 Count with Clicks")).toBeTruthy();
@@ -484,7 +480,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows I Imagined It button", () => {
       const { getByText, getAllByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToImaginePhase(getByText, getAllByText);
       expect(getByText("I Imagined It →")).toBeTruthy();
@@ -492,7 +488,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("transitions to Play phase when I Imagined It is pressed", () => {
       const { getByText, getAllByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToImaginePhase(getByText, getAllByText);
       fireEvent.press(getByText("I Imagined It →"));
@@ -501,7 +497,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("plays metronome clicks when Count with Clicks is pressed", () => {
       const { getByText, getAllByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToImaginePhase(getByText, getAllByText);
       fireEvent.press(getByText("🥁 Count with Clicks"));
@@ -513,10 +509,10 @@ describe("QuarterRestLessonExercise", () => {
   describe("Play Phase", () => {
     const goToPlayPhase = (
       getByText: (text: string) => unknown,
-      getAllByText: (text: string) => unknown[]
+      getAllByText: (text: string) => unknown[],
     ) => {
-      fireEvent.press(getByText("Got It →") as never);
-      fireEvent.press(getByText("🔊 Hear Pattern") as never);
+      fireEvent.press(getByText("Begin →") as never);
+      fireEvent.press(getByText("🎵 Hear the Pattern") as never);
       act(() => {
         jest.advanceTimersByTime(20000);
       });
@@ -539,7 +535,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows Play phase title", () => {
       const { getByText, getAllByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToPlayPhase(getByText, getAllByText);
       expect(getByText("Play")).toBeTruthy();
@@ -547,18 +543,18 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows play instruction with beat pattern", () => {
       const { getByText, getAllByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToPlayPhase(getByText, getAllByText);
       expect(
-        getByText(/note \(1\) - rest \(2\) - note \(3\) - rest \(4\)/)
+        getByText(/note \(1\) - rest \(2\) - note \(3\) - rest \(4\)/),
       ).toBeTruthy();
       expect(getByText(/Two measures of alternating pattern/)).toBeTruthy();
     });
 
     it("shows target note in Play phase", () => {
       const { getByText, getAllByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToPlayPhase(getByText, getAllByText);
       expect(getByText("F")).toBeTruthy();
@@ -566,7 +562,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows Start Playing button", () => {
       const { getByText, getAllByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToPlayPhase(getByText, getAllByText);
       expect(getByText("🎵 Start Playing")).toBeTruthy();
@@ -574,7 +570,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows Try Again on failed play attempt", () => {
       const { getByText, getAllByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToPlayPhase(getByText, getAllByText);
       fireEvent.press(getByText("🎵 Start Playing"));
@@ -586,7 +582,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows attestation button after 3 failed play attempts", () => {
       const { getByText, getAllByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToPlayPhase(getByText, getAllByText);
 
@@ -615,8 +611,8 @@ describe("QuarterRestLessonExercise", () => {
   // ===== ATTESTATION MODAL TESTS =====
   describe("Attestation Modal", () => {
     const goToSingPhase = (getByText: (text: string) => unknown) => {
-      fireEvent.press(getByText("Got It →") as never);
-      fireEvent.press(getByText("🔊 Hear Pattern") as never);
+      fireEvent.press(getByText("Begin →") as never);
+      fireEvent.press(getByText("🎵 Hear the Pattern") as never);
       act(() => {
         jest.advanceTimersByTime(20000);
       });
@@ -625,7 +621,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("opens modal when attestation button pressed", () => {
       const { getByText, getAllByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToSingPhase(getByText);
 
@@ -647,7 +643,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("shows attestation text in modal", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToSingPhase(getByText);
 
@@ -665,7 +661,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("closes modal on Cancel", () => {
       const { getByText, queryByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToSingPhase(getByText);
 
@@ -685,7 +681,7 @@ describe("QuarterRestLessonExercise", () => {
 
     it("marks success on Confirm", () => {
       const { getByText, getAllByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToSingPhase(getByText);
 
@@ -709,24 +705,24 @@ describe("QuarterRestLessonExercise", () => {
   // ===== BEAT INDICATOR TESTS =====
   describe("Beat Indicator", () => {
     const goToListenPhase = (getByText: (text: string) => unknown) => {
-      fireEvent.press(getByText("Got It →") as never);
+      fireEvent.press(getByText("Begin →") as never);
     };
 
     it("shows count-in row during playback", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToListenPhase(getByText);
-      fireEvent.press(getByText("🔊 Hear Pattern"));
+      fireEvent.press(getByText("🎵 Hear the Pattern"));
       expect(getByText("Count in:")).toBeTruthy();
     });
 
     it("shows Play: label during playback", () => {
       const { getByText } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
       goToListenPhase(getByText);
-      fireEvent.press(getByText("🔊 Hear Pattern"));
+      fireEvent.press(getByText("🎵 Hear the Pattern"));
       expect(getByText("Play:")).toBeTruthy();
     });
   });
@@ -739,7 +735,7 @@ describe("QuarterRestLessonExercise", () => {
         config: { ...defaultProps.config, bpm: 120 },
       };
       const { getByText } = render(
-        <QuarterRestLessonExercise {...customProps} />
+        <QuarterRestLessonExercise {...customProps} />,
       );
       expect(getByText("Quarter Rest")).toBeTruthy();
     });
@@ -750,7 +746,7 @@ describe("QuarterRestLessonExercise", () => {
         config: { ...defaultProps.config, clef: "bass" },
       };
       const { getByText } = render(
-        <QuarterRestLessonExercise {...customProps} />
+        <QuarterRestLessonExercise {...customProps} />,
       );
       expect(getByText("Quarter Rest")).toBeTruthy();
     });
@@ -761,9 +757,9 @@ describe("QuarterRestLessonExercise", () => {
         userFirstNote: "G4",
       };
       const { getByText } = render(
-        <QuarterRestLessonExercise {...customProps} />
+        <QuarterRestLessonExercise {...customProps} />,
       );
-      fireEvent.press(getByText("Got It →"));
+      fireEvent.press(getByText("Begin →"));
       expect(getByText("G")).toBeTruthy();
     });
   });
@@ -772,18 +768,18 @@ describe("QuarterRestLessonExercise", () => {
   describe("Notation Display", () => {
     it("shows notation when toggle pressed", () => {
       const { getByText, getByTestId } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
-      fireEvent.press(getByText("Got It →"));
+      fireEvent.press(getByText("Begin →"));
       fireEvent.press(getByText("Show Notation 📝"));
       expect(getByTestId("notation-display")).toBeTruthy();
     });
 
     it("hides notation when Hide Notation pressed", () => {
       const { getByText, queryByTestId } = render(
-        <QuarterRestLessonExercise {...defaultProps} />
+        <QuarterRestLessonExercise {...defaultProps} />,
       );
-      fireEvent.press(getByText("Got It →"));
+      fireEvent.press(getByText("Begin →"));
       fireEvent.press(getByText("Show Notation 📝"));
       fireEvent.press(getByText("Hide Notation"));
       expect(queryByTestId("notation-display")).toBeNull();
@@ -817,7 +813,7 @@ describe("QuarterRestLessonExercise", () => {
     it("handles default userFirstNote when not provided", () => {
       const props = { ...defaultProps, userFirstNote: undefined };
       const { getByText } = render(<QuarterRestLessonExercise {...props} />);
-      fireEvent.press(getByText("Got It →"));
+      fireEvent.press(getByText("Begin →"));
       expect(getByText("F")).toBeTruthy();
     });
   });
@@ -830,7 +826,7 @@ describe("QuarterRestLessonExercise", () => {
         expect.objectContaining({
           streak: expect.any(Number),
           masteryRequired: expect.any(Number),
-        })
+        }),
       );
     });
   });

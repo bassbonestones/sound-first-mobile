@@ -3,6 +3,8 @@
  *
  * Dropdown selector for chord progressions.
  * Allows switching between progressions, creating new ones, and duplicating existing ones.
+ *
+ * Can be used with explicit props OR with ChordProgressionContext via the Connected variant.
  */
 
 import React, { memo, useState, useCallback } from "react";
@@ -22,6 +24,7 @@ import { Feather } from "@expo/vector-icons";
 import { colors, spacing } from "../../../constants";
 import type { ChordProgression } from "../types";
 import { PROGRESSION_PRESET_NAMES } from "../types";
+import { useChordProgressionOptional } from "../contexts";
 
 // =============================================================================
 // Types
@@ -802,3 +805,47 @@ const styles = StyleSheet.create({
 // =============================================================================
 
 export const ProgressionSelector = memo(ProgressionSelectorComponent);
+
+// =============================================================================
+// Connected Component (uses ChordProgressionContext)
+// =============================================================================
+
+export interface ProgressionSelectorConnectedProps {
+  /** Test ID for testing */
+  testID?: string;
+}
+
+/**
+ * ProgressionSelector that gets its props from ChordProgressionContext.
+ * Use this when the parent has wrapped with ChordProgressionProvider.
+ */
+function ProgressionSelectorConnectedComponent({
+  testID,
+}: ProgressionSelectorConnectedProps): React.ReactElement | null {
+  const context = useChordProgressionOptional();
+
+  // If no context provided, don't render
+  if (!context) {
+    return null;
+  }
+
+  return (
+    <ProgressionSelector
+      progressions={context.progressions}
+      activeProgressionId={context.activeProgressionId}
+      onSelectProgression={context.selectProgression}
+      onCreateProgression={context.createProgression}
+      onDuplicateProgression={context.duplicateProgression}
+      onDeleteProgression={context.deleteProgression}
+      onRenameProgression={context.renameProgression}
+      isEditMode={context.isEditMode}
+      onToggleEditMode={context.toggleEditMode}
+      disabled={context.disabled}
+      testID={testID}
+    />
+  );
+}
+
+export const ProgressionSelectorConnected = memo(
+  ProgressionSelectorConnectedComponent,
+);

@@ -6,6 +6,7 @@
  */
 
 import { Platform } from "react-native";
+import { devWarn, devError } from "../utils/devLogger";
 import type { PitchEvent } from "../api/generation";
 
 // =============================================================================
@@ -70,7 +71,7 @@ class GenerationPlaybackService {
 
     // Only works on web for now
     if (Platform.OS !== "web") {
-      console.warn("GenerationPlayback: Native audio not implemented yet");
+      devWarn("GenerationPlayback: Native audio not implemented yet");
       return;
     }
 
@@ -81,7 +82,7 @@ class GenerationPlaybackService {
           .webkitAudioContext;
 
       if (!AudioContextClass) {
-        console.warn("GenerationPlayback: Web Audio API not available");
+        devWarn("GenerationPlayback: Web Audio API not available");
         return;
       }
 
@@ -93,7 +94,7 @@ class GenerationPlaybackService {
 
       this.isInitialized = true;
     } catch (error) {
-      console.error("GenerationPlayback: Failed to initialize", error);
+      devError("GenerationPlayback: Failed to initialize", error);
     }
   }
 
@@ -349,4 +350,17 @@ class GenerationPlaybackService {
 // Singleton Export
 // =============================================================================
 
+/**
+ * Singleton instance of GenerationPlaybackService
+ * Handles audio playback for generated scales, arpeggios, and patterns
+ *
+ * @example
+ * import { generationPlayback } from '../services/generationPlayback';
+ *
+ * // Play a generated scale
+ * await generationPlayback.playGeneration(notes, { tempo: 120, instrument: 'piano' });
+ *
+ * // Stop playback
+ * generationPlayback.stop();
+ */
 export const generationPlayback = new GenerationPlaybackService();

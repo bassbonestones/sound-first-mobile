@@ -1,22 +1,121 @@
 /**
  * useCapabilities - Hook for capability CRUD operations
  */
-import { useState, useEffect, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  Dispatch,
+  SetStateAction,
+} from "react";
 import { baseUrl } from "../../../../../api/client";
 import { devLog, devError } from "../../../../../utils/devLogger";
+import type { Capability } from "../../../../../types/capability";
 
-export default function useCapabilities() {
-  const [capabilities, setCapabilities] = useState([]);
-  const [filteredCapabilities, setFilteredCapabilities] = useState([]);
+/** Data for creating a new capability */
+export interface CreateCapabilityData {
+  name: string;
+  display_name?: string;
+  domain: string;
+  subdomain?: string;
+  requirement_type?: string;
+  prerequisite_ids?: number[];
+  mastery_type?: string;
+  mastery_count?: number;
+  difficulty_tier?: number;
+}
+
+/** Data for updating an existing capability */
+export interface UpdateCapabilityData extends Partial<CreateCapabilityData> {
+  is_active?: boolean;
+  bit_index?: number;
+}
+
+/** Result of a capability operation */
+export interface CapabilityOperationResult {
+  success: boolean;
+  capability?: Capability;
+  error?: string;
+  errors?: string[];
+}
+
+/** Export status */
+export interface ExportStatus {
+  type: "success" | "error";
+  message: string;
+}
+
+/** Dependency graph data */
+export interface DependencyGraph {
+  nodes: Array<{ id: number; name: string }>;
+  edges: Array<{ from: number; to: number }>;
+}
+
+/** Return type for useCapabilities hook */
+export interface UseCapabilitiesReturn {
+  // State
+  capabilities: Capability[];
+  filteredCapabilities: Capability[];
+  loading: boolean;
+  searchQuery: string;
+  setSearchQuery: Dispatch<SetStateAction<string>>;
+  domainFilter: string;
+  setDomainFilter: Dispatch<SetStateAction<string>>;
+  domains: string[];
+  exporting: boolean;
+  exportStatus: ExportStatus | null;
+  capabilitiesWithContent: Set<string>;
+
+  // Actions
+  loadCapabilities: () => Promise<void>;
+  loadDependencyGraph: (
+    capabilityId: number,
+  ) => Promise<DependencyGraph | null>;
+  archiveCapability: (
+    capability: Capability,
+  ) => Promise<CapabilityOperationResult>;
+  restoreCapability: (
+    capability: Capability,
+  ) => Promise<CapabilityOperationResult>;
+  deleteCapability: (
+    capability: Capability,
+  ) => Promise<CapabilityOperationResult>;
+  createCapability: (
+    createData: CreateCapabilityData,
+  ) => Promise<CapabilityOperationResult>;
+  updateCapability: (
+    capabilityId: number,
+    updateData: UpdateCapabilityData,
+  ) => Promise<CapabilityOperationResult>;
+  moveCapability: (
+    capability: Capability,
+    direction: "up" | "down",
+  ) => Promise<CapabilityOperationResult>;
+  renameDomain: (
+    oldName: string,
+    newName: string,
+  ) => Promise<CapabilityOperationResult>;
+  exportToFile: () => Promise<void>;
+}
+
+/**
+ * Hook for capability CRUD operations in admin panel
+ * @returns Object containing capability state and management functions
+ */
+export default function useCapabilities(): UseCapabilitiesReturn {
+  const [capabilities, setCapabilities] = useState<Capability[]>([]);
+  const [filteredCapabilities, setFilteredCapabilities] = useState<
+    Capability[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [domainFilter, setDomainFilter] = useState("all");
-  const [domains, setDomains] = useState([]);
+  const [domains, setDomains] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
-  const [exportStatus, setExportStatus] = useState(null);
-  const [capabilitiesWithContent, setCapabilitiesWithContent] = useState(
-    new Set(),
-  );
+  const [exportStatus, setExportStatus] = useState<ExportStatus | null>(null);
+  const [capabilitiesWithContent, setCapabilitiesWithContent] = useState<
+    Set<string>
+  >(new Set());
 
   // Load capabilities on mount
   useEffect(() => {
@@ -28,7 +127,7 @@ export default function useCapabilities() {
     filterCapabilities();
   }, [capabilities, searchQuery, domainFilter]);
 
-  const loadCapabilities = async () => {
+  const loadCapabilities = async (): Promise<void> => {
     setLoading(true);
     try {
       // Fetch capabilities
@@ -37,13 +136,13 @@ export default function useCapabilities() {
       const data = await response.json();
       setCapabilities(data.capabilities || []);
 
-      const uniqueDomains = [
-        ...new Set((data.capabilities || []).map((c) => c.domain)),
-      ].sort();
+      const uniqueDomains: string[] = [
+        ...new Set((data.capabilities || []).map((c: Capability) => c.domain)),
+      ].sort() as string[];
       setDomains(uniqueDomains);
 
       // Fetch teaching modules from API to identify which capabilities have modules
-      const withContent = new Set();
+      const withContent = new Set<string>();
       try {
         const modulesResponse = await fetch(
           `${baseUrl}/modules/?active_only=false`,
@@ -56,8 +155,10 @@ export default function useCapabilities() {
           const modulesData = await modulesResponse.json();
           devLog("[useCapabilities] Modules loaded:", modulesData.length);
           modulesData
-            .filter((m) => m.capability_name)
-            .forEach((m) => withContent.add(m.capability_name));
+            .filter((m: { capability_name?: string }) => m.capability_name)
+            .forEach((m: { capability_name: string }) =>
+              withContent.add(m.capability_name),
+            );
         }
       } catch (moduleErr) {
         devLog("[useCapabilities] Could not load teaching modules:", moduleErr);
@@ -86,9 +187,11 @@ export default function useCapabilities() {
         const fallback = await fetch(`${baseUrl}/capabilities/v2`);
         const data = await fallback.json();
         setCapabilities(data.capabilities || []);
-        const uniqueDomains = [
-          ...new Set((data.capabilities || []).map((c) => c.domain)),
-        ].sort();
+        const uniqueDomains: string[] = [
+          ...new Set(
+            (data.capabilities || []).map((c: Capability) => c.domain),
+          ),
+        ].sort() as string[];
         setDomains(uniqueDomains);
       } catch (e) {
         devError("[useCapabilities] Fallback failed:", e);
@@ -97,7 +200,7 @@ export default function useCapabilities() {
     setLoading(false);
   };
 
-  const filterCapabilities = useCallback(() => {
+  const filterCapabilities = useCallback((): void => {
     let filtered = [...capabilities];
 
     if (searchQuery) {
@@ -120,7 +223,9 @@ export default function useCapabilities() {
     setFilteredCapabilities(filtered);
   }, [capabilities, searchQuery, domainFilter]);
 
-  const loadDependencyGraph = async (capabilityId) => {
+  const loadDependencyGraph = async (
+    capabilityId: number,
+  ): Promise<DependencyGraph | null> => {
     try {
       const response = await fetch(
         `${baseUrl}/admin/capabilities/${capabilityId}/graph`,
@@ -134,7 +239,9 @@ export default function useCapabilities() {
     return null;
   };
 
-  const archiveCapability = async (capability) => {
+  const archiveCapability = async (
+    capability: Capability,
+  ): Promise<CapabilityOperationResult> => {
     try {
       const response = await fetch(
         `${baseUrl}/admin/capabilities/${capability.id}/archive`,
@@ -153,7 +260,9 @@ export default function useCapabilities() {
     return { success: false };
   };
 
-  const restoreCapability = async (capability) => {
+  const restoreCapability = async (
+    capability: Capability,
+  ): Promise<CapabilityOperationResult> => {
     try {
       const response = await fetch(
         `${baseUrl}/admin/capabilities/${capability.id}/restore`,
@@ -172,7 +281,9 @@ export default function useCapabilities() {
     return { success: false };
   };
 
-  const deleteCapability = async (capability) => {
+  const deleteCapability = async (
+    capability: Capability,
+  ): Promise<CapabilityOperationResult> => {
     try {
       const response = await fetch(
         `${baseUrl}/admin/capabilities/${capability.id}`,
@@ -188,7 +299,9 @@ export default function useCapabilities() {
     return { success: false };
   };
 
-  const createCapability = async (createData) => {
+  const createCapability = async (
+    createData: CreateCapabilityData,
+  ): Promise<CapabilityOperationResult> => {
     try {
       const response = await fetch(`${baseUrl}/admin/capabilities`, {
         method: "POST",
@@ -211,7 +324,10 @@ export default function useCapabilities() {
     }
   };
 
-  const updateCapability = async (capabilityId, updateData) => {
+  const updateCapability = async (
+    capabilityId: number,
+    updateData: UpdateCapabilityData,
+  ): Promise<CapabilityOperationResult> => {
     try {
       const response = await fetch(
         `${baseUrl}/admin/capabilities/${capabilityId}`,
@@ -252,7 +368,10 @@ export default function useCapabilities() {
     }
   };
 
-  const moveCapability = async (capability, direction) => {
+  const moveCapability = async (
+    capability: Capability,
+    direction: "up" | "down",
+  ): Promise<CapabilityOperationResult> => {
     if (domainFilter === "all") return { success: false };
 
     const domainCaps = capabilities
@@ -301,7 +420,10 @@ export default function useCapabilities() {
     return { success: false };
   };
 
-  const renameDomain = async (oldName, newName) => {
+  const renameDomain = async (
+    oldName: string,
+    newName: string,
+  ): Promise<CapabilityOperationResult> => {
     try {
       const response = await fetch(`${baseUrl}/admin/domains/rename`, {
         method: "POST",
@@ -324,7 +446,7 @@ export default function useCapabilities() {
     }
   };
 
-  const exportToFile = async () => {
+  const exportToFile = async (): Promise<void> => {
     setExporting(true);
     setExportStatus(null);
     try {

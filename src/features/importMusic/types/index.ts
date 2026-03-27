@@ -100,3 +100,6 @@ export {
   listOmrProviders,
   normalizeProgress,
 } from "./omrProviderTypes";
+
+// Score preview types
+export type { HighlightedMeasure, WebViewMessage } from "./scorePreviewTypes";

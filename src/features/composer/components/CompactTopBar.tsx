@@ -3,6 +3,10 @@
  *
  * Minimal top bar for small screens: back button, title, validation indicator, and settings gear.
  * All score settings (clef, time, key, tempo) are accessed via a single settings modal.
+ *
+ * Supports two usage modes:
+ * 1. Props-based: All values passed as props (legacy)
+ * 2. Context-based: Values from ScoreSettingsContext (reduced props)
  */
 
 import React, { memo, useCallback, useState } from "react";
@@ -24,6 +28,7 @@ import { Feather } from "@expo/vector-icons";
 import { colors, spacing } from "../../../constants";
 import TimeSignaturePickerModal from "../../../components/Metronome/TimeSignaturePickerModal";
 import { getKeyName, ALL_KEY_SIGNATURES } from "../constants";
+import { useOptionalScoreSettingsContext } from "../contexts";
 import type { Clef, TimeSignature, KeySignature } from "../types";
 
 // =============================================================================
@@ -31,33 +36,69 @@ import type { Clef, TimeSignature, KeySignature } from "../types";
 // =============================================================================
 
 export interface CompactTopBarProps {
-  /** Score title */
-  title: string;
-  /** Called when title changes */
-  onTitleChange: (title: string) => void;
-  /** Current clef */
-  clef: Clef;
-  /** Called when clef changes */
-  onClefChange: (clef: Clef) => void;
-  /** Current time signature */
-  timeSignature: TimeSignature;
-  /** Called when time signature changes */
-  onTimeSignatureChange: (ts: TimeSignature) => void;
-  /** Whether time signature is locked (notes exist) */
+  /**
+   * Score title.
+   * If not provided, uses value from ScoreSettingsContext.
+   */
+  title?: string;
+  /**
+   * Called when title changes.
+   * If not provided, uses setTitle from ScoreSettingsContext.
+   */
+  onTitleChange?: (title: string) => void;
+  /**
+   * Current clef.
+   * If not provided, uses value from ScoreSettingsContext.
+   */
+  clef?: Clef;
+  /**
+   * Called when clef changes.
+   * If not provided, uses setClef from ScoreSettingsContext.
+   */
+  onClefChange?: (clef: Clef) => void;
+  /**
+   * Current time signature.
+   * If not provided, uses value from ScoreSettingsContext.
+   */
+  timeSignature?: TimeSignature;
+  /**
+   * Called when time signature changes.
+   * If not provided, uses setTimeSignature from ScoreSettingsContext.
+   */
+  onTimeSignatureChange?: (ts: TimeSignature) => boolean;
+  /**
+   * Whether time signature is locked (notes exist).
+   * If not provided, uses value from ScoreSettingsContext.
+   */
   timeSignatureLocked?: boolean;
-  /** Current key signature (-7 to +7) */
-  keySignature: KeySignature;
-  /** Called when key signature changes */
-  onKeySignatureChange: (key: KeySignature) => void;
-  /** Current tempo in BPM */
-  tempo: number;
-  /** Called when tempo changes */
-  onTempoChange: (tempo: number) => void;
+  /**
+   * Current key signature (-7 to +7).
+   * If not provided, uses value from ScoreSettingsContext.
+   */
+  keySignature?: KeySignature;
+  /**
+   * Called when key signature changes.
+   * If not provided, uses setKeySignature from ScoreSettingsContext.
+   */
+  onKeySignatureChange?: (key: KeySignature) => void;
+  /**
+   * Current tempo in BPM.
+   * If not provided, uses value from ScoreSettingsContext.
+   */
+  tempo?: number;
+  /**
+   * Called when tempo changes.
+   * If not provided, uses setTempo from ScoreSettingsContext.
+   */
+  onTempoChange?: (tempo: number) => void;
   /** Current zoom level (0.5-2.5) */
   zoom: number;
   /** Called when zoom changes */
   onZoomChange: (zoom: number) => void;
-  /** Called when clear score is pressed */
+  /**
+   * Called when clear score is pressed.
+   * If not provided, uses clearScore from ScoreSettingsContext.
+   */
   onClearScore?: () => void;
   /** Called when back is pressed */
   onBack?: () => void;
@@ -72,24 +113,44 @@ export interface CompactTopBarProps {
 // =============================================================================
 
 function CompactTopBarComponent({
-  title: _title,
-  onTitleChange: _onTitleChange,
-  clef,
-  onClefChange,
-  timeSignature,
-  onTimeSignatureChange,
-  timeSignatureLocked = false,
-  keySignature,
-  onKeySignatureChange,
-  tempo,
-  onTempoChange,
+  title: propTitle,
+  onTitleChange: propOnTitleChange,
+  clef: propClef,
+  onClefChange: propOnClefChange,
+  timeSignature: propTimeSignature,
+  onTimeSignatureChange: propOnTimeSignatureChange,
+  timeSignatureLocked: propTimeSignatureLocked,
+  keySignature: propKeySignature,
+  onKeySignatureChange: propOnKeySignatureChange,
+  tempo: propTempo,
+  onTempoChange: propOnTempoChange,
   zoom,
   onZoomChange,
-  onClearScore,
+  onClearScore: propOnClearScore,
   onBack,
   disabled = false,
   testID,
 }: CompactTopBarProps): React.ReactElement {
+  // Try to get values from context (returns null if no provider)
+  const context = useOptionalScoreSettingsContext();
+
+  // Resolve values: props take precedence over context
+  const _title = propTitle ?? context?.title ?? "";
+  const _onTitleChange = propOnTitleChange ?? context?.setTitle;
+  const clef = propClef ?? context?.clef ?? "treble";
+  const onClefChange = propOnClefChange ?? context?.setClef;
+  const timeSignature = propTimeSignature ??
+    context?.timeSignature ?? { beats: 4, beatUnit: 4 };
+  const onTimeSignatureChange =
+    propOnTimeSignatureChange ?? context?.setTimeSignature;
+  const timeSignatureLocked =
+    propTimeSignatureLocked ?? context?.timeSignatureLocked ?? false;
+  const keySignature = propKeySignature ?? context?.keySignature ?? 0;
+  const onKeySignatureChange =
+    propOnKeySignatureChange ?? context?.setKeySignature;
+  const tempo = propTempo ?? context?.tempo ?? 120;
+  const onTempoChange = propOnTempoChange ?? context?.setTempo;
+  const onClearScore = propOnClearScore ?? context?.clearScore;
   // Modal states
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showTimeModal, setShowTimeModal] = useState(false);

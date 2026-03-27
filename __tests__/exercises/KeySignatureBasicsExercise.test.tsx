@@ -4,7 +4,7 @@
  */
 
 import React from "react";
-import { render, fireEvent, waitFor } from "@testing-library/react-native";
+import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
 
 // Mock AudioContext
 jest.mock("react-native-audio-api", () => ({
@@ -68,6 +68,11 @@ describe("KeySignatureBasicsExercise", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   // ==========================================================================
@@ -364,7 +369,7 @@ describe("KeySignatureBasicsExercise", () => {
       ).toBeTruthy();
     });
 
-    it("shows next button after answering", () => {
+    it("disables options during feedback", () => {
       const { getByText } = render(
         <KeySignatureBasicsExercise {...defaultProps} />,
       );
@@ -372,10 +377,11 @@ describe("KeySignatureBasicsExercise", () => {
       fireEvent.press(
         getByText("Which sharps/flats to play throughout the piece"),
       );
-      expect(getByText("Next →")).toBeTruthy();
+      // Options are disabled during feedback (hook auto-advances)
+      expect(getByText("✓ Correct!")).toBeTruthy();
     });
 
-    it("proceeds to next question", () => {
+    it("auto-advances to next question after delay", () => {
       const { getByText } = render(
         <KeySignatureBasicsExercise {...defaultProps} />,
       );
@@ -383,11 +389,13 @@ describe("KeySignatureBasicsExercise", () => {
       fireEvent.press(
         getByText("Which sharps/flats to play throughout the piece"),
       );
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       expect(getByText("Question 2 of 4")).toBeTruthy();
     });
 
-    it("shows See Results button on last question", () => {
+    it("completes quiz and goes to result on last question", () => {
       const { getByText } = render(
         <KeySignatureBasicsExercise {...defaultProps} />,
       );
@@ -396,16 +404,26 @@ describe("KeySignatureBasicsExercise", () => {
       fireEvent.press(
         getByText("Which sharps/flats to play throughout the piece"),
       );
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       // Q2
       fireEvent.press(getByText("Every F in the entire piece"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       // Q3
       fireEvent.press(getByText("No sharps or flats"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       // Q4
       fireEvent.press(getByText("1 sharp (F#)"));
-      expect(getByText("See Results →")).toBeTruthy();
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
+      // Should now be on result page
+      expect(getByText("You understand key signatures!")).toBeTruthy();
     });
   });
 
@@ -421,7 +439,7 @@ describe("KeySignatureBasicsExercise", () => {
       fireEvent.press(getByText("How It Works →"));
       fireEvent.press(getByText("See Examples →"));
       fireEvent.press(getByText("Quiz Me →"));
-      // Answer all 4 questions
+      // Answer all 4 questions with auto-advance
       fireEvent.press(
         getByText(
           allCorrect
@@ -429,13 +447,21 @@ describe("KeySignatureBasicsExercise", () => {
             : "How fast to play",
         ),
       );
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       fireEvent.press(getByText("Every F in the entire piece"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       fireEvent.press(getByText("No sharps or flats"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       fireEvent.press(getByText("1 sharp (F#)"));
-      fireEvent.press(getByText("See Results →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
     };
 
     it("shows perfect score title", () => {

@@ -9,6 +9,10 @@ import {
   TextStyle,
   StyleProp,
 } from "react-native";
+import type { PitchAccuracy } from "../types/audio";
+
+// Re-export for backward compatibility
+export type { PitchAccuracy } from "../types/audio";
 
 /**
  * VolumeBar Component - Visual volume indicator
@@ -25,8 +29,6 @@ const COLORS = {
   background: "#F5F5F5", // Background color
   peak: "#FFC107", // Yellow - peak indicator
 };
-
-export type PitchAccuracy = "correct" | "off" | "listening" | null;
 
 export interface VolumeBarProps {
   /** Volume level 0-1 */

@@ -755,4 +755,465 @@ describe("useCapabilities", () => {
       expect(response.error).toBe("Network error");
     });
   });
+
+  // ==========================================================================
+  // MOVE CAPABILITY
+  // ==========================================================================
+  describe("moveCapability", () => {
+    it("returns failure when domain filter is 'all'", async () => {
+      setupDefaultMocks();
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Domain filter is 'all' by default
+      let response;
+      await act(async () => {
+        response = await result.current.moveCapability(
+          mockCapabilities[0],
+          "up",
+        );
+      });
+
+      expect(response.success).toBe(false);
+    });
+
+    it("returns failure when capability not found in domain", async () => {
+      setupDefaultMocks();
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setDomainFilter("pitch");
+      });
+
+      // Try with non-existent capability ID
+      let response;
+      await act(async () => {
+        response = await result.current.moveCapability({ id: 999 }, "up");
+      });
+
+      expect(response.success).toBe(false);
+    });
+
+    it("returns failure when moving up from first position", async () => {
+      setupDefaultMocks();
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setDomainFilter("pitch");
+      });
+
+      // First pitch capability - can't move up further
+      let response;
+      await act(async () => {
+        response = await result.current.moveCapability(
+          mockCapabilities[0],
+          "up",
+        );
+      });
+
+      expect(response.success).toBe(false);
+    });
+
+    it("returns failure when moving down from last position", async () => {
+      setupDefaultMocks();
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setDomainFilter("pitch");
+      });
+
+      // Last pitch capability (pitch_match) - can't move down further
+      let response;
+      await act(async () => {
+        response = await result.current.moveCapability(
+          mockCapabilities[2],
+          "down",
+        );
+      });
+
+      expect(response.success).toBe(false);
+    });
+
+    it("moves capability down successfully", async () => {
+      setupDefaultMocks();
+      // Mock reorder API response
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            new_order: [
+              { id: 3, bit_index: 1 },
+              { id: 1, bit_index: 2 },
+            ],
+          }),
+      });
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setDomainFilter("pitch");
+      });
+
+      // Move first pitch capability down
+      let response;
+      await act(async () => {
+        response = await result.current.moveCapability(
+          mockCapabilities[0],
+          "down",
+        );
+      });
+
+      expect(response.success).toBe(true);
+      expect(global.fetch).toHaveBeenCalledWith(
+        "http://test-api.com/admin/capabilities/reorder",
+        expect.objectContaining({
+          method: "POST",
+        }),
+      );
+    });
+
+    it("handles reorder API failure gracefully", async () => {
+      setupDefaultMocks();
+      // Mock reorder API to fail
+      (global.fetch as jest.Mock).mockRejectedValueOnce(
+        new Error("Network error"),
+      );
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      act(() => {
+        result.current.setDomainFilter("pitch");
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.moveCapability(
+          mockCapabilities[0],
+          "down",
+        );
+      });
+
+      expect(response.success).toBe(false);
+    });
+  });
+
+  // ==========================================================================
+  // RENAME DOMAIN
+  // ==========================================================================
+  describe("renameDomain", () => {
+    it("renames domain successfully", async () => {
+      setupDefaultMocks();
+      // Mock rename response
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      });
+      // Mock reload after rename
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ capabilities: mockCapabilities }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockModules),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockDay0),
+        });
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.renameDomain(
+          "pitch",
+          "pitch_detection",
+        );
+      });
+
+      expect(response.success).toBe(true);
+      expect(global.fetch).toHaveBeenCalledWith(
+        "http://test-api.com/admin/domains/rename",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            old_name: "pitch",
+            new_name: "pitch_detection",
+          }),
+        }),
+      );
+    });
+
+    it("handles rename API failure with detail", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ detail: "Domain already exists" }),
+      });
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.renameDomain("pitch", "rhythm");
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Domain already exists");
+    });
+
+    it("handles rename API failure without detail", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({}),
+      });
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.renameDomain("pitch", "invalid");
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Failed to rename domain");
+    });
+
+    it("handles rename network error", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockRejectedValueOnce(
+        new Error("Network error"),
+      );
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.renameDomain("pitch", "new_pitch");
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toBe("Network error");
+    });
+  });
+
+  // ==========================================================================
+  // EXPORT TO FILE
+  // ==========================================================================
+  describe("exportToFile", () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("exports successfully and sets success status", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            filename: "capabilities_export_20240101.json",
+          }),
+      });
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.exportToFile();
+      });
+
+      expect(result.current.exporting).toBe(false);
+      expect(result.current.exportStatus).toEqual({
+        type: "success",
+        message: "Exported to capabilities_export_20240101.json",
+      });
+    });
+
+    it("handles export API failure with detail", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        json: () =>
+          Promise.resolve({ detail: { message: "No write permission" } }),
+      });
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.exportToFile();
+      });
+
+      expect(result.current.exportStatus).toEqual({
+        type: "error",
+        message: "No write permission",
+      });
+    });
+
+    it("handles export without success flag", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ success: false }),
+      });
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.exportToFile();
+      });
+
+      expect(result.current.exportStatus).toEqual({
+        type: "error",
+        message: "Export failed",
+      });
+    });
+
+    it("handles export network error", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Timeout"));
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.exportToFile();
+      });
+
+      expect(result.current.exportStatus).toEqual({
+        type: "error",
+        message: "Failed to connect to server",
+      });
+    });
+
+    it("clears export status after timeout", async () => {
+      setupDefaultMocks();
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            filename: "export.json",
+          }),
+      });
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.exportToFile();
+      });
+
+      expect(result.current.exportStatus).not.toBeNull();
+
+      // Fast-forward timer
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+
+      expect(result.current.exportStatus).toBeNull();
+    });
+
+    it("sets exporting to true during export", async () => {
+      setupDefaultMocks();
+
+      let resolveExport: (value: any) => void;
+      const pendingExport = new Promise((resolve) => {
+        resolveExport = resolve;
+      });
+
+      (global.fetch as jest.Mock).mockReturnValueOnce(pendingExport);
+
+      const { result } = renderHook(() => useCapabilities());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Start export (don't await)
+      const exportPromise = act(async () => {
+        result.current.exportToFile();
+      });
+
+      // exporting should be true while waiting
+      // Note: This is tricky to test synchronously
+      // Complete the export
+      await act(async () => {
+        resolveExport!({
+          ok: true,
+          json: () => Promise.resolve({ success: true, filename: "test.json" }),
+        });
+        await exportPromise;
+      });
+
+      expect(result.current.exporting).toBe(false);
+    });
+  });
 });

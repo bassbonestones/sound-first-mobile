@@ -9,6 +9,7 @@ import {
   TextStyle,
 } from "react-native";
 import { devLog, devWarn, devError } from "../utils/devLogger";
+import { createAudioContext } from "../screens/Session/components/exercises/shared/audioHelpers";
 
 // Import pitch utilities from extracted module
 import {
@@ -110,12 +111,6 @@ interface WebViewMessageData {
 interface PitchReading {
   midi: number;
   timestamp: number;
-}
-
-// Extended Window interface for WebAudio
-interface ExtendedWindow extends Window {
-  AudioContext?: typeof AudioContext;
-  webkitAudioContext?: typeof AudioContext;
 }
 
 export default function AudioInput({
@@ -356,13 +351,10 @@ export default function AudioInput({
       mediaStreamRef.current = stream;
       setPermissionGranted(true);
 
-      const extWindow = window as ExtendedWindow;
-      const AudioContextClass =
-        extWindow.AudioContext || extWindow.webkitAudioContext;
-      if (!AudioContextClass) {
+      const audioContext = createAudioContext();
+      if (!audioContext) {
         throw new Error("AudioContext not supported");
       }
-      const audioContext = new AudioContextClass();
       audioContextRef.current = audioContext;
 
       const analyser = audioContext.createAnalyser();

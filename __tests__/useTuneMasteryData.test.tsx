@@ -799,6 +799,27 @@ describe("useTuneMasteryData", () => {
       expect(result.current.error).toBeInstanceOf(Error);
       expect(result.current.error?.message).toBe("Storage error");
     });
+
+    it("handles save error gracefully", async () => {
+      mockAsyncStorage.getItem.mockResolvedValue(null);
+      // Make setItem fail after initial load
+      mockAsyncStorage.setItem.mockRejectedValue(new Error("Save failed"));
+
+      const { result } = renderHook(() => useTuneMasteryData());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Trigger a save operation - should handle error gracefully
+      act(() => {
+        result.current.addTune("Test Tune");
+      });
+
+      // Should not crash - error is logged but handled gracefully
+      // The tune is added to state even if save fails
+      expect(result.current.data.activeTunes).toHaveLength(1);
+    });
   });
 
   describe("ALL_KEYS constant", () => {

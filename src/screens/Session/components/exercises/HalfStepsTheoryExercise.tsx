@@ -17,6 +17,7 @@ import {
   Platform,
 } from "react-native";
 import type { LessonExerciseProps } from "./shared";
+import { useQuizExerciseState } from "./shared/useQuizExerciseState";
 import { devWarn } from "../../../../utils/devLogger";
 import MiniKeyboard from "./shared/MiniKeyboard";
 
@@ -77,11 +78,13 @@ const HALF_STEP_EXAMPLES = [
 // Quiz questions
 const QUIZ_QUESTIONS = [
   {
+    id: "smallest_interval",
     question: "A half step is the _____ interval in Western music.",
     correctAnswer: "smallest",
     options: ["smallest", "largest", "medium", "loudest"],
   },
   {
+    id: "e_to_f_reason",
     question: "E to F is a half step because...",
     correctAnswer: "They're adjacent keys with no black key between",
     options: [
@@ -92,11 +95,13 @@ const QUIZ_QUESTIONS = [
     ],
   },
   {
+    id: "not_half_step",
     question: "Which pair is NOT a half step?",
     correctAnswer: "C to D",
     options: ["E to F", "B to C", "C to C#", "C to D"],
   },
   {
+    id: "octave_half_steps",
     question: "How many half steps are in one octave?",
     correctAnswer: "12",
     options: ["7", "8", "10", "12"],
@@ -112,15 +117,28 @@ export default function HalfStepsTheoryExercise({
   sessionState = {},
   onComplete,
   onCancel,
+  onProgress,
 }: LessonExerciseProps) {
   const [phase, setPhase] = useState(PHASES.INTRO);
-  const [quizIndex, setQuizIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [showResult, setShowResult] = useState(false);
   const [highlightedNotes, setHighlightedNotes] = useState([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentExample, setCurrentExample] = useState(0);
+
+  // Use shared quiz hook for quiz state management
+  const {
+    quiz,
+    currentQuestion,
+    totalQuestions,
+    handleAnswer: handleQuizAnswer,
+    resetQuiz,
+    isCorrectAnswer,
+  } = useQuizExerciseState({
+    questions: QUIZ_QUESTIONS,
+    onProgress,
+    onQuizComplete: (passed) => {
+      setPhase(PHASES.RESULT);
+    },
+  });
 
   const audioContextRef = useRef(null);
 
@@ -193,36 +211,13 @@ export default function HalfStepsTheoryExercise({
     [isPlaying, playNote],
   );
 
-  // Handle quiz answer
-  const handleAnswer = useCallback(
-    (answer) => {
-      setSelectedAnswer(answer);
-      setShowResult(true);
-      if (answer === QUIZ_QUESTIONS[quizIndex].correctAnswer) {
-        setScore((s) => s + 1);
-      }
-    },
-    [quizIndex],
-  );
-
-  // Next question
-  const handleNext = useCallback(() => {
-    setSelectedAnswer(null);
-    setShowResult(false);
-    if (quizIndex < QUIZ_QUESTIONS.length - 1) {
-      setQuizIndex((i) => i + 1);
-    } else {
-      setPhase(PHASES.RESULT);
-    }
-  }, [quizIndex]);
-
   // Complete exercise
   const handleComplete = useCallback(() => {
-    const passed = score === QUIZ_QUESTIONS.length; // 100% required
+    const passed = quiz.score === totalQuestions;
     if (onComplete) {
-      onComplete({ success: passed, score });
+      onComplete({ success: passed, score: quiz.score });
     }
-  }, [onComplete, score]);
+  }, [onComplete, quiz.score, totalQuestions]);
 
   // ============================================================
   // RENDER PHASES
@@ -446,33 +441,32 @@ export default function HalfStepsTheoryExercise({
   }
 
   // Quiz phase
-  if (phase === PHASES.QUIZ) {
-    const currentQ = QUIZ_QUESTIONS[quizIndex];
-
+  if (phase === PHASES.QUIZ && currentQuestion) {
     return (
       <View style={styles.container}>
         <View style={styles.progressBar}>
           <View
             style={[
               styles.progressFill,
-              { width: `${((quizIndex + 1) / QUIZ_QUESTIONS.length) * 100}%` },
+              { width: `${((quiz.currentIndex + 1) / totalQuestions) * 100}%` },
             ]}
           />
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text style={styles.quizProgress}>
-            Question {quizIndex + 1} of {QUIZ_QUESTIONS.length}
+            Question {quiz.currentIndex + 1} of {totalQuestions}
           </Text>
 
-          <Text style={styles.quizQuestion}>{currentQ.question}</Text>
+          <Text style={styles.quizQuestion}>{currentQuestion.question}</Text>
 
           <View style={styles.optionsContainer}>
-            {currentQ.options.map((option, idx) => {
-              const isSelected = selectedAnswer === option;
-              const isCorrect = option === currentQ.correctAnswer;
-              const showCorrect = showResult && isCorrect;
-              const showWrong = showResult && isSelected && !isCorrect;
+            {currentQuestion.options.map((option, idx) => {
+              const isSelected = quiz.selectedAnswer === option;
+              const isCorrectOption = isCorrectAnswer(option);
+              const showCorrect = quiz.showFeedback && isCorrectOption;
+              const showWrong =
+                quiz.showFeedback && isSelected && !isCorrectOption;
 
               return (
                 <TouchableOpacity
@@ -481,10 +475,12 @@ export default function HalfStepsTheoryExercise({
                     styles.optionButton,
                     showCorrect && styles.optionCorrect,
                     showWrong && styles.optionWrong,
-                    isSelected && !showResult && styles.optionSelected,
+                    isSelected && !quiz.showFeedback && styles.optionSelected,
                   ]}
-                  onPress={() => !showResult && handleAnswer(option)}
-                  disabled={showResult}
+                  onPress={() => handleQuizAnswer(option)}
+                  disabled={quiz.showFeedback}
+                  accessibilityLabel={`Select ${option}`}
+                  accessibilityRole="button"
                 >
                   <Text
                     style={[
@@ -499,45 +495,30 @@ export default function HalfStepsTheoryExercise({
             })}
           </View>
 
-          {showResult && (
+          {quiz.showFeedback && (
             <View style={styles.feedbackContainer}>
               <Text
                 style={[
                   styles.feedbackText,
-                  selectedAnswer === currentQ.correctAnswer
+                  isCorrectAnswer(quiz.selectedAnswer)
                     ? styles.feedbackCorrect
                     : styles.feedbackWrong,
                 ]}
               >
-                {selectedAnswer === currentQ.correctAnswer
+                {isCorrectAnswer(quiz.selectedAnswer)
                   ? "✓ Correct!"
-                  : `✗ The answer is: ${currentQ.correctAnswer}`}
+                  : `✗ The answer is: ${currentQuestion.correctAnswer}`}
               </Text>
             </View>
           )}
         </ScrollView>
-
-        {showResult && (
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleNext}
-            accessibilityLabel="Next step"
-            accessibilityRole="button"
-          >
-            <Text style={styles.primaryButtonText}>
-              {quizIndex < QUIZ_QUESTIONS.length - 1
-                ? "Next →"
-                : "See Results →"}
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
     );
   }
 
   // Result phase
   if (phase === PHASES.RESULT) {
-    const passed = score === QUIZ_QUESTIONS.length;
+    const passed = quiz.score === totalQuestions;
 
     return (
       <View style={styles.container}>
@@ -547,7 +528,7 @@ export default function HalfStepsTheoryExercise({
             {passed ? "You understand half steps!" : "Let's review"}
           </Text>
           <Text style={styles.resultScore}>
-            {score} / {QUIZ_QUESTIONS.length} correct
+            {quiz.score} / {totalQuestions} correct
           </Text>
 
           <View style={styles.card}>

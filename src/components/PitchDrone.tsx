@@ -4,12 +4,11 @@ import {
   Text,
   TouchableOpacity,
   Pressable,
-  Platform,
   Modal,
   useWindowDimensions,
 } from "react-native";
 import Slider from "@react-native-community/slider";
-import { devLog, devWarn } from "../utils/devLogger";
+import { devLog } from "../utils/devLogger";
 
 // Import constants and utilities from extracted module
 import {
@@ -25,36 +24,18 @@ import {
 // Import styles
 import { styles, colors } from "./PitchDrone/styles";
 
+// Import shared audio helpers
+import {
+  createAudioContext,
+  cleanupAudioContext,
+} from "../screens/Session/components/exercises/shared/audioHelpers";
+
 // Import shared tuning settings component
 import TuningSettingsButton, {
   type Minor7System,
   type Temperament,
   MINOR_7TH_RATIOS,
 } from "./TuningSettingsButton";
-
-// AudioContext types
-interface NativeAudioContextType {
-  currentTime: number;
-  state: string;
-  destination: AudioDestinationNode;
-  resume: () => Promise<void>;
-  close: () => Promise<void>;
-  createOscillator: () => OscillatorNode;
-  createGain: () => GainNode;
-}
-
-type NativeAudioContextConstructor = new () => NativeAudioContextType;
-
-// Cross-platform AudioContext
-let NativeAudioContext: NativeAudioContextConstructor | null = null;
-if (Platform.OS !== "web") {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    NativeAudioContext = require("react-native-audio-api").AudioContext;
-  } catch (e) {
-    devWarn("react-native-audio-api not available");
-  }
-}
 
 interface PitchDroneProps {
   onPlayingChange?: (isPlaying: boolean) => void;
@@ -78,11 +59,6 @@ interface ActiveDrones {
 
 interface OctaveStacks {
   [noteName: string]: number[];
-}
-
-interface ExtendedWindow extends Window {
-  AudioContext?: typeof AudioContext;
-  webkitAudioContext?: typeof AudioContext;
 }
 
 export default function PitchDrone({
@@ -115,9 +91,7 @@ export default function PitchDrone({
 
   const MAX_OCTAVES_PER_NOTE = 3;
 
-  const audioContextRef = useRef<AudioContext | NativeAudioContextType | null>(
-    null,
-  );
+  const audioContextRef = useRef<AudioContext | null>(null);
   const oscillatorsRef = useRef<Record<string, OscillatorNode>>({});
   const gainNodesRef = useRef<Record<string, GainNode>>({});
   const lfoRef = useRef<Record<string, OscillatorNode>>({});
@@ -182,17 +156,9 @@ export default function PitchDrone({
   }, [initialConcertA]);
 
   // Initialize AudioContext
+  // Initialize AudioContext using shared utility
   useEffect(() => {
-    if (Platform.OS === "web" && typeof window !== "undefined") {
-      const extWindow = window as ExtendedWindow;
-      const AudioContextClass =
-        extWindow.AudioContext || extWindow.webkitAudioContext;
-      if (AudioContextClass) {
-        audioContextRef.current = new AudioContextClass();
-      }
-    } else if (NativeAudioContext) {
-      audioContextRef.current = new NativeAudioContext();
-    }
+    audioContextRef.current = createAudioContext();
 
     return () => {
       Object.entries(oscillatorsRef.current).forEach(([key, osc]) => {
@@ -222,9 +188,8 @@ export default function PitchDrone({
       lfoRef.current = {};
       lfoGainRef.current = {};
 
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
+      // Use async cleanup helper
+      void cleanupAudioContext(audioContextRef.current);
     };
   }, []);
 

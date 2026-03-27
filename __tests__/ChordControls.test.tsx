@@ -383,7 +383,7 @@ describe("ChordControls", () => {
       fireEvent.changeText(input, "C7");
       fireEvent.press(getByTestId("chord-ext-b9"));
 
-      expect(input.props.value).toBe("C7b9");
+      expect(input.props.value).toBe("C7(b9)");
     });
 
     it("should have accessible labels on symbol buttons", () => {
@@ -611,9 +611,9 @@ describe("ChordControls", () => {
       chordModeActive: true,
     };
 
-    it("should not render preview button when onPreviewChord not provided", () => {
-      const { queryByTestId } = render(<ChordControls {...activeProps} />);
-      expect(queryByTestId("chord-preview-button")).toBeNull();
+    it("should always render preview button", () => {
+      const { getByTestId } = render(<ChordControls {...activeProps} />);
+      expect(getByTestId("chord-preview-button")).toBeTruthy();
     });
 
     it("should render preview button when onPreviewChord provided", () => {
@@ -653,7 +653,7 @@ describe("ChordControls", () => {
       const { getByLabelText } = render(
         <ChordControls {...activeProps} onPreviewChord={jest.fn()} />,
       );
-      expect(getByLabelText("Preview chord")).toBeTruthy();
+      expect(getByLabelText("Preview chord tones")).toBeTruthy();
     });
   });
 

@@ -115,20 +115,36 @@ export const instrumentDefaults = {
 /**
  * Get the clef for a given instrument
  */
-export function getClefForInstrument(instrument, selectedFamily) {
+export function getClefForInstrument(
+  instrument: string | undefined | null,
+  selectedFamily: string | undefined | null,
+): string {
   if (!selectedFamily || !instrument) return "treble";
-  const family = instrumentFamilies[selectedFamily];
-  if (!family) return instrumentDefaults[instrument]?.clef || "treble";
+  const family =
+    instrumentFamilies[selectedFamily as keyof typeof instrumentFamilies];
+  if (!family)
+    return (
+      instrumentDefaults[instrument as keyof typeof instrumentDefaults]?.clef ||
+      "treble"
+    );
   const inst = family.instruments.find((i) => i.name === instrument);
-  return inst?.clef || instrumentDefaults[instrument]?.clef || "treble";
+  return (
+    inst?.clef ||
+    instrumentDefaults[instrument as keyof typeof instrumentDefaults]?.clef ||
+    "treble"
+  );
 }
 
 /**
  * Get the icon for a given instrument
  */
-export function getIconForInstrument(instrument, selectedFamily) {
+export function getIconForInstrument(
+  instrument: string | undefined | null,
+  selectedFamily: string | undefined | null,
+): string {
   if (!selectedFamily || !instrument) return "🎵";
-  const family = instrumentFamilies[selectedFamily];
+  const family =
+    instrumentFamilies[selectedFamily as keyof typeof instrumentFamilies];
   if (!family) return "🎵";
   const inst = family.instruments.find((i) => i.name === instrument);
   return inst?.icon || "🎵";

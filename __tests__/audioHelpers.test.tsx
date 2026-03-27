@@ -53,6 +53,7 @@ function mockCreateAudioContext(options?: { state?: string }) {
     })),
     createBufferSource: jest.fn(() => bufferSource),
     close: jest.fn(() => Promise.resolve()),
+    resume: jest.fn(() => Promise.resolve()),
   };
 }
 
@@ -355,6 +356,117 @@ describe("audioHelpers", () => {
         } = require("../src/screens/Session/components/exercises/shared/audioHelpers");
         // Should not throw
         await expect(cleanupAudioContext(mockContext)).resolves.toBeUndefined();
+      });
+    });
+  });
+
+  describe("resumeAudioContext", () => {
+    it("returns false when audioContext is null", async () => {
+      jest.isolateModules(async () => {
+        const {
+          resumeAudioContext,
+        } = require("../src/screens/Session/components/exercises/shared/audioHelpers");
+        const result = await resumeAudioContext(null);
+        expect(result).toBe(false);
+      });
+    });
+
+    it("resumes suspended audioContext", async () => {
+      Platform.OS = "ios" as typeof Platform.OS;
+      const mockContext = mockCreateAudioContext({ state: "suspended" });
+      mockContext.resume = jest.fn(() => {
+        mockContext.state = "running";
+        return Promise.resolve();
+      });
+
+      jest.isolateModules(async () => {
+        const {
+          resumeAudioContext,
+        } = require("../src/screens/Session/components/exercises/shared/audioHelpers");
+        const result = await resumeAudioContext(mockContext);
+
+        expect(mockContext.resume).toHaveBeenCalled();
+        expect(result).toBe(true);
+      });
+    });
+
+    it("returns true for already running audioContext", async () => {
+      Platform.OS = "ios" as typeof Platform.OS;
+      const mockContext = mockCreateAudioContext({ state: "running" });
+      mockContext.resume = jest.fn();
+
+      jest.isolateModules(async () => {
+        const {
+          resumeAudioContext,
+        } = require("../src/screens/Session/components/exercises/shared/audioHelpers");
+        const result = await resumeAudioContext(mockContext);
+
+        expect(mockContext.resume).not.toHaveBeenCalled();
+        expect(result).toBe(true);
+      });
+    });
+
+    it("handles resume errors gracefully", async () => {
+      Platform.OS = "ios" as typeof Platform.OS;
+      const mockContext = mockCreateAudioContext({ state: "suspended" });
+      mockContext.resume = jest.fn(() =>
+        Promise.reject(new Error("Resume failed")),
+      );
+
+      jest.isolateModules(async () => {
+        const {
+          resumeAudioContext,
+        } = require("../src/screens/Session/components/exercises/shared/audioHelpers");
+        const result = await resumeAudioContext(mockContext);
+
+        expect(result).toBe(false);
+      });
+    });
+  });
+
+  describe("isAudioContextReady", () => {
+    it("returns false when audioContext is null", () => {
+      jest.isolateModules(() => {
+        const {
+          isAudioContextReady,
+        } = require("../src/screens/Session/components/exercises/shared/audioHelpers");
+        expect(isAudioContextReady(null)).toBe(false);
+      });
+    });
+
+    it("returns true when audioContext is running", () => {
+      Platform.OS = "ios" as typeof Platform.OS;
+      const mockContext = mockCreateAudioContext({ state: "running" });
+
+      jest.isolateModules(() => {
+        const {
+          isAudioContextReady,
+        } = require("../src/screens/Session/components/exercises/shared/audioHelpers");
+        expect(isAudioContextReady(mockContext)).toBe(true);
+      });
+    });
+
+    it("returns false when audioContext is suspended", () => {
+      Platform.OS = "ios" as typeof Platform.OS;
+      const mockContext = mockCreateAudioContext({ state: "suspended" });
+
+      jest.isolateModules(() => {
+        const {
+          isAudioContextReady,
+        } = require("../src/screens/Session/components/exercises/shared/audioHelpers");
+        expect(isAudioContextReady(mockContext)).toBe(false);
+      });
+    });
+
+    it("returns false when audioContext is closed", () => {
+      Platform.OS = "ios" as typeof Platform.OS;
+      const mockContext = mockCreateAudioContext({ state: "closed" });
+
+      jest.isolateModules(() => {
+        const {
+          isAudioContextReady,
+        } = require("../src/screens/Session/components/exercises/shared/audioHelpers");
+        expect(isAudioContextReady(mockContext)).toBe(false);
       });
     });
   });

@@ -23,6 +23,17 @@ export type {
   PlaybackEvent,
 } from "./hooks";
 
+// Contexts
+export {
+  ChordProgressionProvider,
+  useChordProgression,
+  useChordProgressionOptional,
+} from "./contexts";
+export type {
+  ChordProgressionContextValue,
+  ChordProgressionProviderProps,
+} from "./contexts";
+
 // Services
 export {
   tuneComposerStorageService,

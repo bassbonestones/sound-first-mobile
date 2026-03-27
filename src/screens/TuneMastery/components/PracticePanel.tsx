@@ -8,21 +8,32 @@
  * - Mute button with volume controls (long press)
  * - Rating slider with fine-tune buttons
  */
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useReducer, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   ScrollView,
   SafeAreaView,
-  Platform,
   Modal,
 } from "react-native";
 import Slider from "@react-native-community/slider";
 import Metronome from "../../../components/Metronome";
 import PitchDrone from "../../../components/PitchDrone";
-import Tuner, { TunerMode, Temperament } from "./Tuner";
+import Tuner from "./Tuner";
+import { practicePanelStyles as styles } from "./practicePanelStyles";
+import { practicePanelReducer } from "./practicePanelReducer";
+import {
+  createInitialPracticePanelState,
+  type PracticePanelSettings,
+  type TuneSettingsForPractice,
+} from "./practicePanelTypes";
+
+// Re-export types for backward compatibility
+export type {
+  PracticePanelSettings,
+  TuneSettingsForPractice,
+} from "./practicePanelTypes";
 
 // Focus card type
 interface FocusCard {
@@ -190,21 +201,6 @@ const FOCUS_CARDS: FocusCard[] = [
   },
 ];
 
-export interface PracticePanelSettings {
-  tunerMode?: TunerMode;
-  temperament?: Temperament;
-  autoMetronome?: boolean;
-  autoDrone?: boolean;
-}
-
-export interface TuneSettingsForPractice {
-  bpm?: number;
-  timeSignature?: string;
-  subdivision?: number;
-  pitchSystem?: "equal" | "just";
-  aHertz?: number;
-}
-
 export interface PracticePanelProps {
   tuneName: string;
   tuneKey: string;
@@ -259,49 +255,48 @@ export default function PracticePanel({
   settings,
   tuneSettings,
 }: PracticePanelProps): React.JSX.Element {
-  const [rating, setRating] = useState(currentScore || 50);
-
-  // Tool visibility states - expanded means full screen view
-  const [tunerExpanded, setTunerExpanded] = useState(false);
-  const [metronomeExpanded, setMetronomeExpanded] = useState(false);
-  const [droneExpanded, setDroneExpanded] = useState(false);
-
-  // Track if tools are active (playing) - separate from expanded state
-  const [metronomeActive, setMetronomeActive] = useState(
-    settings?.autoMetronome || false,
-  );
-  const [droneActive, setDroneActive] = useState(settings?.autoDrone || false);
-
-  // Track if audio is actually playing (updated by child component callbacks)
-  const [metronomeIsPlaying, setMetronomeIsPlaying] = useState(
-    settings?.autoMetronome || false,
-  );
-  const [droneIsPlaying, setDroneIsPlaying] = useState(
-    settings?.autoDrone || false,
+  // Single reducer manages all component state
+  const [state, dispatch] = useReducer(
+    practicePanelReducer,
+    { currentScore, settings },
+    ({ currentScore: score, settings: s }) =>
+      createInitialPracticePanelState(score, s),
   );
 
-  // Track whether auto-start has already happened (prevents restart on remount)
-  const [metronomeAutoStarted, setMetronomeAutoStarted] = useState(false);
-  const [droneAutoStarted, setDroneAutoStarted] = useState(false);
+  // Destructure state for readability
+  const { tunerExpanded, metronomeExpanded, droneExpanded } =
+    state.toolExpansion;
+  const { metronomeActive, droneActive } = state.toolActivation;
+  const {
+    metronomeIsPlaying,
+    droneIsPlaying,
+    metronomeAutoStarted,
+    droneAutoStarted,
+  } = state.playback;
+  const { audioMuted, metronomeVolume, droneVolume } = state.audio;
+  const { showVolumeModal, rating } = state.ui;
 
   // Set autoStarted flag when component first becomes active
   useEffect(() => {
     if (metronomeActive && !metronomeAutoStarted) {
-      setMetronomeAutoStarted(true);
+      dispatch({ type: "SET_METRONOME_AUTO_STARTED" });
     }
   }, [metronomeActive, metronomeAutoStarted]);
 
   useEffect(() => {
     if (droneActive && !droneAutoStarted) {
-      setDroneAutoStarted(true);
+      dispatch({ type: "SET_DRONE_AUTO_STARTED" });
     }
   }, [droneActive, droneAutoStarted]);
 
-  // Audio controls
-  const [audioMuted, setAudioMuted] = useState(false);
-  const [showVolumeModal, setShowVolumeModal] = useState(false);
-  const [metronomeVolume, setMetronomeVolume] = useState(0.5);
-  const [droneVolume, setDroneVolume] = useState(0.5);
+  // Callbacks for child components
+  const handleMetronomePlayingChange = useCallback((isPlaying: boolean) => {
+    dispatch({ type: "SET_METRONOME_PLAYING", payload: isPlaying });
+  }, []);
+
+  const handleDronePlayingChange = useCallback((isPlaying: boolean) => {
+    dispatch({ type: "SET_DRONE_PLAYING", payload: isPlaying });
+  }, []);
 
   // Get metronome settings from tune or use defaults
   const metronomeBpm = tuneSettings?.bpm || 120;
@@ -328,9 +323,9 @@ export default function PracticePanel({
     return FOCUS_CARDS[randomIndex];
   }, [tuneName, tuneKey]);
 
-  const handleFineTune = (delta: number): void => {
-    setRating((prev) => Math.min(100, Math.max(0, prev + delta)));
-  };
+  const handleFineTune = useCallback((delta: number): void => {
+    dispatch({ type: "ADJUST_RATING", payload: delta });
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -364,15 +359,10 @@ export default function PracticePanel({
                 tunerExpanded && styles.headerToolButtonActiveExpanded,
               ]}
               onPress={() => {
-                const willExpand = !tunerExpanded;
-                setTunerExpanded(willExpand);
-                if (willExpand) {
-                  setMetronomeExpanded(false);
-                  setDroneExpanded(false);
-                  // Only mute if something is actually playing
-                  if (metronomeIsPlaying || droneIsPlaying) {
-                    setAudioMuted(true);
-                  }
+                if (tunerExpanded) {
+                  dispatch({ type: "COLLAPSE_TUNER" });
+                } else {
+                  dispatch({ type: "EXPAND_TUNER" });
                 }
               }}
               accessibilityLabel={
@@ -393,23 +383,15 @@ export default function PracticePanel({
               ]}
               onPress={() => {
                 if (!metronomeActive) {
-                  setMetronomeActive(true);
-                  setMetronomeExpanded(true);
-                  setTunerExpanded(false);
-                  setDroneExpanded(false);
+                  dispatch({ type: "EXPAND_METRONOME" });
+                } else if (metronomeExpanded) {
+                  dispatch({ type: "COLLAPSE_METRONOME" });
                 } else {
-                  const willExpand = !metronomeExpanded;
-                  setMetronomeExpanded(willExpand);
-                  if (willExpand) {
-                    setTunerExpanded(false);
-                    setDroneExpanded(false);
-                  }
+                  dispatch({ type: "EXPAND_METRONOME" });
                 }
               }}
               onLongPress={() => {
-                setMetronomeActive(false);
-                setMetronomeExpanded(false);
-                setMetronomeIsPlaying(false);
+                dispatch({ type: "DEACTIVATE_METRONOME" });
               }}
               accessibilityLabel={
                 metronomeExpanded ? "Collapse metronome" : "Expand metronome"
@@ -427,23 +409,15 @@ export default function PracticePanel({
               ]}
               onPress={() => {
                 if (!droneActive) {
-                  setDroneActive(true);
-                  setDroneExpanded(true);
-                  setTunerExpanded(false);
-                  setMetronomeExpanded(false);
+                  dispatch({ type: "EXPAND_DRONE" });
+                } else if (droneExpanded) {
+                  dispatch({ type: "COLLAPSE_DRONE" });
                 } else {
-                  const willExpand = !droneExpanded;
-                  setDroneExpanded(willExpand);
-                  if (willExpand) {
-                    setTunerExpanded(false);
-                    setMetronomeExpanded(false);
-                  }
+                  dispatch({ type: "EXPAND_DRONE" });
                 }
               }}
               onLongPress={() => {
-                setDroneActive(false);
-                setDroneExpanded(false);
-                setDroneIsPlaying(false);
+                dispatch({ type: "DEACTIVATE_DRONE" });
               }}
               accessibilityLabel={
                 droneExpanded ? "Collapse drone" : "Expand drone"
@@ -457,7 +431,7 @@ export default function PracticePanel({
               <>
                 <View style={styles.headerToolDivider} />
                 <TouchableOpacity
-                  onPress={() => setShowVolumeModal(true)}
+                  onPress={() => dispatch({ type: "SHOW_VOLUME_MODAL" })}
                   style={styles.headerToolButton}
                   accessibilityLabel="Adjust volume"
                   accessibilityRole="button"
@@ -469,7 +443,7 @@ export default function PracticePanel({
                     styles.headerToolButton,
                     audioMuted && styles.headerToolButtonMuted,
                   ]}
-                  onPress={() => setAudioMuted((prev) => !prev)}
+                  onPress={() => dispatch({ type: "TOGGLE_MUTE" })}
                   accessibilityLabel={audioMuted ? "Unmute" : "Mute"}
                   accessibilityRole="button"
                 >
@@ -517,7 +491,7 @@ export default function PracticePanel({
             muted={audioMuted}
             volume={metronomeVolume}
             hideInternalMute={true}
-            onPlayingChange={setMetronomeIsPlaying}
+            onPlayingChange={handleMetronomePlayingChange}
           />
         </View>
       )}
@@ -541,7 +515,7 @@ export default function PracticePanel({
             temperament={tunePitchSystem}
             pitchCenter={tuneKeyIndex}
             concertA={tuneSettings?.aHertz || 440}
-            onPlayingChange={setDroneIsPlaying}
+            onPlayingChange={handleDronePlayingChange}
           />
         </View>
       )}
@@ -573,7 +547,9 @@ export default function PracticePanel({
             <Slider
               style={styles.slider}
               value={rating}
-              onValueChange={(value: number) => setRating(Math.round(value))}
+              onValueChange={(value: number) =>
+                dispatch({ type: "SET_RATING", payload: Math.round(value) })
+              }
               minimumValue={0}
               maximumValue={100}
               step={1}
@@ -640,7 +616,7 @@ export default function PracticePanel({
         visible={showVolumeModal}
         animationType="fade"
         transparent={true}
-        onRequestClose={() => setShowVolumeModal(false)}
+        onRequestClose={() => dispatch({ type: "HIDE_VOLUME_MODAL" })}
       >
         <View style={styles.modalBackdrop}>
           <View style={styles.volumeModalContainer}>
@@ -656,7 +632,9 @@ export default function PracticePanel({
                 minimumValue={0}
                 maximumValue={1}
                 value={metronomeVolume}
-                onValueChange={setMetronomeVolume}
+                onValueChange={(value) =>
+                  dispatch({ type: "SET_METRONOME_VOLUME", payload: value })
+                }
                 minimumTrackTintColor="#9C27B0"
                 maximumTrackTintColor="#444"
                 thumbTintColor="#9C27B0"
@@ -673,7 +651,9 @@ export default function PracticePanel({
                 minimumValue={0}
                 maximumValue={1}
                 value={droneVolume}
-                onValueChange={setDroneVolume}
+                onValueChange={(value) =>
+                  dispatch({ type: "SET_DRONE_VOLUME", payload: value })
+                }
                 minimumTrackTintColor="#00BCD4"
                 maximumTrackTintColor="#444"
                 thumbTintColor="#00BCD4"
@@ -682,7 +662,7 @@ export default function PracticePanel({
 
             {/* Done Button */}
             <TouchableOpacity
-              onPress={() => setShowVolumeModal(false)}
+              onPress={() => dispatch({ type: "HIDE_VOLUME_MODAL" })}
               style={styles.volumeDoneButton}
               accessibilityLabel="Close volume control"
               accessibilityRole="button"
@@ -696,302 +676,4 @@ export default function PracticePanel({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#1a1a2e",
-  },
-  header: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#3a3a4e",
-    backgroundColor: "#2a2a3e",
-  },
-  headerTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    rowGap: 8,
-  },
-  headerTitleGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexGrow: 1,
-    flexShrink: 1,
-    minWidth: 80,
-  },
-  cancelButton: {
-    padding: 6,
-    marginRight: 4,
-  },
-  cancelButtonText: {
-    color: "#FFD700",
-    fontSize: 22,
-    fontWeight: "bold",
-  },
-  titleContainer: {
-    flexShrink: 1,
-    minWidth: 60,
-    alignItems: "flex-start",
-    marginLeft: 4,
-  },
-  practiceTitle: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  practiceKey: {
-    color: "#FFD700",
-    fontSize: 12,
-    marginTop: 1,
-  },
-  headerToolsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginLeft: "auto",
-  },
-  headerToolButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#3a3a4e",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#4a4a5e",
-  },
-  // Tuner button styles - lighter when closed, solid when expanded
-  headerToolButtonActive: {
-    backgroundColor: "rgba(255, 215, 0, 0.3)",
-    borderColor: "#FFD700",
-  },
-  headerToolButtonActiveExpanded: {
-    backgroundColor: "#FFD700",
-    borderColor: "#FFD700",
-  },
-  // Metronome button styles - lighter when closed, solid when expanded
-  headerToolButtonMetronome: {
-    backgroundColor: "rgba(156, 39, 176, 0.3)",
-    borderColor: "#9C27B0",
-  },
-  headerToolButtonMetronomeExpanded: {
-    backgroundColor: "#9C27B0",
-    borderColor: "#9C27B0",
-  },
-  // Drone button styles - lighter when closed, solid when expanded
-  headerToolButtonDrone: {
-    backgroundColor: "rgba(0, 188, 212, 0.3)",
-    borderColor: "#00BCD4",
-  },
-  headerToolButtonDroneExpanded: {
-    backgroundColor: "#00BCD4",
-    borderColor: "#00BCD4",
-  },
-  headerToolButtonMuted: {
-    backgroundColor: "#ff6b6b",
-    borderColor: "#ff6b6b",
-  },
-  headerToolEmoji: {
-    fontSize: 20,
-  },
-  headerToolDivider: {
-    width: 2,
-    height: 28,
-    backgroundColor: "#FFD700",
-    marginHorizontal: 4,
-    borderRadius: 1,
-  },
-
-  // Content
-  content: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 16,
-  },
-
-  // Focus Card
-  focusCard: {
-    backgroundColor: "#3b2c1a",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: "#FFD700",
-  },
-  focusCardCategory: {
-    color: "#888",
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  focusCardName: {
-    color: "#FFD700",
-    fontSize: 18,
-    fontWeight: "bold",
-    fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
-    marginBottom: 8,
-  },
-  focusCardCue: {
-    color: "#fffbe6",
-    fontSize: 16,
-    fontFamily: Platform.OS === "ios" ? "Baskerville" : "serif",
-    lineHeight: 22,
-  },
-
-  // Tool Panels
-  tunerPanelFixed: {
-    flex: 1,
-    backgroundColor: "#2a2a3e",
-    borderRadius: 12,
-    margin: 16,
-    borderWidth: 1,
-    borderColor: "#FFD700",
-    overflow: "hidden",
-  },
-  toolPanelFixed: {
-    flex: 1,
-    borderRadius: 12,
-    margin: 16,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  toolPanelMetronome: {
-    backgroundColor: "#1a1410",
-    borderColor: "#9C27B0",
-  },
-  toolPanelDrone: {
-    backgroundColor: "#1a1a2a",
-    borderColor: "#00BCD4",
-  },
-  toolPanelCollapsed: {
-    flex: 0,
-    height: 0,
-    margin: 0,
-    borderWidth: 0,
-    overflow: "hidden",
-  },
-
-  // Rating
-  ratingSection: {
-    backgroundColor: "#2a2a3e",
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 4,
-  },
-  ratingLabel: {
-    color: "#888",
-    fontSize: 14,
-    textAlign: "center",
-    marginBottom: 4,
-  },
-  scoreDisplay: {
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  scoreValue: {
-    color: "#FFD700",
-    fontSize: 40,
-    fontWeight: "bold",
-  },
-  scorePrevious: {
-    color: "#666",
-    fontSize: 13,
-  },
-  slider: {
-    width: "100%",
-    height: 32,
-  },
-  fineTuneRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 10,
-    marginTop: 8,
-  },
-  fineTuneButton: {
-    backgroundColor: "#3a3a4e",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  fineTuneButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-
-  // Submit
-  submitContainer: {
-    padding: 16,
-    backgroundColor: "#2a2a3e",
-    borderTopWidth: 1,
-    borderTopColor: "#3a3a4e",
-  },
-  submitButton: {
-    backgroundColor: "#FFD700",
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  submitButtonText: {
-    color: "#1a1a2e",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-
-  // Volume Modal
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  volumeModalContainer: {
-    backgroundColor: "#2a2a3e",
-    borderRadius: 16,
-    padding: 24,
-    width: "100%",
-    maxWidth: 320,
-  },
-  volumeModalTitle: {
-    color: "#FFD700",
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  volumeSection: {
-    marginBottom: 24,
-  },
-  volumeLabelMetronome: {
-    color: "#9C27B0",
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  volumeLabelDrone: {
-    color: "#00BCD4",
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  volumeSlider: {
-    width: "100%",
-    height: 40,
-  },
-  volumeDoneButton: {
-    backgroundColor: "#FFD700",
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  volumeDoneButtonText: {
-    color: "#1a1a2e",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-});
+// Note: Styles have been extracted to practicePanelStyles.ts

@@ -1,12 +1,59 @@
 /**
- * Parse note name to get components
- * @param {string} note - Note name like "Bb3", "C#4"
- * @returns {Object} Parsed note components
+ * Note helper utilities for FirstNote flow
+ *
+ * Provides note parsing, MusicXML generation, and frequency conversion.
  */
-export function parseNoteName(note) {
-  if (!note) return { letter: "C", accidental: "", octave: 4 };
+
+// =============================================================================
+// Types
+// =============================================================================
+
+/** Result of parsing a note name like "Bb3" */
+export interface ParsedNoteResult {
+  letter: string;
+  accidental: string;
+  rawAccidental: string;
+  octave: number;
+  hasAccidental: boolean;
+}
+
+/** MusicXML pitch representation */
+export interface MusicXMLPitch {
+  step: string;
+  octave: number;
+  alter: number;
+}
+
+/** Clef type for staff rendering */
+export type ClefType = "treble" | "bass";
+
+// =============================================================================
+// Functions
+// =============================================================================
+
+/**
+ * Parse note name to get components
+ * @param note - Note name like "Bb3", "C#4"
+ * @returns Parsed note components
+ */
+export function parseNoteName(note: string): ParsedNoteResult {
+  if (!note)
+    return {
+      letter: "C",
+      accidental: "",
+      rawAccidental: "",
+      octave: 4,
+      hasAccidental: false,
+    };
   const match = note.match(/^([A-Ga-g])([#b]?)(\d)$/);
-  if (!match) return { letter: "C", accidental: "", octave: 4 };
+  if (!match)
+    return {
+      letter: "C",
+      accidental: "",
+      rawAccidental: "",
+      octave: 4,
+      hasAccidental: false,
+    };
   return {
     letter: match[1].toUpperCase(),
     accidental: match[2] === "#" ? "♯" : match[2] === "b" ? "♭" : "",
@@ -18,10 +65,10 @@ export function parseNoteName(note) {
 
 /**
  * Convert note name to MusicXML pitch representation
- * @param {string} noteName - Note name like "Bb3"
- * @returns {Object} MusicXML pitch object with step, octave, alter
+ * @param noteName - Note name like "Bb3"
+ * @returns MusicXML pitch object with step, octave, alter
  */
-export function noteToMusicXMLPitch(noteName) {
+export function noteToMusicXMLPitch(noteName: string): MusicXMLPitch {
   const parsed = parseNoteName(noteName);
   if (!parsed) return { step: "C", octave: 4, alter: 0 };
 
@@ -37,11 +84,14 @@ export function noteToMusicXMLPitch(noteName) {
 
 /**
  * Generate MusicXML for a single note on a staff
- * @param {string} noteName - Note name like "Bb3"
- * @param {string} clef - Clef type: "treble" or "bass"
- * @returns {string} MusicXML content
+ * @param noteName - Note name like "Bb3"
+ * @param clef - Clef type: "treble" or "bass"
+ * @returns MusicXML content
  */
-export function generateSingleNoteMusicXML(noteName, clef = "treble") {
+export function generateSingleNoteMusicXML(
+  noteName: string,
+  clef: ClefType = "treble",
+): string {
   const pitch = noteToMusicXMLPitch(noteName);
   const clefSign = clef === "bass" ? "F" : "G";
   const clefLine = clef === "bass" ? "4" : "2";
@@ -91,10 +141,10 @@ ${alterXML}          <octave>${pitch.octave}</octave>
 
 /**
  * Convert note name to frequency (e.g., "Bb3" -> 233.08 Hz)
- * @param {string} noteName - Note name like "Bb3", "A4"
- * @returns {number} Frequency in Hz
+ * @param noteName - Note name like "Bb3", "A4"
+ * @returns Frequency in Hz
  */
-export function noteToFrequency(noteName) {
+export function noteToFrequency(noteName: string): number {
   // Parse note name
   const match = noteName.match(/^([A-Ga-g])([#b]?)(\d+)$/);
   if (!match) return 440; // Default A4
@@ -103,7 +153,15 @@ export function noteToFrequency(noteName) {
   const octave = parseInt(octaveStr, 10);
 
   // Semitones from C
-  const noteMap = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  const noteMap: Record<string, number> = {
+    C: 0,
+    D: 2,
+    E: 4,
+    F: 5,
+    G: 7,
+    A: 9,
+    B: 11,
+  };
   let semitone = noteMap[letter.toUpperCase()] || 0;
 
   if (accidental === "#") semitone += 1;

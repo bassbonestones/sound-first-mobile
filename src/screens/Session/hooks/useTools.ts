@@ -1,9 +1,58 @@
 /**
  * useTools - Hook for managing metronome and pitch drone tools
  */
-import { useState, useEffect, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  Dispatch,
+  SetStateAction,
+  MutableRefObject,
+} from "react";
 
-export default function useTools(currentMiniSession) {
+/** Return type for useTools hook */
+export interface UseToolsReturn {
+  // Metronome
+  metronomeEnabled: boolean;
+  setMetronomeEnabled: Dispatch<SetStateAction<boolean>>;
+  metronomeVisible: boolean;
+  setMetronomeVisible: Dispatch<SetStateAction<boolean>>;
+  metronomeIsPlaying: boolean;
+  setMetronomeIsPlaying: Dispatch<SetStateAction<boolean>>;
+  metronomeVolume: number;
+  setMetronomeVolume: Dispatch<SetStateAction<number>>;
+  toggleMetronome: () => void;
+
+  // Drone
+  droneEnabled: boolean;
+  setDroneEnabled: Dispatch<SetStateAction<boolean>>;
+  droneVisible: boolean;
+  setDroneVisible: Dispatch<SetStateAction<boolean>>;
+  droneIsPlaying: boolean;
+  setDroneIsPlaying: Dispatch<SetStateAction<boolean>>;
+  droneVolume: number;
+  setDroneVolume: Dispatch<SetStateAction<number>>;
+  toggleDrone: () => void;
+
+  // Audio
+  audioMuted: boolean;
+  setAudioMuted: Dispatch<SetStateAction<boolean>>;
+  showVolumeModal: boolean;
+  setShowVolumeModal: Dispatch<SetStateAction<boolean>>;
+
+  // Long press helpers
+  startMuteLongPress: () => void;
+  cancelMuteLongPress: () => void;
+  handleMutePress: () => void;
+  longPressTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
+}
+
+/**
+ * Hook for managing metronome and pitch drone tools in session screens
+ * @param currentMiniSession - Current mini session (used to reset tools on session change)
+ * @returns Object containing tool state and controls
+ */
+export default function useTools(currentMiniSession: unknown): UseToolsReturn {
   // Metronome state
   const [metronomeEnabled, setMetronomeEnabled] = useState(false);
   const [metronomeVisible, setMetronomeVisible] = useState(false);
@@ -23,7 +72,7 @@ export default function useTools(currentMiniSession) {
   const [showVolumeModal, setShowVolumeModal] = useState(false);
 
   // Long-press timer ref for mute button
-  const longPressTimerRef = useRef(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset tools when mini-session changes
   useEffect(() => {
@@ -37,7 +86,7 @@ export default function useTools(currentMiniSession) {
   }, [currentMiniSession]);
 
   // Toggle metronome
-  const toggleMetronome = () => {
+  const toggleMetronome = (): void => {
     if (metronomeEnabled) {
       setMetronomeEnabled(false);
       setMetronomeVisible(false);
@@ -48,7 +97,7 @@ export default function useTools(currentMiniSession) {
   };
 
   // Toggle drone
-  const toggleDrone = () => {
+  const toggleDrone = (): void => {
     if (droneEnabled) {
       setDroneEnabled(false);
       setDroneVisible(false);
@@ -59,14 +108,14 @@ export default function useTools(currentMiniSession) {
   };
 
   // Start long press for mute
-  const startMuteLongPress = () => {
+  const startMuteLongPress = (): void => {
     longPressTimerRef.current = setTimeout(() => {
       setShowVolumeModal(true);
     }, 500);
   };
 
   // Cancel long press
-  const cancelMuteLongPress = () => {
+  const cancelMuteLongPress = (): void => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
@@ -74,7 +123,7 @@ export default function useTools(currentMiniSession) {
   };
 
   // Handle short press (toggle mute)
-  const handleMutePress = () => {
+  const handleMutePress = (): void => {
     cancelMuteLongPress();
     setAudioMuted(!audioMuted);
   };

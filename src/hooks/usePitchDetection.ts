@@ -3,7 +3,7 @@
  *
  * Uses Web Audio API for web and react-native-live-audio-stream for native.
  */
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useReducer } from "react";
 import { Platform, PermissionsAndroid } from "react-native";
 import { devLog, devWarn, devError } from "../utils/devLogger";
 import {
@@ -105,6 +105,91 @@ interface PitchBufferEntry {
   noteInfo: NoteInfo;
 }
 
+// Reducer state type
+interface PitchDetectionState {
+  isListening: boolean;
+  permissionGranted: boolean;
+  error: string | null;
+  currentPitch: NoteInfo | null;
+  volume: number;
+  isSounding: boolean;
+}
+
+// Action types for pitch detection reducer
+type PitchDetectionAction =
+  | { type: "START_LISTENING" }
+  | { type: "STOP_LISTENING" }
+  | { type: "SET_PERMISSION"; granted: boolean }
+  | { type: "SET_ERROR"; error: string | null }
+  | { type: "SET_VOLUME"; volume: number }
+  | { type: "SET_PITCH"; pitch: NoteInfo | null }
+  | { type: "SET_SOUNDING"; isSounding: boolean }
+  | { type: "CLEAR_ERROR" };
+
+const initialPitchDetectionState: PitchDetectionState = {
+  isListening: false,
+  permissionGranted: false,
+  error: null,
+  currentPitch: null,
+  volume: 0,
+  isSounding: false,
+};
+
+function pitchDetectionReducer(
+  state: PitchDetectionState,
+  action: PitchDetectionAction,
+): PitchDetectionState {
+  switch (action.type) {
+    case "START_LISTENING":
+      return {
+        ...state,
+        isListening: true,
+        error: null,
+      };
+    case "STOP_LISTENING":
+      return {
+        ...state,
+        isListening: false,
+        volume: 0,
+        currentPitch: null,
+        isSounding: false,
+      };
+    case "SET_PERMISSION":
+      return {
+        ...state,
+        permissionGranted: action.granted,
+      };
+    case "SET_ERROR":
+      return {
+        ...state,
+        error: action.error,
+        isListening: false,
+      };
+    case "SET_VOLUME":
+      return {
+        ...state,
+        volume: action.volume,
+      };
+    case "SET_PITCH":
+      return {
+        ...state,
+        currentPitch: action.pitch,
+      };
+    case "SET_SOUNDING":
+      return {
+        ...state,
+        isSounding: action.isSounding,
+      };
+    case "CLEAR_ERROR":
+      return {
+        ...state,
+        error: null,
+      };
+    default:
+      return state;
+  }
+}
+
 /**
  * Hook for real-time pitch detection on mobile using react-native-live-audio-stream.
  */
@@ -124,12 +209,18 @@ export function usePitchDetection({
   externalAudioContext = null,
   soundingFrequencyRange = null,
 }: UsePitchDetectionOptions): UsePitchDetectionReturn {
-  const [isListening, setIsListening] = useState(false);
-  const [permissionGranted, setPermissionGranted] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPitch, setCurrentPitch] = useState<NoteInfo | null>(null);
-  const [volume, setVolume] = useState(0);
-  const [isSounding, setIsSounding] = useState(false);
+  const [state, dispatch] = useReducer(
+    pitchDetectionReducer,
+    initialPitchDetectionState,
+  );
+  const {
+    isListening,
+    permissionGranted,
+    error,
+    currentPitch,
+    volume,
+    isSounding,
+  } = state;
 
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const soundStartedRef = useRef(false);
@@ -157,7 +248,7 @@ export function usePitchDetection({
   const requestPermission = useCallback(async (): Promise<boolean> => {
     try {
       if (Platform.OS === "web") {
-        setPermissionGranted(true);
+        dispatch({ type: "SET_PERMISSION", granted: true });
         return true;
       } else if (Platform.OS === "android") {
         const granted = await PermissionsAndroid.request(
@@ -171,15 +262,21 @@ export function usePitchDetection({
             buttonPositive: "OK",
           },
         );
-        setPermissionGranted(granted === PermissionsAndroid.RESULTS.GRANTED);
+        dispatch({
+          type: "SET_PERMISSION",
+          granted: granted === PermissionsAndroid.RESULTS.GRANTED,
+        });
         return granted === PermissionsAndroid.RESULTS.GRANTED;
       } else {
-        setPermissionGranted(true);
+        dispatch({ type: "SET_PERMISSION", granted: true });
         return true;
       }
     } catch (err) {
       devError("Permission error:", err);
-      setError("Failed to request microphone permission");
+      dispatch({
+        type: "SET_ERROR",
+        error: "Failed to request microphone permission",
+      });
       return false;
     }
   }, []);
@@ -205,7 +302,7 @@ export function usePitchDetection({
 
         if (Math.abs(normalizedVolume - lastVolumeRef.current) > 0.01) {
           lastVolumeRef.current = normalizedVolume;
-          setVolume(normalizedVolume);
+          dispatch({ type: "SET_VOLUME", volume: normalizedVolume });
         }
         onVolumeChange?.(normalizedVolume);
 
@@ -234,7 +331,7 @@ export function usePitchDetection({
                 devLog("[Audio Processing]", result, noteInfo, "IN RANGE");
                 if (noteInfo.noteName !== lastPitchNoteRef.current) {
                   lastPitchNoteRef.current = noteInfo.noteName;
-                  setCurrentPitch(noteInfo);
+                  dispatch({ type: "SET_PITCH", pitch: noteInfo });
                 }
               }
 
@@ -273,14 +370,14 @@ export function usePitchDetection({
             : true;
           if (!soundStartedRef.current && shouldTriggerSounding) {
             soundStartedRef.current = true;
-            setIsSounding(true);
+            dispatch({ type: "SET_SOUNDING", isSounding: true });
             onSoundStart?.();
           }
         } else {
           if (soundStartedRef.current && !silenceTimerRef.current) {
             silenceTimerRef.current = setTimeout(() => {
               soundStartedRef.current = false;
-              setIsSounding(false);
+              dispatch({ type: "SET_SOUNDING", isSounding: false });
 
               const cutoff = Date.now() - 1000;
               const recent = pitchBufferRef.current.filter(
@@ -315,7 +412,7 @@ export function usePitchDetection({
               pitchBufferRef.current = [];
               if (!isSounding) {
                 lastPitchNoteRef.current = null;
-                setCurrentPitch(null);
+                dispatch({ type: "SET_PITCH", pitch: null });
               }
               onSoundEnd?.();
             }, silenceDuration);
@@ -359,7 +456,7 @@ export function usePitchDetection({
 
       if (Math.abs(normalizedVolume - lastVolumeRef.current) > 0.01) {
         lastVolumeRef.current = normalizedVolume;
-        setVolume(normalizedVolume);
+        dispatch({ type: "SET_VOLUME", volume: normalizedVolume });
       }
       onVolumeChange?.(normalizedVolume);
 
@@ -392,7 +489,7 @@ export function usePitchDetection({
               if (inSoundingRange) {
                 if (noteInfo.noteName !== lastPitchNoteRef.current) {
                   lastPitchNoteRef.current = noteInfo.noteName;
-                  setCurrentPitch(noteInfo);
+                  dispatch({ type: "SET_PITCH", pitch: noteInfo });
                 }
                 onRealtimePitch?.(noteInfo);
               }
@@ -424,13 +521,13 @@ export function usePitchDetection({
         if (soundingFrequencyRange) {
           if (validPitchDetected && !soundStartedRef.current) {
             soundStartedRef.current = true;
-            setIsSounding(true);
+            dispatch({ type: "SET_SOUNDING", isSounding: true });
             onSoundStart?.();
           }
         } else {
           if (!soundStartedRef.current) {
             soundStartedRef.current = true;
-            setIsSounding(true);
+            dispatch({ type: "SET_SOUNDING", isSounding: true });
             onSoundStart?.();
           }
         }
@@ -438,9 +535,9 @@ export function usePitchDetection({
         if (soundStartedRef.current && !silenceTimerRef.current) {
           silenceTimerRef.current = setTimeout(() => {
             soundStartedRef.current = false;
-            setIsSounding(false);
+            dispatch({ type: "SET_SOUNDING", isSounding: false });
             lastPitchNoteRef.current = null;
-            setCurrentPitch(null);
+            dispatch({ type: "SET_PITCH", pitch: null });
             onSoundEnd?.();
           }, silenceDuration);
         }
@@ -528,17 +625,17 @@ export function usePitchDetection({
 
       isListeningRef.current = true;
       isStartingRef.current = false;
-      setIsListening(true);
-      setError(null);
+      dispatch({ type: "START_LISTENING" });
 
       processWebAudioFrame();
 
       devLog("[usePitchDetection] Web audio started");
     } catch (err) {
       devError("Web audio start error:", err);
-      setError(
-        `Failed to start microphone: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      dispatch({
+        type: "SET_ERROR",
+        error: `Failed to start microphone: ${err instanceof Error ? err.message : String(err)}`,
+      });
       isStartingRef.current = false;
     }
   }, [processWebAudioFrame, externalAudioContext]);
@@ -565,12 +662,9 @@ export function usePitchDetection({
     webAudioContextRef.current = null;
     webAnalyserRef.current = null;
 
-    setIsListening(false);
-    setVolume(0);
+    dispatch({ type: "STOP_LISTENING" });
     lastPitchNoteRef.current = null;
     lastVolumeRef.current = 0;
-    setCurrentPitch(null);
-    setIsSounding(false);
     soundStartedRef.current = false;
 
     if (silenceTimerRef.current) {
@@ -582,9 +676,11 @@ export function usePitchDetection({
   // Start listening - native version
   const startListeningNative = useCallback(async () => {
     if (!LiveAudioStream) {
-      setError(
-        "Native audio streaming not available. Please use Expo Dev Client.",
-      );
+      dispatch({
+        type: "SET_ERROR",
+        error:
+          "Native audio streaming not available. Please use Expo Dev Client.",
+      });
       return;
     }
 
@@ -605,14 +701,14 @@ export function usePitchDetection({
 
       LiveAudioStream.start();
       isListeningRef.current = true;
-      setIsListening(true);
-      setError(null);
+      dispatch({ type: "START_LISTENING" });
       devLog("[usePitchDetection] Native audio started");
     } catch (err) {
       devError("Native audio start error:", err);
-      setError(
-        `Failed to start audio: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      dispatch({
+        type: "SET_ERROR",
+        error: `Failed to start audio: ${err instanceof Error ? err.message : String(err)}`,
+      });
     }
   }, [processAudioData]);
 
@@ -624,12 +720,9 @@ export function usePitchDetection({
       devLog("[usePitchDetection] Stopping native audio");
       isListeningRef.current = false;
       LiveAudioStream.stop();
-      setIsListening(false);
-      setVolume(0);
+      dispatch({ type: "STOP_LISTENING" });
       lastPitchNoteRef.current = null;
       lastVolumeRef.current = 0;
-      setCurrentPitch(null);
-      setIsSounding(false);
       soundStartedRef.current = false;
 
       if (silenceTimerRef.current) {

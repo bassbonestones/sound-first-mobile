@@ -31,11 +31,14 @@ import {
 import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../constants";
+import { devLog, devError } from "../../../utils/devLogger";
+import type { WebViewRef } from "../../../types/webview";
 import { generateComposerOsmdHtml } from "../../composer/components/composerScoreHtml";
 import { generateMusicXml } from "../services/tuneComposerMusicXmlGenerator";
 import type { TuneComposerScore, Note } from "../types";
 import { getNoteDuration, getBeatUnitDuration } from "../types";
 import type { CursorPosition } from "../../composer/types";
+import { useOptionalPlaybackContext } from "../contexts";
 
 // Conditionally import WebView
 let WebView: typeof import("react-native-webview").WebView | null = null;
@@ -117,15 +120,26 @@ function TuneComposerScoreViewportComponent({
   onZoomChange,
   minZoom = 0.5,
   maxZoom = 2.5,
-  playbackState = "stopped",
-  playbackMeasureIndex,
-  onPlay,
-  onPause,
-  onStop,
+  playbackState: propPlaybackState,
+  playbackMeasureIndex: propPlaybackMeasureIndex,
+  onPlay: propOnPlay,
+  onPause: propOnPause,
+  onStop: propOnStop,
   testID,
 }: TuneComposerScoreViewportProps): React.ReactElement {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const webViewRef = useRef<any>(null);
+  // Get playback context (optional - props take precedence)
+  const playbackContext = useOptionalPlaybackContext();
+
+  // Resolve playback values: props override context
+  const playbackState =
+    propPlaybackState ?? playbackContext?.playbackState ?? "stopped";
+  const playbackMeasureIndex =
+    propPlaybackMeasureIndex ?? playbackContext?.playbackMeasureIndex;
+  const onPlay = propOnPlay ?? playbackContext?.onPlay;
+  const onPause = propOnPause ?? playbackContext?.onPause;
+  const onStop = propOnStop ?? playbackContext?.onStop;
+
+  const webViewRef = useRef<WebViewRef | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -152,7 +166,7 @@ function TuneComposerScoreViewportComponent({
 
   // Calculate chord cursor x position for overlay
   const chordCursorX = useMemo(() => {
-    console.log(
+    devLog(
       "[ChordCursor] useMemo triggered, measurePositions:",
       measurePositions.length,
       "chordCursor:",
@@ -165,7 +179,7 @@ function TuneComposerScoreViewportComponent({
       (m) => m.measureIndex === chordCursor.measureIndex,
     );
     if (!measurePos) {
-      console.log(
+      devLog(
         "[ChordCursor] No measure position found for index:",
         chordCursor.measureIndex,
       );
@@ -195,7 +209,7 @@ function TuneComposerScoreViewportComponent({
       }
     }
 
-    console.log(
+    devLog(
       "[ChordCursor] Looking for beat index:",
       chordCursor.beatPosition,
       "in quarters:",
@@ -227,7 +241,7 @@ function TuneComposerScoreViewportComponent({
       if (exactMatch) {
         // Target beat has a note - cursor falls directly on it
         xPosition = exactMatch.x;
-        console.log(
+        devLog(
           "[ChordCursor] Exact match at beat",
           targetBeatInQuarters,
           "x:",
@@ -242,7 +256,7 @@ function TuneComposerScoreViewportComponent({
           (bp) => bp.beat > targetBeatInQuarters,
         );
 
-        console.log(
+        devLog(
           "[ChordCursor] Interpolating - before:",
           before,
           "after:",
@@ -283,7 +297,7 @@ function TuneComposerScoreViewportComponent({
             xPosition = before.x + beatsAfterLastNote * estimatedPixelsPerBeat;
           }
 
-          console.log(
+          devLog(
             "[ChordCursor] Extrapolating after last note - lastNoteBeat:",
             before.beat,
             "targetBeat:",
@@ -325,7 +339,7 @@ function TuneComposerScoreViewportComponent({
       }
     }
 
-    console.log(
+    devLog(
       "[ChordCursor] Calculated position - beat index:",
       chordCursor.beatPosition,
       "in quarters:",
@@ -336,7 +350,7 @@ function TuneComposerScoreViewportComponent({
 
     const result = xPosition * osmdZoom;
 
-    console.log("[ChordCursor] Final position:", {
+    devLog("[ChordCursor] Final position:", {
       measure: chordCursor.measureIndex,
       beat: chordCursor.beatPosition,
       xPosition,
@@ -507,11 +521,8 @@ function TuneComposerScoreViewportComponent({
               contentWidth: number;
               zoom: number;
             };
-            console.log(
-              "[MeasurePositions] Received:",
-              JSON.stringify(positions),
-            );
-            console.log(
+            devLog("[MeasurePositions] Received:", JSON.stringify(positions));
+            devLog(
               "[MeasurePositions] Measure 0 beatPositions:",
               positions[0]?.beatPositions,
             );
@@ -545,9 +556,9 @@ function TuneComposerScoreViewportComponent({
             const log = data.payload as { level: string; message: string };
             if (__DEV__) {
               if (log.level === "error") {
-                console.error("[OSMD]", log.message);
+                devError("[OSMD]", log.message);
               } else {
-                console.log("[OSMD]", log.message);
+                devLog("[OSMD]", log.message);
               }
             }
             break;

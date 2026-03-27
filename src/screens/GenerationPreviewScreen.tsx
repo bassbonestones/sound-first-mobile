@@ -3,14 +3,12 @@
  *
  * Dev tool for previewing the generation engine.
  * Allows parameter configuration, generation, playback, and notation display.
+ *
+ * State is managed by two custom hooks:
+ * - useGeneratorMode: handles scale/arpeggio generation, parameters, randomization, pools
+ * - useTunesMode: handles tune preview, transposition, solfège, analysis
  */
-import React, {
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-  useMemo,
-} from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -25,625 +23,41 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { Picker } from "@react-native-picker/picker";
 
-import { devLog, devError } from "../utils/devLogger";
+import { devLog } from "../utils/devLogger";
 import colors from "../constants/colors";
 import { ScoreViewport } from "../components/ScoreViewport";
 import { TempoSlider } from "../components/TempoSlider";
-import {
-  generateContent,
-  type GenerationType,
-  type ScaleType,
-  type ArpeggioType,
-  type ScalePattern,
-  type ArpeggioPattern,
-  type RhythmType,
-  type GenerationResponse,
-  type MusicalKey,
+import type {
+  GenerationType,
+  ScaleType,
+  ArpeggioType,
+  MusicalKey,
 } from "../api/generation";
+import { generationPlayback } from "../services/generationPlayback";
+import type { ClefType } from "../utils/generationNotation";
+
+// Import hooks that manage the state
+import { useGeneratorMode } from "../features/generation-preview/hooks/useGeneratorMode";
+import { useTunesMode } from "../features/generation-preview/hooks/useTunesMode";
+
+// Import constants needed for UI rendering
 import {
-  listPreviewFiles,
-  previewMaterial,
-  getSolfege,
-  transposeMaterial,
-  analyzeMaterial,
-  type MaterialPreviewResponse,
-  type MaterialAnalysis,
-} from "../api/materials";
-import {
-  generationPlayback,
-  type PlaybackState,
-} from "../services/generationPlayback";
-import {
-  eventsToMusicXml,
-  generateDisplayTitle,
-  getMeasureIndexForNote,
-  type ClefType,
-} from "../utils/generationNotation";
+  GENERATION_TYPES,
+  SCALE_TYPES,
+  ARPEGGIO_TYPES,
+  ARPEGGIO_PATTERNS,
+  ROOT_KEYS,
+  OCTAVES,
+  CLEFS,
+  RHYTHM_DISPLAY_LABELS,
+  formatScaleLabel,
+  formatArpeggioLabel,
+  formatScalePatternLabel,
+  formatArpeggioPatternLabel,
+} from "../features/generation-preview/constants/generatorConstants";
 
 // View modes for the screen
 type ViewMode = "generator" | "tunes";
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-/** Pick a random item from an array */
-function pickRandom<T>(items: T[]): T {
-  return items[Math.floor(Math.random() * items.length)];
-}
-
-const GENERATION_TYPES: GenerationType[] = ["scale", "arpeggio", "lick"];
-
-// Pattern constraints - patterns with limits on octaves or scale compatibility
-interface PatternConstraints {
-  maxOctaves?: number;
-  chromaticMaxOctaves?: number; // Override maxOctaves specifically for chromatic scale
-  requiresSymmetric?: boolean; // If true, incompatible with asymmetric scales
-  blockedScaleTypes?: string[]; // Scale types that cannot use this pattern
-  onlyForScaleTypes?: string[]; // If set, pattern only available for these scales
-  chromaticDisplayName?: string; // Display name when applied to chromatic scale
-  pentatonicDisplayName?: string; // Display name for 5-note scales (pentatonic)
-  hexatonicDisplayName?: string; // Display name for 6-note scales (blues, whole tone)
-  octatonicDisplayName?: string; // Display name for 8-note scales (diminished, bebop)
-  minScaleNotes?: number; // Minimum notes per octave required for this pattern
-}
-
-// Scale categories by notes per octave
-const PENTATONIC_SCALES: ScaleType[] = ["pentatonic_major", "pentatonic_minor"];
-const HEXATONIC_SCALES: ScaleType[] = ["blues", "blues_major", "whole_tone"];
-const OCTATONIC_SCALES: ScaleType[] = [
-  "diminished_hw",
-  "diminished_wh",
-  "bebop_dominant",
-  "bebop_major",
-  "bebop_dorian",
-];
-
-/** Get the number of notes per octave for a scale type */
-function getScaleNoteCount(scaleType: ScaleType): number {
-  if (PENTATONIC_SCALES.includes(scaleType)) return 5;
-  if (HEXATONIC_SCALES.includes(scaleType)) return 6;
-  if (OCTATONIC_SCALES.includes(scaleType)) return 8;
-  if (scaleType === "chromatic") return 12;
-  return 7; // Standard heptatonic (modes, harmonic/melodic minor, etc.)
-}
-
-// Scales with more than 7 notes per octave (can use extended patterns)
-const EXTENDED_SCALES: ScaleType[] = [
-  "chromatic", // 12 notes
-  "diminished_hw", // 8 notes
-  "diminished_wh", // 8 notes
-  "bebop_dominant", // 8 notes
-  "bebop_major", // 8 notes
-  "bebop_dorian", // 8 notes
-];
-
-const SCALE_PATTERN_CONSTRAINTS: Record<string, PatternConstraints> = {
-  // Interval patterns - use "Skip X" naming for non-heptatonic scales
-  // in_octaves is ISOLATED - always means literal octaves, not an interval skip
-  //
-  // For pentatonic (5 notes): Skip 1-3 available, then In Octaves (skip 4 = octave)
-  // For hexatonic (6 notes): Skip 1-4 available, then In Octaves (skip 5 = octave)
-  // For octatonic (8 notes): Skip 1-6 available, then In Octaves (skip 7 = octave)
-  // For chromatic: Use interval names (m2, M2, m3, etc.)
-  in_3rds: {
-    chromaticDisplayName: "Chromatic Major 2nds",
-    pentatonicDisplayName: "Skip 1",
-    hexatonicDisplayName: "Skip 1",
-    octatonicDisplayName: "Skip 1",
-  },
-  in_4ths: {
-    chromaticDisplayName: "Chromatic minor 3rds",
-    pentatonicDisplayName: "Skip 2",
-    hexatonicDisplayName: "Skip 2",
-    octatonicDisplayName: "Skip 2",
-  },
-  in_5ths: {
-    maxOctaves: 2,
-    chromaticDisplayName: "Chromatic Major 3rds",
-    pentatonicDisplayName: "Skip 3", // Last before octaves for pentatonic
-    hexatonicDisplayName: "Skip 3",
-    octatonicDisplayName: "Skip 3",
-  },
-  in_6ths: {
-    maxOctaves: 2,
-    chromaticDisplayName: "Chromatic Perfect 4ths",
-    hexatonicDisplayName: "Skip 4", // Last before octaves for hexatonic
-    octatonicDisplayName: "Skip 4",
-    minScaleNotes: 6, // Not available for pentatonic (skip 4 = octave)
-  },
-  in_7ths: {
-    maxOctaves: 2,
-    chromaticDisplayName: "Chromatic Tritones",
-    octatonicDisplayName: "Skip 5",
-    minScaleNotes: 7, // Not available for pentatonic (5) or hexatonic (6)
-  },
-  in_8ths: {
-    maxOctaves: 2,
-    chromaticDisplayName: "Chromatic Perfect 5ths",
-    octatonicDisplayName: "Skip 6", // Last before octaves for octatonic (8 notes)
-    minScaleNotes: 8, // Only for octatonic scales (diminished, bebop)
-  },
-  // in_octaves is a unique pattern that pairs each note with itself an octave up/down.
-  // NOT part of the interval skip sequence. For chromatic, use in_13ths instead.
-  in_octaves: {
-    blockedScaleTypes: ["chromatic"], // Chromatic uses in_13ths for octaves
-  },
-  // Extended intervals - chromatic only (9ths+ go beyond octave for smaller scales)
-  in_9ths: {
-    onlyForScaleTypes: ["chromatic"],
-    chromaticDisplayName: "Chromatic minor 6ths",
-  },
-  in_10ths: {
-    onlyForScaleTypes: ["chromatic"],
-    chromaticDisplayName: "Chromatic Major 6ths",
-  },
-  in_11ths: {
-    onlyForScaleTypes: ["chromatic"],
-    chromaticDisplayName: "Chromatic minor 7ths",
-  },
-  in_12ths: {
-    onlyForScaleTypes: ["chromatic"],
-    chromaticDisplayName: "Chromatic Major 7ths",
-  },
-  in_13ths: {
-    onlyForScaleTypes: ["chromatic"],
-    chromaticDisplayName: "Chromatic Octaves",
-  },
-  // Large group patterns - chromatic needs fewer octaves due to note density
-  groups_of_3: { chromaticMaxOctaves: 2 },
-  groups_of_4: { chromaticMaxOctaves: 2 },
-  groups_of_5: { maxOctaves: 2, chromaticMaxOctaves: 1 },
-  groups_of_6: { maxOctaves: 2, chromaticMaxOctaves: 1 },
-  groups_of_7: { maxOctaves: 2, chromaticMaxOctaves: 1 },
-  // Extended groups - only for scales with 8+ notes
-  groups_of_8: {
-    maxOctaves: 2,
-    chromaticMaxOctaves: 1,
-    onlyForScaleTypes: [
-      "chromatic",
-      "diminished_hw",
-      "diminished_wh",
-      "bebop_dominant",
-      "bebop_major",
-      "bebop_dorian",
-    ],
-  },
-  groups_of_9: {
-    maxOctaves: 2,
-    chromaticMaxOctaves: 1,
-    onlyForScaleTypes: ["chromatic"],
-  },
-  groups_of_10: {
-    maxOctaves: 2,
-    chromaticMaxOctaves: 1,
-    onlyForScaleTypes: ["chromatic"],
-  },
-  groups_of_11: {
-    maxOctaves: 2,
-    chromaticMaxOctaves: 1,
-    onlyForScaleTypes: ["chromatic"],
-  },
-  groups_of_12: {
-    maxOctaves: 2,
-    chromaticMaxOctaves: 1,
-    onlyForScaleTypes: ["chromatic"],
-  },
-  // Diatonic chord patterns - don't make sense for chromatic/whole_tone
-  diatonic_triads: {
-    maxOctaves: 2,
-    blockedScaleTypes: ["chromatic", "whole_tone"],
-  },
-  diatonic_7ths: {
-    maxOctaves: 2,
-    blockedScaleTypes: ["chromatic", "whole_tone"],
-  },
-  broken_chords: {
-    maxOctaves: 2,
-    blockedScaleTypes: ["chromatic", "whole_tone"],
-  },
-  // Special patterns
-  broken_thirds_neighbor: {
-    maxOctaves: 1,
-    requiresSymmetric: true,
-    blockedScaleTypes: ["chromatic"],
-  },
-  // Pyramid patterns grow quadratically (~n² notes)
-  pyramid_ascend: { maxOctaves: 1 },
-  pyramid_descend: { maxOctaves: 1 },
-};
-
-// Asymmetric scales (different pitches ascending vs descending)
-const ASYMMETRIC_SCALES: ScaleType[] = ["melodic_minor_classical"];
-
-const SCALE_TYPES: ScaleType[] = [
-  // Major modes
-  "ionian",
-  "dorian",
-  "phrygian",
-  "lydian",
-  "mixolydian",
-  "aeolian",
-  "locrian",
-  // Pentatonic & Blues
-  "pentatonic_major",
-  "pentatonic_minor",
-  "blues",
-  "blues_major",
-  // Harmonic minor modes
-  "harmonic_minor",
-  "phrygian_dominant",
-  "lydian_sharp2",
-  // Melodic minor modes
-  "melodic_minor",
-  "melodic_minor_classical",
-  "lydian_augmented",
-  "lydian_dominant",
-  "mixolydian_flat6",
-  "altered",
-  // Harmonic major
-  "harmonic_major",
-  // Symmetric
-  "whole_tone",
-  "diminished_hw",
-  "diminished_wh",
-  "chromatic",
-  // Bebop
-  "bebop_dominant",
-  "bebop_major",
-  "bebop_dorian",
-];
-
-/** Format scale type for display, adding common name aliases */
-function formatScaleLabel(scaleType: ScaleType): string {
-  const labels: Partial<Record<ScaleType, string>> = {
-    ionian: "Ionian (Major)",
-    aeolian: "Aeolian (Natural Minor)",
-    melodic_minor: "Minor-Major",
-    melodic_minor_classical: "Melodic Minor (Classical)",
-    harmonic_major: "Harmonic Major (b6)",
-    mixolydian_flat6: "Major-Minor (b6 b7)",
-    blues_major: "Blues Major",
-    phrygian_dominant: "Phrygian Dominant (Spanish)",
-    lydian_dominant: "Lydian Dominant",
-    lydian_augmented: "Lydian Augmented",
-    altered: "Altered (Super Locrian)",
-    diminished_hw: "Diminished (Half-Whole)",
-    diminished_wh: "Diminished (Whole-Half)",
-    bebop_dominant: "Bebop Dominant",
-    bebop_major: "Bebop Major",
-    bebop_dorian: "Bebop Dorian",
-    lydian_sharp2: "Lydian #2",
-  };
-  return (
-    labels[scaleType] ??
-    scaleType
-      .split("_")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ")
-  );
-}
-
-const ARPEGGIO_TYPES: ArpeggioType[] = [
-  // Triads
-  "major",
-  "minor",
-  "augmented",
-  "diminished",
-  "sus4",
-  "sus2",
-  // 7th chords
-  "maj7",
-  "dom7",
-  "min7",
-  "min_maj7",
-  "half_dim7",
-  "dim7",
-  "aug_maj7",
-  "aug7",
-  "dom7sus4",
-  // Extended
-  "maj9",
-  "dom9",
-  "min9",
-];
-
-/** Format arpeggio type for display */
-function formatArpeggioLabel(arpeggioType: ArpeggioType): string {
-  const labels: Partial<Record<ArpeggioType, string>> = {
-    maj7: "Major 7",
-    dom7: "Dominant 7",
-    min7: "Minor 7",
-    min_maj7: "Minor-Major 7",
-    half_dim7: "Half-Diminished 7",
-    dim7: "Diminished 7",
-    aug_maj7: "Augmented Major 7",
-    aug7: "Augmented 7",
-    dom7sus4: "Dominant 7 sus4",
-    maj9: "Major 9",
-    dom9: "Dominant 9",
-    min9: "Minor 9",
-    sus4: "Suspended 4th",
-    sus2: "Suspended 2nd",
-  };
-  return (
-    labels[arpeggioType] ??
-    arpeggioType.charAt(0).toUpperCase() + arpeggioType.slice(1)
-  );
-}
-
-const SCALE_PATTERNS: ScalePattern[] = [
-  // Basic
-  "straight_up",
-  "straight_down",
-  "straight_up_down",
-  "straight_down_up",
-  // Pyramid
-  "pyramid_ascend",
-  "pyramid_descend",
-  // Intervals
-  "in_3rds",
-  "in_4ths",
-  "in_5ths",
-  "in_6ths",
-  "in_7ths",
-  "in_8ths",
-  "in_octaves",
-  "in_9ths",
-  "in_10ths",
-  "in_11ths",
-  "in_12ths",
-  "in_13ths",
-  // Groups
-  "groups_of_3",
-  "groups_of_4",
-  "groups_of_5",
-  "groups_of_6",
-  "groups_of_7",
-  "groups_of_8",
-  "groups_of_9",
-  "groups_of_10",
-  "groups_of_11",
-  "groups_of_12",
-  // Weaving
-  "broken_thirds_neighbor",
-  // Arpeggio-based
-  "diatonic_triads",
-  "diatonic_7ths",
-  "broken_chords",
-];
-
-/** Format scale pattern for display, using chromatic-specific names when applicable */
-function formatScalePatternLabel(
-  pattern: ScalePattern,
-  scaleType?: ScaleType,
-): string {
-  // Check for scale-type-specific display names
-  if (scaleType) {
-    const constraints = SCALE_PATTERN_CONSTRAINTS[pattern];
-    if (constraints) {
-      // Check in order of specificity
-      if (scaleType === "chromatic" && constraints.chromaticDisplayName) {
-        return constraints.chromaticDisplayName;
-      }
-      if (
-        PENTATONIC_SCALES.includes(scaleType) &&
-        constraints.pentatonicDisplayName
-      ) {
-        return constraints.pentatonicDisplayName;
-      }
-      if (
-        HEXATONIC_SCALES.includes(scaleType) &&
-        constraints.hexatonicDisplayName
-      ) {
-        return constraints.hexatonicDisplayName;
-      }
-      if (
-        OCTATONIC_SCALES.includes(scaleType) &&
-        constraints.octatonicDisplayName
-      ) {
-        return constraints.octatonicDisplayName;
-      }
-    }
-  }
-
-  const labels: Partial<Record<ScalePattern, string>> = {
-    straight_up: "Straight Up",
-    straight_down: "Straight Down",
-    straight_up_down: "Up & Down",
-    straight_down_up: "Down & Up",
-    pyramid_ascend: "Pyramid Ascend",
-    pyramid_descend: "Pyramid Descend",
-    in_3rds: "In 3rds",
-    in_4ths: "In 4ths",
-    in_5ths: "In 5ths",
-    in_6ths: "In 6ths",
-    in_7ths: "In 7ths",
-    in_8ths: "In 8ths",
-    in_octaves: "In Octaves",
-    in_9ths: "In 9ths",
-    in_10ths: "In 10ths",
-    in_11ths: "In 11ths",
-    in_12ths: "In 12ths",
-    in_13ths: "In 13ths",
-    groups_of_3: "Groups of 3",
-    groups_of_4: "Groups of 4",
-    groups_of_5: "Groups of 5",
-    groups_of_6: "Groups of 6",
-    groups_of_7: "Groups of 7",
-    groups_of_8: "Groups of 8",
-    groups_of_9: "Groups of 9",
-    groups_of_10: "Groups of 10",
-    groups_of_11: "Groups of 11",
-    groups_of_12: "Groups of 12",
-    broken_thirds_neighbor: "Broken 3rds w/ Neighbor",
-    diatonic_triads: "Diatonic Triads",
-    diatonic_7ths: "Diatonic 7ths",
-    broken_chords: "Broken Chords",
-  };
-  return labels[pattern] ?? pattern.replace(/_/g, " ");
-}
-
-const ARPEGGIO_PATTERNS: ArpeggioPattern[] = [
-  "straight_up",
-  "straight_down",
-  "straight_up_down",
-  "weaving_ascend",
-  "weaving_descend",
-  "broken_skip_1",
-  "inversion_root",
-  "inversion_1st",
-  "inversion_2nd",
-  "inversion_3rd",
-  "rolling_alberti",
-  "spread_voicings",
-  "approach_notes",
-  "enclosures",
-];
-
-/** Format arpeggio pattern for display */
-function formatArpeggioPatternLabel(pattern: ArpeggioPattern): string {
-  const labels: Partial<Record<ArpeggioPattern, string>> = {
-    straight_up: "Straight Up",
-    straight_down: "Straight Down",
-    straight_up_down: "Up & Down",
-    weaving_ascend: "Weaving Ascend",
-    weaving_descend: "Weaving Descend",
-    broken_skip_1: "Broken (Skip 1)",
-    inversion_root: "Root Position",
-    inversion_1st: "1st Inversion",
-    inversion_2nd: "2nd Inversion",
-    inversion_3rd: "3rd Inversion",
-    rolling_alberti: "Alberti Bass",
-    spread_voicings: "Spread Voicings",
-    approach_notes: "Approach Notes",
-    enclosures: "Enclosures",
-    diatonic_sequence: "Diatonic Sequence",
-    circle_4ths: "Circle of 4ths",
-    circle_5ths: "Circle of 5ths",
-  };
-  return labels[pattern] ?? pattern.replace(/_/g, " ");
-}
-
-const RHYTHM_TYPES: RhythmType[] = [
-  // Sustained
-  "whole_notes",
-  "half_notes",
-  // Pulse
-  "quarter_notes",
-  // Subdivisions
-  "eighth_notes",
-  "sixteenth_notes",
-  // Triplets
-  "eighth_triplets",
-  // Swing
-  "swing_eighths",
-  "scotch_snap",
-  // Dotted
-  "dotted_quarter_eighth",
-  "dotted_eighth_sixteenth",
-  // Compound
-  "sixteenth_eighth_sixteenth",
-  "eighth_sixteenth_sixteenth",
-  "sixteenth_sixteenth_eighth",
-  "syncopated",
-];
-
-/** Display labels for rhythm types */
-const RHYTHM_DISPLAY_LABELS: Record<RhythmType, string> = {
-  quarter_notes: "Quarter Notes",
-  eighth_notes: "Eighth Notes",
-  eighth_triplets: "Eighth Triplets",
-  swing_eighths: "Swung Eighths",
-  whole_notes: "Whole Notes",
-  half_notes: "Half Notes",
-  sixteenth_notes: "Sixteenth Notes",
-  scotch_snap: "Scotch Snap",
-  dotted_quarter_eighth: "Dotted Quarter-Eighth",
-  dotted_eighth_sixteenth: "Dotted Eighth-Sixteenth",
-  sixteenth_eighth_sixteenth: "16th-8th-16th",
-  eighth_sixteenth_sixteenth: "8th-16th-16th",
-  sixteenth_sixteenth_eighth: "16th-16th-8th",
-  syncopated: "Syncopated",
-};
-
-// =============================================================================
-// Rhythm-Pattern Compatibility
-// =============================================================================
-// Slow rhythms (whole notes, half notes) are only allowed with simple patterns
-
-/** Patterns that allow WHOLE_NOTES rhythm */
-const WHOLE_NOTE_PATTERNS: Set<ScalePattern> = new Set([
-  "straight_up",
-  "straight_down",
-]);
-
-/** Patterns that allow HALF_NOTES rhythm */
-const HALF_NOTE_PATTERNS: Set<ScalePattern> = new Set([
-  "straight_up",
-  "straight_down",
-  "straight_up_down",
-  "straight_down_up",
-]);
-
-/**
- * Get available rhythm types for a given pattern.
- * Whole/half notes are only available for simple patterns.
- */
-function getAvailableRhythmsForPattern(
-  pattern: ScalePattern | null,
-): RhythmType[] {
-  return RHYTHM_TYPES.filter((rhythm) => {
-    // If no pattern, allow all rhythms
-    if (!pattern) return true;
-    // Check whole note compatibility
-    if (rhythm === "whole_notes" && !WHOLE_NOTE_PATTERNS.has(pattern)) {
-      return false;
-    }
-    // Check half note compatibility
-    if (rhythm === "half_notes" && !HALF_NOTE_PATTERNS.has(pattern)) {
-      return false;
-    }
-    return true;
-  });
-}
-
-const ROOT_KEYS: MusicalKey[] = [
-  "C",
-  "C#",
-  "Db",
-  "D",
-  "Eb",
-  "E",
-  "F",
-  "F#",
-  "Gb",
-  "G",
-  "Ab",
-  "A",
-  "Bb",
-  "B",
-];
-
-// Simplified key list for tune transposition (no enharmonic duplicates)
-const TUNE_KEYS: MusicalKey[] = [
-  "C",
-  "Db",
-  "D",
-  "Eb",
-  "E",
-  "F",
-  "F#",
-  "G",
-  "Ab",
-  "A",
-  "Bb",
-  "B",
-];
-
-const OCTAVES = [1, 2, 3, 4, 5, 6, 7];
-
-const CLEFS: ClefType[] = ["treble", "bass"];
 
 // =============================================================================
 // Component
@@ -652,239 +66,15 @@ const CLEFS: ClefType[] = ["treble", "bass"];
 export default function GenerationPreviewScreen() {
   const navigation = useNavigation();
 
-  // Parameter state
-  const [generationType, setGenerationType] = useState<GenerationType>("scale");
-  const [scaleType, setScaleType] = useState<ScaleType>("ionian");
-  const [arpeggioType, setArpeggioType] = useState<ArpeggioType>("major");
-  const [scalePattern, setScalePattern] =
-    useState<ScalePattern>("straight_up_down");
-  const [arpeggioPattern, setArpeggioPattern] =
-    useState<ArpeggioPattern>("straight_up_down");
-  const [rhythmType, setRhythmType] = useState<RhythmType>("quarter_notes");
-  const [rootKey, setRootKey] = useState<MusicalKey>("C");
-  const [startOctave, setStartOctave] = useState<number>(4);
-  const [numOctaves, setNumOctaves] = useState<number>(1);
-  const [clef, setClef] = useState<ClefType>("treble");
-  const [tempo, setTempo] = useState(120);
-
-  // Random toggle checkboxes - when checked, field randomizes on each generate
-  const [randomize, setRandomize] = useState({
-    scaleType: false,
-    arpeggioType: false,
-    scalePattern: false,
-    arpeggioPattern: false,
-    rhythmType: false,
-    rootKey: false,
-    startOctave: false,
-    numOctaves: false,
-    clef: false,
-  });
-
-  // Helper to toggle a randomize field
-  const toggleRandomize = (field: keyof typeof randomize) => {
-    setRandomize((prev) => ({ ...prev, [field]: !prev[field] }));
-  };
-
-  // Pool selection mode
-  const [poolModeEnabled, setPoolModeEnabled] = useState(false);
-  const [scalePool, setScalePool] = useState<ScaleType[]>(["ionian", "dorian"]);
-  const [arpeggioPool, setArpeggioPool] = useState<ArpeggioType[]>([
-    "major",
-    "minor",
-  ]);
-  const [keyPool, setKeyPool] = useState<MusicalKey[]>(["C", "G", "F"]);
-
-  // Generation state
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generationError, setGenerationError] = useState<string | null>(null);
-  const [response, setResponse] = useState<GenerationResponse | null>(null);
-  // Store generation context for MusicXML generation
-  const [generationContext, setGenerationContext] = useState<{
-    title: string;
-    key: MusicalKey;
-    clef: ClefType;
-    rhythm: RhythmType;
-    mode?: string;
-  } | null>(null);
-
-  // Playback state
-  const [playbackState, setPlaybackState] = useState<PlaybackState>("stopped");
-  const [currentNoteIndex, setCurrentNoteIndex] = useState<number | null>(null);
+  // Local state: only view mode coordination
+  const [viewMode, setViewMode] = useState<ViewMode>("generator");
   const isPlaybackInitialized = useRef(false);
 
-  // Preview mode state
-  const [viewMode, setViewMode] = useState<ViewMode>("generator");
-  const [previewFiles, setPreviewFiles] = useState<string[]>([]);
-  const [selectedPreviewFile, setSelectedPreviewFile] = useState<string | null>(
-    null,
-  );
-  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  const [previewResponse, setPreviewResponse] =
-    useState<MaterialPreviewResponse | null>(null);
-  const [previewTempo, setPreviewTempo] = useState(120);
+  // Generator mode hook - handles all generator state
+  const generator = useGeneratorMode();
 
-  // Solfège view toggle state
-  const [showSolfege, setShowSolfege] = useState(false);
-  const [solfegeXml, setSolfegeXml] = useState<string | null>(null);
-  const [isLoadingSolfege, setIsLoadingSolfege] = useState(false);
-
-  // Tune transposition state
-  const [tuneClef, setTuneClef] = useState<ClefType>("treble");
-  const [tuneKey, setTuneKey] = useState<MusicalKey>("C");
-  const [transposedXml, setTransposedXml] = useState<string | null>(null);
-  const [isTransposing, setIsTransposing] = useState(false);
-
-  // Clef change modal state
-  const [clefChangeModal, setClefChangeModal] = useState<{
-    visible: boolean;
-    targetClef: ClefType;
-  }>({ visible: false, targetClef: "treble" });
-
-  // Key change modal state
-  const [keyChangeModal, setKeyChangeModal] = useState<{
-    visible: boolean;
-    targetKey: MusicalKey;
-  }>({ visible: false, targetKey: "C" });
-
-  // Material analysis state
-  const [materialAnalysis, setMaterialAnalysis] =
-    useState<MaterialAnalysis | null>(null);
-  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
-
-  // Compute MusicXML (only changes when content changes, not playback position)
-  const musicXml = useMemo(() => {
-    if (
-      !response?.events ||
-      response.events.length === 0 ||
-      !generationContext
-    ) {
-      return null;
-    }
-    return eventsToMusicXml(response.events, {
-      title: generationContext.title,
-      tempo,
-      key: generationContext.key,
-      clef: generationContext.clef,
-      rhythm: generationContext.rhythm,
-      mode: generationContext.mode,
-    });
-  }, [response, generationContext, tempo]);
-
-  // Compute playback measure index for auto-scroll
-  const playbackMeasureIndex = useMemo(() => {
-    if (currentNoteIndex === null || !response?.events) {
-      return undefined;
-    }
-    return getMeasureIndexForNote(response.events, currentNoteIndex, 4);
-  }, [currentNoteIndex, response]);
-
-  // Filter scale patterns based on selected scale type
-  const availableScalePatterns = useMemo(() => {
-    // When randomizing scale type, allow all patterns
-    if (randomize.scaleType) return SCALE_PATTERNS;
-    const isAsymmetric = ASYMMETRIC_SCALES.includes(scaleType);
-    const scaleNoteCount = getScaleNoteCount(scaleType);
-    return SCALE_PATTERNS.filter((pattern) => {
-      const constraints = SCALE_PATTERN_CONSTRAINTS[pattern];
-      if (!constraints) return true;
-      // Exclude patterns that require more notes than the scale has
-      if (
-        constraints.minScaleNotes &&
-        scaleNoteCount < constraints.minScaleNotes
-      )
-        return false;
-      // Exclude patterns that require symmetric scales when an asymmetric scale is selected
-      if (constraints.requiresSymmetric && isAsymmetric) return false;
-      // Exclude patterns blocked for this scale type
-      if (constraints.blockedScaleTypes?.includes(scaleType)) return false;
-      // Exclude patterns that are only for specific scale types
-      if (
-        constraints.onlyForScaleTypes &&
-        !constraints.onlyForScaleTypes.includes(scaleType)
-      )
-        return false;
-      return true;
-    });
-  }, [scaleType, randomize.scaleType]);
-
-  // Filter scales based on selected pattern
-  const availableScaleTypes = useMemo(() => {
-    if (randomize.scalePattern) return SCALE_TYPES;
-    const constraints = SCALE_PATTERN_CONSTRAINTS[scalePattern];
-    if (!constraints) return SCALE_TYPES;
-
-    let filtered = SCALE_TYPES;
-
-    // If pattern only works for specific scales, limit to those
-    if (constraints.onlyForScaleTypes) {
-      filtered = filtered.filter((type) =>
-        constraints.onlyForScaleTypes!.includes(type),
-      );
-    }
-
-    // Exclude scales that don't have enough notes for this pattern
-    if (constraints.minScaleNotes) {
-      filtered = filtered.filter(
-        (type) => getScaleNoteCount(type) >= constraints.minScaleNotes!,
-      );
-    }
-
-    // Exclude asymmetric scales when pattern requires symmetric
-    if (constraints.requiresSymmetric) {
-      filtered = filtered.filter((type) => !ASYMMETRIC_SCALES.includes(type));
-    }
-
-    return filtered;
-  }, [scalePattern, randomize.scalePattern]);
-
-  // Get max octaves for current pattern (use chromaticMaxOctaves if chromatic)
-  const maxOctaves = useMemo(() => {
-    if (randomize.scalePattern) return 3;
-    const constraints = SCALE_PATTERN_CONSTRAINTS[scalePattern];
-    if (
-      scaleType === "chromatic" &&
-      constraints?.chromaticMaxOctaves !== undefined
-    ) {
-      return constraints.chromaticMaxOctaves;
-    }
-    return constraints?.maxOctaves ?? 3;
-  }, [scalePattern, scaleType, randomize.scalePattern]);
-
-  // Reset scale pattern if it becomes unavailable due to scale selection
-  useEffect(() => {
-    if (
-      !randomize.scalePattern &&
-      !availableScalePatterns.includes(scalePattern)
-    ) {
-      setScalePattern("straight_up_down");
-    }
-  }, [availableScalePatterns, scalePattern, randomize.scalePattern]);
-
-  // Reset scale type if it becomes unavailable due to pattern selection
-  useEffect(() => {
-    if (!randomize.scaleType && !availableScaleTypes.includes(scaleType)) {
-      setScaleType("ionian");
-    }
-  }, [availableScaleTypes, scaleType, randomize.scaleType]);
-
-  // Clamp numOctaves if it exceeds max for current pattern
-  useEffect(() => {
-    if (!randomize.numOctaves && numOctaves > maxOctaves) {
-      setNumOctaves(maxOctaves);
-    }
-  }, [maxOctaves, numOctaves, randomize.numOctaves]);
-
-  // Reset rhythm if it becomes unavailable due to pattern selection
-  // (whole/half notes only allowed for simple patterns)
-  useEffect(() => {
-    if (!randomize.rhythmType && generationType === "scale") {
-      const availableRhythms = getAvailableRhythmsForPattern(scalePattern);
-      if (!availableRhythms.includes(rhythmType)) {
-        setRhythmType("quarter_notes");
-      }
-    }
-  }, [scalePattern, rhythmType, generationType, randomize.rhythmType]);
+  // Tunes mode hook - handles all tunes preview state
+  const tunes = useTunesMode();
 
   // Initialize playback service
   useEffect(() => {
@@ -901,509 +91,23 @@ export default function GenerationPreviewScreen() {
     };
   }, []);
 
-  // Generate content handler
-  const handleGenerate = useCallback(async () => {
-    devLog("[GenerationPreview] Generating content...");
-    setIsGenerating(true);
-    setGenerationError(null);
-    generationPlayback.stop();
-
-    try {
-      // Build request based on type
-      const selectedType = generationType;
-
-      // Resolve random selections based on checkbox state
-      let selectedScaleType: ScaleType = randomize.scaleType
-        ? pickRandom(availableScaleTypes)
-        : scaleType;
-      let selectedArpeggioType: ArpeggioType = randomize.arpeggioType
-        ? pickRandom(ARPEGGIO_TYPES)
-        : arpeggioType;
-      let selectedKey: MusicalKey = randomize.rootKey
-        ? pickRandom(ROOT_KEYS)
-        : rootKey;
-      let selectedScalePattern: ScalePattern = randomize.scalePattern
-        ? pickRandom(availableScalePatterns)
-        : scalePattern;
-      let selectedArpeggioPattern: ArpeggioPattern = randomize.arpeggioPattern
-        ? pickRandom(ARPEGGIO_PATTERNS)
-        : arpeggioPattern;
-      // Get available rhythms for the selected pattern (scales only)
-      const availableRhythms =
-        selectedType === "scale"
-          ? getAvailableRhythmsForPattern(selectedScalePattern)
-          : RHYTHM_TYPES;
-      let selectedRhythm: RhythmType = randomize.rhythmType
-        ? pickRandom(availableRhythms)
-        : rhythmType;
-      let selectedStartOctave: number = randomize.startOctave
-        ? pickRandom(OCTAVES)
-        : startOctave;
-      let selectedNumOctaves: number = randomize.numOctaves
-        ? pickRandom([1, 2, 3].filter((n) => n <= maxOctaves))
-        : numOctaves;
-      let selectedClef: ClefType = randomize.clef ? pickRandom(CLEFS) : clef;
-
-      // Pool mode overrides individual random selections
-      if (poolModeEnabled) {
-        if (generationType === "scale" && scalePool.length > 0) {
-          // Filter pool to respect pattern constraints
-          const patternConstraints =
-            SCALE_PATTERN_CONSTRAINTS[selectedScalePattern];
-          let validPool = scalePool;
-          if (patternConstraints?.onlyForScaleTypes) {
-            validPool = scalePool.filter((type) =>
-              patternConstraints.onlyForScaleTypes!.includes(type),
-            );
-          }
-          if (patternConstraints?.blockedScaleTypes) {
-            validPool = validPool.filter(
-              (type) => !patternConstraints.blockedScaleTypes!.includes(type),
-            );
-          }
-          if (patternConstraints?.requiresSymmetric) {
-            validPool = validPool.filter(
-              (type) => !ASYMMETRIC_SCALES.includes(type),
-            );
-          }
-          // If no valid options in pool, fall back to full pool or default
-          if (validPool.length > 0) {
-            selectedScaleType = pickRandom(validPool);
-          } else if (scalePool.length > 0) {
-            // Pool has items but none are valid for pattern - use straight_up_down
-            selectedScalePattern = "straight_up_down";
-            selectedScaleType = pickRandom(scalePool);
-          }
-        }
-        if (generationType === "arpeggio" && arpeggioPool.length > 0) {
-          selectedArpeggioType = pickRandom(arpeggioPool);
-        }
-        if (keyPool.length > 0) {
-          selectedKey = pickRandom(keyPool);
-        }
-      }
-
-      // Validate scale/pattern combination after all selections
-      // (handles cases where non-pool random picked invalid combo)
-      const finalConstraints = SCALE_PATTERN_CONSTRAINTS[selectedScalePattern];
-      if (finalConstraints?.onlyForScaleTypes) {
-        if (!finalConstraints.onlyForScaleTypes.includes(selectedScaleType)) {
-          // Invalid combo - reset pattern to straight_up_down
-          selectedScalePattern = "straight_up_down";
-        }
-      }
-      if (finalConstraints?.blockedScaleTypes?.includes(selectedScaleType)) {
-        selectedScalePattern = "straight_up_down";
-      }
-
-      // Compute effective max octaves based on final selected values
-      const selectedConstraints =
-        SCALE_PATTERN_CONSTRAINTS[selectedScalePattern];
-      let effectiveMaxOctaves = selectedConstraints?.maxOctaves ?? 3;
-      if (
-        selectedScaleType === "chromatic" &&
-        selectedConstraints?.chromaticMaxOctaves !== undefined
-      ) {
-        effectiveMaxOctaves = selectedConstraints.chromaticMaxOctaves;
-      }
-
-      // Clamp octaves to effective max for selected pattern/scale combo
-      if (selectedNumOctaves > effectiveMaxOctaves) {
-        selectedNumOctaves = effectiveMaxOctaves;
-      }
-
-      // Update dropdowns to show what was randomly selected
-      // Also update pattern if it was changed due to constraint validation
-      if (randomize.scaleType) setScaleType(selectedScaleType);
-      if (randomize.arpeggioType) setArpeggioType(selectedArpeggioType);
-      if (randomize.rootKey) setRootKey(selectedKey);
-      if (randomize.scalePattern || selectedScalePattern !== scalePattern)
-        setScalePattern(selectedScalePattern);
-      if (randomize.arpeggioPattern)
-        setArpeggioPattern(selectedArpeggioPattern);
-      if (randomize.rhythmType) setRhythmType(selectedRhythm);
-      if (randomize.startOctave) setStartOctave(selectedStartOctave);
-      if (randomize.numOctaves) setNumOctaves(selectedNumOctaves);
-      if (randomize.clef) setClef(selectedClef);
-
-      // Determine definition (scale type or arpeggio type)
-      const definition =
-        selectedType === "arpeggio" ? selectedArpeggioType : selectedScaleType;
-
-      // Determine pattern
-      const pattern =
-        selectedType === "arpeggio"
-          ? selectedArpeggioPattern
-          : selectedScalePattern;
-
-      const request: Parameters<typeof generateContent>[0] = {
-        content_type: selectedType,
-        definition,
-        octaves: selectedNumOctaves as 1 | 2 | 3,
-        pattern,
-        rhythm: selectedRhythm,
-        key: selectedKey,
-        // Convert start octave to MIDI note: C4 = 60, so CX = (X+1)*12
-        range_low_midi: (selectedStartOctave + 1) * 12,
-      };
-
-      devLog("[GenerationPreview] Request:", request);
-
-      const result = await generateContent(request);
-
-      devLog("[GenerationPreview] Response:", result);
-      setResponse(result);
-
-      // Convert to MusicXML for display
-      if (result.events && result.events.length > 0) {
-        const title = generateDisplayTitle(
-          selectedType,
-          definition,
-          selectedKey,
-          pattern,
-        );
-
-        // Store context for reactive MusicXML generation
-        setGenerationContext({
-          title,
-          key: selectedKey,
-          clef: selectedClef,
-          rhythm: selectedRhythm,
-          mode: selectedType === "scale" ? definition : undefined,
-        });
-
-        // Load into playback service
-        generationPlayback.load(result.events, {
-          tempo,
-          onStateChange: setPlaybackState,
-          onProgress: setCurrentNoteIndex,
-          onComplete: () => {
-            setCurrentNoteIndex(null);
-            devLog("[GenerationPreview] Playback complete");
-          },
-        });
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      devError("[GenerationPreview] Generation failed:", error);
-      setGenerationError(message);
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [
-    generationType,
-    scaleType,
-    arpeggioType,
-    scalePattern,
-    arpeggioPattern,
-    rhythmType,
-    rootKey,
-    numOctaves,
-    startOctave,
-    clef,
-    tempo,
-    poolModeEnabled,
-    scalePool,
-    arpeggioPool,
-    keyPool,
-    randomize,
-    maxOctaves,
-    availableScalePatterns,
-    availableScaleTypes,
-  ]);
-
-  // Playback controls
-  const handlePlay = useCallback(async () => {
-    await generationPlayback.resume();
-    await generationPlayback.play();
-  }, []);
-
-  const handlePause = useCallback(() => {
-    generationPlayback.pause();
-  }, []);
-
-  const handleStop = useCallback(() => {
-    generationPlayback.stop();
-    setCurrentNoteIndex(null);
-  }, []);
-
-  // Tempo control - updates state and playback service
-  const handleTempoChange = useCallback((bpm: number) => {
-    setTempo(bpm);
-    generationPlayback.setTempo(bpm);
-  }, []);
-
-  // Preview tempo control
-  const handlePreviewTempoChange = useCallback((bpm: number) => {
-    setPreviewTempo(bpm);
-    generationPlayback.setTempo(bpm);
-  }, []);
-
-  // Load preview files when switching to tunes mode
-  const loadPreviewFiles = useCallback(async () => {
-    try {
-      const result = await listPreviewFiles();
-      setPreviewFiles(result.files);
-      devLog("[GenerationPreview] Loaded preview files:", result.files);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      devError("[GenerationPreview] Failed to load preview files:", error);
-      setPreviewError(message);
-    }
-  }, []);
-
   // Handle view mode change
   const handleViewModeChange = useCallback(
     (mode: ViewMode) => {
       // Stop any active playback when switching modes
       generationPlayback.stop();
-      setCurrentNoteIndex(null);
-      setPlaybackState("stopped");
-
       setViewMode(mode);
-      if (mode === "tunes" && previewFiles.length === 0) {
-        loadPreviewFiles();
+      if (mode === "tunes" && tunes.previewFiles.length === 0) {
+        tunes.loadPreviewFiles();
       }
     },
-    [previewFiles.length, loadPreviewFiles],
+    [tunes],
   );
 
-  // Load preview for selected file
-  const handlePreviewFile = useCallback(
-    async (filename: string) => {
-      if (!filename) return;
-
-      setIsLoadingPreview(true);
-      setPreviewError(null);
-      setPreviewResponse(null);
-      setSelectedPreviewFile(filename);
-      setMaterialAnalysis(null);
-
-      // Stop any current playback
-      generationPlayback.stop();
-      setCurrentNoteIndex(null);
-      setPlaybackState("stopped");
-
-      try {
-        const result = await previewMaterial(filename);
-        setPreviewResponse(result);
-        devLog("[GenerationPreview] Preview result:", result);
-
-        // Load playback events if available
-        if (result.playback_events && result.playback_events.length > 0) {
-          generationPlayback.load(result.playback_events, {
-            tempo: result.tempo_bpm || previewTempo,
-            onStateChange: setPlaybackState,
-            onProgress: setCurrentNoteIndex,
-            onComplete: () => {
-              setCurrentNoteIndex(null);
-              devLog("[GenerationPreview] Preview playback complete");
-            },
-          });
-          devLog(
-            "[GenerationPreview] Loaded",
-            result.playback_events.length,
-            "events for playback",
-          );
-        }
-
-        // Run material analysis on the MusicXML
-        if (result.musicxml_content) {
-          setIsLoadingAnalysis(true);
-          try {
-            const analysis = await analyzeMaterial(
-              result.musicxml_content,
-              filename,
-            );
-            setMaterialAnalysis(analysis);
-            devLog("[GenerationPreview] Material analysis:", analysis);
-          } catch (analysisError) {
-            devError(
-              "[GenerationPreview] Material analysis failed:",
-              analysisError,
-            );
-          } finally {
-            setIsLoadingAnalysis(false);
-          }
-        }
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Unknown error";
-        devError("[GenerationPreview] Preview failed:", error);
-        setPreviewError(message);
-      } finally {
-        setIsLoadingPreview(false);
-      }
-    },
-    [previewTempo],
-  );
-
-  // Handle solfège toggle
-  const handleSolfegeToggle = useCallback(async () => {
-    const newShowSolfege = !showSolfege;
-    setShowSolfege(newShowSolfege);
-
-    // If enabling solfège and we don't have it cached, fetch it
-    if (newShowSolfege && !solfegeXml && selectedPreviewFile) {
-      setIsLoadingSolfege(true);
-      try {
-        // Pass the current tune key so solfege is in the correct key
-        const result = await getSolfege(selectedPreviewFile, tuneKey);
-        setSolfegeXml(result.solfege_xml);
-        devLog("[GenerationPreview] Solfège loaded for key:", result.key_used);
-      } catch (error) {
-        devError("[GenerationPreview] Solfège fetch failed:", error);
-        setShowSolfege(false); // Revert toggle on error
-      } finally {
-        setIsLoadingSolfege(false);
-      }
-    }
-  }, [showSolfege, solfegeXml, selectedPreviewFile, tuneKey]);
-
-  // Handle tune clef change - show modal to ask about transposition
-  const handleTuneClefChange = useCallback(
-    (newClef: ClefType) => {
-      if (!previewResponse || newClef === tuneClef) return;
-      // Show modal to ask about transposition
-      setClefChangeModal({ visible: true, targetClef: newClef });
-    },
-    [previewResponse, tuneClef],
-  );
-
-  // Handle clef transposition selection from modal
-  const handleClefTranspose = useCallback(
-    async (octaves: number) => {
-      const targetClef = clefChangeModal.targetClef;
-      setClefChangeModal({ visible: false, targetClef: "treble" });
-      setTuneClef(targetClef);
-      setIsTransposing(true);
-      try {
-        const result = await transposeMaterial(
-          previewResponse!.musicxml_content,
-          { octaves, target_clef: targetClef },
-        );
-        setTransposedXml(result.musicxml_content);
-        // Clear solfege when clef changes (it would need re-fetching)
-        setSolfegeXml(null);
-        setShowSolfege(false);
-        devLog(
-          "[GenerationPreview] Transposed to clef:",
-          targetClef,
-          "octaves:",
-          octaves,
-        );
-      } catch (error) {
-        devError("[GenerationPreview] Clef transpose failed:", error);
-      } finally {
-        setIsTransposing(false);
-      }
-    },
-    [clefChangeModal.targetClef, previewResponse],
-  );
-
-  // Cancel clef change modal
-  const handleClefChangeCancel = useCallback(() => {
-    setClefChangeModal({ visible: false, targetClef: "treble" });
-  }, []);
-
-  // Handle tune key change - show modal to ask about transposition direction
-  const handleTuneKeyChange = useCallback(
-    (newKey: MusicalKey) => {
-      if (!previewResponse || newKey === tuneKey) return;
-      // Show modal to ask about transposition direction
-      setKeyChangeModal({ visible: true, targetKey: newKey });
-    },
-    [previewResponse, tuneKey],
-  );
-
-  // Key to semitones helper
-  const keyToSemitones: Record<MusicalKey, number> = {
-    C: 0,
-    "C#": 1,
-    Db: 1,
-    D: 2,
-    "D#": 3,
-    Eb: 3,
-    E: 4,
-    F: 5,
-    "F#": 6,
-    Gb: 6,
-    G: 7,
-    "G#": 8,
-    Ab: 8,
-    A: 9,
-    "A#": 10,
-    Bb: 10,
-    B: 11,
-  };
-
-  // Calculate transpose intervals for key change
-  const getKeyTransposeIntervals = useCallback(
-    (targetKey: MusicalKey): { down: number; up: number } => {
-      const currentSemitones = keyToSemitones[tuneKey] ?? 0;
-      const newSemitones = keyToSemitones[targetKey] ?? 0;
-
-      // Calculate the interval (can be 0-11)
-      const rawInterval = (((newSemitones - currentSemitones) % 12) + 12) % 12;
-
-      // Down interval is negative, up interval is positive
-      const down = rawInterval === 0 ? 0 : rawInterval - 12;
-      const up = rawInterval;
-
-      return { down, up };
-    },
-    [tuneKey, keyToSemitones],
-  );
-
-  // Handle key transposition selection from modal
-  const handleKeyTranspose = useCallback(
-    async (semitones: number) => {
-      const targetKey = keyChangeModal.targetKey;
-      setKeyChangeModal({ visible: false, targetKey: "C" });
-      setTuneKey(targetKey);
-      setIsTransposing(true);
-      try {
-        const result = await transposeMaterial(
-          previewResponse!.musicxml_content,
-          { semitones, target_clef: tuneClef },
-        );
-        setTransposedXml(result.musicxml_content);
-        // Clear solfege when key changes
-        setSolfegeXml(null);
-        setShowSolfege(false);
-        devLog(
-          "[GenerationPreview] Transposed to key:",
-          targetKey,
-          "semitones:",
-          semitones,
-        );
-      } catch (error) {
-        devError("[GenerationPreview] Key transpose failed:", error);
-      } finally {
-        setIsTransposing(false);
-      }
-    },
-    [keyChangeModal.targetKey, previewResponse, tuneClef],
-  );
-
-  // Cancel key change modal
-  const handleKeyChangeCancel = useCallback(() => {
-    setKeyChangeModal({ visible: false, targetKey: "C" });
-  }, []);
-
-  // Clear solfège and transposition cache when preview file changes
-  useEffect(() => {
-    setSolfegeXml(null);
-    setShowSolfege(false);
-    setTransposedXml(null);
-    setTuneKey("C");
-    setTuneClef("treble");
-  }, [selectedPreviewFile]);
-
-  // Toggle pool item
+  // Toggle pool item helper
   const togglePoolItem = <T extends string>(
     pool: T[],
-    setPool: React.Dispatch<React.SetStateAction<T[]>>,
+    setPool: (items: T[]) => void,
     item: T,
   ) => {
     if (pool.includes(item)) {
@@ -1479,15 +183,15 @@ export default function GenerationPreviewScreen() {
               <Text style={styles.sectionLabel}>Select Tune</Text>
               <View style={styles.pickerContainer}>
                 <Picker
-                  selectedValue={selectedPreviewFile ?? ""}
+                  selectedValue={tunes.selectedPreviewFile ?? ""}
                   onValueChange={(value) => {
-                    if (value) handlePreviewFile(value);
+                    if (value) tunes.handlePreviewFile(value);
                   }}
                   style={styles.picker}
                   accessibilityLabel="Select tune file"
                 >
                   <Picker.Item label="Choose a file..." value="" />
-                  {previewFiles.map((file) => (
+                  {tunes.previewFiles.map((file) => (
                     <Picker.Item
                       key={file}
                       label={file
@@ -1498,7 +202,7 @@ export default function GenerationPreviewScreen() {
                   ))}
                 </Picker>
               </View>
-              {previewFiles.length === 0 && (
+              {tunes.previewFiles.length === 0 && (
                 <Text style={styles.hintText}>
                   No files in pending folder. Add MusicXML files to
                   resources/materials/pending/
@@ -1507,20 +211,22 @@ export default function GenerationPreviewScreen() {
             </View>
 
             {/* Loading/Error State */}
-            {isLoadingPreview && (
+            {tunes.isLoadingPreview && (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={styles.loadingText}>Loading preview...</Text>
               </View>
             )}
-            {previewError && (
+            {tunes.previewError && (
               <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>Error: {previewError}</Text>
+                <Text style={styles.errorText}>
+                  Error: {tunes.previewError}
+                </Text>
               </View>
             )}
 
             {/* Preview Content */}
-            {previewResponse && !isLoadingPreview && (
+            {tunes.previewResponse && !tunes.isLoadingPreview && (
               <>
                 {/* Key and Clef Selectors */}
                 <View style={styles.section}>
@@ -1529,12 +235,12 @@ export default function GenerationPreviewScreen() {
                       <Text style={styles.sectionLabel}>Key</Text>
                       <View style={styles.pickerContainer}>
                         <Picker
-                          selectedValue={tuneKey}
+                          selectedValue={tunes.tuneKey}
                           onValueChange={(value) =>
-                            handleTuneKeyChange(value as MusicalKey)
+                            tunes.handleTuneKeyChange(value as MusicalKey)
                           }
                           style={styles.picker}
-                          enabled={!isTransposing}
+                          enabled={!tunes.isTransposing}
                           accessibilityLabel="Select key"
                         >
                           {ROOT_KEYS.map((key) => (
@@ -1547,12 +253,12 @@ export default function GenerationPreviewScreen() {
                       <Text style={styles.sectionLabel}>Clef</Text>
                       <View style={styles.pickerContainer}>
                         <Picker
-                          selectedValue={tuneClef}
+                          selectedValue={tunes.tuneClef}
                           onValueChange={(value) =>
-                            handleTuneClefChange(value as ClefType)
+                            tunes.handleTuneClefChange(value as ClefType)
                           }
                           style={styles.picker}
-                          enabled={!isTransposing}
+                          enabled={!tunes.isTransposing}
                           accessibilityLabel="Select clef"
                         >
                           {CLEFS.map((c) => (
@@ -1566,7 +272,7 @@ export default function GenerationPreviewScreen() {
                       </View>
                     </View>
                   </View>
-                  {isTransposing && (
+                  {tunes.isTransposing && (
                     <View style={styles.transposingIndicator}>
                       <ActivityIndicator size="small" color={colors.primary} />
                       <Text style={styles.transposingText}>Transposing...</Text>
@@ -1578,47 +284,45 @@ export default function GenerationPreviewScreen() {
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
                     <Text style={styles.sectionLabel}>
-                      {previewResponse.title}
-                      {previewResponse.original_key_center &&
-                        ` (Original: ${previewResponse.original_key_center})`}
+                      {tunes.previewResponse.title}
+                      {tunes.previewResponse.original_key_center &&
+                        ` (Original: ${tunes.previewResponse.original_key_center})`}
                     </Text>
                     <TouchableOpacity
                       style={[
                         styles.solfegeToggle,
-                        showSolfege && styles.solfegeToggleActive,
+                        tunes.showSolfege && styles.solfegeToggleActive,
                       ]}
-                      onPress={handleSolfegeToggle}
-                      disabled={isLoadingSolfege}
+                      onPress={tunes.handleSolfegeToggle}
+                      disabled={tunes.isLoadingSolfege}
                       accessibilityLabel="Toggle solfège view"
                       accessibilityRole="switch"
-                      accessibilityState={{ checked: showSolfege }}
+                      accessibilityState={{ checked: tunes.showSolfege }}
                     >
-                      {isLoadingSolfege ? (
+                      {tunes.isLoadingSolfege ? (
                         <ActivityIndicator size="small" color={colors.text} />
                       ) : (
                         <Text
                           style={[
                             styles.solfegeToggleText,
-                            showSolfege && styles.solfegeToggleTextActive,
+                            tunes.showSolfege && styles.solfegeToggleTextActive,
                           ]}
                         >
-                          {showSolfege ? "Remove Solfège" : "View Solfège"}
+                          {tunes.showSolfege
+                            ? "Remove Solfège"
+                            : "View Solfège"}
                         </Text>
                       )}
                     </TouchableOpacity>
                   </View>
                   <View style={styles.notationContainer}>
                     <ScoreViewport
-                      musicXml={
-                        showSolfege && solfegeXml
-                          ? solfegeXml
-                          : (transposedXml ?? previewResponse.musicxml_content)
-                      }
+                      musicXml={tunes.displayXml ?? ""}
                       height={350}
                       fixedWidth={400}
-                      playbackState={playbackState}
+                      playbackState={tunes.playbackState}
                       playbackMeasureIndex={undefined}
-                      highlightedNoteIndex={currentNoteIndex ?? undefined}
+                      highlightedNoteIndex={tunes.currentNoteIndex ?? undefined}
                     />
                   </View>
                 </View>
@@ -1626,8 +330,8 @@ export default function GenerationPreviewScreen() {
                 {/* Tempo Slider */}
                 <View style={styles.section}>
                   <TempoSlider
-                    tempo={previewTempo}
-                    onTempoChange={handlePreviewTempoChange}
+                    tempo={tunes.previewTempo}
+                    onTempoChange={tunes.handlePreviewTempoChange}
                     minTempo={40}
                     maxTempo={200}
                     label="Preview Tempo"
@@ -1639,25 +343,25 @@ export default function GenerationPreviewScreen() {
                   <Text style={styles.sectionLabel}>Analysis</Text>
                   <View style={styles.debugContainer}>
                     <Text style={styles.debugText}>
-                      Measures: {previewResponse.measure_count}
+                      Measures: {tunes.previewResponse.measure_count}
                     </Text>
-                    {previewResponse.tempo_bpm && (
+                    {tunes.previewResponse.tempo_bpm && (
                       <Text style={styles.debugText}>
-                        Tempo: {previewResponse.tempo_bpm} BPM
-                        {previewResponse.tempo_marking &&
+                        Tempo: {tunes.previewResponse.tempo_bpm} BPM
+                        {tunes.previewResponse.tempo_marking &&
                           ` (${previewResponse.tempo_marking})`}
                       </Text>
                     )}
                     <Text style={styles.debugText}>
-                      Capabilities: {previewResponse.capability_count}
+                      Capabilities: {tunes.previewResponse.capability_count}
                     </Text>
-                    {Object.entries(previewResponse.capabilities_by_domain).map(
-                      ([domain, caps]) => (
-                        <Text key={domain} style={styles.debugText}>
-                          • {domain}: {(caps as string[]).length}
-                        </Text>
-                      ),
-                    )}
+                    {Object.entries(
+                      tunes.previewResponse.capabilities_by_domain,
+                    ).map(([domain, caps]) => (
+                      <Text key={domain} style={styles.debugText}>
+                        • {domain}: {(caps as string[]).length}
+                      </Text>
+                    ))}
                   </View>
                 </View>
 
@@ -1665,46 +369,59 @@ export default function GenerationPreviewScreen() {
                 <View style={styles.section}>
                   <Text style={styles.sectionLabel}>Soft Gates</Text>
                   <View style={styles.debugContainer}>
-                    {previewResponse.soft_gates.interval_sustained_stage !==
-                      undefined && (
+                    {tunes.previewResponse.soft_gates
+                      .interval_sustained_stage !== undefined && (
                       <Text style={styles.debugText}>
                         Interval Sustained:{" "}
-                        {previewResponse.soft_gates.interval_sustained_stage}/6
+                        {
+                          tunes.previewResponse.soft_gates
+                            .interval_sustained_stage
+                        }
+                        /6
                       </Text>
                     )}
-                    {previewResponse.soft_gates.interval_hazard_stage !==
+                    {tunes.previewResponse.soft_gates.interval_hazard_stage !==
                       undefined && (
                       <Text style={styles.debugText}>
                         Interval Hazard:{" "}
-                        {previewResponse.soft_gates.interval_hazard_stage}/6
+                        {tunes.previewResponse.soft_gates.interval_hazard_stage}
+                        /6
                       </Text>
                     )}
-                    {previewResponse.soft_gates.rhythm_complexity_stage !==
-                      undefined && (
+                    {tunes.previewResponse.soft_gates
+                      .rhythm_complexity_stage !== undefined && (
                       <Text style={styles.debugText}>
                         Rhythm Complexity:{" "}
-                        {previewResponse.soft_gates.rhythm_complexity_stage}/6
+                        {
+                          tunes.previewResponse.soft_gates
+                            .rhythm_complexity_stage
+                        }
+                        /6
                       </Text>
                     )}
-                    {previewResponse.soft_gates.tonal_complexity_stage !==
+                    {tunes.previewResponse.soft_gates.tonal_complexity_stage !==
                       undefined && (
                       <Text style={styles.debugText}>
                         Tonal Complexity:{" "}
-                        {previewResponse.soft_gates.tonal_complexity_stage}/5
+                        {
+                          tunes.previewResponse.soft_gates
+                            .tonal_complexity_stage
+                        }
+                        /5
                       </Text>
                     )}
-                    {previewResponse.soft_gates.range_usage_stage !==
+                    {tunes.previewResponse.soft_gates.range_usage_stage !==
                       undefined && (
                       <Text style={styles.debugText}>
                         Range Usage:{" "}
-                        {previewResponse.soft_gates.range_usage_stage}/6
+                        {tunes.previewResponse.soft_gates.range_usage_stage}/6
                       </Text>
                     )}
                   </View>
                 </View>
 
                 {/* Unified Scores */}
-                {previewResponse.unified_scores.difficulty_index !==
+                {tunes.previewResponse.unified_scores.difficulty_index !==
                   undefined && (
                   <View style={styles.section}>
                     <Text style={styles.sectionLabel}>Difficulty</Text>
@@ -1712,7 +429,8 @@ export default function GenerationPreviewScreen() {
                       <Text style={styles.debugText}>
                         Difficulty Index:{" "}
                         {(
-                          previewResponse.unified_scores.difficulty_index * 100
+                          tunes.previewResponse.unified_scores
+                            .difficulty_index * 100
                         ).toFixed(1)}
                         %
                       </Text>
@@ -1723,21 +441,21 @@ export default function GenerationPreviewScreen() {
                 {/* Material Analysis */}
                 <View style={styles.section}>
                   <Text style={styles.sectionLabel}>Material Analysis</Text>
-                  {isLoadingAnalysis ? (
+                  {tunes.isLoadingAnalysis ? (
                     <View style={styles.loadingContainer}>
                       <ActivityIndicator size="small" color={colors.primary} />
                       <Text style={styles.loadingText}>
                         Running analysis...
                       </Text>
                     </View>
-                  ) : materialAnalysis ? (
+                  ) : tunes.materialAnalysis ? (
                     <View style={styles.debugContainer}>
                       {/* Extract key/time signatures from detailed_extraction */}
                       {(() => {
-                        const detailed =
-                          materialAnalysis.detailed_extraction as
-                            | Record<string, unknown>
-                            | undefined;
+                        const detailed = tunes.materialAnalysis
+                          .detailed_extraction as
+                          | Record<string, unknown>
+                          | undefined;
                         const keySignatures = detailed?.key_signatures as
                           | string[]
                           | undefined;
@@ -1762,9 +480,9 @@ export default function GenerationPreviewScreen() {
                                 Time: {timeSignatures.join(", ")}
                               </Text>
                             )}
-                            {materialAnalysis.tempo_bpm && (
+                            {tunes.materialAnalysis.tempo_bpm && (
                               <Text style={styles.debugText}>
-                                Tempo: {materialAnalysis.tempo_bpm} BPM
+                                Tempo: {tunes.materialAnalysis.tempo_bpm} BPM
                               </Text>
                             )}
                             {rangeAnalysis && (
@@ -1776,28 +494,30 @@ export default function GenerationPreviewScreen() {
                           </>
                         );
                       })()}
-                      {materialAnalysis.capabilities &&
-                        (materialAnalysis.capabilities as string[]).length >
-                          0 && (
+                      {tunes.materialAnalysis.capabilities &&
+                        (tunes.materialAnalysis.capabilities as string[])
+                          .length > 0 && (
                           <>
                             <Text style={styles.debugText}>
                               Capabilities (
                               {
-                                (materialAnalysis.capabilities as string[])
-                                  .length
+                                (
+                                  tunes.materialAnalysis
+                                    .capabilities as string[]
+                                ).length
                               }
                               ):
                             </Text>
-                            {(materialAnalysis.capabilities as string[]).map(
-                              (cap, idx) => (
-                                <Text
-                                  key={idx}
-                                  style={[styles.debugText, { marginLeft: 8 }]}
-                                >
-                                  • {cap}
-                                </Text>
-                              ),
-                            )}
+                            {(
+                              tunes.materialAnalysis.capabilities as string[]
+                            ).map((cap, idx) => (
+                              <Text
+                                key={idx}
+                                style={[styles.debugText, { marginLeft: 8 }]}
+                              >
+                                • {cap}
+                              </Text>
+                            ))}
                           </>
                         )}
                     </View>
@@ -1807,15 +527,15 @@ export default function GenerationPreviewScreen() {
                 </View>
 
                 {/* Playback Controls */}
-                {previewResponse.playback_events &&
-                  previewResponse.playback_events.length > 0 && (
+                {tunes.previewResponse.playback_events &&
+                  tunes.previewResponse.playback_events.length > 0 && (
                     <View style={styles.playbackSection}>
                       <Text style={styles.sectionLabel}>Playback</Text>
                       <View style={styles.playbackControls}>
-                        {playbackState === "playing" ? (
+                        {tunes.playbackState === "playing" ? (
                           <TouchableOpacity
                             style={styles.playButton}
-                            onPress={handlePause}
+                            onPress={tunes.handlePause}
                             accessibilityLabel="Pause playback"
                           >
                             <Text style={styles.playButtonText}>⏸ Pause</Text>
@@ -1823,7 +543,7 @@ export default function GenerationPreviewScreen() {
                         ) : (
                           <TouchableOpacity
                             style={styles.playButton}
-                            onPress={handlePlay}
+                            onPress={tunes.handlePlay}
                             accessibilityLabel="Play tune"
                           >
                             <Text style={styles.playButtonText}>▶️ Play</Text>
@@ -1831,16 +551,16 @@ export default function GenerationPreviewScreen() {
                         )}
                         <TouchableOpacity
                           style={styles.stopButton}
-                          onPress={handleStop}
+                          onPress={tunes.handleStop}
                           accessibilityLabel="Stop playback"
                         >
                           <Text style={styles.stopButtonText}>⏹ Stop</Text>
                         </TouchableOpacity>
                       </View>
                       <Text style={styles.playbackStatus}>
-                        State: {playbackState}
-                        {currentNoteIndex !== null &&
-                          ` | Note: ${currentNoteIndex + 1}/${previewResponse.playback_events.length}`}
+                        State: {tunes.playbackState}
+                        {tunes.currentNoteIndex !== null &&
+                          ` | Note: ${tunes.currentNoteIndex + 1}/${tunes.previewResponse.playback_events.length}`}
                       </Text>
                     </View>
                   )}
@@ -1861,14 +581,15 @@ export default function GenerationPreviewScreen() {
                     key={type}
                     style={[
                       styles.typeButton,
-                      generationType === type && styles.typeButtonSelected,
+                      generator.generationType === type &&
+                        styles.typeButtonSelected,
                     ]}
-                    onPress={() => setGenerationType(type)}
+                    onPress={() => generator.setGenerationType(type)}
                   >
                     <Text
                       style={[
                         styles.typeButtonText,
-                        generationType === type &&
+                        generator.generationType === type &&
                           styles.typeButtonTextSelected,
                       ]}
                     >
@@ -1880,39 +601,40 @@ export default function GenerationPreviewScreen() {
             </View>
 
             {/* Scale/Arpeggio Type */}
-            {generationType === "scale" || generationType === "lick" ? (
+            {generator.generationType === "scale" ||
+            generator.generationType === "lick" ? (
               <View style={styles.section}>
                 <View style={styles.labelRow}>
                   <Text style={styles.sectionLabel}>Scale Type</Text>
-                  {randomize.scaleType && (
+                  {generator.randomize.scaleType && (
                     <Text style={styles.randomBadge}>🎲</Text>
                   )}
                 </View>
                 <View style={styles.pickerRow}>
                   <TouchableOpacity
                     style={styles.randomCheckbox}
-                    onPress={() => toggleRandomize("scaleType")}
+                    onPress={() => generator.toggleRandomize("scaleType")}
                   >
                     <Text style={styles.checkboxText}>
-                      {randomize.scaleType ? "☑" : "☐"}
+                      {generator.randomize.scaleType ? "☑" : "☐"}
                     </Text>
                   </TouchableOpacity>
                   <View
                     style={[
                       styles.pickerContainer,
                       { flex: 1 },
-                      randomize.scaleType && styles.pickerDisabled,
+                      generator.randomize.scaleType && styles.pickerDisabled,
                     ]}
                   >
                     <Picker
-                      selectedValue={scaleType}
+                      selectedValue={generator.scaleType}
                       onValueChange={(value) =>
-                        setScaleType(value as ScaleType)
+                        generator.setScaleType(value as ScaleType)
                       }
                       style={styles.picker}
-                      enabled={!randomize.scaleType}
+                      enabled={!generator.randomize.scaleType}
                     >
-                      {availableScaleTypes.map((type) => (
+                      {generator.availableScaleTypes.map((type) => (
                         <Picker.Item
                           key={type}
                           label={formatScaleLabel(type)}
@@ -1927,33 +649,33 @@ export default function GenerationPreviewScreen() {
               <View style={styles.section}>
                 <View style={styles.labelRow}>
                   <Text style={styles.sectionLabel}>Arpeggio Type</Text>
-                  {randomize.arpeggioType && (
+                  {generator.randomize.arpeggioType && (
                     <Text style={styles.randomBadge}>🎲</Text>
                   )}
                 </View>
                 <View style={styles.pickerRow}>
                   <TouchableOpacity
                     style={styles.randomCheckbox}
-                    onPress={() => toggleRandomize("arpeggioType")}
+                    onPress={() => generator.toggleRandomize("arpeggioType")}
                   >
                     <Text style={styles.checkboxText}>
-                      {randomize.arpeggioType ? "☑" : "☐"}
+                      {generator.randomize.arpeggioType ? "☑" : "☐"}
                     </Text>
                   </TouchableOpacity>
                   <View
                     style={[
                       styles.pickerContainer,
                       { flex: 1 },
-                      randomize.arpeggioType && styles.pickerDisabled,
+                      generator.randomize.arpeggioType && styles.pickerDisabled,
                     ]}
                   >
                     <Picker
-                      selectedValue={arpeggioType}
+                      selectedValue={generator.arpeggioType}
                       onValueChange={(value) =>
-                        setArpeggioType(value as ArpeggioType)
+                        generator.setArpeggioType(value as ArpeggioType)
                       }
                       style={styles.picker}
-                      enabled={!randomize.arpeggioType}
+                      enabled={!generator.randomize.arpeggioType}
                     >
                       {ARPEGGIO_TYPES.map((type) => (
                         <Picker.Item
@@ -1972,9 +694,9 @@ export default function GenerationPreviewScreen() {
             <View style={styles.section}>
               <View style={styles.labelRow}>
                 <Text style={styles.sectionLabel}>Pattern</Text>
-                {(generationType === "scale"
-                  ? randomize.scalePattern
-                  : randomize.arpeggioPattern) && (
+                {(generator.generationType === "scale"
+                  ? generator.randomize.scalePattern
+                  : generator.randomize.arpeggioPattern) && (
                   <Text style={styles.randomBadge}>🎲</Text>
                 )}
               </View>
@@ -1982,8 +704,8 @@ export default function GenerationPreviewScreen() {
                 <TouchableOpacity
                   style={styles.randomCheckbox}
                   onPress={() =>
-                    toggleRandomize(
-                      generationType === "scale"
+                    generator.toggleRandomize(
+                      generator.generationType === "scale"
                         ? "scalePattern"
                         : "arpeggioPattern",
                     )
@@ -1991,9 +713,9 @@ export default function GenerationPreviewScreen() {
                 >
                   <Text style={styles.checkboxText}>
                     {(
-                      generationType === "scale"
-                        ? randomize.scalePattern
-                        : randomize.arpeggioPattern
+                      generator.generationType === "scale"
+                        ? generator.randomize.scalePattern
+                        : generator.randomize.arpeggioPattern
                     )
                       ? "☑"
                       : "☐"}
@@ -2003,36 +725,40 @@ export default function GenerationPreviewScreen() {
                   style={[
                     styles.pickerContainer,
                     { flex: 1 },
-                    (generationType === "scale"
-                      ? randomize.scalePattern
-                      : randomize.arpeggioPattern) && styles.pickerDisabled,
+                    (generator.generationType === "scale"
+                      ? generator.randomize.scalePattern
+                      : generator.randomize.arpeggioPattern) &&
+                      styles.pickerDisabled,
                   ]}
                 >
-                  {generationType === "scale" ? (
+                  {generator.generationType === "scale" ? (
                     <Picker
-                      selectedValue={scalePattern}
+                      selectedValue={generator.scalePattern}
                       onValueChange={(value) =>
-                        setScalePattern(value as ScalePattern)
+                        generator.setScalePattern(value)
                       }
                       style={styles.picker}
-                      enabled={!randomize.scalePattern}
+                      enabled={!generator.randomize.scalePattern}
                     >
-                      {availableScalePatterns.map((pattern) => (
+                      {generator.availableScalePatterns.map((pattern) => (
                         <Picker.Item
                           key={pattern}
-                          label={formatScalePatternLabel(pattern, scaleType)}
+                          label={formatScalePatternLabel(
+                            pattern,
+                            generator.scaleType,
+                          )}
                           value={pattern}
                         />
                       ))}
                     </Picker>
                   ) : (
                     <Picker
-                      selectedValue={arpeggioPattern}
+                      selectedValue={generator.arpeggioPattern}
                       onValueChange={(value) =>
-                        setArpeggioPattern(value as ArpeggioPattern)
+                        generator.setArpeggioPattern(value)
                       }
                       style={styles.picker}
-                      enabled={!randomize.arpeggioPattern}
+                      enabled={!generator.randomize.arpeggioPattern}
                     >
                       {ARPEGGIO_PATTERNS.map((pattern) => (
                         <Picker.Item
@@ -2051,37 +777,33 @@ export default function GenerationPreviewScreen() {
             <View style={styles.section}>
               <View style={styles.labelRow}>
                 <Text style={styles.sectionLabel}>Rhythm</Text>
-                {randomize.rhythmType && (
+                {generator.randomize.rhythmType && (
                   <Text style={styles.randomBadge}>🎲</Text>
                 )}
               </View>
               <View style={styles.pickerRow}>
                 <TouchableOpacity
                   style={styles.randomCheckbox}
-                  onPress={() => toggleRandomize("rhythmType")}
+                  onPress={() => generator.toggleRandomize("rhythmType")}
                 >
                   <Text style={styles.checkboxText}>
-                    {randomize.rhythmType ? "☑" : "☐"}
+                    {generator.randomize.rhythmType ? "☑" : "☐"}
                   </Text>
                 </TouchableOpacity>
                 <View
                   style={[
                     styles.pickerContainer,
                     { flex: 1 },
-                    randomize.rhythmType && styles.pickerDisabled,
+                    generator.randomize.rhythmType && styles.pickerDisabled,
                   ]}
                 >
                   <Picker
-                    selectedValue={rhythmType}
-                    onValueChange={(value) =>
-                      setRhythmType(value as RhythmType)
-                    }
+                    selectedValue={generator.rhythmType}
+                    onValueChange={(value) => generator.setRhythmType(value)}
                     style={styles.picker}
-                    enabled={!randomize.rhythmType}
+                    enabled={!generator.randomize.rhythmType}
                   >
-                    {getAvailableRhythmsForPattern(
-                      generationType === "scale" ? scalePattern : null,
-                    ).map((r) => (
+                    {generator.availableRhythms.map((r) => (
                       <Picker.Item
                         key={r}
                         label={RHYTHM_DISPLAY_LABELS[r] ?? r.replace(/_/g, " ")}
@@ -2097,31 +819,33 @@ export default function GenerationPreviewScreen() {
             <View style={styles.section}>
               <View style={styles.labelRow}>
                 <Text style={styles.sectionLabel}>Root Key</Text>
-                {randomize.rootKey && (
+                {generator.randomize.rootKey && (
                   <Text style={styles.randomBadge}>🎲</Text>
                 )}
               </View>
               <View style={styles.pickerRow}>
                 <TouchableOpacity
                   style={styles.randomCheckbox}
-                  onPress={() => toggleRandomize("rootKey")}
+                  onPress={() => generator.toggleRandomize("rootKey")}
                 >
                   <Text style={styles.checkboxText}>
-                    {randomize.rootKey ? "☑" : "☐"}
+                    {generator.randomize.rootKey ? "☑" : "☐"}
                   </Text>
                 </TouchableOpacity>
                 <View
                   style={[
                     styles.pickerContainer,
                     { flex: 1 },
-                    randomize.rootKey && styles.pickerDisabled,
+                    generator.randomize.rootKey && styles.pickerDisabled,
                   ]}
                 >
                   <Picker
-                    selectedValue={rootKey}
-                    onValueChange={(value) => setRootKey(value as MusicalKey)}
+                    selectedValue={generator.rootKey}
+                    onValueChange={(value) =>
+                      generator.setRootKey(value as MusicalKey)
+                    }
                     style={styles.picker}
-                    enabled={!randomize.rootKey}
+                    enabled={!generator.randomize.rootKey}
                   >
                     {ROOT_KEYS.map((key) => (
                       <Picker.Item key={key} label={key} value={key} />
@@ -2136,31 +860,33 @@ export default function GenerationPreviewScreen() {
               <View style={styles.halfSection}>
                 <View style={styles.labelRow}>
                   <Text style={styles.sectionLabel}>Start Oct</Text>
-                  {randomize.startOctave && (
+                  {generator.randomize.startOctave && (
                     <Text style={styles.randomBadge}>🎲</Text>
                   )}
                 </View>
                 <View style={styles.pickerRow}>
                   <TouchableOpacity
                     style={styles.randomCheckbox}
-                    onPress={() => toggleRandomize("startOctave")}
+                    onPress={() => generator.toggleRandomize("startOctave")}
                   >
                     <Text style={styles.checkboxText}>
-                      {randomize.startOctave ? "☑" : "☐"}
+                      {generator.randomize.startOctave ? "☑" : "☐"}
                     </Text>
                   </TouchableOpacity>
                   <View
                     style={[
                       styles.pickerContainer,
                       { flex: 1 },
-                      randomize.startOctave && styles.pickerDisabled,
+                      generator.randomize.startOctave && styles.pickerDisabled,
                     ]}
                   >
                     <Picker
-                      selectedValue={startOctave}
-                      onValueChange={(value) => setStartOctave(Number(value))}
+                      selectedValue={generator.startOctave}
+                      onValueChange={(value) =>
+                        generator.setStartOctave(Number(value))
+                      }
                       style={styles.picker}
-                      enabled={!randomize.startOctave}
+                      enabled={!generator.randomize.startOctave}
                     >
                       {OCTAVES.map((oct) => (
                         <Picker.Item
@@ -2176,36 +902,36 @@ export default function GenerationPreviewScreen() {
               <View style={styles.halfSection}>
                 <View style={styles.labelRow}>
                   <Text style={styles.sectionLabel}># Octs</Text>
-                  {randomize.numOctaves && (
+                  {generator.randomize.numOctaves && (
                     <Text style={styles.randomBadge}>🎲</Text>
                   )}
                 </View>
                 <View style={styles.pickerRow}>
                   <TouchableOpacity
                     style={styles.randomCheckbox}
-                    onPress={() => toggleRandomize("numOctaves")}
+                    onPress={() => generator.toggleRandomize("numOctaves")}
                   >
                     <Text style={styles.checkboxText}>
-                      {randomize.numOctaves ? "☑" : "☐"}
+                      {generator.randomize.numOctaves ? "☑" : "☐"}
                     </Text>
                   </TouchableOpacity>
                   <View
                     style={[
                       styles.pickerContainer,
                       { flex: 1 },
-                      randomize.numOctaves && styles.pickerDisabled,
+                      generator.randomize.numOctaves && styles.pickerDisabled,
                     ]}
                   >
                     <Picker
-                      selectedValue={numOctaves}
+                      selectedValue={generator.numOctaves}
                       onValueChange={(value) =>
-                        setNumOctaves(Number(value) as 1 | 2 | 3)
+                        generator.setNumOctaves(Number(value) as 1 | 2 | 3)
                       }
                       style={styles.picker}
-                      enabled={!randomize.numOctaves}
+                      enabled={!generator.randomize.numOctaves}
                     >
                       {[1, 2, 3]
-                        .filter((n) => n <= maxOctaves)
+                        .filter((n) => n <= generator.maxOctaves)
                         .map((n) => (
                           <Picker.Item key={n} label={String(n)} value={n} />
                         ))}
@@ -2219,29 +945,33 @@ export default function GenerationPreviewScreen() {
             <View style={styles.section}>
               <View style={styles.labelRow}>
                 <Text style={styles.sectionLabel}>Clef</Text>
-                {randomize.clef && <Text style={styles.randomBadge}>🎲</Text>}
+                {generator.randomize.clef && (
+                  <Text style={styles.randomBadge}>🎲</Text>
+                )}
               </View>
               <View style={styles.pickerRow}>
                 <TouchableOpacity
                   style={styles.randomCheckbox}
-                  onPress={() => toggleRandomize("clef")}
+                  onPress={() => generator.toggleRandomize("clef")}
                 >
                   <Text style={styles.checkboxText}>
-                    {randomize.clef ? "☑" : "☐"}
+                    {generator.randomize.clef ? "☑" : "☐"}
                   </Text>
                 </TouchableOpacity>
                 <View
                   style={[
                     styles.pickerContainer,
                     { flex: 1 },
-                    randomize.clef && styles.pickerDisabled,
+                    generator.randomize.clef && styles.pickerDisabled,
                   ]}
                 >
                   <Picker
-                    selectedValue={clef}
-                    onValueChange={(value) => setClef(value as ClefType)}
+                    selectedValue={generator.clef}
+                    onValueChange={(value) =>
+                      generator.setClef(value as ClefType)
+                    }
                     style={styles.picker}
-                    enabled={!randomize.clef}
+                    enabled={!generator.randomize.clef}
                   >
                     {CLEFS.map((c) => (
                       <Picker.Item
@@ -2260,18 +990,22 @@ export default function GenerationPreviewScreen() {
               <TouchableOpacity
                 style={[
                   styles.poolToggle,
-                  poolModeEnabled && styles.poolToggleEnabled,
+                  generator.poolModeEnabled && styles.poolToggleEnabled,
                 ]}
-                onPress={() => setPoolModeEnabled(!poolModeEnabled)}
+                onPress={() =>
+                  generator.setPoolModeEnabled(!generator.poolModeEnabled)
+                }
               >
                 <Text style={styles.poolToggleText}>
-                  {poolModeEnabled ? "🎲 Pool Mode ON" : "Pool Mode OFF"}
+                  {generator.poolModeEnabled
+                    ? "🎲 Pool Mode ON"
+                    : "Pool Mode OFF"}
                 </Text>
               </TouchableOpacity>
             </View>
 
             {/* Pool Selection (when enabled) */}
-            {poolModeEnabled && (
+            {generator.poolModeEnabled && (
               <View style={styles.poolSection}>
                 <Text style={styles.poolTitle}>Random Selection Pools</Text>
 
@@ -2282,16 +1016,23 @@ export default function GenerationPreviewScreen() {
                       key={key}
                       style={[
                         styles.poolChip,
-                        keyPool.includes(key) && styles.poolChipSelected,
+                        generator.keyPool.includes(key) &&
+                          styles.poolChipSelected,
                       ]}
-                      onPress={() => togglePoolItem(keyPool, setKeyPool, key)}
+                      onPress={() =>
+                        togglePoolItem(
+                          generator.keyPool,
+                          generator.setKeyPool,
+                          key,
+                        )
+                      }
                     >
                       <Text style={styles.poolChipText}>{key}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
 
-                {generationType === "scale" && (
+                {generator.generationType === "scale" && (
                   <>
                     <Text style={styles.poolSubtitle}>Scales:</Text>
                     <View style={styles.poolChipContainer}>
@@ -2300,10 +1041,15 @@ export default function GenerationPreviewScreen() {
                           key={type}
                           style={[
                             styles.poolChip,
-                            scalePool.includes(type) && styles.poolChipSelected,
+                            generator.scalePool.includes(type) &&
+                              styles.poolChipSelected,
                           ]}
                           onPress={() =>
-                            togglePoolItem(scalePool, setScalePool, type)
+                            togglePoolItem(
+                              generator.scalePool,
+                              generator.setScalePool,
+                              type,
+                            )
                           }
                         >
                           <Text style={styles.poolChipText}>
@@ -2315,7 +1061,7 @@ export default function GenerationPreviewScreen() {
                   </>
                 )}
 
-                {generationType === "arpeggio" && (
+                {generator.generationType === "arpeggio" && (
                   <>
                     <Text style={styles.poolSubtitle}>Arpeggios:</Text>
                     <View style={styles.poolChipContainer}>
@@ -2324,11 +1070,15 @@ export default function GenerationPreviewScreen() {
                           key={type}
                           style={[
                             styles.poolChip,
-                            arpeggioPool.includes(type) &&
+                            generator.arpeggioPool.includes(type) &&
                               styles.poolChipSelected,
                           ]}
                           onPress={() =>
-                            togglePoolItem(arpeggioPool, setArpeggioPool, type)
+                            togglePoolItem(
+                              generator.arpeggioPool,
+                              generator.setArpeggioPool,
+                              type,
+                            )
                           }
                         >
                           <Text style={styles.poolChipText}>
@@ -2347,134 +1097,158 @@ export default function GenerationPreviewScreen() {
               <TouchableOpacity
                 style={[
                   styles.generateButton,
-                  isGenerating && styles.generateButtonDisabled,
+                  generator.isGenerating && styles.generateButtonDisabled,
                 ]}
-                onPress={handleGenerate}
-                disabled={isGenerating}
+                onPress={generator.handleGenerate}
+                disabled={generator.isGenerating}
               >
-                {isGenerating ? (
+                {generator.isGenerating ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text style={styles.generateButtonText}>
-                    {poolModeEnabled ? "🎲 Randomize & Generate" : "Generate"}
+                    {generator.poolModeEnabled
+                      ? "🎲 Randomize & Generate"
+                      : "Generate"}
                   </Text>
                 )}
               </TouchableOpacity>
             </View>
 
             {/* Error Display */}
-            {generationError && (
+            {generator.generationError && (
               <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{generationError}</Text>
+                <Text style={styles.errorText}>
+                  {generator.generationError}
+                </Text>
               </View>
             )}
 
             {/* Notation Display */}
-            {musicXml && (
+            {generator.musicXml && (
               <View style={styles.notationSection}>
                 <Text style={[styles.sectionLabel, { paddingHorizontal: 16 }]}>
                   Generated Content
                 </Text>
                 <ScoreViewport
-                  musicXml={musicXml}
+                  musicXml={generator.musicXml}
                   height={350}
                   fixedWidth={2000}
-                  playbackState={playbackState}
-                  playbackMeasureIndex={playbackMeasureIndex}
-                  highlightedNoteIndex={currentNoteIndex ?? undefined}
+                  playbackState={generator.playbackState}
+                  playbackMeasureIndex={generator.playbackMeasureIndex}
+                  highlightedNoteIndex={generator.currentNoteIndex ?? undefined}
                   testID="notation-display"
                 />
               </View>
             )}
 
             {/* Playback Controls */}
-            {response && response.events && response.events.length > 0 && (
-              <View style={styles.playbackSection}>
-                <Text style={styles.sectionLabel}>Playback</Text>
-                <View style={styles.playbackControls}>
-                  {playbackState === "playing" ? (
+            {generator.response &&
+              generator.response.events &&
+              generator.response.events.length > 0 && (
+                <View style={styles.playbackSection}>
+                  <Text style={styles.sectionLabel}>Playback</Text>
+                  <View style={styles.playbackControls}>
+                    {generator.playbackState === "playing" ? (
+                      <TouchableOpacity
+                        style={styles.playButton}
+                        onPress={generator.handlePause}
+                      >
+                        <Text style={styles.playButtonText}>⏸ Pause</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.playButton}
+                        onPress={generator.handlePlay}
+                      >
+                        <Text style={styles.playButtonText}>▶️ Play</Text>
+                      </TouchableOpacity>
+                    )}
                     <TouchableOpacity
-                      style={styles.playButton}
-                      onPress={handlePause}
+                      style={styles.stopButton}
+                      onPress={generator.handleStop}
                     >
-                      <Text style={styles.playButtonText}>⏸ Pause</Text>
+                      <Text style={styles.stopButtonText}>⏹ Stop</Text>
                     </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.playButton}
-                      onPress={handlePlay}
-                    >
-                      <Text style={styles.playButtonText}>▶️ Play</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity
-                    style={styles.stopButton}
-                    onPress={handleStop}
-                  >
-                    <Text style={styles.stopButtonText}>⏹ Stop</Text>
-                  </TouchableOpacity>
+                  </View>
+                  <TempoSlider
+                    tempo={generator.tempo}
+                    tempoRange={generator.response.tempo_range}
+                    onTempoChange={generator.handleTempoChange}
+                    trackColor={colors.primary}
+                    thumbColor={colors.primary}
+                  />
+                  <Text style={styles.playbackStatus}>
+                    State: {generator.playbackState}
+                    {generator.currentNoteIndex !== null &&
+                      ` | Note: ${generator.currentNoteIndex + 1}/${generator.response.events.length}`}
+                  </Text>
                 </View>
-                <TempoSlider
-                  tempo={tempo}
-                  tempoRange={response.tempo_range}
-                  onTempoChange={handleTempoChange}
-                  trackColor={colors.primary}
-                  thumbColor={colors.primary}
-                />
-                <Text style={styles.playbackStatus}>
-                  State: {playbackState}
-                  {currentNoteIndex !== null &&
-                    ` | Note: ${currentNoteIndex + 1}/${response.events.length}`}
-                </Text>
-              </View>
-            )}
+              )}
 
             {/* Response Debug Info */}
-            {response && (
+            {generator.response && (
               <View style={styles.debugSection}>
                 <Text style={styles.debugTitle}>Response Info</Text>
                 <Text style={styles.debugText}>
-                  Events: {response.events?.length ?? 0}
-                  {"\n"}Total Beats: {response.total_beats}
-                  {"\n"}Key: {response.key} | Octaves:{" "}
-                  {response.effective_octaves}
-                  {"\n"}Definition: {response.definition}
+                  Events: {generator.response.events?.length ?? 0}
+                  {"\n"}Total Beats: {generator.response.total_beats}
+                  {"\n"}Key: {generator.response.key} | Octaves:{" "}
+                  {generator.response.effective_octaves}
+                  {"\n"}Definition: {generator.response.definition}
                 </Text>
-                {response.capabilities_required &&
-                  response.capabilities_required.length > 0 && (
+                {generator.response.capabilities_required &&
+                  generator.response.capabilities_required.length > 0 && (
                     <>
                       <Text style={styles.debugSubtitle}>
                         Required Capabilities
                       </Text>
                       <Text style={styles.debugCapabilities}>
-                        {response.capabilities_required.join(", ")}
+                        {generator.response.capabilities_required.join(", ")}
                       </Text>
                     </>
                   )}
-                {response.predicted_soft_gates && (
+                {generator.response.predicted_soft_gates && (
                   <>
                     <Text style={styles.debugSubtitle}>
                       Predicted Soft Gates
                     </Text>
                     <Text style={styles.debugText}>
                       Interval Sustained:{" "}
-                      {response.predicted_soft_gates.interval_sustained_stage}/6
+                      {
+                        generator.response.predicted_soft_gates
+                          .interval_sustained_stage
+                      }
+                      /6
                       {"\n"}Interval Hazard:{" "}
-                      {response.predicted_soft_gates.interval_hazard_stage}/6
+                      {
+                        generator.response.predicted_soft_gates
+                          .interval_hazard_stage
+                      }
+                      /6
                       {"\n"}Rhythm Complexity:{" "}
                       {(
-                        response.predicted_soft_gates.rhythm_complexity_score *
-                        100
+                        generator.response.predicted_soft_gates
+                          .rhythm_complexity_score * 100
                       ).toFixed(0)}
                       %{"\n"}Tonal Stage:{" "}
-                      {response.predicted_soft_gates.tonal_complexity_stage}/5 (
-                      {response.predicted_soft_gates.accidental_count}{" "}
+                      {
+                        generator.response.predicted_soft_gates
+                          .tonal_complexity_stage
+                      }
+                      /5 (
+                      {generator.response.predicted_soft_gates.accidental_count}{" "}
                       accidentals)
                       {"\n"}Max Interval:{" "}
-                      {response.predicted_soft_gates.max_interval_semitones}{" "}
+                      {
+                        generator.response.predicted_soft_gates
+                          .max_interval_semitones
+                      }{" "}
                       semitones
                       {"\n"}P75 Interval:{" "}
-                      {response.predicted_soft_gates.interval_p75_semitones}{" "}
+                      {
+                        generator.response.predicted_soft_gates
+                          .interval_p75_semitones
+                      }{" "}
                       semitones
                     </Text>
                   </>
@@ -2489,12 +1263,15 @@ export default function GenerationPreviewScreen() {
 
       {/* Clef Change Transposition Modal */}
       <Modal
-        visible={clefChangeModal.visible}
+        visible={tunes.clefChangeModal.visible}
         transparent
         animationType="fade"
-        onRequestClose={handleClefChangeCancel}
+        onRequestClose={tunes.handleClefChangeCancel}
       >
-        <Pressable style={styles.modalOverlay} onPress={handleClefChangeCancel}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={tunes.handleClefChangeCancel}
+        >
           <View
             style={styles.modalContent}
             onStartShouldSetResponder={() => true}
@@ -2502,25 +1279,26 @@ export default function GenerationPreviewScreen() {
             <Text style={styles.modalTitle}>Transpose Notes?</Text>
             <Text style={styles.modalMessage}>
               How would you like to transpose the notes when switching to{" "}
-              {clefChangeModal.targetClef === "bass" ? "bass" : "treble"} clef?
+              {tunes.clefChangeModal.targetClef === "bass" ? "bass" : "treble"}{" "}
+              clef?
             </Text>
-            {clefChangeModal.targetClef === "bass" ? (
+            {tunes.clefChangeModal.targetClef === "bass" ? (
               <>
                 <TouchableOpacity
                   style={styles.modalOption}
-                  onPress={() => handleClefTranspose(0)}
+                  onPress={() => tunes.handleClefTranspose(0)}
                 >
                   <Text style={styles.modalOptionText}>No Transpose</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.modalOption}
-                  onPress={() => handleClefTranspose(-1)}
+                  onPress={() => tunes.handleClefTranspose(-1)}
                 >
                   <Text style={styles.modalOptionText}>Octave Down</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.modalOption}
-                  onPress={() => handleClefTranspose(-2)}
+                  onPress={() => tunes.handleClefTranspose(-2)}
                 >
                   <Text style={styles.modalOptionText}>2 Octaves Down</Text>
                 </TouchableOpacity>
@@ -2529,19 +1307,19 @@ export default function GenerationPreviewScreen() {
               <>
                 <TouchableOpacity
                   style={styles.modalOption}
-                  onPress={() => handleClefTranspose(0)}
+                  onPress={() => tunes.handleClefTranspose(0)}
                 >
                   <Text style={styles.modalOptionText}>No Transpose</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.modalOption}
-                  onPress={() => handleClefTranspose(1)}
+                  onPress={() => tunes.handleClefTranspose(1)}
                 >
                   <Text style={styles.modalOptionText}>Octave Up</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.modalOption}
-                  onPress={() => handleClefTranspose(2)}
+                  onPress={() => tunes.handleClefTranspose(2)}
                 >
                   <Text style={styles.modalOptionText}>2 Octaves Up</Text>
                 </TouchableOpacity>
@@ -2549,7 +1327,7 @@ export default function GenerationPreviewScreen() {
             )}
             <TouchableOpacity
               style={styles.modalCancel}
-              onPress={handleClefChangeCancel}
+              onPress={tunes.handleClefChangeCancel}
             >
               <Text style={styles.modalCancelText}>Cancel</Text>
             </TouchableOpacity>
@@ -2559,12 +1337,15 @@ export default function GenerationPreviewScreen() {
 
       {/* Key Change Transposition Modal */}
       <Modal
-        visible={keyChangeModal.visible}
+        visible={tunes.keyChangeModal.visible}
         transparent
         animationType="fade"
-        onRequestClose={handleKeyChangeCancel}
+        onRequestClose={tunes.handleKeyChangeCancel}
       >
-        <Pressable style={styles.modalOverlay} onPress={handleKeyChangeCancel}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={tunes.handleKeyChangeCancel}
+        >
           <View
             style={styles.modalContent}
             onStartShouldSetResponder={() => true}
@@ -2574,20 +1355,20 @@ export default function GenerationPreviewScreen() {
               How would you like to transpose the notes when changing key?
             </Text>
             {(() => {
-              const { down, up } = getKeyTransposeIntervals(
-                keyChangeModal.targetKey,
+              const { down, up } = tunes.getKeyTransposeIntervals(
+                tunes.keyChangeModal.targetKey,
               );
               return (
                 <>
                   <TouchableOpacity
                     style={styles.modalOption}
-                    onPress={() => handleKeyTranspose(up)}
+                    onPress={() => tunes.handleKeyTranspose(up)}
                   >
                     <Text style={styles.modalOptionText}>Transpose Up</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.modalOption}
-                    onPress={() => handleKeyTranspose(down)}
+                    onPress={() => tunes.handleKeyTranspose(down)}
                   >
                     <Text style={styles.modalOptionText}>Transpose Down</Text>
                   </TouchableOpacity>
@@ -2596,7 +1377,7 @@ export default function GenerationPreviewScreen() {
             })()}
             <TouchableOpacity
               style={styles.modalCancel}
-              onPress={handleKeyChangeCancel}
+              onPress={tunes.handleKeyChangeCancel}
             >
               <Text style={styles.modalCancelText}>Cancel</Text>
             </TouchableOpacity>

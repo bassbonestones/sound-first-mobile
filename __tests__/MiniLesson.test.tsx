@@ -436,6 +436,34 @@ describe("MiniLesson", () => {
         );
       });
     });
+
+    it("handles quiz result submission failure gracefully", async () => {
+      const { getByText } = render(
+        <MiniLesson
+          capabilityId={1}
+          onComplete={jest.fn()}
+          onCancel={jest.fn()}
+        />,
+      );
+
+      await navigateToQuiz(getByText);
+
+      await waitFor(() => {
+        expect(getByText("Treble Clef")).toBeTruthy();
+      });
+
+      // Make quiz result submission fail
+      mockFetch.mockClear();
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+      // Select answer - should not crash even if submission fails
+      fireEvent.press(getByText("Treble Clef"));
+
+      await waitFor(() => {
+        // Quiz still shows result even if submission fails
+        expect(getByText(/Correct/i)).toBeTruthy();
+      });
+    });
   });
 
   describe("Completion", () => {
@@ -522,6 +550,62 @@ describe("MiniLesson", () => {
       await waitFor(() => {
         expect(getByText("Learn")).toBeTruthy();
       });
+    });
+  });
+
+  describe("Empty lesson handling", () => {
+    it("shows error message when lesson has no steps", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            capability_id: 1,
+            capability_name: "Test",
+            domain: "Test",
+            steps: [],
+          }),
+      });
+
+      const { getByText } = render(
+        <MiniLesson
+          capabilityId={1}
+          onComplete={jest.fn()}
+          onCancel={jest.fn()}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(getByText("No lesson content available.")).toBeTruthy();
+      });
+    });
+
+    it("shows close button when lesson has no content", async () => {
+      const onCancel = jest.fn();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            capability_id: 1,
+            capability_name: "Test",
+            domain: "Test",
+            steps: [],
+          }),
+      });
+
+      const { getByText } = render(
+        <MiniLesson
+          capabilityId={1}
+          onComplete={jest.fn()}
+          onCancel={onCancel}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(getByText("No lesson content available.")).toBeTruthy();
+      });
+
+      fireEvent.press(getByText("Close"));
+      expect(onCancel).toHaveBeenCalled();
     });
   });
 });

@@ -31,6 +31,10 @@ import NaturalAccidentalExercise from "./NaturalAccidentalExercise";
 import WholeStepsTheoryExercise from "./WholeStepsTheoryExercise";
 import DiatonicScalePatternExercise from "./DiatonicScalePatternExercise";
 import KeySignatureBasicsExercise from "./KeySignatureBasicsExercise";
+import type { ExerciseProps } from "./shared/propTypes";
+
+/** Exercise component type */
+export type ExerciseComponent = React.ComponentType<ExerciseProps>;
 
 // Map template IDs to exercise components
 export const EXERCISE_COMPONENTS = {
@@ -119,11 +123,19 @@ export {
   KeySignatureBasicsExercise,
 };
 
+/** Exercise template ID type */
+export type ExerciseTemplateId = keyof typeof EXERCISE_COMPONENTS;
+
 /**
  * Get the exercise component for a given template ID
- * @param {string} templateId - e.g., "aural_compare", "pitch_direction"
- * @returns {React.Component|null} The exercise component or null if not found
+ * @param templateId - e.g., "aural_compare", "pitch_direction"
+ * @returns The exercise component or null if not found
  */
-export function getExerciseComponent(templateId) {
-  return EXERCISE_COMPONENTS[templateId] || null;
+export function getExerciseComponent(
+  templateId: string,
+): ExerciseComponent | null {
+  return (
+    (EXERCISE_COMPONENTS as Record<string, ExerciseComponent>)[templateId] ??
+    null
+  );
 }

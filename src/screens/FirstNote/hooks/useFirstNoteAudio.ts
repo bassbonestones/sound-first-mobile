@@ -2,57 +2,95 @@
  * useFirstNoteAudio - Audio playback for FirstNote flow
  * Handles resonant note, pitch explorer, and accidental explorer sounds
  */
-import { useState, useRef, useCallback, useEffect } from "react";
+import {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  Dispatch,
+  SetStateAction,
+} from "react";
 import { Platform } from "react-native";
 import { devError } from "../../../utils/devLogger";
 import { noteToFrequency } from "../utils";
 import { PITCH_EXPLORER_NOTES } from "../data";
 
+/** Accidental type for explorer */
+export type AccidentalType = "flat" | "natural" | "sharp";
+
+/** Return type for useFirstNoteAudio hook */
+export interface UseFirstNoteAudioReturn {
+  isPlaying: boolean;
+  playCount: number;
+  showHeardItButton: boolean;
+  setShowHeardItButton: Dispatch<SetStateAction<boolean>>;
+  playNote: () => Promise<void>;
+  playPitchExplorer: (noteIndex: number) => Promise<void>;
+  playAccidentalExplorer: (accidental: AccidentalType) => Promise<void>;
+  playCombinedExplorer: (
+    noteIndex: number,
+    accidental: AccidentalType,
+  ) => Promise<void>;
+  stopAudio: () => void;
+  resetHeardIt: () => void;
+}
+
 // Cross-platform AudioContext
-let NativeAudioContext = null;
+let NativeAudioContext: typeof AudioContext | null = null;
 try {
   NativeAudioContext = require("react-native-audio-api").AudioContext;
 } catch (e) {
   // react-native-audio-api not available
 }
 
-export default function useFirstNoteAudio(resonantNote) {
+/**
+ * Hook for audio playback in FirstNote flow
+ * @param resonantNote - The user's resonant note (e.g., "C4")
+ * @returns Object containing playback state and controls
+ */
+export default function useFirstNoteAudio(
+  resonantNote: string,
+): UseFirstNoteAudioReturn {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playCount, setPlayCount] = useState(0);
   const [showHeardItButton, setShowHeardItButton] = useState(false);
 
-  const audioContextRef = useRef(null);
-  const oscillatorRef = useRef(null);
-  const gainNodeRef = useRef(null);
-  const heardItTimerRef = useRef(null);
-  const playbackTimeoutRef = useRef(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const oscillatorRef = useRef<OscillatorNode | OscillatorNode[] | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const heardItTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Get or create audio context
-  const getAudioContext = useCallback(async () => {
-    if (Platform.OS === "web" && typeof window !== "undefined") {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
+  const getAudioContext =
+    useCallback(async (): Promise<AudioContext | null> => {
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!audioContextRef.current) {
+          audioContextRef.current = new AudioContext();
+        }
+        if (audioContextRef.current.state === "suspended") {
+          await audioContextRef.current.resume();
+        }
+        return audioContextRef.current;
+      } else if (NativeAudioContext) {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new NativeAudioContext();
+        }
+        return audioContextRef.current;
       }
-      if (audioContextRef.current.state === "suspended") {
-        await audioContextRef.current.resume();
-      }
-      return audioContextRef.current;
-    } else if (NativeAudioContext) {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new NativeAudioContext();
-      }
-      return audioContextRef.current;
-    }
-    return null;
-  }, []);
+      return null;
+    }, []);
 
   // Stop any existing oscillator
-  const stopOscillator = useCallback(() => {
+  const stopOscillator = useCallback((): void => {
     if (oscillatorRef.current) {
       try {
-        oscillatorRef.current.onended = null;
-        oscillatorRef.current.stop();
+        const osc = Array.isArray(oscillatorRef.current)
+          ? oscillatorRef.current[0]
+          : oscillatorRef.current;
+        osc.onended = null;
+        osc.stop();
       } catch (e) {
         /* ignore */
       }
@@ -61,7 +99,7 @@ export default function useFirstNoteAudio(resonantNote) {
   }, []);
 
   // Play the user's resonant note using Web Audio (pure sine wave)
-  const playNote = useCallback(async () => {
+  const playNote = useCallback(async (): Promise<void> => {
     const DURATION = 3;
     const ATTACK = 0.05;
     const RELEASE = 0.1;
@@ -134,7 +172,7 @@ export default function useFirstNoteAudio(resonantNote) {
 
   // Play piano-like note with harmonics
   const playPianoNote = useCallback(
-    async (freq) => {
+    async (freq: number): Promise<void> => {
       const DURATION = 1;
       const ATTACK = 0.01;
       const DECAY = 0.2;
@@ -189,7 +227,7 @@ export default function useFirstNoteAudio(resonantNote) {
 
   // Play pitch explorer note
   const playPitchExplorer = useCallback(
-    async (noteIndex) => {
+    async (noteIndex: number): Promise<void> => {
       const noteName = PITCH_EXPLORER_NOTES[noteIndex].name;
       const freq = noteToFrequency(noteName);
       await playPianoNote(freq);
@@ -199,8 +237,8 @@ export default function useFirstNoteAudio(resonantNote) {
 
   // Play accidental explorer note
   const playAccidentalExplorer = useCallback(
-    async (accidental) => {
-      const noteMap = {
+    async (accidental: AccidentalType): Promise<void> => {
+      const noteMap: Record<AccidentalType, string> = {
         flat: "Db3",
         natural: "D3",
         sharp: "D#3",
@@ -213,12 +251,12 @@ export default function useFirstNoteAudio(resonantNote) {
 
   // Play combined explorer note
   const playCombinedExplorer = useCallback(
-    async (noteIndex, accidental) => {
+    async (noteIndex: number, accidental: AccidentalType): Promise<void> => {
       const baseName = PITCH_EXPLORER_NOTES[noteIndex].name;
       const letter = baseName.slice(0, 1);
       const octave = baseName.slice(1);
 
-      let noteName;
+      let noteName: string;
       if (accidental === "flat") {
         noteName = `${letter}b${octave}`;
       } else if (accidental === "sharp") {
@@ -234,7 +272,7 @@ export default function useFirstNoteAudio(resonantNote) {
   );
 
   // Stop any playing audio
-  const stopAudio = useCallback(() => {
+  const stopAudio = useCallback((): void => {
     stopOscillator();
     if (playbackTimeoutRef.current) {
       clearTimeout(playbackTimeoutRef.current);
@@ -243,7 +281,7 @@ export default function useFirstNoteAudio(resonantNote) {
   }, [stopOscillator]);
 
   // Reset heard it button
-  const resetHeardIt = useCallback(() => {
+  const resetHeardIt = useCallback((): void => {
     setShowHeardItButton(false);
     if (heardItTimerRef.current) {
       clearTimeout(heardItTimerRef.current);

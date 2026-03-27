@@ -2,20 +2,69 @@
  * Validation constants and functions for capability forms
  */
 
-export const VALID_REQUIREMENT_TYPES = ["required", "learnable_in_context"];
-export const VALID_MASTERY_TYPES = ["single", "any_of_pool", "multiple"];
+// =============================================================================
+// Types
+// =============================================================================
+
+/** Valid requirement_type values for capabilities */
+export type RequirementType = "required" | "learnable_in_context";
+
+/** Valid mastery_type values for capabilities */
+export type MasteryType = "single" | "any_of_pool" | "multiple";
+
+/** Capability form data structure (all values are strings for form state) */
+export interface CapabilityFormData {
+  name: string;
+  display_name: string;
+  domain: string;
+  subdomain: string;
+  requirement_type: RequirementType | string;
+  difficulty_tier: string;
+  difficulty_weight: string;
+  mastery_type: MasteryType | string;
+  mastery_count: string;
+  evidence_required_count: string;
+  evidence_distinct_materials: boolean;
+  evidence_acceptance_threshold: string;
+}
+
+/** Validation result from validateCapabilityForm */
+export interface ValidationResult {
+  isValid: boolean;
+  errors: Record<string, string>;
+}
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+export const VALID_REQUIREMENT_TYPES: RequirementType[] = [
+  "required",
+  "learnable_in_context",
+];
+export const VALID_MASTERY_TYPES: MasteryType[] = [
+  "single",
+  "any_of_pool",
+  "multiple",
+];
 export const MIN_RATING = 1;
 export const MAX_RATING = 5;
 export const MIN_DIFFICULTY_WEIGHT = 0.1;
 export const MAX_DIFFICULTY_WEIGHT = 10.0;
 
+// =============================================================================
+// Functions
+// =============================================================================
+
 /**
  * Validates capability form data
- * @param {Object} formData - Form data to validate
- * @returns {{ isValid: boolean, errors: Record<string, string> }}
+ * @param formData - Form data to validate
+ * @returns Validation result with isValid flag and error messages
  */
-export function validateCapabilityForm(formData) {
-  const errors = {};
+export function validateCapabilityForm(
+  formData: CapabilityFormData,
+): ValidationResult {
+  const errors: Record<string, string> = {};
 
   // Required string fields
   if (!formData.name?.trim()) {
@@ -59,11 +108,15 @@ export function validateCapabilityForm(formData) {
   }
 
   // Enum validations
-  if (!VALID_REQUIREMENT_TYPES.includes(formData.requirement_type)) {
+  if (
+    !VALID_REQUIREMENT_TYPES.includes(
+      formData.requirement_type as RequirementType,
+    )
+  ) {
     errors.requirement_type = `Must be one of: ${VALID_REQUIREMENT_TYPES.join(", ")}`;
   }
 
-  if (!VALID_MASTERY_TYPES.includes(formData.mastery_type)) {
+  if (!VALID_MASTERY_TYPES.includes(formData.mastery_type as MasteryType)) {
     errors.mastery_type = `Must be one of: ${VALID_MASTERY_TYPES.join(", ")}`;
   }
 
@@ -76,7 +129,7 @@ export function validateCapabilityForm(formData) {
 /**
  * Default form values for a new capability
  */
-export const DEFAULT_CAPABILITY_FORM = {
+export const DEFAULT_CAPABILITY_FORM: CapabilityFormData = {
   name: "",
   display_name: "",
   domain: "",

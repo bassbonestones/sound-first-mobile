@@ -6,3 +6,4 @@
 
 export * from "./tuneComposerTypes";
 export * from "./actionTypes";
+export * from "./tuneComposerScreenTypes";

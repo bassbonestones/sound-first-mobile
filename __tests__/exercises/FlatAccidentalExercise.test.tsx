@@ -276,7 +276,9 @@ describe("FlatAccidentalExercise", () => {
       );
       goToQuiz(getByText);
       fireEvent.press(getByText("Lowers it by a half step"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       expect(getByText(/Question 2 of 4/)).toBeTruthy();
     });
   });
@@ -292,13 +294,21 @@ describe("FlatAccidentalExercise", () => {
       fireEvent.press(getByText("Quiz Me →"));
 
       fireEvent.press(getByText("Lowers it by a half step"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       fireEvent.press(getByText("one half step lower"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       fireEvent.press(getByText("one key to the left"));
-      fireEvent.press(getByText("Next →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
       fireEvent.press(getByText("The black key just left of E"));
-      fireEvent.press(getByText("See Results →"));
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
     };
 
     it("shows success with all correct", () => {

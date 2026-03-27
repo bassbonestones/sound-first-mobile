@@ -12,6 +12,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 
+import { devLog, devError } from "../../../utils/devLogger";
 import type {
   FileAcquisitionAdapter,
   AcquisitionResult,
@@ -339,7 +340,7 @@ export class ExpoFileAcquisitionAdapter implements FileAcquisitionAdapter {
         multiple: false,
       });
 
-      console.log(
+      devLog(
         "[ExpoAdapter] DocumentPicker result:",
         JSON.stringify(result, null, 2),
       );
@@ -354,7 +355,7 @@ export class ExpoFileAcquisitionAdapter implements FileAcquisitionAdapter {
       }
 
       const docAsset = result.assets[0];
-      console.log(
+      devLog(
         "[ExpoAdapter] Selected document:",
         docAsset.name,
         "uri:",
@@ -463,7 +464,7 @@ export class ExpoFileAcquisitionAdapter implements FileAcquisitionAdapter {
 
   async readFileAsString(uri: string): Promise<string> {
     try {
-      console.log(
+      devLog(
         "[ExpoAdapter] readFileAsString uri:",
         uri,
         "platform:",
@@ -475,40 +476,34 @@ export class ExpoFileAcquisitionAdapter implements FileAcquisitionAdapter {
         Platform.OS === "web" &&
         (uri.startsWith("blob:") || uri.startsWith("data:"))
       ) {
-        console.log("[ExpoAdapter] Using fetch for web blob/data URL");
+        devLog("[ExpoAdapter] Using fetch for web blob/data URL");
         const response = await fetch(uri);
         const text = await response.text();
-        console.log("[ExpoAdapter] Web fetch success, length:", text.length);
+        devLog("[ExpoAdapter] Web fetch success, length:", text.length);
         return text;
       }
 
       const content = await FileSystem.readAsStringAsync(uri, {
         encoding: "utf8",
       });
-      console.log(
-        "[ExpoAdapter] readFileAsString success, length:",
-        content.length,
-      );
+      devLog("[ExpoAdapter] readFileAsString success, length:", content.length);
       return content;
     } catch (error) {
-      console.error("[ExpoAdapter] readFileAsString failed:", error);
+      devError("[ExpoAdapter] readFileAsString failed:", error);
 
       // Fallback for web: try fetch if FileSystem fails
       if (Platform.OS === "web") {
         try {
-          console.log("[ExpoAdapter] Trying fetch fallback for web");
+          devLog("[ExpoAdapter] Trying fetch fallback for web");
           const response = await fetch(uri);
           const text = await response.text();
-          console.log(
+          devLog(
             "[ExpoAdapter] Web fetch fallback success, length:",
             text.length,
           );
           return text;
         } catch (fetchError) {
-          console.error(
-            "[ExpoAdapter] Web fetch fallback also failed:",
-            fetchError,
-          );
+          devError("[ExpoAdapter] Web fetch fallback also failed:", fetchError);
           throw new Error(
             `Failed to read file on web: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`,
           );
@@ -528,7 +523,7 @@ export class ExpoFileAcquisitionAdapter implements FileAcquisitionAdapter {
         Platform.OS === "web" &&
         (uri.startsWith("blob:") || uri.startsWith("data:"))
       ) {
-        console.log("[ExpoAdapter] Using fetch for web blob/data URL (base64)");
+        devLog("[ExpoAdapter] Using fetch for web blob/data URL (base64)");
         const response = await fetch(uri);
         const blob = await response.blob();
         return new Promise((resolve, reject) => {
@@ -552,7 +547,7 @@ export class ExpoFileAcquisitionAdapter implements FileAcquisitionAdapter {
       // Fallback for web: try fetch if FileSystem fails
       if (Platform.OS === "web") {
         try {
-          console.log(
+          devLog(
             "[ExpoAdapter] FileSystem failed, trying fetch fallback (base64)",
           );
           const response = await fetch(uri);
@@ -568,7 +563,7 @@ export class ExpoFileAcquisitionAdapter implements FileAcquisitionAdapter {
             reader.readAsDataURL(blob);
           });
         } catch (fetchError) {
-          console.error(
+          devError(
             "[ExpoAdapter] Web fetch fallback also failed (base64):",
             fetchError,
           );

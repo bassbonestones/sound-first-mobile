@@ -30,9 +30,12 @@ import {
 import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../constants";
+import { devLog, devError } from "../../../utils/devLogger";
+import type { WebViewRef } from "../../../types/webview";
 import { generateComposerOsmdHtml } from "./composerScoreHtml";
 import { generateMusicXml } from "../services/musicXmlGenerator";
 import type { ComposerScore, CursorPosition } from "../types";
+import { useOptionalPlaybackContext } from "../contexts";
 
 // Conditionally import WebView
 let WebView: typeof import("react-native-webview").WebView | null = null;
@@ -111,15 +114,26 @@ function ComposerScoreViewportComponent({
   onZoomChange,
   minZoom = 0.5,
   maxZoom = 2.5,
-  playbackState = "stopped",
-  playbackMeasureIndex,
-  onPlay,
-  onPause,
-  onStop,
+  playbackState: propPlaybackState,
+  playbackMeasureIndex: propPlaybackMeasureIndex,
+  onPlay: propOnPlay,
+  onPause: propOnPause,
+  onStop: propOnStop,
   testID,
 }: ComposerScoreViewportProps): React.ReactElement {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const webViewRef = useRef<any>(null);
+  // Get playback context (optional - props take precedence)
+  const playbackContext = useOptionalPlaybackContext();
+
+  // Resolve playback values: props override context
+  const playbackState =
+    propPlaybackState ?? playbackContext?.playbackState ?? "stopped";
+  const playbackMeasureIndex =
+    propPlaybackMeasureIndex ?? playbackContext?.playbackMeasureIndex;
+  const onPlay = propOnPlay ?? playbackContext?.onPlay;
+  const onPause = propOnPause ?? playbackContext?.onPause;
+  const onStop = propOnStop ?? playbackContext?.onStop;
+
+  const webViewRef = useRef<WebViewRef | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -288,9 +302,9 @@ function ComposerScoreViewportComponent({
             const log = data.payload as { level: string; message: string };
             if (__DEV__) {
               if (log.level === "error") {
-                console.error("[OSMD]", log.message);
+                devError("[OSMD]", log.message);
               } else {
-                console.log("[OSMD]", log.message);
+                devLog("[OSMD]", log.message);
               }
             }
             break;
