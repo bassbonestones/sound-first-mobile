@@ -475,7 +475,9 @@ function extractDirections(measureContent: string): RawDirection[] {
     // Sound element (playback tempo) - fallback if no metronome
     // Format: <sound tempo="100"/> or <sound tempo="100"></sound>
     if (!metronome) {
-      const soundMatch = dirContent.match(/<sound[^>]*tempo=["'](\d+(?:\.\d+)?)["'][^>]*\/?>/i);
+      const soundMatch = dirContent.match(
+        /<sound[^>]*tempo=["'](\d+(?:\.\d+)?)["'][^>]*\/?>/i,
+      );
       if (soundMatch) {
         const tempo = parseFloat(soundMatch[1]);
         if (tempo > 0) {

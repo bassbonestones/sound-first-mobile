@@ -291,16 +291,14 @@ export function generateComposerOsmdHtml(
       const container = document.getElementById('osmd-container');
       if (!container) return;
       
-      // Find all text elements that might be chord symbols
-      // OSMD renders chords as text elements with specific styling
-      const textElements = container.querySelectorAll('svg text');
+      // Find chord symbol text elements specifically
+      // OSMD wraps chord symbols in containers with class containing "ChordSymbol"
+      // This avoids modifying lyrics or other text elements
+      const chordElements = container.querySelectorAll('svg g[class*="ChordSymbol"] text, svg [class*="chord"] text');
       
-      textElements.forEach(function(el) {
+      chordElements.forEach(function(el) {
         const text = el.textContent || '';
-        // Skip if it's not likely a chord symbol
-        if (text.length < 2 || /^[0-9]+$/.test(text)) return;
-        // Skip note names, dynamics, etc. (single letters except chord roots)
-        if (/^[a-gA-G][#b]?$/.test(text)) return;
+        if (text.length < 1) return;
         
         // Apply chord symbol shortenings
         // Note: △ alone means "major 7th" in jazz notation
