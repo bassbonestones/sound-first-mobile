@@ -104,6 +104,8 @@ export interface CompactTopBarProps {
   onBack?: () => void;
   /** Whether controls are disabled */
   disabled?: boolean;
+  /** Display title shown in the header (defaults to "Composer") */
+  displayTitle?: string;
   /** Test ID for testing */
   testID?: string;
 }
@@ -129,6 +131,7 @@ function CompactTopBarComponent({
   onClearScore: propOnClearScore,
   onBack,
   disabled = false,
+  displayTitle,
   testID,
 }: CompactTopBarProps): React.ReactElement {
   // Try to get values from context (returns null if no provider)
@@ -242,7 +245,7 @@ function CompactTopBarComponent({
       {/* Title */}
       <View style={styles.titleContainer}>
         <Text style={styles.title} numberOfLines={1}>
-          Composer
+          {displayTitle || "Composer"}
         </Text>
       </View>
 

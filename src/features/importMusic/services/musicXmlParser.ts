@@ -49,7 +49,10 @@ export {
 } from "./chordSymbolParsing";
 
 // Internal import for use in this file
-import { extractHarmonyFromMeasure } from "./chordSymbolParsing";
+import {
+  extractHarmonyFromMeasure,
+  convertHarmoniesToSymbols,
+} from "./chordSymbolParsing";
 import type { RawHarmonyData } from "./chordSymbolParsing";
 
 // ============================================================================
@@ -890,6 +893,11 @@ function convertMeasures(rawMeasures: RawMeasure[]): ImportedMeasure[] {
         (d) => d.words && !d.metronome && !isTempoWord(d.words),
       )?.words ?? null;
 
+    // Convert harmony data to ImportedHarmony format
+    const harmony = rawMeasure.harmony
+      ? convertHarmoniesToSymbols(rawMeasure.harmony)
+      : undefined;
+
     return {
       number: rawMeasure.number,
       events: convertNotes(rawMeasure.notes, initialDynamic, initialExpression),
@@ -901,6 +909,7 @@ function convertMeasures(rawMeasures: RawMeasure[]): ImportedMeasure[] {
         : null,
       confidence: null,
       isPickup: rawMeasure.isPickup || undefined,
+      harmony: harmony && harmony.length > 0 ? harmony : undefined,
     };
   });
 }

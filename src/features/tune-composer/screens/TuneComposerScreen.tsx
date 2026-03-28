@@ -1136,6 +1136,7 @@ function TuneComposerScreenContent({
           onClearScore={composerState.clearScore}
           onBack={handleBack}
           disabled={isPlaying}
+          displayTitle={tuneMetadata.title !== "Untitled Tune" ? tuneMetadata.title : undefined}
           testID="composer-topbar"
         />
 

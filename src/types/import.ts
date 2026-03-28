@@ -374,6 +374,18 @@ export interface ImportedMeasure {
   readonly confidence: number | null;
   /** If true, this is a pickup (anacrusis) measure */
   readonly isPickup?: boolean;
+  /** Chord symbols in this measure */
+  readonly harmony?: ImportedHarmony[];
+}
+
+/**
+ * A chord symbol event
+ */
+export interface ImportedHarmony {
+  /** The chord symbol string (e.g., "Cmaj7", "F#m7", "G/B") */
+  readonly symbol: string;
+  /** Beat offset in divisions from start of measure */
+  readonly offset: number;
 }
 
 /**

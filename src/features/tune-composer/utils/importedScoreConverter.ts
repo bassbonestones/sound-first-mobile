@@ -9,6 +9,7 @@ import type {
   ImportedScore,
   ImportedNoteEvent,
   ImportedMeasure,
+  ImportedHarmony,
   PitchInfo,
   DurationType,
   LyricInfo,
@@ -32,11 +33,16 @@ import {
   generateId,
   createNote,
   createMeasure,
-  createDefaultProgression,
   createDisplaySettings,
   createPlaybackSettings,
   DURATION,
 } from "../types/tuneComposerTypes";
+import {
+  ChordProgression,
+  ChordSymbol,
+  createChordSymbol,
+  createDefaultProgression,
+} from "../types/chordTypes";
 
 // =============================================================================
 // Constants
@@ -256,6 +262,59 @@ export function importedMeasureToMeasure(
 }
 
 /**
+ * Divisions per quarter note in MusicXML export
+ */
+const DIVISIONS_PER_QUARTER = 12;
+
+/**
+ * Convert offset in divisions to beat position.
+ * Offset 0 = beat 0, offset 12 = beat 1, etc.
+ */
+function offsetToBeatPosition(offset: number): number {
+  return offset / DIVISIONS_PER_QUARTER;
+}
+
+/**
+ * Extract chord symbols from imported measures.
+ * Converts ImportedHarmony (from MusicXML) to ChordSymbol[].
+ */
+export function extractChordsFromMeasures(
+  importedMeasures: ImportedMeasure[],
+): ChordSymbol[] {
+  const chords: ChordSymbol[] = [];
+
+  importedMeasures.forEach((measure, measureIndex) => {
+    if (measure.harmony && measure.harmony.length > 0) {
+      measure.harmony.forEach((h) => {
+        const beatPosition = offsetToBeatPosition(h.offset);
+        chords.push(createChordSymbol(h.symbol, measureIndex, beatPosition));
+      });
+    }
+  });
+
+  return chords;
+}
+
+/**
+ * Create a chord progression from imported chords.
+ * Returns null if no chords were imported.
+ */
+function createProgressionFromImportedChords(
+  chords: ChordSymbol[],
+): ChordProgression | null {
+  if (chords.length === 0) {
+    return null;
+  }
+
+  return {
+    id: generateId(),
+    name: "Default",
+    isDefault: true,
+    chords,
+  };
+}
+
+/**
  * Infer clef from MIDI pitch range
  * If average pitch is below middle C (60), use bass clef
  */
@@ -352,6 +411,14 @@ export function importedScoreToComposerScore(
   // Extract tempo
   const tempo = metadata.tempo?.bpm ?? 120;
 
+  // Extract chord progressions from imported harmony
+  const importedChords = extractChordsFromMeasures(firstPart.measures);
+  const importedProgression =
+    createProgressionFromImportedChords(importedChords);
+  const chordProgressions = importedProgression
+    ? [importedProgression]
+    : [createDefaultProgression()];
+
   return {
     id: options?.scoreId ?? generateId(),
     title: options?.title ?? metadata.title ?? "Untitled",
@@ -361,7 +428,7 @@ export function importedScoreToComposerScore(
     tempo,
     measures,
     pickupDuration,
-    chordProgressions: [createDefaultProgression()],
+    chordProgressions,
     displaySettings: createDisplaySettings(),
     playbackSettings: createPlaybackSettings(),
     createdAt: now,
