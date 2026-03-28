@@ -1087,6 +1087,8 @@ function TuneComposerScreenContent({
               zoom={zoom}
               onZoomChange={setZoom}
               showZoomControls={false}
+              playbackNoteIndex={playback.position.noteIndex}
+              playbackBeat={playback.position.beat}
               testID="composer-viewport"
             />
           </View>

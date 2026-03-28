@@ -31,7 +31,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../constants";
-import { devLog, devError } from "../../../utils/devLogger";
+import { devError } from "../../../utils/devLogger";
 import type { WebViewRef } from "../../../types/webview";
 import { generateComposerOsmdHtml } from "../../composer/components/composerScoreHtml";
 import { generateMusicXml } from "../services/tuneComposerMusicXmlGenerator";
@@ -87,6 +87,10 @@ export interface TuneComposerScoreViewportProps {
   playbackState?: "stopped" | "playing" | "paused";
   /** Current playback measure index (for auto-scroll during playback) */
   playbackMeasureIndex?: number;
+  /** Current playback note index within measure (for scroll checking on every note) */
+  playbackNoteIndex?: number;
+  /** Current playback beat position within measure */
+  playbackBeat?: number;
   /** Called when play is pressed */
   onPlay?: () => void;
   /** Called when pause is pressed */
@@ -122,6 +126,8 @@ function TuneComposerScoreViewportComponent({
   maxZoom = 2.5,
   playbackState: propPlaybackState,
   playbackMeasureIndex: propPlaybackMeasureIndex,
+  playbackNoteIndex: propPlaybackNoteIndex,
+  playbackBeat: propPlaybackBeat,
   onPlay: propOnPlay,
   onPause: propOnPause,
   onStop: propOnStop,
@@ -135,6 +141,8 @@ function TuneComposerScoreViewportComponent({
     propPlaybackState ?? playbackContext?.playbackState ?? "stopped";
   const playbackMeasureIndex =
     propPlaybackMeasureIndex ?? playbackContext?.playbackMeasureIndex;
+  const playbackNoteIndex = propPlaybackNoteIndex;
+  const playbackBeat = propPlaybackBeat;
   const onPlay = propOnPlay ?? playbackContext?.onPlay;
   const onPause = propOnPause ?? playbackContext?.onPause;
   const onStop = propOnStop ?? playbackContext?.onStop;
@@ -142,7 +150,7 @@ function TuneComposerScoreViewportComponent({
   const webViewRef = useRef<WebViewRef | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
-  const savedScrollPositionRef = useRef<number | null>(null);
+  const currentScrollXRef = useRef<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -159,7 +167,12 @@ function TuneComposerScoreViewportComponent({
   >([]);
   const [contentWidth, setContentWidth] = useState(2000);
   const [osmdZoom, setOsmdZoom] = useState(1);
-  const lastScrolledMeasureRef = useRef(-1);
+  const viewportWidthRef = useRef(400);
+  // Refs for values used in playback scroll effect (to avoid dependency on state changes)
+  const measurePositionsRef = useRef(measurePositions);
+  const osmdZoomRef = useRef(osmdZoom);
+  measurePositionsRef.current = measurePositions;
+  osmdZoomRef.current = osmdZoom;
 
   // Use controlled zoom if provided, otherwise internal state
   const zoom = controlledZoom ?? internalZoom;
@@ -167,23 +180,12 @@ function TuneComposerScoreViewportComponent({
 
   // Calculate chord cursor x position for overlay
   const chordCursorX = useMemo(() => {
-    devLog(
-      "[ChordCursor] useMemo triggered, measurePositions:",
-      measurePositions.length,
-      "chordCursor:",
-      chordCursor,
-    );
-
     if (!chordCursor || measurePositions.length === 0) return null;
 
     const measurePos = measurePositions.find(
       (m) => m.measureIndex === chordCursor.measureIndex,
     );
     if (!measurePos) {
-      devLog(
-        "[ChordCursor] No measure position found for index:",
-        chordCursor.measureIndex,
-      );
       return null;
     }
 
@@ -210,19 +212,6 @@ function TuneComposerScoreViewportComponent({
       }
     }
 
-    devLog(
-      "[ChordCursor] Looking for beat index:",
-      chordCursor.beatPosition,
-      "in quarters:",
-      targetBeatInQuarters,
-      "beatUnitDuration:",
-      beatUnitDuration,
-      "beatsPerMeasure:",
-      beatsPerMeasure,
-      "Note positions:",
-      JSON.stringify(noteBeatPositions),
-    );
-
     // Total measure duration in quarter notes
     const measureDurationInQuarters = beatsPerMeasure * beatUnitDuration;
 
@@ -242,12 +231,6 @@ function TuneComposerScoreViewportComponent({
       if (exactMatch) {
         // Target beat has a note - cursor falls directly on it
         xPosition = exactMatch.x;
-        devLog(
-          "[ChordCursor] Exact match at beat",
-          targetBeatInQuarters,
-          "x:",
-          xPosition,
-        );
       } else {
         // Find surrounding notes and interpolate
         const before = noteBeatPositions
@@ -255,13 +238,6 @@ function TuneComposerScoreViewportComponent({
           .pop();
         const after = noteBeatPositions.find(
           (bp) => bp.beat > targetBeatInQuarters,
-        );
-
-        devLog(
-          "[ChordCursor] Interpolating - before:",
-          before,
-          "after:",
-          after,
         );
 
         if (before && after) {
@@ -297,17 +273,6 @@ function TuneComposerScoreViewportComponent({
               (measurePos.width ?? 100) / measureDurationInQuarters;
             xPosition = before.x + beatsAfterLastNote * estimatedPixelsPerBeat;
           }
-
-          devLog(
-            "[ChordCursor] Extrapolating after last note - lastNoteBeat:",
-            before.beat,
-            "targetBeat:",
-            targetBeatInQuarters,
-            "beatsAfter:",
-            beatsAfterLastNote,
-            "x:",
-            xPosition,
-          );
         } else if (after) {
           // Target is before all notes (shouldn't happen normally)
           if (noteBeatPositions.length >= 2) {
@@ -340,24 +305,7 @@ function TuneComposerScoreViewportComponent({
       }
     }
 
-    devLog(
-      "[ChordCursor] Calculated position - beat index:",
-      chordCursor.beatPosition,
-      "in quarters:",
-      targetBeatInQuarters,
-      "x:",
-      xPosition,
-    );
-
     const result = xPosition * osmdZoom;
-
-    devLog("[ChordCursor] Final position:", {
-      measure: chordCursor.measureIndex,
-      beat: chordCursor.beatPosition,
-      xPosition,
-      result,
-    });
-
     return result;
   }, [
     chordCursor?.measureIndex,
@@ -407,71 +355,90 @@ function TuneComposerScoreViewportComponent({
     }
   }, [isReady, musicXml, executeScript]);
 
+  // Handle viewport layout to track actual width
+  const handleViewportLayout = useCallback(
+    (event: { nativeEvent: { layout: { width: number } } }) => {
+      viewportWidthRef.current = event.nativeEvent.layout.width;
+    },
+    [],
+  );
+
   // Scroll the parent ScrollView during playback
+  // Scrolls when the current note position passes 70% of viewport
   useEffect(() => {
     if (playbackState === "playing" && playbackMeasureIndex !== undefined) {
-      // Skip if we've already scrolled to this measure
-      if (playbackMeasureIndex === lastScrolledMeasureRef.current) return;
-      lastScrolledMeasureRef.current = playbackMeasureIndex;
+      // If starting at measure 0, note 0, always scroll to the beginning
+      if (
+        playbackMeasureIndex === 0 &&
+        playbackNoteIndex === 0 &&
+        scrollViewRef.current
+      ) {
+        scrollViewRef.current.scrollTo({ x: 0, animated: true });
+        return;
+      }
 
-      // Find the position for this measure
-      const measurePos = measurePositions.find(
+      // Get current measure position info
+      const currentMeasurePos = measurePositionsRef.current.find(
         (m) => m.measureIndex === playbackMeasureIndex,
       );
-      if (measurePos && scrollViewRef.current) {
-        // Calculate scroll position - keep measure ~15% from left edge
-        const scrollX = measurePos.x * osmdZoom - 50;
-        scrollViewRef.current.scrollTo({
-          x: Math.max(0, scrollX),
-          animated: true,
-        });
+      if (!currentMeasurePos) {
+        return;
       }
-    } else if (playbackState === "stopped") {
-      lastScrolledMeasureRef.current = -1;
+
+      const zoom = osmdZoomRef.current;
+      const vw = viewportWidthRef.current;
+      const currentScrollX = currentScrollXRef.current;
+
+      // Calculate the X position of the current note
+      // Use beatPositions if available, otherwise interpolate within measure
+      let currentNoteX: number;
+
+      if (
+        currentMeasurePos.beatPositions &&
+        currentMeasurePos.beatPositions.length > 0 &&
+        playbackBeat !== undefined
+      ) {
+        // Find the beat position closest to our current beat
+        const beatPositions = currentMeasurePos.beatPositions;
+        let closestBeatPos = beatPositions[0];
+        for (const bp of beatPositions) {
+          if (bp.beat <= playbackBeat) {
+            closestBeatPos = bp;
+          } else {
+            break;
+          }
+        }
+        currentNoteX = closestBeatPos.x * zoom;
+      } else {
+        // Fallback: interpolate based on note index within measure
+        // This is approximate but better than nothing
+        const measureWidth = currentMeasurePos.width || 100;
+        const measureStartX = currentMeasurePos.x;
+        // Assume notes are roughly evenly distributed (not perfect but works)
+        currentNoteX = (measureStartX + measureWidth * 0.3) * zoom; // Start a bit into the measure
+      }
+
+      // Check if current note is past 70% of visible viewport
+      const threshold = currentScrollX + vw * 0.7;
+
+      if (currentNoteX > threshold) {
+        // Scroll to put current note at ~15% from left
+        const targetScrollX = Math.max(0, currentNoteX - vw * 0.15);
+
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollTo({
+            x: targetScrollX,
+            animated: true,
+          });
+        }
+      }
     }
-  }, [playbackState, playbackMeasureIndex, measurePositions, osmdZoom]);
+  }, [playbackState, playbackMeasureIndex, playbackNoteIndex, playbackBeat]);
 
-  // Scroll to cursor when not playing (for editing)
-  useEffect(() => {
-    if (playbackState === "playing") return;
+  // Auto-scroll for cursor editing is disabled - user controls scroll manually
+  // The cursor position is tracked but we don't auto-scroll to it
 
-    const measurePos = measurePositions.find(
-      (m) => m.measureIndex === cursor.measureIndex,
-    );
-    if (measurePos && scrollViewRef.current) {
-      const scrollX = measurePos.x * osmdZoom - 50;
-      scrollViewRef.current.scrollTo({
-        x: Math.max(0, scrollX),
-        animated: false,
-      });
-    }
-  }, [cursor.measureIndex, playbackState, measurePositions, osmdZoom]);
-
-  // Scroll to chord cursor when in chord entry mode
-  useEffect(() => {
-    if (!chordCursor || playbackState === "playing") return;
-
-    const measurePos = measurePositions.find(
-      (m) => m.measureIndex === chordCursor.measureIndex,
-    );
-    if (measurePos && scrollViewRef.current) {
-      // Calculate position with beat offset
-      const beatsPerMeasure = score.timeSignature.beats;
-      const beatFraction = chordCursor.beatPosition / beatsPerMeasure;
-      const xInMeasure = measurePos.x + beatFraction * measurePos.width;
-      const scrollX = xInMeasure * osmdZoom - 80; // Keep cursor centered-ish
-      scrollViewRef.current.scrollTo({
-        x: Math.max(0, scrollX),
-        animated: true,
-      });
-    }
-  }, [
-    chordCursor,
-    playbackState,
-    measurePositions,
-    osmdZoom,
-    score.timeSignature.beats,
-  ]);
+  // Auto-scroll for chord cursor is disabled - user controls scroll manually
 
   // Apply zoom when controlled zoom changes
   useEffect(() => {
@@ -483,7 +450,7 @@ function TuneComposerScoreViewportComponent({
   // Track scroll position so we can restore it after re-render
   const handleScroll = useCallback(
     (event: { nativeEvent: { contentOffset: { x: number } } }) => {
-      savedScrollPositionRef.current = event.nativeEvent.contentOffset.x;
+      currentScrollXRef.current = event.nativeEvent.contentOffset.x;
     },
     [],
   );
@@ -511,14 +478,6 @@ function TuneComposerScoreViewportComponent({
 
           case "rendered":
             setIsLoading(false);
-            // Restore scroll position after render if we saved one
-            if (savedScrollPositionRef.current !== null && scrollViewRef.current) {
-              scrollViewRef.current.scrollTo({
-                x: savedScrollPositionRef.current,
-                animated: false,
-              });
-              savedScrollPositionRef.current = null;
-            }
             onRenderComplete?.();
             break;
 
@@ -539,11 +498,6 @@ function TuneComposerScoreViewportComponent({
               contentWidth: number;
               zoom: number;
             };
-            devLog("[MeasurePositions] Received:", JSON.stringify(positions));
-            devLog(
-              "[MeasurePositions] Measure 0 beatPositions:",
-              positions[0]?.beatPositions,
-            );
             setMeasurePositions(positions);
             setContentWidth(width);
             setOsmdZoom(reportedZoom);
@@ -569,15 +523,26 @@ function TuneComposerScoreViewportComponent({
             setZoom(data.payload as number);
             break;
 
+          case "wheel": {
+            const { deltaX, deltaY } = data.payload as {
+              deltaX: number;
+              deltaY: number;
+            };
+            if (scrollViewRef.current) {
+              // Get current scroll position and add delta (deltaY for horizontal on trackpad)
+              const currentX = currentScrollXRef.current;
+              const newX = Math.max(0, currentX + (deltaX || deltaY));
+              currentScrollXRef.current = newX;
+              scrollViewRef.current.scrollTo({ x: newX, animated: false });
+            }
+            break;
+          }
+
           case "consoleLog": {
-            // Debug logging from WebView
+            // Only log errors from WebView
             const log = data.payload as { level: string; message: string };
-            if (__DEV__) {
-              if (log.level === "error") {
-                devError("[OSMD]", log.message);
-              } else {
-                devLog("[OSMD]", log.message);
-              }
+            if (__DEV__ && log.level === "error") {
+              devError("[OSMD]", log.message);
             }
             break;
           }
@@ -651,70 +616,63 @@ function TuneComposerScoreViewportComponent({
           showsHorizontalScrollIndicator
           style={styles.scrollView}
           onScroll={handleScroll}
+          onLayout={handleViewportLayout}
           scrollEventThrottle={16}
           contentContainerStyle={{
             width: contentWidth * osmdZoom,
             height: "100%",
           }}
         >
-          {/* Wrapper for WebView + chord cursor overlay */}
-          <View
-            style={{
-              width: contentWidth * osmdZoom,
-              height: "100%",
-              position: "relative",
-            }}
-          >
-            {Platform.OS === "web" ? (
-              <iframe
-                ref={iframeRef as React.RefObject<HTMLIFrameElement>}
-                srcDoc={html}
-                style={{
-                  width: contentWidth * osmdZoom,
-                  height: "100%",
-                  border: "none",
-                  backgroundColor: "white",
-                }}
-                sandbox="allow-scripts"
-              />
-            ) : WebView ? (
-              <WebView
-                ref={
-                  webViewRef as React.RefObject<InstanceType<typeof WebView>>
-                }
-                source={{ html }}
-                style={[styles.webView, { width: contentWidth * osmdZoom }]}
-                originWhitelist={["*"]}
-                javaScriptEnabled
-                domStorageEnabled
-                scrollEnabled={false}
-                onMessage={handleMessage}
-                onError={() => {
-                  setError("Failed to load renderer");
-                  onError?.("Failed to load renderer");
-                }}
-              />
-            ) : (
-              <View style={styles.noWebView}>
-                <Text style={styles.noWebViewText}>
-                  WebView not available on this platform
-                </Text>
-              </View>
-            )}
-
-            {/* Chord cursor overlay - shows beat position for chord entry */}
-            {chordCursorX !== null && (
-              <View
-                style={[styles.chordCursorOverlay, { left: chordCursorX }]}
-                pointerEvents="none"
-                testID="chord-cursor-overlay"
-              >
-                <View style={styles.chordCursorLine} />
-                <View style={styles.chordCursorDiamond} />
-              </View>
-            )}
-          </View>
+          {Platform.OS === "web" ? (
+            <iframe
+              ref={iframeRef as React.RefObject<HTMLIFrameElement>}
+              srcDoc={html}
+              style={{
+                width: contentWidth * osmdZoom,
+                height: "100%",
+                border: "none",
+                backgroundColor: "white",
+              }}
+              sandbox="allow-scripts"
+            />
+          ) : WebView ? (
+            <WebView
+              ref={webViewRef as React.RefObject<InstanceType<typeof WebView>>}
+              source={{ html }}
+              style={[styles.webView, { width: contentWidth * osmdZoom }]}
+              originWhitelist={["*"]}
+              javaScriptEnabled
+              domStorageEnabled
+              scrollEnabled={false}
+              onMessage={handleMessage}
+              onError={() => {
+                setError("Failed to load renderer");
+                onError?.("Failed to load renderer");
+              }}
+            />
+          ) : (
+            <View style={styles.noWebView}>
+              <Text style={styles.noWebViewText}>
+                WebView not available on this platform
+              </Text>
+            </View>
+          )}
         </ScrollView>
+
+        {/* Chord cursor overlay - positioned absolutely over viewport */}
+        {chordCursorX !== null && (
+          <View
+            style={[
+              styles.chordCursorOverlay,
+              { left: chordCursorX - currentScrollXRef.current },
+            ]}
+            pointerEvents="none"
+            testID="chord-cursor-overlay"
+          >
+            <View style={styles.chordCursorLine} />
+            <View style={styles.chordCursorDiamond} />
+          </View>
+        )}
 
         {/* Loading overlay */}
         {isLoading && (

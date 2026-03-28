@@ -136,6 +136,7 @@ function ComposerScoreViewportComponent({
   const webViewRef = useRef<WebViewRef | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+  const currentScrollXRef = useRef<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -146,6 +147,11 @@ function ComposerScoreViewportComponent({
   const [contentWidth, setContentWidth] = useState(2000);
   const [osmdZoom, setOsmdZoom] = useState(1);
   const lastScrolledMeasureRef = useRef(-1);
+  // Refs for values used in scroll effects (to avoid dependency on state changes)
+  const measurePositionsRef = useRef(measurePositions);
+  const osmdZoomRef = useRef(osmdZoom);
+  measurePositionsRef.current = measurePositions;
+  osmdZoomRef.current = osmdZoom;
 
   // Use controlled zoom if provided, otherwise internal state
   const zoom = controlledZoom ?? internalZoom;
@@ -196,13 +202,13 @@ function ComposerScoreViewportComponent({
       if (playbackMeasureIndex === lastScrolledMeasureRef.current) return;
       lastScrolledMeasureRef.current = playbackMeasureIndex;
 
-      // Find the position for this measure
-      const measurePos = measurePositions.find(
+      // Find the position for this measure (using ref to avoid dependency on state)
+      const measurePos = measurePositionsRef.current.find(
         (m) => m.measureIndex === playbackMeasureIndex,
       );
       if (measurePos && scrollViewRef.current) {
         // Calculate scroll position - keep measure ~15% from left edge
-        const scrollX = measurePos.x * osmdZoom - 50;
+        const scrollX = measurePos.x * osmdZoomRef.current - 50;
         scrollViewRef.current.scrollTo({
           x: Math.max(0, scrollX),
           animated: true,
@@ -211,23 +217,31 @@ function ComposerScoreViewportComponent({
     } else if (playbackState === "stopped") {
       lastScrolledMeasureRef.current = -1;
     }
-  }, [playbackState, playbackMeasureIndex, measurePositions, osmdZoom]);
+  }, [playbackState, playbackMeasureIndex]);
+
+  // Track last auto-scrolled cursor to avoid re-scrolling on every render
+  const lastAutoScrolledCursorRef = useRef<number>(-1);
 
   // Scroll to cursor when not playing (for editing)
   useEffect(() => {
     if (playbackState === "playing") return;
+    // Only scroll when cursor measure actually changes
+    if (cursor.measureIndex === lastAutoScrolledCursorRef.current) return;
+    if (measurePositionsRef.current.length === 0) return;
 
-    const measurePos = measurePositions.find(
+    lastAutoScrolledCursorRef.current = cursor.measureIndex;
+
+    const measurePos = measurePositionsRef.current.find(
       (m) => m.measureIndex === cursor.measureIndex,
     );
     if (measurePos && scrollViewRef.current) {
-      const scrollX = measurePos.x * osmdZoom - 50;
+      const scrollX = measurePos.x * osmdZoomRef.current - 50;
       scrollViewRef.current.scrollTo({
         x: Math.max(0, scrollX),
         animated: false,
       });
     }
-  }, [cursor.measureIndex, playbackState, measurePositions, osmdZoom]);
+  }, [cursor.measureIndex, playbackState]);
 
   // Apply zoom when controlled zoom changes
   useEffect(() => {
@@ -235,6 +249,14 @@ function ComposerScoreViewportComponent({
       executeScript(`window.setZoom(${controlledZoom})`);
     }
   }, [isReady, controlledZoom, executeScript]);
+
+  // Track scroll position for wheel event handling
+  const handleScroll = useCallback(
+    (event: { nativeEvent: { contentOffset: { x: number } } }) => {
+      currentScrollXRef.current = event.nativeEvent.contentOffset.x;
+    },
+    [],
+  );
 
   // Handle messages from WebView
   const handleMessage = useCallback(
@@ -296,6 +318,20 @@ function ComposerScoreViewportComponent({
           case "zoomChange":
             setZoom(data.payload as number);
             break;
+
+          case "wheel": {
+            const { deltaX, deltaY } = data.payload as {
+              deltaX: number;
+              deltaY: number;
+            };
+            if (scrollViewRef.current) {
+              const currentX = currentScrollXRef.current;
+              const newX = Math.max(0, currentX + (deltaX || deltaY));
+              currentScrollXRef.current = newX;
+              scrollViewRef.current.scrollTo({ x: newX, animated: false });
+            }
+            break;
+          }
 
           case "consoleLog": {
             // Debug logging from WebView
@@ -378,6 +414,8 @@ function ComposerScoreViewportComponent({
           horizontal
           showsHorizontalScrollIndicator
           style={styles.scrollView}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           contentContainerStyle={{
             width: contentWidth * osmdZoom,
             height: "100%",

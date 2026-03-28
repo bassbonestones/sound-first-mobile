@@ -357,16 +357,6 @@ export function generateComposerOsmdHtml(
         let lastNoteX = null;
         
         if (staffMeasure.staffEntries && staffMeasure.staffEntries.length > 0) {
-          console.log('[OSMD] Measure', i, 'staffEntries:', staffMeasure.staffEntries.length);
-          
-          // Log first entry structure to find timestamp property
-          const firstEntry = staffMeasure.staffEntries[0];
-          console.log('[OSMD] First entry keys:', Object.keys(firstEntry || {}));
-          if (firstEntry?.sourceStaffEntry) {
-            console.log('[OSMD] sourceStaffEntry keys:', Object.keys(firstEntry.sourceStaffEntry));
-            console.log('[OSMD] sourceStaffEntry.Timestamp:', firstEntry.sourceStaffEntry.Timestamp);
-          }
-          
           let entryIndex = 0;
           for (const entry of staffMeasure.staffEntries) {
             if (entry && entry.boundingBox) {
@@ -385,11 +375,6 @@ export function generateComposerOsmdHtml(
                   const relativeTimestamp = sourceEntry.Timestamp.RealValue - measureStart;
                   // Convert whole notes to beats (multiply by 4 for 4/4 time)
                   beatNumber = Math.round(relativeTimestamp * 4);
-                  console.log('[OSMD] Entry', entryIndex, '- timestamp:', sourceEntry.Timestamp.RealValue,
-                    'measureStart:', measureStart, 'relative:', relativeTimestamp,
-                    'beat:', beatNumber, 'x:', entryX * 10);
-                } else {
-                  console.log('[OSMD] Entry', entryIndex, '- no timestamp, using index as beat, x:', entryX * 10);
                 }
                 
                 beatPositions.push({
@@ -552,6 +537,7 @@ export function generateComposerOsmdHtml(
     };
 
     // Scroll to a specific measure with smooth animation (for playback)
+    // Uses 70% threshold: only scrolls when measure passes 70% of viewport
     window.scrollToMeasureSmooth = function(measureIndex) {
       // Skip if already at this measure (avoid redundant scrolls during playback)
       if (measureIndex === lastSmoothScrolledMeasure) return;
@@ -572,13 +558,26 @@ export function generateComposerOsmdHtml(
       const posX = bbox.absolutePosition ? bbox.absolutePosition.x : bbox.x;
       if (posX === undefined || isNaN(posX)) return;
       
-      // Keep measure at ~15% from left edge for better visibility
       const container = document.getElementById('container');
       if (!container) return;
       
       const containerWidth = container.clientWidth;
+      const measureX = posX * 10 * currentZoom;
+      const currentScrollLeft = container.scrollLeft;
+      
+      // Only scroll if measure is past 70% of viewport or before visible area
+      const threshold = currentScrollLeft + (containerWidth * 0.7);
+      const leftEdge = currentScrollLeft;
+      
+      if (measureX >= leftEdge && measureX < threshold) {
+        // Measure is visible and before 70% threshold, no scroll needed
+        lastSmoothScrolledMeasure = measureIndex;
+        return;
+      }
+      
+      // Scroll to put measure at ~15% from left edge
       const leadSpace = containerWidth * 0.15;
-      const scrollX = (posX * 10 * currentZoom) - leadSpace;
+      const scrollX = measureX - leadSpace;
 
       container.scrollTo({
         left: Math.max(0, scrollX),
@@ -627,6 +626,12 @@ export function generateComposerOsmdHtml(
       
       check();
     }
+
+    // Forward wheel events to parent for external scrolling
+    document.addEventListener('wheel', function(e) {
+      e.preventDefault();
+      sendMessage('wheel', { deltaX: e.deltaX, deltaY: e.deltaY });
+    }, { passive: false });
 
     // Initialize
     function startup() {
