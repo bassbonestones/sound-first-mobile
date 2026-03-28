@@ -6,7 +6,6 @@
 import React from "react";
 import {
   Modal,
-  Pressable,
   View,
   Text,
   TouchableOpacity,
@@ -49,14 +48,8 @@ export function SaveNewFileModal({
       animationType="fade"
       onRequestClose={() => !isSaving && onCancel()}
     >
-      <Pressable
-        style={modalStyles.overlay}
-        onPress={() => !isSaving && onCancel()}
-      >
-        <View
-          style={[modalStyles.content, styles.saveNewModalContent]}
-          onStartShouldSetResponder={() => true}
-        >
+      <View style={modalStyles.overlay}>
+        <View style={[modalStyles.content, styles.saveNewModalContent]}>
           <Text style={modalStyles.title}>Save New File</Text>
           <Text style={modalStyles.message}>
             Enter a filename for the new tune (will be saved in beginner/).
@@ -108,7 +101,7 @@ export function SaveNewFileModal({
             </TouchableOpacity>
           </View>
         </View>
-      </Pressable>
+      </View>
     </Modal>
   );
 }
