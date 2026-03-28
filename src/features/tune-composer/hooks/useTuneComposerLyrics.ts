@@ -110,7 +110,16 @@ export function useTuneComposerLyrics(
       const pitchedNotes = getPitchedNotes(prev.score);
       const nextIndex = prev.lyricsCursor + 1;
       if (nextIndex >= pitchedNotes.length) return prev; // At end
-      return { ...prev, lyricsCursor: nextIndex };
+      // Also update the main cursor to trigger scroll
+      const noteInfo = pitchedNotes[nextIndex];
+      return {
+        ...prev,
+        lyricsCursor: nextIndex,
+        cursor: {
+          measureIndex: noteInfo.measureIndex,
+          noteIndex: noteInfo.noteIndex,
+        },
+      };
     });
   }, [setState]);
 
@@ -119,7 +128,17 @@ export function useTuneComposerLyrics(
       if (!prev.lyricsMode || prev.lyricsCursor === null) return prev;
       const prevIndex = prev.lyricsCursor - 1;
       if (prevIndex < 0) return prev; // At start
-      return { ...prev, lyricsCursor: prevIndex };
+      // Also update the main cursor to trigger scroll
+      const pitchedNotes = getPitchedNotes(prev.score);
+      const noteInfo = pitchedNotes[prevIndex];
+      return {
+        ...prev,
+        lyricsCursor: prevIndex,
+        cursor: {
+          measureIndex: noteInfo.measureIndex,
+          noteIndex: noteInfo.noteIndex,
+        },
+      };
     });
   }, [setState]);
 
