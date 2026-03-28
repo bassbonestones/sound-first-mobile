@@ -67,12 +67,27 @@ export function useTuneComposerLyrics(
     setState((prev) => {
       const newLyricsMode = !prev.lyricsMode;
       if (newLyricsMode) {
-        // Entering lyrics mode - set cursor to first pitched note
+        // Entering lyrics mode - try to start at the currently selected note
         const pitchedNotes = getPitchedNotes(prev.score);
+        if (pitchedNotes.length === 0) {
+          return { ...prev, lyricsMode: true, lyricsCursor: null };
+        }
+
+        // Find the index of the selected note in pitched notes
+        let startIndex = 0;
+        if (prev.selectedNoteId) {
+          const selectedIndex = pitchedNotes.findIndex(
+            (pn) => pn.note.id === prev.selectedNoteId,
+          );
+          if (selectedIndex >= 0) {
+            startIndex = selectedIndex;
+          }
+        }
+
         return {
           ...prev,
           lyricsMode: true,
-          lyricsCursor: pitchedNotes.length > 0 ? 0 : null,
+          lyricsCursor: startIndex,
         };
       } else {
         // Exiting lyrics mode

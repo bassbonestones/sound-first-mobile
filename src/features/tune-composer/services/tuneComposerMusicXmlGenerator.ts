@@ -419,10 +419,10 @@ function generateLyricXml(lyric: Lyric | undefined): string {
   const syllabic = lyric.syllabic || "single";
   const text = escapeXml(lyric.text);
 
-  // Handle melisma (extend marks)
+  // Handle melisma (extend marks) - use plain <extend/> for compatibility
   const extendXml =
     lyric.melismaLength && lyric.melismaLength > 1
-      ? '\n          <extend type="start"/>'
+      ? '\n          <extend/>'
       : "";
 
   return `
@@ -487,6 +487,7 @@ function generateNoteXml(
   isLastInTripletGroup: boolean = false,
   beamType: "begin" | "continue" | "end" | null = null,
   slurPlacement?: "above" | "below",
+  isMelismaContinuation: boolean = false,
 ): string {
   const baseDuration = DURATION_TO_DIVISIONS[note.duration];
   const duration = note.dotted ? baseDuration * 1.5 : baseDuration;
@@ -601,8 +602,14 @@ function generateNoteXml(
     ? `\n        <notations>${notationsContent}</notations>`
     : "";
 
-  // Generate lyric
-  const lyricXml = generateLyricXml(note.lyric);
+  // Generate lyric (or extend for melisma continuation)
+  let lyricXml = generateLyricXml(note.lyric);
+  if (!lyricXml && isMelismaContinuation) {
+    lyricXml = `
+        <lyric number="1">
+          <extend/>
+        </lyric>`;
+  }
 
   return `      <note${noteAttrs}>${tieXml}
 ${pitchXml}
@@ -648,6 +655,7 @@ function generateMeasureXml(
   scoreHasNotes: boolean,
   activeChords: ChordSymbol[],
   isFirstFullMeasure: boolean = false,
+  melismaContinuationNotes: Set<string> = new Set(),
 ): string {
   const preferFlats = score.keySignature < 0;
   const isPickup = measure.isPickup ?? false;
@@ -785,8 +793,9 @@ function generateMeasureXml(
     const isLastInTriplet = lastInTripletGroup.has(note.id);
     const beam = beamInfo.get(note.id) || null;
     const slurPlacement = slurPlacements.get(note.id);
+    const isMelismaContinuation = melismaContinuationNotes.has(note.id);
     notesXml +=
-      "\n" + generateNoteXml(note, preferFlats, options, score.clef, isLastInTriplet, beam, slurPlacement);
+      "\n" + generateNoteXml(note, preferFlats, options, score.clef, isLastInTriplet, beam, slurPlacement, isMelismaContinuation);
 
     // Advance beat position by note duration
     currentBeat += note.duration;
@@ -853,6 +862,29 @@ export function generateMusicXml(
   const activeProgression = getActiveProgression(score);
   const activeChords = activeProgression?.chords ?? [];
 
+  // Pre-compute melisma continuation notes
+  // A note is a melisma continuation if a previous note's lyric has melismaLength
+  // that extends to cover this note
+  const melismaContinuationNotes = new Set<string>();
+  let melismaRemaining = 0;
+  
+  for (const measure of score.measures) {
+    for (const note of measure.notes) {
+      // Only pitched notes can be part of melisma
+      if (note.midi !== null) {
+        if (melismaRemaining > 0) {
+          melismaContinuationNotes.add(note.id);
+          melismaRemaining--;
+        }
+        // Check if this note starts a new melisma
+        if (note.lyric?.melismaLength && note.lyric.melismaLength > 1) {
+          // The next (melismaLength - 1) pitched notes are continuations
+          melismaRemaining = note.lyric.melismaLength - 1;
+        }
+      }
+    }
+  }
+
   // Check if first measure is pickup
   const hasPickup = score.measures[0]?.isPickup ?? false;
   
@@ -875,6 +907,7 @@ export function generateMusicXml(
         scoreHasNotes,
         activeChords,
         isFirstFullMeasure,
+        melismaContinuationNotes,
       );
     })
     .join("\n");

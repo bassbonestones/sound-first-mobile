@@ -109,8 +109,10 @@ export function lyricInfoToLyric(lyricInfo: LyricInfo): Lyric {
   return {
     text: lyricInfo.text,
     syllabic: lyricInfo.syllabic,
-    // If extend is true, this is a melisma continuation
-    melismaLength: lyricInfo.extend ? 1 : undefined,
+    // If extend is true, this starts a melisma - set to 2 to extend to next note
+    // (The actual count should be calculated during full score conversion
+    // by counting consecutive extend-only notes)
+    melismaLength: lyricInfo.extend ? 2 : undefined,
   };
 }
 

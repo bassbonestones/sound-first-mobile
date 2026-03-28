@@ -718,13 +718,15 @@ export function createInitialState(
   score?: TuneComposerScore,
 ): TuneComposerState {
   const actualScore = score || createScore();
+  // Select the first note if one exists
+  const firstNote = actualScore.measures[0]?.notes[0];
   return {
     score: actualScore,
     cursor: { ...DEFAULT_CURSOR },
     selectedDuration: DURATION.QUARTER,
     dottedMode: false,
     selectedOctave: DEFAULT_OCTAVE_MIDI[actualScore.clef],
-    selectedNoteId: null,
+    selectedNoteId: firstNote?.id ?? null,
     isPlaying: false,
     playbackPosition: null,
     isDirty: false,

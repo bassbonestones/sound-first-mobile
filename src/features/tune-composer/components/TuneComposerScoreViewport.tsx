@@ -142,6 +142,7 @@ function TuneComposerScoreViewportComponent({
   const webViewRef = useRef<WebViewRef | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+  const savedScrollPositionRef = useRef<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -400,6 +401,7 @@ function TuneComposerScoreViewportComponent({
   // Render MusicXML when ready
   useEffect(() => {
     if (isReady && musicXml) {
+      // Scroll position is tracked via onScroll handler and restored in "rendered" message handler
       const escapedXml = musicXml.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
       executeScript(`window.renderMusicXML(\`${escapedXml}\`)`);
     }
@@ -478,6 +480,14 @@ function TuneComposerScoreViewportComponent({
     }
   }, [isReady, controlledZoom, executeScript]);
 
+  // Track scroll position so we can restore it after re-render
+  const handleScroll = useCallback(
+    (event: { nativeEvent: { contentOffset: { x: number } } }) => {
+      savedScrollPositionRef.current = event.nativeEvent.contentOffset.x;
+    },
+    [],
+  );
+
   // Handle messages from WebView
   const handleMessage = useCallback(
     (event: { nativeEvent: { data: string } } | MessageEvent) => {
@@ -501,6 +511,14 @@ function TuneComposerScoreViewportComponent({
 
           case "rendered":
             setIsLoading(false);
+            // Restore scroll position after render if we saved one
+            if (savedScrollPositionRef.current !== null && scrollViewRef.current) {
+              scrollViewRef.current.scrollTo({
+                x: savedScrollPositionRef.current,
+                animated: false,
+              });
+              savedScrollPositionRef.current = null;
+            }
             onRenderComplete?.();
             break;
 
@@ -632,6 +650,8 @@ function TuneComposerScoreViewportComponent({
           horizontal
           showsHorizontalScrollIndicator
           style={styles.scrollView}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           contentContainerStyle={{
             width: contentWidth * osmdZoom,
             height: "100%",
