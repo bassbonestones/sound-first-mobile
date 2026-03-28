@@ -413,7 +413,8 @@ function TuneComposerScoreViewportComponent({
   );
 
   // Scroll the parent ScrollView during playback
-  // Scrolls when the current note position passes 70% of viewport
+  // Rule: Scroll at 70% if next measure is NOT fully visible,
+  //       otherwise wait until entering that next measure
   useEffect(() => {
     if (playbackState === "playing" && playbackMeasureIndex !== undefined) {
       // If starting at measure 0, note 0, always scroll to the beginning
@@ -467,25 +468,149 @@ function TuneComposerScoreViewportComponent({
         currentNoteX = (measureStartX + measureWidth * 0.3) * zoom; // Start a bit into the measure
       }
 
-      // Check if current note is past 70% of visible viewport
+      // Find next measure to check if it's fully visible
+      const nextMeasurePos = measurePositionsRef.current.find(
+        (m) => m.measureIndex === playbackMeasureIndex + 1,
+      );
+
+      // Check if next measure's right edge is within the viewport
+      const viewportRightEdge = currentScrollX + vw;
+      const nextMeasureFullyVisible = nextMeasurePos
+        ? (nextMeasurePos.x + (nextMeasurePos.width || 100)) * zoom <=
+          viewportRightEdge
+        : false;
+
+      // Decide whether to scroll
+      // Rule: Scroll when past 70% threshold
+      // - If next measure NOT visible: scroll immediately
+      // - If next measure IS visible: wait until entering it, then scroll
       const threshold = currentScrollX + vw * 0.7;
+      const isPast70 = currentNoteX > threshold;
+      let shouldScroll = false;
+      let targetScrollX = 0;
 
-      if (currentNoteX > threshold) {
-        // Scroll to put current note at ~15% from left
-        const targetScrollX = Math.max(0, currentNoteX - vw * 0.15);
-
-        if (scrollViewRef.current) {
-          scrollViewRef.current.scrollTo({
-            x: targetScrollX,
-            animated: true,
-          });
+      if (isPast70) {
+        if (!nextMeasureFullyVisible) {
+          // Next measure not visible - scroll immediately
+          shouldScroll = true;
+          targetScrollX = Math.max(0, currentNoteX - vw * 0.15);
+        } else if (playbackNoteIndex === 0 && playbackBeat === 0) {
+          // Next measure is visible, but we just entered this measure - scroll now
+          shouldScroll = true;
+          targetScrollX = Math.max(0, currentNoteX - vw * 0.15);
         }
+      }
+
+      if (shouldScroll && scrollViewRef.current) {
+        scrollViewRef.current.scrollTo({
+          x: targetScrollX,
+          animated: true,
+        });
       }
     }
   }, [playbackState, playbackMeasureIndex, playbackNoteIndex, playbackBeat]);
 
-  // Auto-scroll for cursor editing is disabled - user controls scroll manually
-  // The cursor position is tracked but we don't auto-scroll to it
+  // Scroll the parent ScrollView when cursor moves (not during playback)
+  // Rule: Scroll at 70% if next measure is NOT fully visible,
+  //       otherwise wait until entering that next measure
+  useEffect(() => {
+    // Only scroll for cursor when not playing
+    if (playbackState === "playing") {
+      return;
+    }
+
+    // If at start, scroll to beginning
+    if (cursor.measureIndex === 0 && cursor.noteIndex === 0) {
+      if (scrollViewRef.current) {
+        scrollViewRef.current.scrollTo({ x: 0, animated: true });
+      }
+      return;
+    }
+
+    // Get current measure position info
+    const currentMeasurePos = measurePositionsRef.current.find(
+      (m) => m.measureIndex === cursor.measureIndex,
+    );
+    if (!currentMeasurePos) {
+      return;
+    }
+
+    const zoom = osmdZoomRef.current;
+    const vw = viewportWidthRef.current;
+    const currentScrollX = currentScrollXRef.current;
+
+    // Calculate the X position of the cursor note
+    let cursorNoteX: number;
+    let cursorBeat = 0;
+
+    if (
+      currentMeasurePos.beatPositions &&
+      currentMeasurePos.beatPositions.length > 0
+    ) {
+      // Calculate beat position from noteIndex by summing note durations
+      const measure = score.measures[cursor.measureIndex];
+      if (measure) {
+        for (let i = 0; i < cursor.noteIndex && i < measure.notes.length; i++) {
+          cursorBeat += getNoteDuration(measure.notes[i]);
+        }
+      }
+
+      // Find the beat position closest to our cursor beat
+      const beatPositions = currentMeasurePos.beatPositions;
+      let closestBeatPos = beatPositions[0];
+      for (const bp of beatPositions) {
+        if (bp.beat <= cursorBeat) {
+          closestBeatPos = bp;
+        } else {
+          break;
+        }
+      }
+      cursorNoteX = closestBeatPos.x * zoom;
+    } else {
+      // Fallback: use measure start position
+      cursorNoteX = currentMeasurePos.x * zoom;
+    }
+
+    // Find next measure to check if it's fully visible
+    const nextMeasurePos = measurePositionsRef.current.find(
+      (m) => m.measureIndex === cursor.measureIndex + 1,
+    );
+
+    // Check if next measure's right edge is within the viewport
+    const viewportRightEdge = currentScrollX + vw;
+    const nextMeasureFullyVisible = nextMeasurePos
+      ? (nextMeasurePos.x + (nextMeasurePos.width || 100)) * zoom <=
+        viewportRightEdge
+      : false;
+
+    // Decide whether to scroll
+    // Rule: Scroll when past 70% threshold
+    // - If next measure NOT visible: scroll immediately
+    // - If next measure IS visible: wait until entering it, then scroll
+    const threshold = currentScrollX + vw * 0.7;
+    const isPast70 = cursorNoteX > threshold;
+    let shouldScroll = false;
+    let targetScrollX = 0;
+
+    if (isPast70) {
+      if (!nextMeasureFullyVisible) {
+        // Next measure not visible - scroll immediately
+        shouldScroll = true;
+        targetScrollX = Math.max(0, cursorNoteX - vw * 0.15);
+      } else if (cursor.noteIndex === 0) {
+        // Next measure is visible, but we just entered this measure - scroll now
+        shouldScroll = true;
+        targetScrollX = Math.max(0, cursorNoteX - vw * 0.15);
+      }
+    }
+
+    if (shouldScroll && scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({
+        x: targetScrollX,
+        animated: true,
+      });
+    }
+  }, [cursor.measureIndex, cursor.noteIndex, playbackState, score.measures]);
 
   // Auto-scroll for chord cursor is disabled - user controls scroll manually
 
