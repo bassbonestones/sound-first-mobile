@@ -5,13 +5,7 @@
  * using up/down buttons.
  */
 import React, { useState, useCallback } from "react";
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
+import { Modal, View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { modalStyles } from "./modalStyles";
 import { colors, spacing } from "../../../../constants";
@@ -122,7 +116,9 @@ export function AddPickupModal({
             </TouchableOpacity>
 
             <View style={styles.durationDisplay}>
-              <Text style={styles.durationText}>{formatDuration(duration)}</Text>
+              <Text style={styles.durationText}>
+                {formatDuration(duration)}
+              </Text>
               <Text style={styles.durationSubtext}>
                 of {formatDuration(beatsPerMeasure)}
               </Text>

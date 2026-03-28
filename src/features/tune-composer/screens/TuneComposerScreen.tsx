@@ -11,7 +11,13 @@
  * Optimized for small screens (320x568 minimum).
  */
 
-import React, { useCallback, useEffect, useRef, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useMemo,
+  useState,
+} from "react";
 import {
   View,
   StyleSheet,

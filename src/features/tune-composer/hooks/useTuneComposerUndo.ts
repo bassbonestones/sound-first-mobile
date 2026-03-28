@@ -447,7 +447,9 @@ export function reverseAction(
       // Reverse: restore previous state
       const hadPickup = action.previousFirstMeasure.isPickup === true;
       const isRemovingPickup = action.newDuration === undefined && hadPickup;
-      const isAddingPickup = action.previousDuration === undefined && action.newDuration !== undefined;
+      const isAddingPickup =
+        action.previousDuration === undefined &&
+        action.newDuration !== undefined;
 
       let newMeasures;
       if (isRemovingPickup) {
@@ -458,7 +460,10 @@ export function reverseAction(
         newMeasures = updatedScore.measures.slice(1);
       } else {
         // Was editing pickup: replace first measure with previous
-        newMeasures = [action.previousFirstMeasure, ...updatedScore.measures.slice(1)];
+        newMeasures = [
+          action.previousFirstMeasure,
+          ...updatedScore.measures.slice(1),
+        ];
       }
 
       return {
@@ -799,7 +804,9 @@ export function reapplyAction(
       // Reapply: apply the action again
       const hadPickup = action.previousFirstMeasure.isPickup === true;
       const isRemovingPickup = action.newDuration === undefined && hadPickup;
-      const isAddingPickup = action.previousDuration === undefined && action.newDuration !== undefined;
+      const isAddingPickup =
+        action.previousDuration === undefined &&
+        action.newDuration !== undefined;
 
       let newMeasures;
       if (isRemovingPickup) {
@@ -810,7 +817,10 @@ export function reapplyAction(
         newMeasures = [action.newFirstMeasure, ...updatedScore.measures];
       } else {
         // Editing pickup: replace first measure
-        newMeasures = [action.newFirstMeasure, ...updatedScore.measures.slice(1)];
+        newMeasures = [
+          action.newFirstMeasure,
+          ...updatedScore.measures.slice(1),
+        ];
       }
 
       return {

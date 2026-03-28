@@ -696,7 +696,7 @@ export function useTuneComposerState(
 
     // Sort whole-beat rests (after fractional) from smallest to largest
     // Find where fractional rests end
-    const fractionalRestCount = rests.filter(r => r.duration < 1).length;
+    const fractionalRestCount = rests.filter((r) => r.duration < 1).length;
     const fractionalRests = rests.slice(0, fractionalRestCount);
     const wholeRests = rests.slice(fractionalRestCount);
     wholeRests.sort((a, b) => a.duration - b.duration);
@@ -742,10 +742,7 @@ export function useTuneComposerState(
         let newMeasures;
         if (alreadyHasPickup) {
           // Replace existing pickup
-          newMeasures = [
-            newPickupMeasure,
-            ...prev.score.measures.slice(1),
-          ];
+          newMeasures = [newPickupMeasure, ...prev.score.measures.slice(1)];
         } else {
           // Insert new pickup at beginning
           newMeasures = [newPickupMeasure, ...prev.score.measures];
