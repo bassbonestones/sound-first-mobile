@@ -155,6 +155,10 @@ function TuneComposerScoreViewportComponent({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const currentScrollXRef = useRef<number>(0);
+  const prevCursorRef = useRef<{ measureIndex: number; noteIndex: number }>({
+    measureIndex: 0,
+    noteIndex: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -519,6 +523,19 @@ function TuneComposerScoreViewportComponent({
       return;
     }
 
+    // Determine cursor movement direction
+    const prevCursor = prevCursorRef.current;
+    const movingLeft =
+      cursor.measureIndex < prevCursor.measureIndex ||
+      (cursor.measureIndex === prevCursor.measureIndex &&
+        cursor.noteIndex < prevCursor.noteIndex);
+
+    // Update prev cursor for next comparison
+    prevCursorRef.current = {
+      measureIndex: cursor.measureIndex,
+      noteIndex: cursor.noteIndex,
+    };
+
     // If at start, scroll to beginning
     if (cursor.measureIndex === 0 && cursor.noteIndex === 0) {
       if (scrollViewRef.current) {
@@ -584,15 +601,19 @@ function TuneComposerScoreViewportComponent({
       : false;
 
     // Decide whether to scroll
-    // Rule: Scroll when past 70% threshold
+    // Right scroll (moving right): when past 70% threshold
     // - If next measure NOT visible: scroll immediately
     // - If next measure IS visible: wait until entering it, then scroll
-    const threshold = currentScrollX + vw * 0.7;
-    const isPast70 = cursorNoteX > threshold;
+    // Left scroll (moving left): when cursor is before 30% of viewport
+    const rightThreshold = currentScrollX + vw * 0.7;
+    const leftThreshold = currentScrollX + vw * 0.3;
+    const isPast70 = cursorNoteX > rightThreshold;
+    const isBefore30 = cursorNoteX < leftThreshold;
     let shouldScroll = false;
     let targetScrollX = 0;
 
-    if (isPast70) {
+    if (!movingLeft && isPast70) {
+      // Moving right and past 70%
       if (!nextMeasureFullyVisible) {
         // Next measure not visible - scroll immediately
         shouldScroll = true;
@@ -602,6 +623,10 @@ function TuneComposerScoreViewportComponent({
         shouldScroll = true;
         targetScrollX = Math.max(0, cursorNoteX - vw * 0.15);
       }
+    } else if (movingLeft && isBefore30 && currentScrollX > 0) {
+      // Moving left and cursor is before 30%, scroll to put it at 70%
+      shouldScroll = true;
+      targetScrollX = Math.max(0, cursorNoteX - vw * 0.7);
     }
 
     if (shouldScroll && scrollViewRef.current) {
