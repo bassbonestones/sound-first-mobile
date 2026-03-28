@@ -65,6 +65,10 @@ export interface UseTuneComposerChordsReturn {
   canChordCursorGoPrev: boolean;
   canChordCursorGoNext: boolean;
 
+  // Subdivision
+  chordSubdivision: 1 | 2 | 3;
+  cycleChordSubdivision: () => void;
+
   // Current chord
   currentChordSymbol: string;
   setChordAtCursor: (symbol: string) => void;
@@ -183,10 +187,18 @@ export function useTuneComposerChords(
     const { measureIndex, beatPosition } = state.chordCursor;
     const beatUnitCount = getMeasureBeatCount(measureIndex, state.score);
     const totalMeasures = state.score.measures.length;
+    const subdivision = state.chordSubdivision;
 
-    // Can go next if not at last beat of last measure
-    return measureIndex < totalMeasures - 1 || beatPosition < beatUnitCount - 1;
-  }, [state.chordCursor, state.score]);
+    // Calculate using integer steps to avoid floating point issues
+    const currentStep = Math.round(beatPosition * subdivision);
+    const maxSteps = Math.floor(beatUnitCount * subdivision);
+
+    // Can go next if not at last subdivision of last measure
+    return (
+      measureIndex < totalMeasures - 1 ||
+      currentStep < maxSteps - 1
+    );
+  }, [state.chordCursor, state.score, state.chordSubdivision]);
 
   // ===========================================================================
   // Chord Operations
@@ -270,16 +282,22 @@ export function useTuneComposerChords(
 
   /**
    * Move chord cursor to the next beat position.
-   * Advances by 1 beat unit (e.g., eighth note in 6/8), moving to the next measure if needed.
+   * Advances by 1/subdivision beat units, moving to the next measure if needed.
    */
   const moveChordCursorNext = useCallback(() => {
     setState((prev) => {
       if (!prev.chordMode || !prev.chordCursor) return prev;
       const { measureIndex, beatPosition } = prev.chordCursor;
       const beatUnitCount = getMeasureBeatCount(measureIndex, prev.score);
-      const nextBeat = beatPosition + 1;
+      const subdivision = prev.chordSubdivision;
+      
+      // Calculate exact next position using integer steps to avoid floating point errors
+      // Convert current position to step index, increment, convert back
+      const currentStep = Math.round(beatPosition * subdivision);
+      const nextStep = currentStep + 1;
+      const nextBeat = nextStep / subdivision;
 
-      if (nextBeat >= beatUnitCount) {
+      if (nextBeat >= beatUnitCount - 0.001) {
         // Move to next measure
         const nextMeasure = measureIndex + 1;
         if (nextMeasure >= prev.score.measures.length) {
@@ -301,34 +319,70 @@ export function useTuneComposerChords(
 
   /**
    * Move chord cursor to the previous beat position.
-   * Goes back by 1 beat unit, moving to the previous measure if needed.
+   * Goes back by 1/subdivision beat units, moving to the previous measure if needed.
    */
   const moveChordCursorPrev = useCallback(() => {
     setState((prev) => {
       if (!prev.chordMode || !prev.chordCursor) return prev;
       const { measureIndex, beatPosition } = prev.chordCursor;
+      const subdivision = prev.chordSubdivision;
+      
+      // Calculate exact previous position using integer steps
+      const currentStep = Math.round(beatPosition * subdivision);
 
-      if (beatPosition > 0) {
+      if (currentStep > 0) {
+        const prevStep = currentStep - 1;
+        const prevBeat = prevStep / subdivision;
         return {
           ...prev,
-          chordCursor: { measureIndex, beatPosition: beatPosition - 1 },
+          chordCursor: { measureIndex, beatPosition: prevBeat },
         };
       } else if (measureIndex > 0) {
-        // Move to last beat of previous measure
+        // Move to last subdivision of previous measure
         const prevMeasureBeatCount = getMeasureBeatCount(
           measureIndex - 1,
           prev.score,
         );
+        // Calculate exact last position
+        const totalSteps = Math.floor(prevMeasureBeatCount * subdivision);
+        const lastBeat = (totalSteps - 1) / subdivision;
         return {
           ...prev,
           chordCursor: {
             measureIndex: measureIndex - 1,
-            beatPosition: prevMeasureBeatCount - 1,
+            beatPosition: Math.max(0, lastBeat),
           },
         };
       }
       // At beginning
       return prev;
+    });
+  }, [setState]);
+
+  /**
+   * Cycle through chord subdivisions: 1 (beat) -> 2 (half) -> 3 (triplet) -> 1
+   */
+  const cycleChordSubdivision = useCallback(() => {
+    setState((prev) => {
+      const nextSubdivision = ((prev.chordSubdivision % 3) + 1) as 1 | 2 | 3;
+      // Snap current position to nearest valid position in new subdivision
+      if (prev.chordCursor) {
+        // Use integer step calculation to avoid floating point errors
+        const currentStep = Math.round(prev.chordCursor.beatPosition * nextSubdivision);
+        const snappedBeat = currentStep / nextSubdivision;
+        return {
+          ...prev,
+          chordSubdivision: nextSubdivision,
+          chordCursor: {
+            ...prev.chordCursor,
+            beatPosition: snappedBeat,
+          },
+        };
+      }
+      return {
+        ...prev,
+        chordSubdivision: nextSubdivision,
+      };
     });
   }, [setState]);
 
@@ -624,6 +678,10 @@ export function useTuneComposerChords(
     moveChordCursorPrev,
     canChordCursorGoPrev,
     canChordCursorGoNext,
+
+    // Subdivision
+    chordSubdivision: state.chordSubdivision,
+    cycleChordSubdivision,
 
     // Current chord
     currentChordSymbol,

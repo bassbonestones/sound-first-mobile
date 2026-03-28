@@ -275,6 +275,10 @@ export interface UseTuneComposerStateReturn {
   canChordCursorGoPrev: boolean;
   /** Whether chord cursor can move to next beat */
   canChordCursorGoNext: boolean;
+  /** Current chord subdivision: 1=beat, 2=half, 3=triplet */
+  chordSubdivision: 1 | 2 | 3;
+  /** Cycle through chord subdivisions */
+  cycleChordSubdivision: () => void;
   /** Whether chord symbols are visible in the score */
   showChordSymbols: boolean;
   /** Toggle chord symbol visibility */
@@ -1271,6 +1275,8 @@ export function useTuneComposerState(
     moveChordCursorPrev: chordsHook.moveChordCursorPrev,
     canChordCursorGoPrev: chordsHook.canChordCursorGoPrev,
     canChordCursorGoNext: chordsHook.canChordCursorGoNext,
+    chordSubdivision: chordsHook.chordSubdivision,
+    cycleChordSubdivision: chordsHook.cycleChordSubdivision,
     showChordSymbols: chordsHook.showChordSymbols,
     toggleChordSymbolVisibility: chordsHook.toggleChordSymbolVisibility,
     activeProgression: chordsHook.activeProgression,

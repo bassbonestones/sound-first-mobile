@@ -1340,6 +1340,8 @@ function TuneComposerScreenContent({
               onPrevBeat={composerState.moveChordCursorPrev}
               canGoPrev={composerState.canChordCursorGoPrev}
               canGoNext={composerState.canChordCursorGoNext}
+              subdivision={composerState.chordSubdivision}
+              onCycleSubdivision={composerState.cycleChordSubdivision}
               currentPosition={
                 composerState.chordCursor ?? {
                   measureIndex: 0,

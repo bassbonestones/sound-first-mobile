@@ -67,6 +67,10 @@ export interface ChordControlsProps {
   canGoPrev: boolean;
   /** Whether we can move to next position */
   canGoNext: boolean;
+  /** Current subdivision: 1=beat, 2=half, 3=triplet */
+  subdivision: 1 | 2 | 3;
+  /** Callback to cycle through subdivisions */
+  onCycleSubdivision: () => void;
   /** Current position info for display */
   currentPosition: {
     measureIndex: number;
@@ -158,6 +162,8 @@ function ChordControlsComponent({
   onPrevBeat,
   canGoPrev,
   canGoNext,
+  subdivision = 1,
+  onCycleSubdivision,
   currentPosition,
   hasSelection,
   disabled = false,
@@ -392,6 +398,21 @@ function ChordControlsComponent({
   }
 
   // In chord mode, show full controls
+  // Format beat position for display (e.g., "1", "1½", "1⅓", "1⅔")
+  const formatBeatPosition = (beat: number): string => {
+    const wholeBeat = Math.floor(beat) + 1; // 1-indexed display
+    const fraction = beat - Math.floor(beat);
+    if (Math.abs(fraction) < 0.01) return `${wholeBeat}`;
+    if (Math.abs(fraction - 0.5) < 0.01) return `${wholeBeat}½`;
+    if (Math.abs(fraction - 1/3) < 0.01) return `${wholeBeat}⅓`;
+    if (Math.abs(fraction - 2/3) < 0.01) return `${wholeBeat}⅔`;
+    // For other fractions, show decimal
+    return `${(beat + 1).toFixed(1)}`;
+  };
+
+  // Subdivision label for display
+  const subdivisionLabel = subdivision === 1 ? "♩" : subdivision === 2 ? "♪" : "𝅘𝅥𝅮³";
+
   return (
     <View style={styles.container} testID={testID}>
       <View style={styles.chordModeContainer}>
@@ -401,8 +422,18 @@ function ChordControlsComponent({
           <Text style={styles.headerLabel}>Chord Mode</Text>
           <Text style={styles.positionInfo}>
             M{currentPosition.measureIndex + 1} Beat{" "}
-            {currentPosition.beatPosition + 1}
+            {formatBeatPosition(currentPosition.beatPosition)}
           </Text>
+          <TouchableOpacity
+            onPress={onCycleSubdivision}
+            style={styles.subdivisionButton}
+            accessibilityRole={"button" as AccessibilityRole}
+            accessibilityLabel={`Subdivision: ${subdivision === 1 ? "beat" : subdivision === 2 ? "half beat" : "triplet"}. Tap to change.`}
+            accessibilityHint="Cycles through beat, half beat, and triplet subdivisions"
+            testID="subdivision-toggle"
+          >
+            <Text style={styles.subdivisionBadge}>{subdivisionLabel}</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Progression selector - uses ChordProgressionContext */}
@@ -752,6 +783,20 @@ const styles = StyleSheet.create({
   positionInfo: {
     fontSize: 12,
     color: colors.textSecondary,
+    marginRight: spacing.xs,
+  },
+  subdivisionButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary + "20",
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  subdivisionBadge: {
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: "600",
   },
   inputRow: {
     flexDirection: "row",
@@ -1016,6 +1061,8 @@ function ChordControlsConnectedComponent({
       onPrevBeat={context.movePrev}
       canGoPrev={context.canGoPrev}
       canGoNext={context.canGoNext}
+      subdivision={context.subdivision}
+      onCycleSubdivision={context.cycleSubdivision}
       currentPosition={context.currentPosition}
       hasSelection={context.hasSelection}
       disabled={context.disabled}

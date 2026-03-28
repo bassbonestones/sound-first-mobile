@@ -713,6 +713,8 @@ export interface TuneComposerState {
   chordMode: boolean;
   /** Current position for chord editing (measure index and beat position) */
   chordCursor: { measureIndex: number; beatPosition: number } | null;
+  /** Chord cursor subdivision: 1 = whole beats, 2 = half beats, 3 = triplets */
+  chordSubdivision: 1 | 2 | 3;
 }
 
 /** Create initial composer state */
@@ -744,6 +746,7 @@ export function createInitialState(
     activeWedgeStartId: null,
     chordMode: false,
     chordCursor: null,
+    chordSubdivision: 1,
   };
 }
 

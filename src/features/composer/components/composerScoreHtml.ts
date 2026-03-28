@@ -349,6 +349,16 @@ export function generateComposerOsmdHtml(
         const bbox = staffMeasure.boundingBox;
         const posX = bbox.absolutePosition ? bbox.absolutePosition.x : bbox.x;
         
+        // DEBUG: Log all available properties on staffMeasure and bbox for measure 1
+        if (i === 1) {
+          console.log('[OSMD] staffMeasure keys:', Object.keys(staffMeasure));
+          console.log('[OSMD] bbox keys:', Object.keys(bbox));
+          console.log('[OSMD] bbox.boundingRectangle:', bbox.boundingRectangle);
+          console.log('[OSMD] staffMeasure.endInstructionsWidth:', staffMeasure.endInstructionsWidth);
+          console.log('[OSMD] staffMeasure.minimumStaffEntriesWidth:', staffMeasure.minimumStaffEntriesWidth);
+          console.log('[OSMD] staffMeasure.staffWidth:', staffMeasure.staffWidth);
+        }
+        
         if (posX === undefined || isNaN(posX)) continue;
         
         // Collect all beat positions from staff entries
@@ -373,8 +383,8 @@ export function generateComposerOsmdHtml(
                   const firstSourceEntry = staffMeasure.staffEntries[0]?.sourceStaffEntry;
                   const measureStart = firstSourceEntry?.Timestamp?.RealValue || 0;
                   const relativeTimestamp = sourceEntry.Timestamp.RealValue - measureStart;
-                  // Convert whole notes to beats (multiply by 4 for 4/4 time)
-                  beatNumber = Math.round(relativeTimestamp * 4);
+                  // Convert whole notes to quarter notes (beats) - keep fractional values!
+                  beatNumber = relativeTimestamp * 4;
                 }
                 
                 beatPositions.push({
@@ -397,11 +407,16 @@ export function generateComposerOsmdHtml(
         const noteStartX = firstNoteX !== null ? firstNoteX * 10 : measureX + 50;
         const noteEndX = lastNoteX !== null ? lastNoteX * 10 : noteStartX + 100;
         
+        // Get actual measure width from bounding box for barline position
+        const measureWidth = bbox.boundingRectangle ? bbox.boundingRectangle.width * 10 : null;
+        const barlineX = measureWidth ? measureX + measureWidth : null;
+        
         positions.push({
           measureIndex: i,
           x: measureX,
           noteStartX: noteStartX,
           noteEndX: noteEndX,
+          barlineX: barlineX,
           beatPositions: beatPositions,
           // Width is from first note to end of measure (estimated as last note + some padding)
           width: (noteEndX - noteStartX) + 40,

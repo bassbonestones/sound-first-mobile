@@ -36,7 +36,7 @@ import type { WebViewRef } from "../../../types/webview";
 import { generateComposerOsmdHtml } from "../../composer/components/composerScoreHtml";
 import { generateMusicXml } from "../services/tuneComposerMusicXmlGenerator";
 import type { TuneComposerScore, Note } from "../types";
-import { getNoteDuration, getBeatUnitDuration } from "../types";
+import { getNoteDuration, getBeatUnitDuration, getMeasureDuration } from "../types";
 import type { CursorPosition } from "../../composer/types";
 import { useOptionalPlaybackContext } from "../contexts";
 
@@ -162,6 +162,7 @@ function TuneComposerScoreViewportComponent({
       width: number;
       noteStartX?: number;
       noteEndX?: number;
+      barlineX?: number;
       beatPositions?: { beat: number; x: number }[];
     }[]
   >([]);
@@ -189,8 +190,13 @@ function TuneComposerScoreViewportComponent({
       return null;
     }
 
-    // Get x positions from OSMD
-    const xPositions = measurePos.beatPositions ?? [];
+    // Get next measure's position to find the barline
+    const nextMeasurePos = measurePositions.find(
+      (m) => m.measureIndex === chordCursor.measureIndex + 1,
+    );
+
+    // Get X positions from OSMD (one per note, in order)
+    const osmdPositions = measurePos.beatPositions ?? [];
     let xPosition: number;
 
     // Convert beat position (beat unit index) to quarter notes
@@ -198,22 +204,63 @@ function TuneComposerScoreViewportComponent({
     const targetBeatInQuarters = chordCursor.beatPosition * beatUnitDuration;
     const beatsPerMeasure = score.timeSignature.beats;
 
-    // Calculate beat positions from our score model (in quarter notes)
     const measure = score.measures[chordCursor.measureIndex];
-    const noteBeatPositions: { beat: number; x: number }[] = [];
-
-    if (measure && xPositions.length > 0) {
-      let currentBeat = 0;
-      for (let i = 0; i < measure.notes.length && i < xPositions.length; i++) {
-        const note = measure.notes[i];
-        const x = xPositions[i].x;
-        noteBeatPositions.push({ beat: currentBeat, x });
-        currentBeat += getNoteDuration(note);
-      }
-    }
 
     // Total measure duration in quarter notes
     const measureDurationInQuarters = beatsPerMeasure * beatUnitDuration;
+    
+    // For pickup measures, use actual duration
+    const actualMeasureDuration = measure?.isPickup 
+      ? (score.pickupDuration ?? getMeasureDuration(measure))
+      : measureDurationInQuarters;
+
+    // Build beat positions from our score model (accurate beats) + OSMD X positions
+    const noteBeatPositions: { beat: number; x: number }[] = [];
+    
+    if (measure && osmdPositions.length > 0) {
+      let currentBeat = 0;
+      for (let i = 0; i < measure.notes.length && i < osmdPositions.length; i++) {
+        const note = measure.notes[i];
+        const x = osmdPositions[i].x; // Use OSMD's exact X position
+        noteBeatPositions.push({ beat: currentBeat, x });
+        currentBeat += getNoteDuration(note);
+      }
+      
+      // Add a virtual endpoint at the measure end (barline position)
+      // Next measure's X position IS the barline position
+      const measureEndBeat = actualMeasureDuration;
+      let barlineX: number;
+      
+      if (nextMeasurePos) {
+        // Next measure starts at the barline - use with small margin
+        barlineX = nextMeasurePos.x - 10;
+      } else if (noteBeatPositions.length >= 2) {
+        // Last measure - extrapolate using spacing between last two notes
+        const lastTwo = noteBeatPositions.slice(-2);
+        const beatRange = lastTwo[1].beat - lastTwo[0].beat;
+        const spacingPerBeat = beatRange > 0 
+          ? (lastTwo[1].x - lastTwo[0].x) / beatRange
+          : 30; // fallback spacing
+        const remainingBeats = measureEndBeat - lastTwo[1].beat;
+        barlineX = lastTwo[1].x + remainingBeats * spacingPerBeat;
+      } else {
+        // Fallback
+        barlineX = measurePos.x + (measurePos.width ?? 100);
+      }
+      
+      noteBeatPositions.push({ beat: measureEndBeat, x: barlineX });
+      
+      // DEBUG: Log barline calculation
+      console.log('[ChordCursor] Barline debug:', {
+        measureIndex: chordCursor.measureIndex,
+        targetBeat: chordCursor.beatPosition,
+        nextMeasureX: nextMeasurePos?.x,
+        barlineX,
+        lastNoteX: noteBeatPositions[noteBeatPositions.length - 2]?.x,
+        lastNoteBeat: noteBeatPositions[noteBeatPositions.length - 2]?.beat,
+        allPositions: noteBeatPositions.map(p => ({ beat: p.beat.toFixed(2), x: Math.round(p.x) })),
+      });
+    }
 
     if (noteBeatPositions.length === 0) {
       // No notes - use proportional fallback
@@ -221,7 +268,7 @@ function TuneComposerScoreViewportComponent({
       const measureWidth = measurePos.width ?? 100;
       xPosition =
         noteStartX +
-        (targetBeatInQuarters / measureDurationInQuarters) * measureWidth;
+        (targetBeatInQuarters / actualMeasureDuration) * measureWidth;
     } else {
       // Find exact match first (comparing in quarter notes)
       const exactMatch = noteBeatPositions.find(
@@ -241,40 +288,32 @@ function TuneComposerScoreViewportComponent({
         );
 
         if (before && after) {
-          // Interpolate between the two surrounding notes
+          // Interpolate between the two surrounding positions (notes or barline)
           const beatRange = after.beat - before.beat;
           const beatOffset = targetBeatInQuarters - before.beat;
           const fraction = beatOffset / beatRange;
           xPosition = before.x + fraction * (after.x - before.x);
-        } else if (before) {
-          // Target is after all notes - extrapolate using note spacing
-          const beatsAfterLastNote = targetBeatInQuarters - before.beat;
-
-          if (noteBeatPositions.length >= 2) {
-            // Use spacing from existing notes to extrapolate
-            const firstNote = noteBeatPositions[0];
-            const lastNote = noteBeatPositions[noteBeatPositions.length - 1];
-            const totalNoteBeatSpan = lastNote.beat - firstNote.beat;
-            const totalNoteXSpan = lastNote.x - firstNote.x;
-
-            if (totalNoteBeatSpan > 0) {
-              const pixelsPerBeat = totalNoteXSpan / totalNoteBeatSpan;
-              xPosition = before.x + beatsAfterLastNote * pixelsPerBeat;
-            } else {
-              // All notes at same beat - use measure width estimate
-              const estimatedPixelsPerBeat =
-                (measurePos.width ?? 100) / measureDurationInQuarters;
-              xPosition =
-                before.x + beatsAfterLastNote * estimatedPixelsPerBeat;
-            }
-          } else {
-            // Only one note - estimate spacing from measure width
-            const estimatedPixelsPerBeat =
-              (measurePos.width ?? 100) / measureDurationInQuarters;
-            xPosition = before.x + beatsAfterLastNote * estimatedPixelsPerBeat;
+          
+          // DEBUG: Log interpolation when near barline
+          const isNearBarline = after.beat === actualMeasureDuration;
+          if (isNearBarline) {
+            console.log('[ChordCursor] Barline interpolation:', {
+              targetBeatInQuarters,
+              beforeBeat: before.beat,
+              afterBeat: after.beat,
+              beforeX: before.x,
+              afterX: after.x,
+              beatRange,
+              beatOffset,
+              fraction: fraction.toFixed(3),
+              resultX: xPosition,
+            });
           }
+        } else if (before) {
+          // Fallback: target is past the measure end (shouldn't happen with virtual endpoint)
+          xPosition = before.x;
         } else if (after) {
-          // Target is before all notes (shouldn't happen normally)
+          // Target is before all notes - extrapolate backwards
           if (noteBeatPositions.length >= 2) {
             const firstTwo = noteBeatPositions.slice(0, 2);
             const beatRange = firstTwo[1].beat - firstTwo[0].beat;
@@ -493,6 +532,7 @@ function TuneComposerScoreViewportComponent({
                 width: number;
                 noteStartX?: number;
                 noteEndX?: number;
+                barlineX?: number;
                 beatPositions?: { beat: number; x: number }[];
               }[];
               contentWidth: number;
