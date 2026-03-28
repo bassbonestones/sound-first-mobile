@@ -398,6 +398,41 @@ describe("MusicXML Parser", () => {
 
       expect(events?.[0].dots).toBe(1);
     });
+
+    it("extracts slur placement from MusicXML", async () => {
+      const xmlWithSlur = `<?xml version="1.0"?>
+<score-partwise version="3.1">
+  <part-list><score-part id="P1"><part-name>Music</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>1</divisions></attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <type>quarter</type>
+        <notations>
+          <slur type="start" number="1" placement="below"/>
+        </notations>
+      </note>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <type>quarter</type>
+        <notations>
+          <slur type="stop" number="1"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+      const result = await parseMusicXml(xmlWithSlur, sourceInfo);
+      const events = result.score?.parts[0].measures[0].events;
+
+      expect(events?.[0].slurStart).toBe(true);
+      expect(events?.[0].slurPlacement).toBe("below");
+      expect(events?.[1].slurEnd).toBe(true);
+    });
   });
 });
 

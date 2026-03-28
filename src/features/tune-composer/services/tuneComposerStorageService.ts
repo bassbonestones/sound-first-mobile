@@ -113,7 +113,19 @@ export const tuneComposerStorageService = {
       if (!json) return null;
 
       const saved: SavedTuneScore = JSON.parse(json);
-      return saved.score;
+      
+      // Clear slurPlacement on all notes so it auto-calculates from stem direction
+      // This ensures slurs adapt correctly when the tune is rendered
+      const score = saved.score;
+      score.measures = score.measures.map((measure) => ({
+        ...measure,
+        notes: measure.notes.map((note) => ({
+          ...note,
+          slurPlacement: undefined,
+        })),
+      }));
+      
+      return score;
     } catch (error) {
       devLogger.error(
         "TuneComposerStorage",
@@ -181,7 +193,18 @@ export const tuneComposerStorageService = {
       if (!json) return null;
 
       const data = JSON.parse(json);
-      return data.score as TuneComposerScore;
+      const score = data.score as TuneComposerScore;
+      
+      // Clear slurPlacement on all notes so it auto-calculates from stem direction
+      score.measures = score.measures.map((measure) => ({
+        ...measure,
+        notes: measure.notes.map((note) => ({
+          ...note,
+          slurPlacement: undefined,
+        })),
+      }));
+      
+      return score;
     } catch (error) {
       devLogger.error("TuneComposerStorage", "Failed to load autosave", error);
       return null;

@@ -49,6 +49,45 @@ export interface MusicXmlGeneratorOptions {
 
 const DIVISIONS = 12;
 
+// Middle line MIDI values: B4 for treble (71), D3 for bass (50)
+const MIDDLE_LINE_MIDI: Record<Clef, number> = {
+  treble: 71,
+  bass: 50,
+};
+
+/**
+ * Compute slur placement for a group of notes.
+ * Matches OSMD's stem direction algorithm:
+ * - If the farthest note above and below middle line are close (within 2 semitones),
+ *   favor the higher note (stems down, slurs above)
+ * - Otherwise, the clearly farthest note determines stem direction
+ * Slurs go on the OPPOSITE side of stems.
+ */
+function computeSlurPlacement(
+  midis: number[],
+  clef: Clef,
+): "above" | "below" {
+  if (midis.length === 0) return "below";
+
+  const middleLine = MIDDLE_LINE_MIDI[clef];
+  const maxMidi = Math.max(...midis);
+  const minMidi = Math.min(...midis);
+
+  // Distance above and below middle line
+  const distAbove = maxMidi - middleLine;
+  const distBelow = middleLine - minMidi;
+
+  // If distances are close (within 2 semitones), favor higher note (stems down, slurs above)
+  // Otherwise, use the clearly farthest note
+  if (Math.abs(distAbove - distBelow) <= 2) {
+    // Near tie - favor higher note if any note is above middle line
+    return distAbove > 0 ? "above" : "below";
+  }
+  
+  // Clear winner - farthest note determines
+  return distAbove > distBelow ? "above" : "below";
+}
+
 const DURATION_TO_TYPE: Record<DurationValue, string> = {
   [DURATION.WHOLE]: "whole",
   [DURATION.HALF]: "half",
@@ -444,8 +483,10 @@ function generateNoteXml(
   note: Note,
   preferFlats: boolean,
   options: MusicXmlGeneratorOptions,
+  clef: Clef,
   isLastInTripletGroup: boolean = false,
   beamType: "begin" | "continue" | "end" | null = null,
+  slurPlacement?: "above" | "below",
 ): string {
   const baseDuration = DURATION_TO_DIVISIONS[note.duration];
   const duration = note.dotted ? baseDuration * 1.5 : baseDuration;
@@ -543,12 +584,10 @@ function generateNoteXml(
     notationsContent += '<tied type="stop"/>';
   }
 
-  // Slurs
+  // Slurs - use computed placement based on stem direction
   if (note.slurStart) {
-    const placement = note.slurPlacement
-      ? ` placement="${note.slurPlacement}"`
-      : "";
-    notationsContent += `<slur type="start" number="1"${placement}/>`;
+    const placementAttr = slurPlacement ? ` placement="${slurPlacement}"` : "";
+    notationsContent += `<slur type="start" number="1"${placementAttr}/>`;
   }
   if (note.slurEnd) {
     notationsContent += '<slur type="stop" number="1"/>';
@@ -686,6 +725,31 @@ function generateMeasureXml(
     }
   }
 
+  // Pre-compute slur placements based on stem direction
+  const slurPlacements = new Map<string, "above" | "below">();
+  let slurStartIndex = -1;
+  let slurStartNoteId: string | null = null;
+  for (let i = 0; i < measure.notes.length; i++) {
+    const note = measure.notes[i];
+    if (note.slurStart) {
+      slurStartIndex = i;
+      slurStartNoteId = note.id;
+    }
+    if (note.slurEnd && slurStartIndex >= 0 && slurStartNoteId) {
+      // Collect MIDI values in this slur
+      const midis: number[] = [];
+      for (let j = slurStartIndex; j <= i; j++) {
+        const m = measure.notes[j].midi;
+        if (m !== null) midis.push(m);
+      }
+      if (midis.length > 0) {
+        slurPlacements.set(slurStartNoteId, computeSlurPlacement(midis, score.clef));
+      }
+      slurStartIndex = -1;
+      slurStartNoteId = null;
+    }
+  }
+
   // Track chord index for interleaving with notes
   let nextChordIndex = 0;
   let currentBeat = 0;
@@ -718,8 +782,9 @@ function generateMeasureXml(
 
     const isLastInTriplet = lastInTripletGroup.has(note.id);
     const beam = beamInfo.get(note.id) || null;
+    const slurPlacement = slurPlacements.get(note.id);
     notesXml +=
-      "\n" + generateNoteXml(note, preferFlats, options, isLastInTriplet, beam);
+      "\n" + generateNoteXml(note, preferFlats, options, score.clef, isLastInTriplet, beam, slurPlacement);
 
     // Advance beat position by note duration
     currentBeat += note.duration;

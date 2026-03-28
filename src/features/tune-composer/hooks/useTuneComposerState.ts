@@ -677,7 +677,8 @@ export function useTuneComposerState(
             if (note.midi === null) return note;
             const newMidi = note.midi + semitoneShift;
             if (newMidi < 0 || newMidi > 127) return note;
-            return { ...note, midi: newMidi };
+            // Clear slurPlacement so it auto-recalculates based on new stem direction
+            return { ...note, midi: newMidi, slurPlacement: undefined };
           }),
         }));
 
@@ -749,6 +750,8 @@ export function useTuneComposerState(
               ...note,
               midi: transposed.midi,
               accidental: transposed.accidental,
+              // Clear slurPlacement so it auto-recalculates based on new stem direction
+              slurPlacement: undefined,
             };
           }),
         }));

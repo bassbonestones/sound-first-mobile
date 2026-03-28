@@ -180,6 +180,8 @@ export function importedNoteEventToNote(event: ImportedNoteEvent): Note {
   // Convert expression if present
   const expression = event.expression ?? undefined;
   // Convert slurs
+  // Note: We don't import slurPlacement - let it auto-calculate from stem direction
+  // This ensures slurs adapt correctly when the tune is transposed
   const slurStart = event.slurStart || undefined;
   const slurEnd = event.slurEnd || undefined;
 

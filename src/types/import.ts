@@ -403,6 +403,8 @@ export interface ImportedNoteEvent {
   readonly slurStart: boolean;
   /** Does this note end a slur? */
   readonly slurEnd: boolean;
+  /** Slur placement (above or below the notes) */
+  readonly slurPlacement?: "above" | "below";
   /** Expression text (e.g., "dolce", "espressivo") */
   readonly expression: string | null;
 }

@@ -140,6 +140,7 @@ interface RawNote {
   readonly articulations: string[];
   readonly slurStart: boolean;
   readonly slurEnd: boolean;
+  readonly slurPlacement?: "above" | "below";
 }
 
 interface RawDefaults {
@@ -580,6 +581,7 @@ function extractNotes(measureContent: string, _warnings: string[]): RawNote[] {
     const articulations: string[] = [];
     let slurStart = false;
     let slurEnd = false;
+    let slurPlacement: "above" | "below" | undefined;
     const notationsBlock = extractTagBlock(noteContent, "notations");
     if (notationsBlock) {
       const articulationsBlock = extractTagBlock(
@@ -606,9 +608,15 @@ function extractNotes(measureContent: string, _warnings: string[]): RawNote[] {
       if (/<fermata[^>]*\/?>/.test(notationsBlock)) {
         articulations.push("fermata");
       }
-      // Slurs - check for slur start and stop
-      if (/<slur[^>]*type=["']start["']/i.test(notationsBlock)) {
+      // Slurs - check for slur start and stop, plus placement
+      const slurStartMatch = notationsBlock.match(/<slur[^>]*type=["']start["'][^>]*>/i);
+      if (slurStartMatch) {
         slurStart = true;
+        // Extract placement attribute if present
+        const placementMatch = slurStartMatch[0].match(/placement=["'](above|below)["']/i);
+        if (placementMatch) {
+          slurPlacement = placementMatch[1].toLowerCase() as "above" | "below";
+        }
       }
       if (/<slur[^>]*type=["']stop["']/i.test(notationsBlock)) {
         slurEnd = true;
@@ -628,6 +636,7 @@ function extractNotes(measureContent: string, _warnings: string[]): RawNote[] {
       articulations,
       slurStart,
       slurEnd,
+      slurPlacement,
     });
   }
 
@@ -1082,6 +1091,7 @@ function createNoteEvent(
       : null,
     slurStart: rawNote.slurStart,
     slurEnd: rawNote.slurEnd,
+    slurPlacement: rawNote.slurPlacement,
     expression,
   };
 }
