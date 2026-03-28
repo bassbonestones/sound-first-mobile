@@ -33,6 +33,7 @@ export type TuneComposerActionType =
   | "TOGGLE_TIE"
   | "ADD_MEASURE"
   | "DELETE_MEASURE"
+  | "SET_PICKUP"
   | "CHANGE_CLEF"
   | "CHANGE_KEY_SIGNATURE"
   | "CHANGE_TIME_SIGNATURE"
@@ -111,6 +112,18 @@ export interface DeleteMeasureAction {
   type: "DELETE_MEASURE";
   measureIndex: number;
   deletedMeasure: Measure;
+}
+
+export interface SetPickupAction {
+  type: "SET_PICKUP";
+  /** New pickup duration in beats (undefined = remove pickup) */
+  newDuration: number | undefined;
+  /** Previous pickup duration (for undo) */
+  previousDuration: number | undefined;
+  /** The previous first measure (for undo when removing pickup) */
+  previousFirstMeasure: Measure;
+  /** The new first measure (pickup or restored full measure) */
+  newFirstMeasure: Measure;
 }
 
 export interface ChangeClefAction {
@@ -235,6 +248,7 @@ export type TuneComposerAction =
   | ToggleTieAction
   | AddMeasureAction
   | DeleteMeasureAction
+  | SetPickupAction
   | ChangeClefAction
   | ChangeKeySignatureAction
   | ChangeTimeSignatureAction
@@ -347,6 +361,21 @@ export function createDeleteMeasureAction(
   deletedMeasure: Measure,
 ): DeleteMeasureAction {
   return { type: "DELETE_MEASURE", measureIndex, deletedMeasure };
+}
+
+export function createSetPickupAction(
+  newDuration: number | undefined,
+  previousDuration: number | undefined,
+  previousFirstMeasure: Measure,
+  newFirstMeasure: Measure,
+): SetPickupAction {
+  return {
+    type: "SET_PICKUP",
+    newDuration,
+    previousDuration,
+    previousFirstMeasure,
+    newFirstMeasure,
+  };
 }
 
 export function createSetLyricAction(

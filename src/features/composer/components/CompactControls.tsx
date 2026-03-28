@@ -43,6 +43,10 @@ export interface CompactControlsProps {
   onDeleteLastMeasure: () => void;
   /** Called when fill with rests is pressed */
   onFillWithRests: () => void;
+  /** Called when add pickup is pressed (optional - tune composer only) */
+  onAddPickup?: () => void;
+  /** Whether a pickup measure exists (optional - tune composer only) */
+  hasPickup?: boolean;
   /** Whether there's a selected note (for delete) */
   hasSelection?: boolean;
   /** Whether delete measure is allowed */
@@ -66,6 +70,8 @@ function CompactControlsComponent({
   onDeleteMeasure,
   onDeleteLastMeasure,
   onFillWithRests,
+  onAddPickup,
+  hasPickup = false,
   hasSelection = false,
   canDeleteMeasure = true,
   disabled = false,
@@ -100,6 +106,13 @@ function CompactControlsComponent({
       setShowMenu(false);
     }
   }, [disabled, validation, onFillWithRests]);
+
+  const handleAddPickup = useCallback(() => {
+    if (!disabled && onAddPickup) {
+      onAddPickup();
+      setShowMenu(false);
+    }
+  }, [disabled, onAddPickup]);
 
   const canFill = !validation.isComplete && validation.difference < 0;
 
@@ -187,6 +200,20 @@ function CompactControlsComponent({
               <Feather name="plus-square" size={18} color={colors.success} />
               <Text style={styles.menuItemText}>Add Measure at End</Text>
             </TouchableOpacity>
+
+            {/* Add/Edit pickup measure - only show if onAddPickup is provided */}
+            {onAddPickup && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={handleAddPickup}
+                testID="menu-pickup"
+              >
+                <Feather name="skip-back" size={18} color={colors.primary} />
+                <Text style={styles.menuItemText}>
+                  {hasPickup ? "Edit Pickup Measure" : "Add Pickup Measure"}
+                </Text>
+              </TouchableOpacity>
+            )}
 
             {/* Delete last measure */}
             <TouchableOpacity

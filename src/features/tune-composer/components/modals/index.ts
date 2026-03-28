@@ -18,6 +18,9 @@ export type {
 export { AddMeasureModal } from "./AddMeasureModal";
 export type { AddMeasureModalProps } from "./AddMeasureModal";
 
+export { AddPickupModal } from "./AddPickupModal";
+export type { AddPickupModalProps } from "./AddPickupModal";
+
 export { ImportTuneModal } from "./ImportTuneModal";
 export type { ImportTuneModalProps } from "./ImportTuneModal";
 

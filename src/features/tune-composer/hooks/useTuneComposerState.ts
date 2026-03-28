@@ -38,6 +38,7 @@ import {
 import {
   createAddMeasureAction,
   createDeleteMeasureAction,
+  createSetPickupAction,
 } from "../types/actionTypes";
 
 // Re-use composer utils
@@ -116,6 +117,16 @@ export interface UseTuneComposerStateReturn {
   deleteMeasure: () => void;
   deleteLastMeasure: () => void;
   fillMeasureWithRests: () => void;
+
+  // Pickup Measure
+  /** Whether the score has a pickup measure */
+  hasPickup: boolean;
+  /** Duration of the pickup measure in beats (undefined if no pickup) */
+  pickupDuration: number | undefined;
+  /** Set or update pickup measure with given duration */
+  setPickupMeasure: (duration: number) => void;
+  /** Remove pickup measure */
+  removePickupMeasure: () => void;
 
   // Score Settings
   setClef: (clef: Clef) => void;
@@ -628,6 +639,186 @@ export function useTuneComposerState(
   }, [state.score, state.cursor.measureIndex, updateScore]);
 
   // ==========================================================================
+  // Pickup Measure Operations
+  // ==========================================================================
+
+  /**
+   * Generate rests to fill a given duration in beats.
+   * For pickup measures, we put fractional beats first, then whole beats.
+   * Rests are ordered from smallest to largest (building up).
+   */
+  const generateRestsForDuration = useCallback((duration: number): Note[] => {
+    const rests: Note[] = [];
+    let remaining = duration;
+
+    // Standard rest durations from smallest to largest
+    const allDurations: DurationValue[] = [
+      DURATION.SIXTEENTH,
+      DURATION.EIGHTH,
+      DURATION.QUARTER,
+      DURATION.HALF,
+    ];
+
+    // First, handle any fractional beat (less than 1 beat) with small rests
+    const fractionalPart = remaining % 1;
+    if (fractionalPart > 0.001) {
+      let frac = fractionalPart;
+      // Use largest small rest that fits first, working down
+      for (const d of [DURATION.EIGHTH, DURATION.SIXTEENTH]) {
+        while (frac >= d - 0.001) {
+          rests.push(createRest(d));
+          frac -= d;
+        }
+      }
+      remaining -= fractionalPart;
+    }
+
+    // Then fill remaining whole beats from smallest to largest
+    // This creates a "building up" pattern: quarter, half, etc.
+    while (remaining > 0.001) {
+      let found = false;
+      // Find largest rest that fits
+      let bestDuration: DurationValue | null = null;
+      for (const d of allDurations) {
+        if (remaining >= d - 0.001) {
+          bestDuration = d;
+        }
+      }
+      if (bestDuration !== null) {
+        rests.push(createRest(bestDuration));
+        remaining -= bestDuration;
+        found = true;
+      }
+      if (!found) {
+        break; // Safety: avoid infinite loop
+      }
+    }
+
+    // Sort whole-beat rests (after fractional) from smallest to largest
+    // Find where fractional rests end
+    const fractionalRestCount = rests.filter(r => r.duration < 1).length;
+    const fractionalRests = rests.slice(0, fractionalRestCount);
+    const wholeRests = rests.slice(fractionalRestCount);
+    wholeRests.sort((a, b) => a.duration - b.duration);
+
+    return [...fractionalRests, ...wholeRests];
+  }, []);
+
+  const hasPickup = useMemo(
+    () => state.score.measures[0]?.isPickup === true,
+    [state.score.measures],
+  );
+
+  const pickupDuration = useMemo(
+    () => state.score.pickupDuration,
+    [state.score.pickupDuration],
+  );
+
+  const setPickupMeasure = useCallback(
+    (duration: number) => {
+      const previousDuration = state.score.pickupDuration;
+      const previousFirstMeasure = state.score.measures[0];
+
+      // Generate rests for the pickup measure
+      const pickupRests = generateRestsForDuration(duration);
+      const newPickupMeasure = {
+        id: previousFirstMeasure?.id ?? `pickup-${Date.now()}`,
+        notes: pickupRests,
+        isPickup: true,
+      };
+
+      // If there was already a pickup, replace it; otherwise insert at beginning
+      const alreadyHasPickup = previousFirstMeasure?.isPickup === true;
+
+      const action = createSetPickupAction(
+        duration,
+        previousDuration,
+        previousFirstMeasure,
+        newPickupMeasure,
+      );
+      undoManager.pushAction(action);
+
+      setState((prev) => {
+        let newMeasures;
+        if (alreadyHasPickup) {
+          // Replace existing pickup
+          newMeasures = [
+            newPickupMeasure,
+            ...prev.score.measures.slice(1),
+          ];
+        } else {
+          // Insert new pickup at beginning
+          newMeasures = [newPickupMeasure, ...prev.score.measures];
+        }
+
+        // Reset cursor to first note of pickup
+        const newCursor = { measureIndex: 0, noteIndex: 0 };
+        cursorRef.current = newCursor;
+
+        return {
+          ...prev,
+          score: {
+            ...prev.score,
+            measures: newMeasures,
+            pickupDuration: duration,
+            updatedAt: new Date().toISOString(),
+          },
+          cursor: newCursor,
+          selectedNoteId: newPickupMeasure.notes[0]?.id ?? null,
+          isDirty: true,
+        };
+      });
+    },
+    [
+      state.score.measures,
+      state.score.pickupDuration,
+      generateRestsForDuration,
+      undoManager,
+    ],
+  );
+
+  const removePickupMeasure = useCallback(() => {
+    const firstMeasure = state.score.measures[0];
+    if (!firstMeasure?.isPickup) return;
+
+    // Can't remove if it's the only measure
+    if (state.score.measures.length <= 1) return;
+
+    const previousDuration = state.score.pickupDuration;
+
+    // When removing pickup, just delete it (don't replace with full measure)
+    // Use a placeholder for newFirstMeasure since we're deleting
+    const action = createSetPickupAction(
+      undefined,
+      previousDuration,
+      firstMeasure,
+      firstMeasure, // placeholder - we're removing, not replacing
+    );
+    undoManager.pushAction(action);
+
+    setState((prev) => {
+      // Remove the pickup measure entirely
+      const newMeasures = prev.score.measures.slice(1);
+
+      const newCursor = { measureIndex: 0, noteIndex: 0 };
+      cursorRef.current = newCursor;
+
+      return {
+        ...prev,
+        score: {
+          ...prev.score,
+          measures: newMeasures,
+          pickupDuration: undefined,
+          updatedAt: new Date().toISOString(),
+        },
+        cursor: newCursor,
+        selectedNoteId: newMeasures[0]?.notes[0]?.id ?? null,
+        isDirty: true,
+      };
+    });
+  }, [state.score.measures, state.score.pickupDuration, undoManager]);
+
+  // ==========================================================================
   // Score Settings
   // ==========================================================================
 
@@ -987,6 +1178,12 @@ export function useTuneComposerState(
     deleteMeasure,
     deleteLastMeasure,
     fillMeasureWithRests,
+
+    // Pickup Measure
+    hasPickup,
+    pickupDuration,
+    setPickupMeasure,
+    removePickupMeasure,
 
     // Score Settings
     setClef,

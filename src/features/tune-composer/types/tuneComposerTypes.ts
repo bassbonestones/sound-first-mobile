@@ -590,6 +590,8 @@ export interface TuneComposerScore {
   updatedAt: string;
   /** Source file if imported from MusicXML */
   importedFrom?: string;
+  /** Duration of pickup measure in beats (undefined = no pickup) */
+  pickupDuration?: number;
 }
 
 /** Default values for a new score */

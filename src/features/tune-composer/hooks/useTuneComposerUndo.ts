@@ -443,6 +443,31 @@ export function reverseAction(
       };
     }
 
+    case "SET_PICKUP": {
+      // Reverse: restore previous state
+      const hadPickup = action.previousFirstMeasure.isPickup === true;
+      const isRemovingPickup = action.newDuration === undefined && hadPickup;
+      const isAddingPickup = action.previousDuration === undefined && action.newDuration !== undefined;
+
+      let newMeasures;
+      if (isRemovingPickup) {
+        // Was removing pickup: re-insert the pickup at beginning
+        newMeasures = [action.previousFirstMeasure, ...updatedScore.measures];
+      } else if (isAddingPickup) {
+        // Was adding pickup: remove the first measure (the pickup)
+        newMeasures = updatedScore.measures.slice(1);
+      } else {
+        // Was editing pickup: replace first measure with previous
+        newMeasures = [action.previousFirstMeasure, ...updatedScore.measures.slice(1)];
+      }
+
+      return {
+        ...updatedScore,
+        measures: newMeasures,
+        pickupDuration: action.previousDuration,
+      };
+    }
+
     default:
       return updatedScore;
   }
@@ -767,6 +792,31 @@ export function reapplyAction(
               }
             : m,
         ),
+      };
+    }
+
+    case "SET_PICKUP": {
+      // Reapply: apply the action again
+      const hadPickup = action.previousFirstMeasure.isPickup === true;
+      const isRemovingPickup = action.newDuration === undefined && hadPickup;
+      const isAddingPickup = action.previousDuration === undefined && action.newDuration !== undefined;
+
+      let newMeasures;
+      if (isRemovingPickup) {
+        // Removing pickup: delete the first measure
+        newMeasures = updatedScore.measures.slice(1);
+      } else if (isAddingPickup) {
+        // Adding pickup: insert new pickup at beginning
+        newMeasures = [action.newFirstMeasure, ...updatedScore.measures];
+      } else {
+        // Editing pickup: replace first measure
+        newMeasures = [action.newFirstMeasure, ...updatedScore.measures.slice(1)];
+      }
+
+      return {
+        ...updatedScore,
+        measures: newMeasures,
+        pickupDuration: action.newDuration,
       };
     }
 

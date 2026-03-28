@@ -11,7 +11,7 @@
  * Optimized for small screens (320x568 minimum).
  */
 
-import React, { useCallback, useEffect, useRef, useMemo } from "react";
+import React, { useCallback, useEffect, useRef, useMemo, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -62,6 +62,7 @@ import {
   KeyChangeModal,
   ChordStyleModal,
   AddMeasureModal,
+  AddPickupModal,
   ImportTuneModal,
   SaveNewFileModal,
   RhythmChangeModal,
@@ -188,6 +189,9 @@ function TuneComposerScreenContent({
     isProgressionEditMode,
     toggleProgressionEditMode,
   } = screenState;
+
+  // Pickup modal state
+  const [showPickupModal, setShowPickupModal] = useState(false);
 
   // Composer state
   const composerState = useTuneComposerState(initialScore);
@@ -1161,6 +1165,8 @@ function TuneComposerScreenContent({
                 onDeleteMeasure={handleDeleteMeasure}
                 onDeleteLastMeasure={handleDeleteLastMeasure}
                 onFillWithRests={handleFillWithRests}
+                onAddPickup={() => setShowPickupModal(true)}
+                hasPickup={composerState.hasPickup}
                 hasSelection={hasSelection}
                 canDeleteMeasure={canDeleteMeasure}
                 disabled={isPlaying}
@@ -1617,6 +1623,23 @@ function TuneComposerScreenContent({
             setShowAddMeasureModal(false);
           }}
           onCancel={() => setShowAddMeasureModal(false)}
+        />
+
+        {/* Add/Edit Pickup Modal */}
+        <AddPickupModal
+          visible={showPickupModal}
+          timeSignature={composerState.score.timeSignature}
+          hasPickup={composerState.hasPickup}
+          currentPickupDuration={composerState.pickupDuration}
+          onConfirm={(duration) => {
+            composerState.setPickupMeasure(duration);
+            setShowPickupModal(false);
+          }}
+          onRemove={() => {
+            composerState.removePickupMeasure();
+            setShowPickupModal(false);
+          }}
+          onCancel={() => setShowPickupModal(false)}
         />
 
         {/* Import Tune Modal */}
