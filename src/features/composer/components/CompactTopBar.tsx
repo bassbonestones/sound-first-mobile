@@ -108,6 +108,10 @@ export interface CompactTopBarProps {
   displayTitle?: string;
   /** Test ID for testing */
   testID?: string;
+  /** Whether swing feel is enabled for playback */
+  swingEnabled?: boolean;
+  /** Called when swing enabled changes */
+  onSwingEnabledChange?: (enabled: boolean) => void;
 }
 
 // =============================================================================
@@ -133,6 +137,8 @@ function CompactTopBarComponent({
   disabled = false,
   displayTitle,
   testID,
+  swingEnabled = false,
+  onSwingEnabledChange,
 }: CompactTopBarProps): React.ReactElement {
   // Try to get values from context (returns null if no provider)
   const context = useOptionalScoreSettingsContext();
@@ -392,6 +398,27 @@ function CompactTopBarComponent({
                   <Text style={styles.bpmLabel}>BPM</Text>
                 </View>
               </View>
+
+              {/* Swing */}
+              {onSwingEnabledChange && (
+                <View style={styles.settingRow}>
+                  <Text style={styles.settingLabel}>Swing</Text>
+                  <TouchableOpacity
+                    style={styles.settingButton}
+                    onPress={() => onSwingEnabledChange(!swingEnabled)}
+                    testID="settings-swing-toggle"
+                  >
+                    <Text style={styles.settingValue}>
+                      {swingEnabled ? "On" : "Off"}
+                    </Text>
+                    <Feather
+                      name={swingEnabled ? "toggle-right" : "toggle-left"}
+                      size={24}
+                      color={swingEnabled ? colors.primary : colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {/* Zoom */}
               <View style={styles.settingRow}>

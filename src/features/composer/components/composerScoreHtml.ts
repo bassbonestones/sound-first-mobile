@@ -349,16 +349,6 @@ export function generateComposerOsmdHtml(
         const bbox = staffMeasure.boundingBox;
         const posX = bbox.absolutePosition ? bbox.absolutePosition.x : bbox.x;
         
-        // DEBUG: Log all available properties on staffMeasure and bbox for measure 1
-        if (i === 1) {
-          console.log('[OSMD] staffMeasure keys:', Object.keys(staffMeasure));
-          console.log('[OSMD] bbox keys:', Object.keys(bbox));
-          console.log('[OSMD] bbox.boundingRectangle:', bbox.boundingRectangle);
-          console.log('[OSMD] staffMeasure.endInstructionsWidth:', staffMeasure.endInstructionsWidth);
-          console.log('[OSMD] staffMeasure.minimumStaffEntriesWidth:', staffMeasure.minimumStaffEntriesWidth);
-          console.log('[OSMD] staffMeasure.staffWidth:', staffMeasure.staffWidth);
-        }
-        
         if (posX === undefined || isNaN(posX)) continue;
         
         // Collect all beat positions from staff entries

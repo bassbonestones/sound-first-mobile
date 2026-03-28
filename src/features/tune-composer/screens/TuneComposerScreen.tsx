@@ -1138,6 +1138,8 @@ function TuneComposerScreenContent({
           disabled={isPlaying}
           displayTitle={tuneMetadata.title !== "Untitled Tune" ? tuneMetadata.title : undefined}
           testID="composer-topbar"
+          swingEnabled={composerState.swingEnabled}
+          onSwingEnabledChange={composerState.setSwingEnabled}
         />
 
         {/* Score Viewport with swipe gestures - fixed at top */}

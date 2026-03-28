@@ -295,6 +295,12 @@ export interface UseTuneComposerStateReturn {
   confirmRhythmChange: () => void;
   /** Cancel pending rhythm change */
   cancelRhythmChange: () => void;
+
+  // === PLAYBACK SETTINGS ===
+  /** Whether swing feel is enabled for playback */
+  swingEnabled: boolean;
+  /** Set whether swing feel is enabled */
+  setSwingEnabled: (enabled: boolean) => void;
 }
 
 // =============================================================================
@@ -1040,6 +1046,19 @@ export function useTuneComposerState(
     [state.score.title, undoManager, updateScore],
   );
 
+  const setSwingEnabled = useCallback(
+    (enabled: boolean) => {
+      updateScore((score) => ({
+        ...score,
+        playbackSettings: {
+          ...score.playbackSettings,
+          swingEnabled: enabled,
+        },
+      }));
+    },
+    [updateScore],
+  );
+
   // ==========================================================================
   // Undo/Redo
   // ==========================================================================
@@ -1299,5 +1318,9 @@ export function useTuneComposerState(
     pendingRhythmChange: notesHook.pendingRhythmChange,
     confirmRhythmChange: notesHook.confirmRhythmChange,
     cancelRhythmChange: notesHook.cancelRhythmChange,
+
+    // Playback Settings
+    swingEnabled: state.score.playbackSettings.swingEnabled,
+    setSwingEnabled,
   };
 }

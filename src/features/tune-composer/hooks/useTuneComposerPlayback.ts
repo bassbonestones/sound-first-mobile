@@ -66,6 +66,86 @@ const INITIAL_POSITION: PlaybackPosition = {
   noteIndex: 0,
 };
 
+/** Swing ratio - first half of the beat pair gets this fraction (2:1 swing = 2/3) */
+const SWING_RATIO = 2 / 3;
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+/**
+ * Calculate the half-beat duration based on time signature.
+ * In 4/4 (beatUnit=4), half-beat is 0.5 (eighth note).
+ * In 6/8 (beatUnit=8), half-beat is 0.5 (sixteenth note relative to eighth beat).
+ */
+function getHalfBeat(_beatUnit: number): number {
+  // Half of whatever the beat unit is
+  return 0.5;
+}
+
+/**
+ * Apply swing timing to a note's duration for playback.
+ *
+ * Swing works by shifting the off-beat position from 0.5 to ~0.67 within each beat.
+ * This affects:
+ * 1. Notes that START on an off-beat (shortened to fit before the next beat)
+ * 2. Notes that END on an off-beat (extended so the next note starts at swung position)
+ */
+function getSwungDuration(
+  beatPosition: number,
+  noteDuration: number,
+  beatUnit: number,
+  swingEnabled: boolean,
+): number {
+  if (!swingEnabled) return noteDuration;
+
+  const halfBeat = getHalfBeat(beatUnit);
+  const endPosition = beatPosition + noteDuration;
+
+  // Check where this note starts and ends within a beat
+  const startInBeat = beatPosition % 1;
+  const endInBeat = endPosition % 1;
+
+  const startsOnBeat = Math.abs(startInBeat) < 0.001;
+  const startsOffBeat = Math.abs(startInBeat - halfBeat) < 0.001;
+  const endsOnBeat = Math.abs(endInBeat) < 0.001;
+  const endsOffBeat = Math.abs(endInBeat - halfBeat) < 0.001;
+
+  // Case 1: Note starts on-beat and ends off-beat (e.g., on-beat eighth, or dotted quarter)
+  // Extend it so the next note starts at the swung off-beat position
+  if (startsOnBeat && endsOffBeat) {
+    // Extend from X.5 to X + SWING_RATIO (e.g., 0.5 → 0.67)
+    const extension = SWING_RATIO - halfBeat;
+    return noteDuration + extension;
+  }
+
+  // Case 2: Note starts off-beat and ends on-beat (e.g., off-beat eighth)
+  // Shorten it because swing pushed its start later
+  if (startsOffBeat && endsOnBeat) {
+    // Started late (at SWING_RATIO instead of 0.5), so shorten
+    const reduction = SWING_RATIO - halfBeat;
+    return noteDuration - reduction;
+  }
+
+  // Case 3: Note starts on-beat and ends on-beat (e.g., quarter, half, whole)
+  // No swing adjustment needed
+  if (startsOnBeat && endsOnBeat) {
+    return noteDuration;
+  }
+
+  // Case 4: Note starts off-beat and ends off-beat (e.g., off-beat to off-beat)
+  // Both start and end are shifted, so duration stays the same
+  if (startsOffBeat && endsOffBeat) {
+    return noteDuration;
+  }
+
+  // Other cases: no swing adjustment (complex rhythms, triplets, etc.)
+  return noteDuration;
+}
+
+// Export helpers for testing
+export { getSwungDuration, SWING_RATIO };
+
 // =============================================================================
 // Hook
 // =============================================================================
@@ -121,7 +201,7 @@ export function useTuneComposerPlayback(
       if (nextNoteIndex < measure.notes.length) {
         let beat = 0;
         for (let i = 0; i < nextNoteIndex; i++) {
-          beat += measure.notes[i].duration;
+          beat += getNoteDuration(measure.notes[i]);
         }
         return {
           measureIndex: current.measureIndex,
@@ -224,16 +304,24 @@ export function useTuneComposerPlayback(
       }
 
       const secondsPerBeat = getSecondsPerBeat(tempo);
-      const noteDuration = getNoteDuration(currentNote) * secondsPerBeat;
+      const rawDuration = getNoteDuration(currentNote);
+      // Apply swing timing - affects when we move to the next note
+      const swungDuration = getSwungDuration(
+        position.beat,
+        rawDuration,
+        score.timeSignature.beatUnit,
+        score.playbackSettings.swingEnabled,
+      );
+      const noteTimingDuration = swungDuration * secondsPerBeat;
 
       setCurrentEvent({
         note: currentNote,
         position,
-        durationSeconds: noteDuration,
+        durationSeconds: rawDuration * secondsPerBeat,
       });
 
-      if (accumulatedTimeRef.current >= noteDuration) {
-        accumulatedTimeRef.current -= noteDuration;
+      if (accumulatedTimeRef.current >= noteTimingDuration) {
+        accumulatedTimeRef.current -= noteTimingDuration;
 
         const nextPos = getNextPosition(position, playRangeRef.current);
 
@@ -290,6 +378,8 @@ export function useTuneComposerPlayback(
       getNextPosition,
       getSecondsPerBeat,
       getTiedNoteDuration,
+      score.timeSignature.beatUnit,
+      score.playbackSettings.swingEnabled,
     ],
   );
 

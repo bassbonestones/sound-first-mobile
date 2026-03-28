@@ -542,11 +542,14 @@ export function isValidAccompanimentStyle(
 export interface PlaybackSettings {
   /** Style of accompaniment for chord playback */
   accompanimentStyle: AccompanimentStyle;
+  /** Whether to apply swing feel to playback */
+  swingEnabled: boolean;
 }
 
 /** Default playback settings */
 export const DEFAULT_PLAYBACK_SETTINGS: PlaybackSettings = {
   accompanimentStyle: DEFAULT_ACCOMPANIMENT_STYLE,
+  swingEnabled: false,
 } as const;
 
 /** Create playback settings with optional overrides */

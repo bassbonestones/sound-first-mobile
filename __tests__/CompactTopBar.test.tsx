@@ -904,4 +904,90 @@ describe("CompactTopBar", () => {
       expect(onZoomChange).toHaveBeenCalledWith(2.5);
     });
   });
+
+  describe("Swing Toggle", () => {
+    it("should render swing toggle when onSwingEnabledChange is provided", () => {
+      const onSwingEnabledChange = jest.fn();
+      const { getByTestId, getByText } = render(
+        <CompactTopBar
+          {...defaultProps}
+          swingEnabled={false}
+          onSwingEnabledChange={onSwingEnabledChange}
+        />,
+      );
+
+      fireEvent.press(getByTestId("topbar-settings"));
+      expect(getByText("Swing")).toBeTruthy();
+      expect(getByTestId("settings-swing-toggle")).toBeTruthy();
+    });
+
+    it("should not render swing toggle when onSwingEnabledChange is not provided", () => {
+      const { getByTestId, queryByText } = render(
+        <CompactTopBar {...defaultProps} />,
+      );
+
+      fireEvent.press(getByTestId("topbar-settings"));
+      expect(queryByText("Swing")).toBeNull();
+    });
+
+    it("should show Off when swing is disabled", () => {
+      const onSwingEnabledChange = jest.fn();
+      const { getByTestId, getByText } = render(
+        <CompactTopBar
+          {...defaultProps}
+          swingEnabled={false}
+          onSwingEnabledChange={onSwingEnabledChange}
+        />,
+      );
+
+      fireEvent.press(getByTestId("topbar-settings"));
+      expect(getByText("Off")).toBeTruthy();
+    });
+
+    it("should show On when swing is enabled", () => {
+      const onSwingEnabledChange = jest.fn();
+      const { getByTestId, getByText } = render(
+        <CompactTopBar
+          {...defaultProps}
+          swingEnabled={true}
+          onSwingEnabledChange={onSwingEnabledChange}
+        />,
+      );
+
+      fireEvent.press(getByTestId("topbar-settings"));
+      expect(getByText("On")).toBeTruthy();
+    });
+
+    it("should call onSwingEnabledChange when toggle is pressed", () => {
+      const onSwingEnabledChange = jest.fn();
+      const { getByTestId } = render(
+        <CompactTopBar
+          {...defaultProps}
+          swingEnabled={false}
+          onSwingEnabledChange={onSwingEnabledChange}
+        />,
+      );
+
+      fireEvent.press(getByTestId("topbar-settings"));
+      fireEvent.press(getByTestId("settings-swing-toggle"));
+
+      expect(onSwingEnabledChange).toHaveBeenCalledWith(true);
+    });
+
+    it("should toggle from enabled to disabled", () => {
+      const onSwingEnabledChange = jest.fn();
+      const { getByTestId } = render(
+        <CompactTopBar
+          {...defaultProps}
+          swingEnabled={true}
+          onSwingEnabledChange={onSwingEnabledChange}
+        />,
+      );
+
+      fireEvent.press(getByTestId("topbar-settings"));
+      fireEvent.press(getByTestId("settings-swing-toggle"));
+
+      expect(onSwingEnabledChange).toHaveBeenCalledWith(false);
+    });
+  });
 });
