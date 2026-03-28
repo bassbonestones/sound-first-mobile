@@ -45,6 +45,7 @@ export interface ScreenModalsState {
   showAddMeasureModal: boolean;
   showImportModal: boolean;
   showSaveNewModal: boolean;
+  showMetadataModal: boolean;
 }
 
 /** Import picker state */
@@ -109,6 +110,7 @@ export type TuneComposerScreenAction =
   | { type: "SET_SHOW_ADD_MEASURE_MODAL"; payload: boolean }
   | { type: "SET_SHOW_IMPORT_MODAL"; payload: boolean }
   | { type: "SET_SHOW_SAVE_NEW_MODAL"; payload: boolean }
+  | { type: "SET_SHOW_METADATA_MODAL"; payload: boolean }
   // Import actions
   | { type: "SET_PREVIEW_FILES"; payload: string[] }
   | { type: "SET_IS_LOADING_FILES"; payload: boolean }
@@ -158,6 +160,7 @@ export const initialTuneComposerScreenState: TuneComposerScreenState = {
     showAddMeasureModal: false,
     showImportModal: false,
     showSaveNewModal: false,
+    showMetadataModal: false,
   },
   import: {
     previewFiles: [],

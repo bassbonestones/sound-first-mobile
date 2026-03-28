@@ -47,6 +47,8 @@ export interface CompactControlsProps {
   onAddPickup?: () => void;
   /** Whether a pickup measure exists (optional - tune composer only) */
   hasPickup?: boolean;
+  /** Called when edit metadata is pressed (optional - tune composer only) */
+  onEditMetadata?: () => void;
   /** Whether there's a selected note (for delete) */
   hasSelection?: boolean;
   /** Whether delete measure is allowed */
@@ -72,6 +74,7 @@ function CompactControlsComponent({
   onFillWithRests,
   onAddPickup,
   hasPickup = false,
+  onEditMetadata,
   hasSelection = false,
   canDeleteMeasure = true,
   disabled = false,
@@ -113,6 +116,13 @@ function CompactControlsComponent({
       setShowMenu(false);
     }
   }, [disabled, onAddPickup]);
+
+  const handleEditMetadata = useCallback(() => {
+    if (!disabled && onEditMetadata) {
+      onEditMetadata();
+      setShowMenu(false);
+    }
+  }, [disabled, onEditMetadata]);
 
   const canFill = !validation.isComplete && validation.difference < 0;
 
@@ -212,6 +222,18 @@ function CompactControlsComponent({
                 <Text style={styles.menuItemText}>
                   {hasPickup ? "Edit Pickup Measure" : "Add Pickup Measure"}
                 </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Edit metadata - only show if onEditMetadata is provided */}
+            {onEditMetadata && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={handleEditMetadata}
+                testID="menu-metadata"
+              >
+                <Feather name="info" size={18} color={colors.primary} />
+                <Text style={styles.menuItemText}>Edit Tune Info</Text>
               </TouchableOpacity>
             )}
 

@@ -188,6 +188,15 @@ export function tuneComposerScreenReducer(
         },
       };
 
+    case "SET_SHOW_METADATA_MODAL":
+      return {
+        ...state,
+        modals: {
+          ...state.modals,
+          showMetadataModal: action.payload,
+        },
+      };
+
     // ==========================================================================
     // Import Actions
     // ==========================================================================

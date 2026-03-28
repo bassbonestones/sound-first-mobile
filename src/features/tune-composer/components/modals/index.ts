@@ -30,4 +30,7 @@ export type { SaveNewFileModalProps } from "./SaveNewFileModal";
 export { RhythmChangeModal } from "./RhythmChangeModal";
 export type { RhythmChangeModalProps } from "./RhythmChangeModal";
 
+export { TuneMetadataModal } from "./TuneMetadataModal";
+export type { TuneMetadataModalProps } from "./TuneMetadataModal";
+
 export { modalStyles } from "./modalStyles";

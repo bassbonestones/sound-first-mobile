@@ -194,10 +194,7 @@ export function useTuneComposerChords(
     const maxSteps = Math.floor(beatUnitCount * subdivision);
 
     // Can go next if not at last subdivision of last measure
-    return (
-      measureIndex < totalMeasures - 1 ||
-      currentStep < maxSteps - 1
-    );
+    return measureIndex < totalMeasures - 1 || currentStep < maxSteps - 1;
   }, [state.chordCursor, state.score, state.chordSubdivision]);
 
   // ===========================================================================
@@ -290,7 +287,7 @@ export function useTuneComposerChords(
       const { measureIndex, beatPosition } = prev.chordCursor;
       const beatUnitCount = getMeasureBeatCount(measureIndex, prev.score);
       const subdivision = prev.chordSubdivision;
-      
+
       // Calculate exact next position using integer steps to avoid floating point errors
       // Convert current position to step index, increment, convert back
       const currentStep = Math.round(beatPosition * subdivision);
@@ -326,7 +323,7 @@ export function useTuneComposerChords(
       if (!prev.chordMode || !prev.chordCursor) return prev;
       const { measureIndex, beatPosition } = prev.chordCursor;
       const subdivision = prev.chordSubdivision;
-      
+
       // Calculate exact previous position using integer steps
       const currentStep = Math.round(beatPosition * subdivision);
 
@@ -368,7 +365,9 @@ export function useTuneComposerChords(
       // Snap current position to nearest valid position in new subdivision
       if (prev.chordCursor) {
         // Use integer step calculation to avoid floating point errors
-        const currentStep = Math.round(prev.chordCursor.beatPosition * nextSubdivision);
+        const currentStep = Math.round(
+          prev.chordCursor.beatPosition * nextSubdivision,
+        );
         const snappedBeat = currentStep / nextSubdivision;
         return {
           ...prev,

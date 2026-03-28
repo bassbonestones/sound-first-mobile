@@ -72,6 +72,7 @@ import {
   ImportTuneModal,
   SaveNewFileModal,
   RhythmChangeModal,
+  TuneMetadataModal,
 } from "../components";
 import {
   ChordProgressionProvider,
@@ -83,6 +84,9 @@ import {
   createAutosaveHandler,
   generateMusicXml,
 } from "../services";
+import { tuneMetadataService } from "../services/tuneMetadataService";
+import type { TuneMetadata } from "../types/tuneMetadataTypes";
+import { createDefaultMetadata } from "../types/tuneMetadataTypes";
 import type {
   TuneComposerScore,
   Clef,
@@ -174,6 +178,9 @@ function TuneComposerScreenContent({
     setShowAddMeasureModal,
     setShowImportModal,
     setShowSaveNewModal,
+    // Metadata modal
+    showMetadataModal,
+    setShowMetadataModal,
     // Import
     previewFiles,
     isLoadingFiles,
@@ -198,6 +205,12 @@ function TuneComposerScreenContent({
 
   // Pickup modal state
   const [showPickupModal, setShowPickupModal] = useState(false);
+
+  // Metadata state
+  const [tuneMetadata, setTuneMetadata] = useState<TuneMetadata>(() =>
+    createDefaultMetadata(),
+  );
+  const [isMetadataSaving, setIsMetadataSaving] = useState(false);
 
   // Composer state
   const composerState = useTuneComposerState(initialScore);
@@ -696,6 +709,13 @@ function TuneComposerScreenContent({
         setCurrentFilename(filename);
         setShowImportModal(false);
 
+        // Load metadata for this file
+        const metadata = await tuneMetadataService.loadOrCreateMetadata(
+          filename,
+          preview.title,
+        );
+        setTuneMetadata(metadata);
+
         // Show success message
         Alert.alert(
           "Imported",
@@ -859,6 +879,51 @@ function TuneComposerScreenContent({
       setIsSaving(false);
     }
   }, [currentFilename, formatFilename, composerState]);
+
+  // Open metadata modal
+  const handleOpenMetadata = useCallback(() => {
+    if (!currentFilename) {
+      const message = "Save the file first before editing metadata.";
+      if (Platform.OS === "web") {
+        window.alert(message);
+      } else {
+        Alert.alert("No File", message);
+      }
+      return;
+    }
+    setShowMetadataModal(true);
+  }, [currentFilename, setShowMetadataModal]);
+
+  // Save metadata
+  const handleSaveMetadata = useCallback(
+    async (metadata: TuneMetadata) => {
+      if (!currentFilename) return;
+
+      setIsMetadataSaving(true);
+      try {
+        await tuneMetadataService.saveMetadata(currentFilename, metadata);
+        setTuneMetadata(metadata);
+        setShowMetadataModal(false);
+        const msg = "Metadata saved!";
+        if (Platform.OS === "web") {
+          window.alert(msg);
+        } else {
+          Alert.alert("Saved", msg);
+        }
+      } catch (err) {
+        const errMsg =
+          err instanceof Error ? err.message : "Failed to save metadata";
+        if (Platform.OS === "web") {
+          window.alert(`Error: ${errMsg}`);
+        } else {
+          Alert.alert("Error", errMsg);
+        }
+      } finally {
+        setIsMetadataSaving(false);
+      }
+    },
+    [currentFilename, setShowMetadataModal],
+  );
 
   // Score tap handler (uses note ID now)
   const handleScoreTap = useCallback(
@@ -1173,6 +1238,7 @@ function TuneComposerScreenContent({
                 onFillWithRests={handleFillWithRests}
                 onAddPickup={() => setShowPickupModal(true)}
                 hasPickup={composerState.hasPickup}
+                onEditMetadata={handleOpenMetadata}
                 hasSelection={hasSelection}
                 canDeleteMeasure={canDeleteMeasure}
                 disabled={isPlaying}
@@ -1677,6 +1743,15 @@ function TuneComposerScreenContent({
           hasLyrics={composerState.pendingRhythmChange?.hasLyrics ?? false}
           onConfirm={composerState.confirmRhythmChange}
           onCancel={composerState.cancelRhythmChange}
+        />
+
+        {/* Tune Metadata Modal */}
+        <TuneMetadataModal
+          visible={showMetadataModal}
+          metadata={tuneMetadata}
+          onSave={handleSaveMetadata}
+          onCancel={() => setShowMetadataModal(false)}
+          isSaving={isMetadataSaving}
         />
       </KeyboardAvoidingView>
     </SafeAreaView>

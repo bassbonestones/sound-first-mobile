@@ -404,14 +404,15 @@ function ChordControlsComponent({
     const fraction = beat - Math.floor(beat);
     if (Math.abs(fraction) < 0.01) return `${wholeBeat}`;
     if (Math.abs(fraction - 0.5) < 0.01) return `${wholeBeat}½`;
-    if (Math.abs(fraction - 1/3) < 0.01) return `${wholeBeat}⅓`;
-    if (Math.abs(fraction - 2/3) < 0.01) return `${wholeBeat}⅔`;
+    if (Math.abs(fraction - 1 / 3) < 0.01) return `${wholeBeat}⅓`;
+    if (Math.abs(fraction - 2 / 3) < 0.01) return `${wholeBeat}⅔`;
     // For other fractions, show decimal
     return `${(beat + 1).toFixed(1)}`;
   };
 
   // Subdivision label for display
-  const subdivisionLabel = subdivision === 1 ? "♩" : subdivision === 2 ? "♪" : "𝅘𝅥𝅮³";
+  const subdivisionLabel =
+    subdivision === 1 ? "♩" : subdivision === 2 ? "♪" : "𝅘𝅥𝅮³";
 
   return (
     <View style={styles.container} testID={testID}>

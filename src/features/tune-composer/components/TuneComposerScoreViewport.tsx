@@ -36,7 +36,11 @@ import type { WebViewRef } from "../../../types/webview";
 import { generateComposerOsmdHtml } from "../../composer/components/composerScoreHtml";
 import { generateMusicXml } from "../services/tuneComposerMusicXmlGenerator";
 import type { TuneComposerScore, Note } from "../types";
-import { getNoteDuration, getBeatUnitDuration, getMeasureDuration } from "../types";
+import {
+  getNoteDuration,
+  getBeatUnitDuration,
+  getMeasureDuration,
+} from "../types";
 import type { CursorPosition } from "../../composer/types";
 import { useOptionalPlaybackContext } from "../contexts";
 
@@ -208,29 +212,33 @@ function TuneComposerScoreViewportComponent({
 
     // Total measure duration in quarter notes
     const measureDurationInQuarters = beatsPerMeasure * beatUnitDuration;
-    
+
     // For pickup measures, use actual duration
-    const actualMeasureDuration = measure?.isPickup 
+    const actualMeasureDuration = measure?.isPickup
       ? (score.pickupDuration ?? getMeasureDuration(measure))
       : measureDurationInQuarters;
 
     // Build beat positions from our score model (accurate beats) + OSMD X positions
     const noteBeatPositions: { beat: number; x: number }[] = [];
-    
+
     if (measure && osmdPositions.length > 0) {
       let currentBeat = 0;
-      for (let i = 0; i < measure.notes.length && i < osmdPositions.length; i++) {
+      for (
+        let i = 0;
+        i < measure.notes.length && i < osmdPositions.length;
+        i++
+      ) {
         const note = measure.notes[i];
         const x = osmdPositions[i].x; // Use OSMD's exact X position
         noteBeatPositions.push({ beat: currentBeat, x });
         currentBeat += getNoteDuration(note);
       }
-      
+
       // Add a virtual endpoint at the measure end (barline position)
       // Next measure's X position IS the barline position
       const measureEndBeat = actualMeasureDuration;
       let barlineX: number;
-      
+
       if (nextMeasurePos) {
         // Next measure starts at the barline - use with small margin
         barlineX = nextMeasurePos.x - 10;
@@ -238,27 +246,29 @@ function TuneComposerScoreViewportComponent({
         // Last measure - extrapolate using spacing between last two notes
         const lastTwo = noteBeatPositions.slice(-2);
         const beatRange = lastTwo[1].beat - lastTwo[0].beat;
-        const spacingPerBeat = beatRange > 0 
-          ? (lastTwo[1].x - lastTwo[0].x) / beatRange
-          : 30; // fallback spacing
+        const spacingPerBeat =
+          beatRange > 0 ? (lastTwo[1].x - lastTwo[0].x) / beatRange : 30; // fallback spacing
         const remainingBeats = measureEndBeat - lastTwo[1].beat;
         barlineX = lastTwo[1].x + remainingBeats * spacingPerBeat;
       } else {
         // Fallback
         barlineX = measurePos.x + (measurePos.width ?? 100);
       }
-      
+
       noteBeatPositions.push({ beat: measureEndBeat, x: barlineX });
-      
+
       // DEBUG: Log barline calculation
-      console.log('[ChordCursor] Barline debug:', {
+      console.log("[ChordCursor] Barline debug:", {
         measureIndex: chordCursor.measureIndex,
         targetBeat: chordCursor.beatPosition,
         nextMeasureX: nextMeasurePos?.x,
         barlineX,
         lastNoteX: noteBeatPositions[noteBeatPositions.length - 2]?.x,
         lastNoteBeat: noteBeatPositions[noteBeatPositions.length - 2]?.beat,
-        allPositions: noteBeatPositions.map(p => ({ beat: p.beat.toFixed(2), x: Math.round(p.x) })),
+        allPositions: noteBeatPositions.map((p) => ({
+          beat: p.beat.toFixed(2),
+          x: Math.round(p.x),
+        })),
       });
     }
 
@@ -293,11 +303,11 @@ function TuneComposerScoreViewportComponent({
           const beatOffset = targetBeatInQuarters - before.beat;
           const fraction = beatOffset / beatRange;
           xPosition = before.x + fraction * (after.x - before.x);
-          
+
           // DEBUG: Log interpolation when near barline
           const isNearBarline = after.beat === actualMeasureDuration;
           if (isNearBarline) {
-            console.log('[ChordCursor] Barline interpolation:', {
+            console.log("[ChordCursor] Barline interpolation:", {
               targetBeatInQuarters,
               beforeBeat: before.beat,
               afterBeat: after.beat,

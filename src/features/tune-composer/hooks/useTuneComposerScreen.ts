@@ -33,6 +33,7 @@ export interface UseTuneComposerScreenReturn {
   showAddMeasureModal: boolean;
   showImportModal: boolean;
   showSaveNewModal: boolean;
+  showMetadataModal: boolean;
   previewFiles: string[];
   isLoadingFiles: boolean;
   isImporting: boolean;
@@ -66,6 +67,7 @@ export interface UseTuneComposerScreenReturn {
   setShowAddMeasureModal: (show: boolean) => void;
   setShowImportModal: (show: boolean) => void;
   setShowSaveNewModal: (show: boolean) => void;
+  setShowMetadataModal: (show: boolean) => void;
 
   // Import actions
   setPreviewFiles: (files: string[]) => void;
@@ -200,6 +202,10 @@ export function useTuneComposerScreen(
     dispatch({ type: "SET_SHOW_SAVE_NEW_MODAL", payload: show });
   }, []);
 
+  const setShowMetadataModal = useCallback((show: boolean) => {
+    dispatch({ type: "SET_SHOW_METADATA_MODAL", payload: show });
+  }, []);
+
   // ==========================================================================
   // Import Actions
   // ==========================================================================
@@ -327,6 +333,7 @@ export function useTuneComposerScreen(
     showAddMeasureModal: state.modals.showAddMeasureModal,
     showImportModal: state.modals.showImportModal,
     showSaveNewModal: state.modals.showSaveNewModal,
+    showMetadataModal: state.modals.showMetadataModal,
     previewFiles: state.import.previewFiles,
     isLoadingFiles: state.import.isLoadingFiles,
     isImporting: state.import.isImporting,
@@ -360,6 +367,7 @@ export function useTuneComposerScreen(
     setShowAddMeasureModal,
     setShowImportModal,
     setShowSaveNewModal,
+    setShowMetadataModal,
 
     // Import actions
     setPreviewFiles,

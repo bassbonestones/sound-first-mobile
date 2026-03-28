@@ -39,12 +39,24 @@ export interface ParsedHarmony {
 // =============================================================================
 
 /**
+ * Unescape XML entities back to original characters
+ */
+function unescapeXml(text: string): string {
+  return text
+    .replace(/&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&gt;/g, ">")
+    .replace(/&lt;/g, "<")
+    .replace(/&amp;/g, "&"); // Must be last to avoid double-unescaping
+}
+
+/**
  * Extract content between opening and closing tags
  */
 function extractTagContent(content: string, tagName: string): string | null {
   const regex = new RegExp(`<${tagName}[^>]*>([^<]*)</${tagName}>`, "i");
   const match = content.match(regex);
-  return match ? match[1].trim() : null;
+  return match ? unescapeXml(match[1].trim()) : null;
 }
 
 /**

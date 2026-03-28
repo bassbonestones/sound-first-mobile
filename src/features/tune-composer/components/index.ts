@@ -43,6 +43,7 @@ export {
   ImportTuneModal,
   SaveNewFileModal,
   RhythmChangeModal,
+  TuneMetadataModal,
   modalStyles,
 } from "./modals";
 export type {
@@ -55,4 +56,5 @@ export type {
   ImportTuneModalProps,
   SaveNewFileModalProps,
   RhythmChangeModalProps,
+  TuneMetadataModalProps,
 } from "./modals";

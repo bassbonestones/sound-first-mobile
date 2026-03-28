@@ -389,18 +389,17 @@ function extractMeasures(
 ): RawMeasure[] {
   const measures: RawMeasure[] = [];
   // Capture measure tag attributes and content
-  const measureRegex =
-    /<measure([^>]*)>([\s\S]*?)<\/measure>/gi;
+  const measureRegex = /<measure([^>]*)>([\s\S]*?)<\/measure>/gi;
 
   let match;
   while ((match = measureRegex.exec(partContent)) !== null) {
     const measureAttrs = match[1];
     const measureContent = match[2];
-    
+
     // Extract measure number
     const numberMatch = measureAttrs.match(/number=["'](\d+)["']/i);
     const measureNumber = numberMatch ? parseInt(numberMatch[1], 10) : 0;
-    
+
     // Check for implicit="yes" (pickup measure)
     const isPickup = /implicit=["']yes["']/i.test(measureAttrs);
 
@@ -619,11 +618,15 @@ function extractNotes(measureContent: string, _warnings: string[]): RawNote[] {
         articulations.push("fermata");
       }
       // Slurs - check for slur start and stop, plus placement
-      const slurStartMatch = notationsBlock.match(/<slur[^>]*type=["']start["'][^>]*>/i);
+      const slurStartMatch = notationsBlock.match(
+        /<slur[^>]*type=["']start["'][^>]*>/i,
+      );
       if (slurStartMatch) {
         slurStart = true;
         // Extract placement attribute if present
-        const placementMatch = slurStartMatch[0].match(/placement=["'](above|below)["']/i);
+        const placementMatch = slurStartMatch[0].match(
+          /placement=["'](above|below)["']/i,
+        );
         if (placementMatch) {
           slurPlacement = placementMatch[1].toLowerCase() as "above" | "below";
         }
@@ -661,12 +664,24 @@ function extractNotes(measureContent: string, _warnings: string[]): RawNote[] {
 // ============================================================================
 
 /**
+ * Unescape XML entities back to original characters
+ */
+function unescapeXml(text: string): string {
+  return text
+    .replace(/&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&gt;/g, ">")
+    .replace(/&lt;/g, "<")
+    .replace(/&amp;/g, "&"); // Must be last to avoid double-unescaping
+}
+
+/**
  * Extract content between opening and closing tags
  */
 function extractTagContent(content: string, tagName: string): string | null {
   const regex = new RegExp(`<${tagName}[^>]*>([^<]*)</${tagName}>`, "i");
   const match = content.match(regex);
-  return match ? match[1].trim() : null;
+  return match ? unescapeXml(match[1].trim()) : null;
 }
 
 /**
