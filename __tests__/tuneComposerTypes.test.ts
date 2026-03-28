@@ -6,6 +6,8 @@
 
 import {
   createChordSymbol,
+  createChordSymbolDirect,
+  resolveChordSymbol,
   getChordsForMeasure,
   findChordAtPosition,
   getActiveChordAtPosition,
@@ -37,81 +39,105 @@ import {
   type PlaybackSettings,
 } from "../src/features/tune-composer/types";
 
+/**
+ * Helper to create a test chord with the old-style symbol for easier testing.
+ * Uses key of C (0 fifths) by default.
+ */
+function testChord(
+  symbol: string,
+  measureIndex: number,
+  beatPosition: number = 0,
+  id?: string,
+): ChordSymbol {
+  const chord = createChordSymbol(symbol, 0, measureIndex, beatPosition)!;
+  if (id) {
+    return { ...chord, id };
+  }
+  return chord;
+}
+
+/**
+ * Helper to resolve a chord to its display symbol for test assertions.
+ */
+function chordSymbol(chord: ChordSymbol): string {
+  return resolveChordSymbol(chord, 0) ?? "";
+}
+
 describe("Tune Composer Types", () => {
   describe("ChordSymbol", () => {
     describe("createChordSymbol", () => {
       it("should create a chord symbol with required fields", () => {
-        const chord = createChordSymbol("Cmaj7", 0);
-        expect(chord.symbol).toBe("Cmaj7");
+        const chord = createChordSymbol("Cmaj7", 0, 0, 0)!;
+        expect(chordSymbol(chord)).toBe("Cmaj7");
         expect(chord.measureIndex).toBe(0);
         expect(chord.beatPosition).toBe(0);
         expect(chord.id).toBeDefined();
       });
 
       it("should create a chord symbol with custom beat position", () => {
-        const chord = createChordSymbol("Dm7", 1, 2);
-        expect(chord.symbol).toBe("Dm7");
+        const chord = createChordSymbol("Dm7", 0, 1, 2)!;
+        expect(chordSymbol(chord)).toBe("Dm7");
         expect(chord.measureIndex).toBe(1);
         expect(chord.beatPosition).toBe(2);
       });
 
       it("should support sub-beat positions", () => {
-        const chord = createChordSymbol("G7", 2, 2.5);
+        const chord = createChordSymbol("G7", 0, 2, 2.5)!;
         expect(chord.beatPosition).toBe(2.5); // "and" of beat 3
       });
 
       it("should generate unique IDs", () => {
-        const chord1 = createChordSymbol("C", 0);
-        const chord2 = createChordSymbol("C", 0);
+        const chord1 = createChordSymbol("C", 0, 0, 0)!;
+        const chord2 = createChordSymbol("C", 0, 0, 0)!;
         expect(chord1.id).not.toBe(chord2.id);
       });
 
       it("should accept any chord symbol string", () => {
         // Basic triads
-        expect(createChordSymbol("C", 0).symbol).toBe("C");
-        expect(createChordSymbol("Cm", 0).symbol).toBe("Cm");
-        expect(createChordSymbol("Cdim", 0).symbol).toBe("Cdim");
-        expect(createChordSymbol("Caug", 0).symbol).toBe("Caug");
+        expect(chordSymbol(createChordSymbol("C", 0, 0)!)).toBe("C");
+        expect(chordSymbol(createChordSymbol("Cm", 0, 0)!)).toBe("Cm");
+        expect(chordSymbol(createChordSymbol("Cdim", 0, 0)!)).toBe("Cdim");
+        expect(chordSymbol(createChordSymbol("Caug", 0, 0)!)).toBe("Caug");
 
         // Seventh chords
-        expect(createChordSymbol("Cmaj7", 0).symbol).toBe("Cmaj7");
-        expect(createChordSymbol("Cm7", 0).symbol).toBe("Cm7");
-        expect(createChordSymbol("C7", 0).symbol).toBe("C7");
-        expect(createChordSymbol("Cdim7", 0).symbol).toBe("Cdim7");
-        expect(createChordSymbol("Cm7b5", 0).symbol).toBe("Cm7b5");
+        expect(chordSymbol(createChordSymbol("Cmaj7", 0, 0)!)).toBe("Cmaj7");
+        expect(chordSymbol(createChordSymbol("Cm7", 0, 0)!)).toBe("Cm7");
+        expect(chordSymbol(createChordSymbol("C7", 0, 0)!)).toBe("C7");
+        expect(chordSymbol(createChordSymbol("Cdim7", 0, 0)!)).toBe("Cdim7");
+        expect(chordSymbol(createChordSymbol("Cm7b5", 0, 0)!)).toBe("Cm7b5");
 
         // Alterations
-        expect(createChordSymbol("C7#9", 0).symbol).toBe("C7#9");
-        expect(createChordSymbol("C7b9", 0).symbol).toBe("C7b9");
-        expect(createChordSymbol("C7alt", 0).symbol).toBe("C7alt");
+        expect(chordSymbol(createChordSymbol("C7#9", 0, 0)!)).toBe("C7#9");
+        expect(chordSymbol(createChordSymbol("C7b9", 0, 0)!)).toBe("C7b9");
+        expect(chordSymbol(createChordSymbol("C7alt", 0, 0)!)).toBe("C7alt");
 
         // Slash chords
-        expect(createChordSymbol("C/E", 0).symbol).toBe("C/E");
-        expect(createChordSymbol("Dm7/G", 0).symbol).toBe("Dm7/G");
+        expect(chordSymbol(createChordSymbol("C/E", 0, 0)!)).toBe("C/E");
+        expect(chordSymbol(createChordSymbol("Dm7/G", 0, 0)!)).toBe("Dm7/G");
       });
     });
 
     describe("getChordsForMeasure", () => {
       const testChords: ChordSymbol[] = [
-        { id: "1", symbol: "Cmaj7", measureIndex: 0, beatPosition: 0 },
-        { id: "2", symbol: "Dm7", measureIndex: 0, beatPosition: 2 },
-        { id: "3", symbol: "G7", measureIndex: 1, beatPosition: 0 },
-        { id: "4", symbol: "Cmaj7", measureIndex: 1, beatPosition: 2 },
-        { id: "5", symbol: "Am7", measureIndex: 2, beatPosition: 0 },
+        testChord("Cmaj7", 0, 0, "1"),
+        testChord("Dm7", 0, 2, "2"),
+        testChord("G7", 1, 0, "3"),
+        testChord("Cmaj7", 1, 2, "4"),
+        testChord("Am7", 2, 0, "5"),
       ];
 
       it("should return chords for a specific measure", () => {
         const measure0Chords = getChordsForMeasure(testChords, 0);
         expect(measure0Chords).toHaveLength(2);
-        expect(measure0Chords[0].symbol).toBe("Cmaj7");
-        expect(measure0Chords[1].symbol).toBe("Dm7");
+        expect(chordSymbol(measure0Chords[0])).toBe("Cmaj7");
+        expect(chordSymbol(measure0Chords[1])).toBe("Dm7");
       });
 
       it("should return chords sorted by beat position", () => {
         const unsortedChords: ChordSymbol[] = [
-          { id: "1", symbol: "Dm7", measureIndex: 0, beatPosition: 2 },
-          { id: "2", symbol: "Cmaj7", measureIndex: 0, beatPosition: 0 },
-          { id: "3", symbol: "G7", measureIndex: 0, beatPosition: 3.5 },
+          testChord("Dm7", 0, 2, "1"),
+          testChord("Cmaj7", 0, 0, "2"),
+          testChord("G7", 0, 3.5, "3"),
         ];
         const sorted = getChordsForMeasure(unsortedChords, 0);
         expect(sorted[0].beatPosition).toBe(0);
@@ -132,15 +158,15 @@ describe("Tune Composer Types", () => {
 
     describe("findChordAtPosition", () => {
       const testChords: ChordSymbol[] = [
-        { id: "1", symbol: "Cmaj7", measureIndex: 0, beatPosition: 0 },
-        { id: "2", symbol: "Dm7", measureIndex: 0, beatPosition: 2 },
-        { id: "3", symbol: "G7", measureIndex: 1, beatPosition: 0 },
+        testChord("Cmaj7", 0, 0, "1"),
+        testChord("Dm7", 0, 2, "2"),
+        testChord("G7", 1, 0, "3"),
       ];
 
       it("should find chord at exact position", () => {
         const chord = findChordAtPosition(testChords, 0, 2);
         expect(chord).toBeDefined();
-        expect(chord?.symbol).toBe("Dm7");
+        expect(chordSymbol(chord!)).toBe("Dm7");
       });
 
       it("should return undefined for position with no chord", () => {
@@ -156,55 +182,55 @@ describe("Tune Composer Types", () => {
       it("should distinguish between measures", () => {
         const chordM0 = findChordAtPosition(testChords, 0, 0);
         const chordM1 = findChordAtPosition(testChords, 1, 0);
-        expect(chordM0?.symbol).toBe("Cmaj7");
-        expect(chordM1?.symbol).toBe("G7");
+        expect(chordSymbol(chordM0!)).toBe("Cmaj7");
+        expect(chordSymbol(chordM1!)).toBe("G7");
       });
     });
 
     describe("getActiveChordAtPosition", () => {
       const testChords: ChordSymbol[] = [
-        { id: "1", symbol: "Cmaj7", measureIndex: 0, beatPosition: 0 },
-        { id: "2", symbol: "Dm7", measureIndex: 0, beatPosition: 2 },
-        { id: "3", symbol: "G7", measureIndex: 1, beatPosition: 0 },
-        { id: "4", symbol: "Cmaj7", measureIndex: 1, beatPosition: 2 },
+        testChord("Cmaj7", 0, 0, "1"),
+        testChord("Dm7", 0, 2, "2"),
+        testChord("G7", 1, 0, "3"),
+        testChord("Cmaj7", 1, 2, "4"),
       ];
 
       it("should return chord at exact position", () => {
         const chord = getActiveChordAtPosition(testChords, 0, 0);
-        expect(chord?.symbol).toBe("Cmaj7");
+        expect(chordSymbol(chord!)).toBe("Cmaj7");
       });
 
       it("should return most recent chord before position", () => {
         const chord = getActiveChordAtPosition(testChords, 0, 3);
-        expect(chord?.symbol).toBe("Dm7");
+        expect(chordSymbol(chord!)).toBe("Dm7");
       });
 
       it("should return chord from previous measure if no chord in current measure before position", () => {
         // Position: measure 1, beat 0.5 (before first chord in measure 1 which is at beat 0... wait)
         // Actually G7 is at beat 0 in measure 1, so let's test with a measure that has no chords early
         const chordsWithGap: ChordSymbol[] = [
-          { id: "1", symbol: "Cmaj7", measureIndex: 0, beatPosition: 0 },
-          { id: "2", symbol: "G7", measureIndex: 2, beatPosition: 0 },
+          testChord("Cmaj7", 0, 0, "1"),
+          testChord("G7", 2, 0, "2"),
         ];
         // In measure 1, there are no chords, so it should look back to measure 0
         const chord = getActiveChordAtPosition(chordsWithGap, 1, 2);
-        expect(chord?.symbol).toBe("Cmaj7");
+        expect(chordSymbol(chord!)).toBe("Cmaj7");
       });
 
       it("should return last chord of previous measure when current measure has no prior chords", () => {
         const chords: ChordSymbol[] = [
-          { id: "1", symbol: "Cmaj7", measureIndex: 0, beatPosition: 0 },
-          { id: "2", symbol: "Dm7", measureIndex: 0, beatPosition: 2 },
-          { id: "3", symbol: "G7", measureIndex: 2, beatPosition: 2 },
+          testChord("Cmaj7", 0, 0, "1"),
+          testChord("Dm7", 0, 2, "2"),
+          testChord("G7", 2, 2, "3"),
         ];
         // Measure 1 has no chords, checking beat 0 should return Dm7 from measure 0
         const chord = getActiveChordAtPosition(chords, 1, 0);
-        expect(chord?.symbol).toBe("Dm7");
+        expect(chordSymbol(chord!)).toBe("Dm7");
       });
 
       it("should return undefined when no chords exist before position", () => {
         const chords: ChordSymbol[] = [
-          { id: "1", symbol: "Cmaj7", measureIndex: 2, beatPosition: 0 },
+          testChord("Cmaj7", 2, 0, "1"),
         ];
         const chord = getActiveChordAtPosition(chords, 0, 0);
         expect(chord).toBeUndefined();
@@ -217,15 +243,15 @@ describe("Tune Composer Types", () => {
 
       it("should handle sub-beat positions", () => {
         const chords: ChordSymbol[] = [
-          { id: "1", symbol: "Cmaj7", measureIndex: 0, beatPosition: 0 },
-          { id: "2", symbol: "Dm7", measureIndex: 0, beatPosition: 2.5 },
+          testChord("Cmaj7", 0, 0, "1"),
+          testChord("Dm7", 0, 2.5, "2"),
         ];
         // Position 2.25 is before Dm7 (at 2.5), so should return Cmaj7
-        expect(getActiveChordAtPosition(chords, 0, 2.25)?.symbol).toBe("Cmaj7");
+        expect(chordSymbol(getActiveChordAtPosition(chords, 0, 2.25)!)).toBe("Cmaj7");
         // Position 2.5 should return Dm7
-        expect(getActiveChordAtPosition(chords, 0, 2.5)?.symbol).toBe("Dm7");
+        expect(chordSymbol(getActiveChordAtPosition(chords, 0, 2.5)!)).toBe("Dm7");
         // Position 3 is after Dm7, so should return Dm7
-        expect(getActiveChordAtPosition(chords, 0, 3)?.symbol).toBe("Dm7");
+        expect(chordSymbol(getActiveChordAtPosition(chords, 0, 3)!)).toBe("Dm7");
       });
     });
   });
@@ -313,9 +339,7 @@ describe("Tune Composer Types", () => {
         });
         const originalWithChords: ChordProgression = {
           ...original,
-          chords: [
-            { id: "c1", symbol: "G7", measureIndex: 0, beatPosition: 0 },
-          ],
+          chords: [testChord("G7", 0, 0, "c1")],
         };
         const duplicate = duplicateProgression(
           originalWithChords,
@@ -325,7 +349,7 @@ describe("Tune Composer Types", () => {
         expect(duplicate.id).not.toBe(originalWithChords.id);
         expect(duplicate.name).toBe("Copy of Original");
         expect(duplicate.chords).toHaveLength(1);
-        expect(duplicate.chords[0].symbol).toBe("G7");
+        expect(chordSymbol(duplicate.chords[0])).toBe("G7");
       });
 
       it("should always make duplicate user-editable", () => {
@@ -345,14 +369,12 @@ describe("Tune Composer Types", () => {
         const original = createChordProgression("Original");
         const originalWithChords: ChordProgression = {
           ...original,
-          chords: [
-            { id: "old-id", symbol: "Am7", measureIndex: 0, beatPosition: 0 },
-          ],
+          chords: [testChord("Am7", 0, 0, "old-id")],
         };
         const duplicate = duplicateProgression(originalWithChords, "Duplicate");
 
         expect(duplicate.chords[0].id).not.toBe("old-id");
-        expect(duplicate.chords[0].symbol).toBe("Am7");
+        expect(chordSymbol(duplicate.chords[0])).toBe("Am7");
       });
 
       it("should use default copy name when not provided", () => {
@@ -452,12 +474,7 @@ describe("Tune Composer Types", () => {
     describe("addChordToProgression", () => {
       it("should add a chord to the progression", () => {
         const progression = createChordProgression("Test");
-        const newChord: ChordSymbol = {
-          id: "new",
-          symbol: "Fmaj7",
-          measureIndex: 0,
-          beatPosition: 0,
-        };
+        const newChord = testChord("Fmaj7", 0, 0, "new");
 
         const updated = addChordToProgression(progression, newChord);
 
@@ -467,22 +484,12 @@ describe("Tune Composer Types", () => {
       });
 
       it("should preserve existing chords and sort by position", () => {
-        const existingChord: ChordSymbol = {
-          id: "existing",
-          symbol: "Cmaj7",
-          measureIndex: 0,
-          beatPosition: 0,
-        };
+        const existingChord = testChord("Cmaj7", 0, 0, "existing");
         const progWithChord: ChordProgression = {
           ...createChordProgression("Test"),
           chords: [existingChord],
         };
-        const newChord: ChordSymbol = {
-          id: "new",
-          symbol: "G7",
-          measureIndex: 1,
-          beatPosition: 0,
-        };
+        const newChord = testChord("G7", 1, 0, "new");
 
         const updated = addChordToProgression(progWithChord, newChord);
 
@@ -492,37 +499,22 @@ describe("Tune Composer Types", () => {
       });
 
       it("should replace chord at same position", () => {
-        const existingChord: ChordSymbol = {
-          id: "existing",
-          symbol: "Cmaj7",
-          measureIndex: 0,
-          beatPosition: 0,
-        };
+        const existingChord = testChord("Cmaj7", 0, 0, "existing");
         const progWithChord: ChordProgression = {
           ...createChordProgression("Test"),
           chords: [existingChord],
         };
-        const newChord: ChordSymbol = {
-          id: "new",
-          symbol: "C7",
-          measureIndex: 0,
-          beatPosition: 0,
-        };
+        const newChord = testChord("C7", 0, 0, "new");
 
         const updated = addChordToProgression(progWithChord, newChord);
 
         expect(updated.chords).toHaveLength(1);
-        expect(updated.chords[0].symbol).toBe("C7");
+        expect(chordSymbol(updated.chords[0])).toBe("C7");
       });
 
       it("should not mutate original progression", () => {
         const progression = createChordProgression("Test");
-        const newChord: ChordSymbol = {
-          id: "new",
-          symbol: "Am7",
-          measureIndex: 0,
-          beatPosition: 0,
-        };
+        const newChord = testChord("Am7", 0, 0, "new");
 
         addChordToProgression(progression, newChord);
 
@@ -533,9 +525,9 @@ describe("Tune Composer Types", () => {
     describe("removeChordFromProgression", () => {
       it("should remove chord by ID", () => {
         const chords: ChordSymbol[] = [
-          { id: "keep1", symbol: "Cmaj7", measureIndex: 0, beatPosition: 0 },
-          { id: "remove", symbol: "Dm7", measureIndex: 0, beatPosition: 2 },
-          { id: "keep2", symbol: "G7", measureIndex: 1, beatPosition: 0 },
+          testChord("Cmaj7", 0, 0, "keep1"),
+          testChord("Dm7", 0, 2, "remove"),
+          testChord("G7", 1, 0, "keep2"),
         ];
         const progression: ChordProgression = {
           ...createChordProgression("Test"),
@@ -550,7 +542,7 @@ describe("Tune Composer Types", () => {
 
       it("should return unchanged progression if chord not found", () => {
         const chords: ChordSymbol[] = [
-          { id: "c1", symbol: "Cmaj7", measureIndex: 0, beatPosition: 0 },
+          testChord("Cmaj7", 0, 0, "c1"),
         ];
         const progression: ChordProgression = {
           ...createChordProgression("Test"),
@@ -564,7 +556,7 @@ describe("Tune Composer Types", () => {
 
       it("should not mutate original progression", () => {
         const chords: ChordSymbol[] = [
-          { id: "c1", symbol: "Cmaj7", measureIndex: 0, beatPosition: 0 },
+          testChord("Cmaj7", 0, 0, "c1"),
         ];
         const progression: ChordProgression = {
           ...createChordProgression("Test"),
@@ -578,10 +570,10 @@ describe("Tune Composer Types", () => {
     });
 
     describe("updateChordInProgression", () => {
-      it("should update chord symbol", () => {
+      it("should update chord quality", () => {
         const chords: ChordSymbol[] = [
-          { id: "c1", symbol: "Cmaj7", measureIndex: 0, beatPosition: 0 },
-          { id: "c2", symbol: "Dm7", measureIndex: 0, beatPosition: 2 },
+          testChord("Cmaj7", 0, 0, "c1"),
+          testChord("Dm7", 0, 2, "c2"),
         ];
         const progression: ChordProgression = {
           ...createChordProgression("Test"),
@@ -589,16 +581,16 @@ describe("Tune Composer Types", () => {
         };
 
         const updated = updateChordInProgression(progression, "c1", {
-          symbol: "C7",
+          quality: "7",
         });
 
-        expect(updated.chords[0].symbol).toBe("C7");
-        expect(updated.chords[1].symbol).toBe("Dm7");
+        expect(chordSymbol(updated.chords[0])).toBe("C7");
+        expect(chordSymbol(updated.chords[1])).toBe("Dm7");
       });
 
       it("should update beat position of chord", () => {
         const chords: ChordSymbol[] = [
-          { id: "c1", symbol: "Cmaj7", measureIndex: 0, beatPosition: 0 },
+          testChord("Cmaj7", 0, 0, "c1"),
         ];
         const progression: ChordProgression = {
           ...createChordProgression("Test"),
@@ -616,21 +608,21 @@ describe("Tune Composer Types", () => {
 
       it("should not mutate original progression", () => {
         const chords: ChordSymbol[] = [
-          { id: "c1", symbol: "Cmaj7", measureIndex: 0, beatPosition: 0 },
+          testChord("Cmaj7", 0, 0, "c1"),
         ];
         const progression: ChordProgression = {
           ...createChordProgression("Test"),
           chords,
         };
 
-        updateChordInProgression(progression, "c1", { symbol: "C7" });
+        updateChordInProgression(progression, "c1", { quality: "7" });
 
-        expect(progression.chords[0].symbol).toBe("Cmaj7");
+        expect(chordSymbol(progression.chords[0])).toBe("Cmaj7");
       });
 
       it("should return unchanged progression if chord ID not found", () => {
         const chords: ChordSymbol[] = [
-          { id: "c1", symbol: "Cmaj7", measureIndex: 0, beatPosition: 0 },
+          testChord("Cmaj7", 0, 0, "c1"),
         ];
         const progression: ChordProgression = {
           ...createChordProgression("Test"),
@@ -638,11 +630,11 @@ describe("Tune Composer Types", () => {
         };
 
         const updated = updateChordInProgression(progression, "non-existent", {
-          symbol: "G7",
+          quality: "7",
         });
 
         expect(updated.chords).toHaveLength(1);
-        expect(updated.chords[0].symbol).toBe("Cmaj7");
+        expect(chordSymbol(updated.chords[0])).toBe("Cmaj7");
       });
     });
   });

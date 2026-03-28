@@ -433,6 +433,59 @@ describe("MusicXML Parser", () => {
       expect(events?.[0].slurPlacement).toBe("below");
       expect(events?.[1].slurEnd).toBe(true);
     });
+
+    it("parses harmony elements into ImportedMeasure.harmony", async () => {
+      const xmlWithHarmony = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Music</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>12</divisions>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+      </attributes>
+      <harmony placement="above">
+        <root><root-step>C</root-step></root>
+        <kind text="">major</kind>
+      </harmony>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>24</duration>
+        <type>half</type>
+      </note>
+      <harmony placement="above">
+        <root><root-step>G</root-step></root>
+        <kind text="7">dominant</kind>
+        <offset>24</offset>
+      </harmony>
+      <note>
+        <pitch><step>G</step><octave>4</octave></pitch>
+        <duration>24</duration>
+        <type>half</type>
+      </note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+      const result = await parseMusicXml(xmlWithHarmony, sourceInfo);
+
+      expect(result.success).toBe(true);
+      const measure = result.score?.parts[0].measures[0];
+
+      // Should have harmony array with 2 chords
+      expect(measure?.harmony).toBeDefined();
+      expect(measure?.harmony?.length).toBe(2);
+
+      // First chord: C at offset 0
+      expect(measure?.harmony?.[0].symbol).toBe("C");
+      expect(measure?.harmony?.[0].offset).toBe(0);
+
+      // Second chord: G7 at offset 24 (beat 3 in 4/4 with divisions=12)
+      expect(measure?.harmony?.[1].symbol).toBe("G7");
+      expect(measure?.harmony?.[1].offset).toBe(24);
+    });
   });
 });
 

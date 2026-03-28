@@ -18,6 +18,8 @@ import type {
 import {
   findChordAtPosition,
   createChordSymbol,
+  resolveChordSymbol,
+  parseChordToRelative,
   getActiveProgression,
   createChordProgression,
   getBeatUnitCount,
@@ -150,7 +152,7 @@ export function useTuneComposerChords(
 
   /**
    * Get the current chord symbol at the chord cursor position.
-   * Uses beat unit index directly since chords store beat unit indices.
+   * Resolves the chord's scale degree to a symbol in the current key.
    */
   const currentChordSymbol = useMemo((): string => {
     if (!state.chordCursor || !activeProgression) return "";
@@ -159,8 +161,10 @@ export function useTuneComposerChords(
       state.chordCursor.measureIndex,
       state.chordCursor.beatPosition,
     );
-    return chord?.symbol ?? "";
-  }, [state.chordCursor, activeProgression]);
+    if (!chord) return "";
+    // Resolve the chord to a display symbol in the current key
+    return resolveChordSymbol(chord, state.score.keySignature);
+  }, [state.chordCursor, activeProgression, state.score.keySignature]);
 
   /**
    * Whether chord symbols are visible in score display.
@@ -223,22 +227,29 @@ export function useTuneComposerChords(
             c.measureIndex === measureIndex && c.beatPosition === beatPosition,
         );
 
+        // Parse the symbol into relative chord data
+        const parsedChord = parseChordToRelative(
+          symbol,
+          score.keySignature,
+          measureIndex,
+          beatPosition,
+        );
+        if (!parsedChord) return score; // Invalid chord, no change
+
         if (existingIndex !== -1) {
-          // Update existing chord
+          // Update existing chord with new relative data
           const newChords = [...prog.chords];
           newChords[existingIndex] = {
             ...newChords[existingIndex],
-            symbol,
+            rootOffset: parsedChord.rootOffset,
+            quality: parsedChord.quality,
+            alterations: parsedChord.alterations,
+            bassOffset: parsedChord.bassOffset,
           };
           prog.chords = newChords;
         } else {
           // Add new chord
-          const newChord = createChordSymbol(
-            symbol,
-            measureIndex,
-            beatPosition,
-          );
-          prog.chords = [...prog.chords, newChord];
+          prog.chords = [...prog.chords, parsedChord];
         }
 
         newProgressions[progIndex] = prog;

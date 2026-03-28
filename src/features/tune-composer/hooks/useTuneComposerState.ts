@@ -948,6 +948,10 @@ export function useTuneComposerState(
           }),
         }));
 
+        // NOTE: Chord progressions don't need to be modified here!
+        // Chords are stored as relative scale degrees (rootOffset) and
+        // auto-resolve to the correct symbols based on the current key.
+
         return {
           ...prev,
           score: {

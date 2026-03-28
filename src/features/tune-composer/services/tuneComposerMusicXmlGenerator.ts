@@ -31,6 +31,7 @@ import {
   getChordsForMeasure,
   getBeatUnitDuration,
   getNoteDuration,
+  resolveChordSymbol,
 } from "../types";
 import { recognizeChord } from "./chordRecognition";
 
@@ -324,12 +325,16 @@ function alterToXml(alter: number): string {
 }
 
 /**
- * Generate MusicXML <harmony> element from a ChordSymbol.
+ * Generate MusicXML <harmony> element from a resolved chord symbol string.
  * Returns empty string if chord cannot be parsed.
- * @param chord The chord symbol to generate
+ * @param symbol The resolved chord symbol string (e.g., "Cmaj7")
+ * @param offsetDivisions Beat offset in divisions (12 per quarter note)
  */
-export function generateHarmonyXml(chord: ChordSymbol): string {
-  const result = recognizeChord(chord.symbol);
+export function generateHarmonyXml(
+  symbol: string,
+  offsetDivisions: number = 0,
+): string {
+  const result = recognizeChord(symbol);
   if (!result.recognized || !result.parsed) {
     return "";
   }
@@ -354,7 +359,7 @@ export function generateHarmonyXml(chord: ChordSymbol): string {
 
   // Create shortened display text for the chord quality/alterations
   // Remove the root note from the symbol and shorten the rest
-  const symbolWithoutRoot = chord.symbol.slice(root.length);
+  const symbolWithoutRoot = symbol.slice(root.length);
   const shortenedQuality = shortenChordSymbol(symbolWithoutRoot);
   const displayText = escapeXml(shortenedQuality);
 
@@ -399,6 +404,12 @@ export function generateHarmonyXml(chord: ChordSymbol): string {
         <bass>
           <bass-step>${bassStep}</bass-step>${bassAlter !== 0 ? `\n          <bass-alter>${bassAlter}</bass-alter>` : ""}
         </bass>`;
+  }
+
+  // Add offset element to preserve beat position during round-trip
+  if (offsetDivisions > 0) {
+    harmonyXml += `
+        <offset>${offsetDivisions}</offset>`;
   }
 
   harmonyXml += `
@@ -774,7 +785,18 @@ function generateMeasureXml(
       measureChords[nextChordIndex].beatPositionInQuarters <=
         currentBeat + 0.001
     ) {
-      notesXml += "\n" + generateHarmonyXml(measureChords[nextChordIndex]);
+      // Calculate offset in divisions (12 per quarter note)
+      // Use beatPositionInQuarters for correct handling of all time signatures
+      const offsetDivisions = Math.round(
+        measureChords[nextChordIndex].beatPositionInQuarters * 12,
+      );
+      // Resolve chord to symbol string using current key signature
+      const resolvedSymbol = resolveChordSymbol(
+        measureChords[nextChordIndex],
+        score.keySignature,
+        preferFlats,
+      );
+      notesXml += "\n" + generateHarmonyXml(resolvedSymbol, offsetDivisions);
       nextChordIndex++;
     }
 
@@ -815,7 +837,17 @@ function generateMeasureXml(
 
   // Output any remaining harmony elements (chords at beat positions after all notes)
   while (nextChordIndex < measureChords.length) {
-    notesXml += "\n" + generateHarmonyXml(measureChords[nextChordIndex]);
+    // Calculate offset in divisions (12 per quarter note)
+    const offsetDivisions = Math.round(
+      measureChords[nextChordIndex].beatPositionInQuarters * 12,
+    );
+    // Resolve chord to symbol string using current key signature
+    const resolvedSymbol = resolveChordSymbol(
+      measureChords[nextChordIndex],
+      score.keySignature,
+      preferFlats,
+    );
+    notesXml += "\n" + generateHarmonyXml(resolvedSymbol, offsetDivisions);
     nextChordIndex++;
   }
 

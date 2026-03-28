@@ -100,8 +100,8 @@ describe("Tune Composer MusicXML Generator", () => {
   describe("Harmony Export", () => {
     describe("generateHarmonyXml", () => {
       it("should generate harmony for major chord", () => {
-        const chord = createChordSymbol("C", 0);
-        const xml = generateHarmonyXml(chord);
+        // generateHarmonyXml now takes a resolved symbol string
+        const xml = generateHarmonyXml("C");
 
         expect(xml).toContain('<harmony placement="above">');
         expect(xml).toContain("<root-step>C</root-step>");
@@ -110,56 +110,49 @@ describe("Tune Composer MusicXML Generator", () => {
       });
 
       it("should generate harmony for minor chord", () => {
-        const chord = createChordSymbol("Am", 0);
-        const xml = generateHarmonyXml(chord);
+        const xml = generateHarmonyXml("Am");
 
         expect(xml).toContain("<root-step>A</root-step>");
         expectKind(xml, "minor");
       });
 
       it("should generate harmony for major seventh", () => {
-        const chord = createChordSymbol("Cmaj7", 0);
-        const xml = generateHarmonyXml(chord);
+        const xml = generateHarmonyXml("Cmaj7");
 
         expect(xml).toContain("<root-step>C</root-step>");
         expectKind(xml, "major-seventh");
       });
 
       it("should generate harmony for dominant seventh", () => {
-        const chord = createChordSymbol("G7", 0);
-        const xml = generateHarmonyXml(chord);
+        const xml = generateHarmonyXml("G7");
 
         expect(xml).toContain("<root-step>G</root-step>");
         expectKind(xml, "dominant");
       });
 
       it("should generate harmony for minor seventh", () => {
-        const chord = createChordSymbol("Dm7", 0);
-        const xml = generateHarmonyXml(chord);
+        const xml = generateHarmonyXml("Dm7");
 
         expect(xml).toContain("<root-step>D</root-step>");
         expectKind(xml, "minor-seventh");
       });
 
       it("should generate harmony for half diminished", () => {
-        const chord = createChordSymbol("Bm7b5", 0);
-        const xml = generateHarmonyXml(chord);
+        const xml = generateHarmonyXml("Bm7b5");
 
         expect(xml).toContain("<root-step>B</root-step>");
         expectKind(xml, "half-diminished");
       });
 
       it("should generate harmony for diminished seventh", () => {
-        const chord = createChordSymbol("Cdim7", 0);
-        const xml = generateHarmonyXml(chord);
+        const xml = generateHarmonyXml("Cdim7");
 
         expect(xml).toContain("<root-step>C</root-step>");
         expectKind(xml, "diminished-seventh");
       });
 
       it("should handle sharp root", () => {
-        const chord = createChordSymbol("F#m7", 0);
-        const xml = generateHarmonyXml(chord);
+        const xml = generateHarmonyXml("F#m7");
 
         expect(xml).toContain("<root-step>F</root-step>");
         expect(xml).toContain("<root-alter>1</root-alter>");
@@ -167,8 +160,7 @@ describe("Tune Composer MusicXML Generator", () => {
       });
 
       it("should handle flat root", () => {
-        const chord = createChordSymbol("Bbmaj7", 0);
-        const xml = generateHarmonyXml(chord);
+        const xml = generateHarmonyXml("Bbmaj7");
 
         expect(xml).toContain("<root-step>B</root-step>");
         expect(xml).toContain("<root-alter>-1</root-alter>");
@@ -176,8 +168,7 @@ describe("Tune Composer MusicXML Generator", () => {
       });
 
       it("should generate harmony for slash chord", () => {
-        const chord = createChordSymbol("C/E", 0);
-        const xml = generateHarmonyXml(chord);
+        const xml = generateHarmonyXml("C/E");
 
         expect(xml).toContain("<root-step>C</root-step>");
         expectKind(xml, "major");
@@ -187,8 +178,7 @@ describe("Tune Composer MusicXML Generator", () => {
       });
 
       it("should handle slash chord with altered bass", () => {
-        const chord = createChordSymbol("Am/G#", 0);
-        const xml = generateHarmonyXml(chord);
+        const xml = generateHarmonyXml("Am/G#");
 
         expect(xml).toContain("<root-step>A</root-step>");
         expect(xml).toContain("<bass-step>G</bass-step>");
@@ -196,48 +186,42 @@ describe("Tune Composer MusicXML Generator", () => {
       });
 
       it("should generate harmony for sus4", () => {
-        const chord = createChordSymbol("Gsus4", 0);
-        const xml = generateHarmonyXml(chord);
+        const xml = generateHarmonyXml("Gsus4");
 
         expect(xml).toContain("<root-step>G</root-step>");
         expectKind(xml, "suspended-fourth");
       });
 
       it("should generate harmony for sixth chord", () => {
-        const chord = createChordSymbol("C6", 0);
-        const xml = generateHarmonyXml(chord);
+        const xml = generateHarmonyXml("C6");
 
         expect(xml).toContain("<root-step>C</root-step>");
         expectKind(xml, "major-sixth");
       });
 
       it("should generate harmony for ninth chord", () => {
-        const chord = createChordSymbol("G9", 0);
-        const xml = generateHarmonyXml(chord);
+        const xml = generateHarmonyXml("G9");
 
         expect(xml).toContain("<root-step>G</root-step>");
         expectKind(xml, "dominant-ninth");
       });
 
       it("should generate harmony for augmented", () => {
-        const chord = createChordSymbol("Caug", 0);
-        const xml = generateHarmonyXml(chord);
+        const xml = generateHarmonyXml("Caug");
 
         expect(xml).toContain("<root-step>C</root-step>");
         expectKind(xml, "augmented");
       });
 
       it("should generate harmony for diminished", () => {
-        const chord = createChordSymbol("Cdim", 0);
-        const xml = generateHarmonyXml(chord);
+        const xml = generateHarmonyXml("Cdim");
 
         expect(xml).toContain("<root-step>C</root-step>");
         expectKind(xml, "diminished");
       });
 
       it("should return empty string for unrecognized chord", () => {
-        const chord = createChordSymbol("XYZ123", 0);
-        const xml = generateHarmonyXml(chord);
+        const xml = generateHarmonyXml("XYZ123");
 
         expect(xml).toBe("");
       });
@@ -249,8 +233,8 @@ describe("Tune Composer MusicXML Generator", () => {
           isDefault: true,
         });
         defaultProgression.chords = [
-          createChordSymbol("C", 0, 0),
-          createChordSymbol("G7", 0, 2),
+          createChordSymbol("C", 0, 0, 0)!,
+          createChordSymbol("G7", 0, 0, 2)!,
         ];
 
         const score = createScore();
@@ -270,8 +254,8 @@ describe("Tune Composer MusicXML Generator", () => {
           isDefault: true,
         });
         defaultProgression.chords = [
-          createChordSymbol("Cmaj7", 0, 0),
-          createChordSymbol("Dm7", 1, 0),
+          createChordSymbol("Cmaj7", 0, 0, 0)!,
+          createChordSymbol("Dm7", 0, 1, 0)!,
         ];
 
         const score = createScore();
@@ -302,7 +286,7 @@ describe("Tune Composer MusicXML Generator", () => {
         const defaultProgression = createChordProgression("Default", {
           isDefault: true,
         });
-        defaultProgression.chords = [createChordSymbol("C/G", 0, 0)];
+        defaultProgression.chords = [createChordSymbol("C/G", 0, 0, 0)!];
 
         const score = createScore();
         score.chordProgressions = [defaultProgression];
@@ -318,7 +302,7 @@ describe("Tune Composer MusicXML Generator", () => {
         const defaultProgression = createChordProgression("Default", {
           isDefault: true,
         });
-        defaultProgression.chords = [createChordSymbol("Cmaj7", 0, 0)];
+        defaultProgression.chords = [createChordSymbol("Cmaj7", 0, 0, 0)!];
 
         const score = createScore();
         score.chordProgressions = [defaultProgression];
@@ -333,8 +317,8 @@ describe("Tune Composer MusicXML Generator", () => {
           isDefault: true,
         });
         defaultProgression.chords = [
-          createChordSymbol("C", 0, 0),
-          createChordSymbol("G7", 0, 2),
+          createChordSymbol("C", 0, 0, 0)!,
+          createChordSymbol("G7", 0, 0, 2)!,
         ];
 
         const score = createScore();
@@ -352,7 +336,7 @@ describe("Tune Composer MusicXML Generator", () => {
         const defaultProgression = createChordProgression("Default", {
           isDefault: true,
         });
-        defaultProgression.chords = [createChordSymbol("Dm7", 0, 0)];
+        defaultProgression.chords = [createChordSymbol("Dm7", 0, 0, 0)!];
 
         const score = createScore();
         score.chordProgressions = [defaultProgression];

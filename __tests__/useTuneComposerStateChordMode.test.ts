@@ -6,7 +6,24 @@
 
 import { renderHook, act } from "@testing-library/react-native";
 import { useTuneComposerState } from "../src/features/tune-composer/hooks/useTuneComposerState";
-import { createScore } from "../src/features/tune-composer/types";
+import { createScore, resolveChordSymbol, createChordSymbol, type ChordSymbol } from "../src/features/tune-composer/types";
+
+/**
+ * Helper to resolve a chord to its display symbol for test assertions.
+ * Uses key of C (0 fifths) by default.
+ */
+function chordSymbol(chord: ChordSymbol | undefined): string | undefined {
+  if (!chord) return undefined;
+  return resolveChordSymbol(chord, 0) ?? undefined;
+}
+
+/**
+ * Helper to create test chords with proper format.
+ * Uses key of C (0 fifths) by default.
+ */
+function testChord(symbol: string, measureIndex: number, beatPosition: number = 0): ChordSymbol {
+  return createChordSymbol(symbol, 0, measureIndex, beatPosition)!;
+}
 
 describe("useTuneComposerState - Chord Mode", () => {
   describe("chord mode toggle", () => {
@@ -264,7 +281,7 @@ describe("useTuneComposerState - Chord Mode", () => {
 
       expect(result.current.currentChordSymbol).toBe("Cmaj7");
       expect(result.current.activeProgression?.chords).toHaveLength(1);
-      expect(result.current.activeProgression?.chords[0].symbol).toBe("Cmaj7");
+      expect(chordSymbol(result.current.activeProgression?.chords[0])).toBe("Cmaj7");
       expect(result.current.activeProgression?.chords[0].measureIndex).toBe(0);
       expect(result.current.activeProgression?.chords[0].beatPosition).toBe(0);
     });
@@ -340,13 +357,13 @@ describe("useTuneComposerState - Chord Mode", () => {
       const firstChord = result.current.activeProgression?.chords.find(
         (c) => c.beatPosition === 0,
       );
-      expect(firstChord?.symbol).toBe("C");
+      expect(chordSymbol(firstChord)).toBe("C");
 
       // Check second chord
       const secondChord = result.current.activeProgression?.chords.find(
         (c) => c.beatPosition === 2,
       );
-      expect(secondChord?.symbol).toBe("Am");
+      expect(chordSymbol(secondChord)).toBe("Am");
     });
   });
 
@@ -406,7 +423,8 @@ describe("useTuneComposerState - Chord Mode", () => {
         result.current.moveChordCursorNext();
       });
 
-      expect(result.current.currentChordSymbol).toBe("Bb7");
+      // Note: In key of C (0 fifths), chord resolves to A#7 (sharp spelling by default)
+      expect(result.current.currentChordSymbol).toBe("A#7");
     });
   });
 
@@ -870,8 +888,8 @@ describe("useTuneComposerState - Chord Mode", () => {
         expect(result.current.activeProgression?.chords).toHaveLength(0);
 
         const newChords = [
-          { id: "c1", symbol: "C", measureIndex: 0, beatPosition: 0 },
-          { id: "c2", symbol: "G", measureIndex: 1, beatPosition: 0 },
+          testChord("C", 0, 0),
+          testChord("G", 1, 0),
         ];
 
         act(() => {
@@ -879,8 +897,8 @@ describe("useTuneComposerState - Chord Mode", () => {
         });
 
         expect(result.current.activeProgression?.chords).toHaveLength(2);
-        expect(result.current.activeProgression?.chords[0].symbol).toBe("C");
-        expect(result.current.activeProgression?.chords[1].symbol).toBe("G");
+        expect(chordSymbol(result.current.activeProgression?.chords[0])).toBe("C");
+        expect(chordSymbol(result.current.activeProgression?.chords[1])).toBe("G");
       });
 
       it("should enable chord symbol visibility when setting chords", () => {
@@ -894,7 +912,7 @@ describe("useTuneComposerState - Chord Mode", () => {
 
         act(() => {
           result.current.setActiveProgressionChords([
-            { id: "c1", symbol: "Dm", measureIndex: 0, beatPosition: 0 },
+            testChord("Dm", 0, 0),
           ]);
         });
 

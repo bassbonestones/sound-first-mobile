@@ -40,7 +40,7 @@ import {
 import {
   ChordProgression,
   ChordSymbol,
-  createChordSymbol,
+  parseChordToRelative,
   createDefaultProgression,
 } from "../types/chordTypes";
 
@@ -268,26 +268,52 @@ const DIVISIONS_PER_QUARTER = 12;
 
 /**
  * Convert offset in divisions to beat position.
- * Offset 0 = beat 0, offset 12 = beat 1, etc.
+ * Uses beat unit duration to handle different time signatures correctly.
+ * @param offset Offset in divisions (12 per quarter note)
+ * @param beatUnitDuration Duration of one beat in quarter notes (e.g., 1 for 4/4, 0.5 for 6/8)
  */
-function offsetToBeatPosition(offset: number): number {
-  return offset / DIVISIONS_PER_QUARTER;
+function offsetToBeatPosition(offset: number, beatUnitDuration: number): number {
+  // Convert divisions to quarter notes, then to beat units
+  const quarterNotes = offset / DIVISIONS_PER_QUARTER;
+  return quarterNotes / beatUnitDuration;
 }
 
 /**
  * Extract chord symbols from imported measures.
  * Converts ImportedHarmony (from MusicXML) to ChordSymbol[].
+ * @param importedMeasures Array of imported measures
+ * @param keyFifths The key signature (circle of fifths) to use for relative conversion
+ * @param defaultBeatUnit Default beat unit for measures without time signature (4 = quarter)
  */
 export function extractChordsFromMeasures(
   importedMeasures: ImportedMeasure[],
+  keyFifths: KeySignature,
+  defaultBeatUnit: number = 4,
 ): ChordSymbol[] {
   const chords: ChordSymbol[] = [];
 
+  // Track current time signature across measures
+  let currentBeatUnit = defaultBeatUnit;
+
   importedMeasures.forEach((measure, measureIndex) => {
+    // Update beat unit if this measure has a time signature change
+    if (measure.timeSignature) {
+      currentBeatUnit = measure.timeSignature.beatType;
+    }
+
     if (measure.harmony && measure.harmony.length > 0) {
+      const beatUnitDuration = 4 / currentBeatUnit;
       measure.harmony.forEach((h) => {
-        const beatPosition = offsetToBeatPosition(h.offset);
-        chords.push(createChordSymbol(h.symbol, measureIndex, beatPosition));
+        const beatPosition = offsetToBeatPosition(h.offset, beatUnitDuration);
+        const chord = parseChordToRelative(
+          h.symbol,
+          keyFifths,
+          measureIndex,
+          beatPosition,
+        );
+        if (chord) {
+          chords.push(chord);
+        }
       });
     }
   });
@@ -412,7 +438,12 @@ export function importedScoreToComposerScore(
   const tempo = metadata.tempo?.bpm ?? 120;
 
   // Extract chord progressions from imported harmony
-  const importedChords = extractChordsFromMeasures(firstPart.measures);
+  // Pass the key signature for relative conversion and beat unit for timing
+  const importedChords = extractChordsFromMeasures(
+    firstPart.measures,
+    keySignature,
+    timeSig.beatUnit,
+  );
   const importedProgression =
     createProgressionFromImportedChords(importedChords);
   const chordProgressions = importedProgression
