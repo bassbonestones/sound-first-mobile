@@ -88,6 +88,7 @@ export function useTuneComposerPlayback(
   } | null>(null);
   const lastPlayedPositionRef = useRef<string | null>(null);
   const repeatRef = useRef(false);
+  const tickRef = useRef<((timestamp: number) => void) | null>(null);
 
   useEffect(() => {
     repeatRef.current = repeat;
@@ -157,6 +158,33 @@ export function useTuneComposerPlayback(
     [score.measures],
   );
 
+  /**
+   * Calculate total duration of a note including any tied notes that follow.
+   */
+  const getTiedNoteDuration = useCallback(
+    (startPos: PlaybackPosition): number => {
+      let totalDuration = 0;
+      let currentPos: PlaybackPosition | null = startPos;
+
+      while (currentPos) {
+        const note = getNoteAtPosition(currentPos);
+        if (!note) break;
+
+        totalDuration += getNoteDuration(note);
+
+        // If this note has tieStart, continue to next note
+        if (note.tieStart) {
+          currentPos = getNextPosition(currentPos, null);
+        } else {
+          break;
+        }
+      }
+
+      return totalDuration;
+    },
+    [getNoteAtPosition, getNextPosition],
+  );
+
   const tick = useCallback(
     (timestamp: number) => {
       if (state !== "playing") return;
@@ -165,14 +193,21 @@ export function useTuneComposerPlayback(
         lastTickRef.current = timestamp;
 
         const firstNote = getNoteAtPosition(position);
-        if (firstNote) {
+        // Only play if this is not a tie continuation
+        if (firstNote && !firstNote.tieEnd) {
           const secondsPerBeat = getSecondsPerBeat(tempo);
-          const noteDuration = getNoteDuration(firstNote) * secondsPerBeat;
+          // Use tied duration if note has tieStart
+          const totalBeats = firstNote.tieStart
+            ? getTiedNoteDuration(position)
+            : getNoteDuration(firstNote);
+          const noteDuration = totalBeats * secondsPerBeat;
           composerSynth.playNote(firstNote.midi, noteDuration * 1000);
           lastPlayedPositionRef.current = `${position.measureIndex}-${position.noteIndex}`;
         }
 
-        animationFrameRef.current = requestAnimationFrame(tick);
+        animationFrameRef.current = requestAnimationFrame((ts) =>
+          tickRef.current?.(ts),
+        );
         return;
       }
 
@@ -207,8 +242,15 @@ export function useTuneComposerPlayback(
 
           const nextNote = getNoteAtPosition(nextPos);
           if (nextNote) {
-            const nextDuration = getNoteDuration(nextNote) * secondsPerBeat;
-            composerSynth.playNote(nextNote.midi, nextDuration * 1000);
+            // Only play if this note is NOT a tie continuation
+            if (!nextNote.tieEnd) {
+              // Use tied duration if note has tieStart
+              const totalBeats = nextNote.tieStart
+                ? getTiedNoteDuration(nextPos)
+                : getNoteDuration(nextNote);
+              const nextDuration = totalBeats * secondsPerBeat;
+              composerSynth.playNote(nextNote.midi, nextDuration * 1000);
+            }
             lastPlayedPositionRef.current = `${nextPos.measureIndex}-${nextPos.noteIndex}`;
           }
         } else if (repeatRef.current) {
@@ -216,8 +258,13 @@ export function useTuneComposerPlayback(
           accumulatedTimeRef.current = 0;
 
           const firstNote = getNoteAtPosition(INITIAL_POSITION);
-          if (firstNote) {
-            const firstDuration = getNoteDuration(firstNote) * secondsPerBeat;
+          // Only play if not a tie continuation
+          if (firstNote && !firstNote.tieEnd) {
+            // Use tied duration if note has tieStart
+            const totalBeats = firstNote.tieStart
+              ? getTiedNoteDuration(INITIAL_POSITION)
+              : getNoteDuration(firstNote);
+            const firstDuration = totalBeats * secondsPerBeat;
             composerSynth.playNote(firstNote.midi, firstDuration * 1000);
             lastPlayedPositionRef.current = `0-0`;
           }
@@ -231,7 +278,9 @@ export function useTuneComposerPlayback(
         }
       }
 
-      animationFrameRef.current = requestAnimationFrame(tick);
+      animationFrameRef.current = requestAnimationFrame((ts) =>
+        tickRef.current?.(ts),
+      );
     },
     [
       state,
@@ -240,14 +289,25 @@ export function useTuneComposerPlayback(
       getNoteAtPosition,
       getNextPosition,
       getSecondsPerBeat,
+      getTiedNoteDuration,
     ],
   );
+
+  // Keep tickRef up to date with latest tick callback
+  useEffect(() => {
+    tickRef.current = tick;
+  }, [tick]);
+
+  // Stable wrapper that calls the latest tick
+  const tickWrapper = useCallback((timestamp: number) => {
+    tickRef.current?.(timestamp);
+  }, []);
 
   useEffect(() => {
     if (state === "playing") {
       lastTickRef.current = 0;
       accumulatedTimeRef.current = 0;
-      animationFrameRef.current = requestAnimationFrame(tick);
+      animationFrameRef.current = requestAnimationFrame(tickWrapper);
     }
 
     return () => {
@@ -256,7 +316,7 @@ export function useTuneComposerPlayback(
         animationFrameRef.current = null;
       }
     };
-  }, [state, tick]);
+  }, [state, tickWrapper]);
 
   const play = useCallback(async () => {
     if (!composerSynth.isReady()) {

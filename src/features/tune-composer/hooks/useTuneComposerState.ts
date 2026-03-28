@@ -385,7 +385,7 @@ export function useTuneComposerState(
 
   const allMeasuresValid = useMemo((): boolean => {
     return score.measures.every(
-      (m) => validateMeasure(m, score.timeSignature).isComplete,
+      (m) => m.isPickup || validateMeasure(m, score.timeSignature).isComplete,
     );
   }, [score.measures, score.timeSignature]);
 

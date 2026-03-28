@@ -248,6 +248,7 @@ export function importedMeasureToMeasure(
   return {
     id: generateId(),
     notes: notes.length > 0 ? notes : [createNote(null, DURATION.WHOLE)],
+    isPickup: importedMeasure.isPickup || undefined,
   };
 }
 

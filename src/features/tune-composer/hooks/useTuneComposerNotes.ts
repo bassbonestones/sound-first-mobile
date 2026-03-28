@@ -32,6 +32,7 @@ import {
   getMeasureDuration,
   getChordsForMeasure,
   getActiveProgression,
+  getPitchedNotes,
 } from "../types";
 import {
   createInsertNoteAction,
@@ -882,6 +883,16 @@ export function useTuneComposerNotes(
 
     const newTieStart = !note.tieStart;
 
+    // Find the next pitched note (could be in same measure or next measure)
+    const pitchedNotes = getPitchedNotes(state.score);
+    const currentPitchedIndex = pitchedNotes.findIndex(
+      (pn) => pn.note.id === note.id,
+    );
+    const nextPitched =
+      currentPitchedIndex >= 0 && currentPitchedIndex < pitchedNotes.length - 1
+        ? pitchedNotes[currentPitchedIndex + 1]
+        : null;
+
     const action = createToggleTieAction(
       position,
       note.id,
@@ -893,16 +904,25 @@ export function useTuneComposerNotes(
 
     updateScore((score) => ({
       ...score,
-      measures: score.measures.map((m, mi) =>
-        mi === position.measureIndex
-          ? {
-              ...m,
-              notes: m.notes.map((n) =>
-                n.id === note.id ? { ...n, tieStart: newTieStart } : n,
-              ),
-            }
-          : m,
-      ),
+      measures: score.measures.map((m, mi) => {
+        let updatedNotes = m.notes;
+
+        // Update tieStart on the current note
+        if (mi === position.measureIndex) {
+          updatedNotes = updatedNotes.map((n) =>
+            n.id === note.id ? { ...n, tieStart: newTieStart } : n,
+          );
+        }
+
+        // Update tieEnd on the next pitched note (if exists)
+        if (nextPitched && mi === nextPitched.measureIndex) {
+          updatedNotes = updatedNotes.map((n) =>
+            n.id === nextPitched.note.id ? { ...n, tieEnd: newTieStart } : n,
+          );
+        }
+
+        return updatedNotes !== m.notes ? { ...m, notes: updatedNotes } : m;
+      }),
     }));
   }, [state.selectedNoteId, state.score, undoManager, updateScore]);
 

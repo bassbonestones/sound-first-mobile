@@ -372,6 +372,8 @@ export interface ImportedMeasure {
   readonly keySignature: KeySignatureInfo | null;
   /** Confidence for this measure (OMR only) */
   readonly confidence: number | null;
+  /** If true, this is a pickup (anacrusis) measure */
+  readonly isPickup?: boolean;
 }
 
 /**

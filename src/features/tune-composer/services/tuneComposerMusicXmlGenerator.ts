@@ -647,8 +647,10 @@ function generateMeasureXml(
   options: MusicXmlGeneratorOptions,
   scoreHasNotes: boolean,
   activeChords: ChordSymbol[],
+  isFirstFullMeasure: boolean = false,
 ): string {
   const preferFlats = score.keySignature < 0;
+  const isPickup = measure.isPickup ?? false;
   let notesXml = "";
 
   if (
@@ -796,14 +798,18 @@ function generateMeasureXml(
     nextChordIndex++;
   }
 
+  // Attributes go on first measure (pickup or first full measure)
   const attributesXml = isFirstMeasure
     ? "\n" +
       generateAttributesXml(score.timeSignature, score.keySignature, score.clef)
     : "";
 
-  const directionXml =
-    isFirstMeasure && scoreHasNotes
-      ? `\n      <direction placement="above">
+  // Metronome/tempo direction on first measure with notes (or first full measure)
+  const showDirection = isPickup
+    ? isFirstMeasure && scoreHasNotes
+    : isFirstFullMeasure && scoreHasNotes;
+  const directionXml = showDirection
+    ? `\n      <direction placement="above">
         <direction-type>
           <metronome parentheses="no">
             <beat-unit>quarter</beat-unit>
@@ -812,7 +818,7 @@ function generateMeasureXml(
         </direction-type>
         <sound tempo="${score.tempo}"/>
       </direction>`
-      : "";
+    : "";
 
   const barlineXml = isLastMeasure
     ? `\n      <barline location="right">
@@ -820,7 +826,12 @@ function generateMeasureXml(
       </barline>`
     : "";
 
-  return `    <measure number="${measureNumber}">${attributesXml}${directionXml}${notesXml}${barlineXml}
+  // Pickup measures use implicit="yes" attribute
+  const measureAttrs = isPickup
+    ? `number="${measureNumber}" implicit="yes"`
+    : `number="${measureNumber}"`;
+
+  return `    <measure ${measureAttrs}>${attributesXml}${directionXml}${notesXml}${barlineXml}
     </measure>`;
 }
 
@@ -842,19 +853,30 @@ export function generateMusicXml(
   const activeProgression = getActiveProgression(score);
   const activeChords = activeProgression?.chords ?? [];
 
+  // Check if first measure is pickup
+  const hasPickup = score.measures[0]?.isPickup ?? false;
+  
+  // Find index of first full (non-pickup) measure
+  const firstFullMeasureIndex = hasPickup ? 1 : 0;
+
   const measuresXml = score.measures
-    .map((measure, index) =>
-      generateMeasureXml(
+    .map((measure, index) => {
+      // Pickup measure = 0, then count from 1
+      const measureNumber = hasPickup ? index : index + 1;
+      const isFirstFullMeasure = index === firstFullMeasureIndex;
+      
+      return generateMeasureXml(
         measure,
-        index + 1,
+        measureNumber,
         index === 0,
         index === score.measures.length - 1,
         score,
         options,
         scoreHasNotes,
         activeChords,
-      ),
-    )
+        isFirstFullMeasure,
+      );
+    })
     .join("\n");
 
   const partListXml = `  <part-list>

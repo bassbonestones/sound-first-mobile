@@ -102,6 +102,7 @@ interface RawPart {
 
 interface RawMeasure {
   readonly number: number;
+  readonly isPickup?: boolean;
   readonly attributes?: RawAttributes;
   readonly direction?: RawDirection[];
   readonly notes: RawNote[];
@@ -387,13 +388,21 @@ function extractMeasures(
   warnings: string[],
 ): RawMeasure[] {
   const measures: RawMeasure[] = [];
+  // Capture measure tag attributes and content
   const measureRegex =
-    /<measure[^>]*number=["'](\d+)["'][^>]*>([\s\S]*?)<\/measure>/gi;
+    /<measure([^>]*)>([\s\S]*?)<\/measure>/gi;
 
   let match;
   while ((match = measureRegex.exec(partContent)) !== null) {
-    const measureNumber = parseInt(match[1], 10);
+    const measureAttrs = match[1];
     const measureContent = match[2];
+    
+    // Extract measure number
+    const numberMatch = measureAttrs.match(/number=["'](\d+)["']/i);
+    const measureNumber = numberMatch ? parseInt(numberMatch[1], 10) : 0;
+    
+    // Check for implicit="yes" (pickup measure)
+    const isPickup = /implicit=["']yes["']/i.test(measureAttrs);
 
     const attributes = extractAttributes(measureContent);
     const direction = extractDirections(measureContent);
@@ -402,6 +411,7 @@ function extractMeasures(
 
     measures.push({
       number: measureNumber,
+      isPickup,
       attributes,
       direction,
       notes,
@@ -875,6 +885,7 @@ function convertMeasures(rawMeasures: RawMeasure[]): ImportedMeasure[] {
         ? convertKeySignature(rawMeasure.attributes.key)
         : null,
       confidence: null,
+      isPickup: rawMeasure.isPickup || undefined,
     };
   });
 }

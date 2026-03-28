@@ -408,6 +408,8 @@ export interface Measure {
   id: string;
   /** Notes in this measure (ordered by position) */
   notes: Note[];
+  /** If true, this is a pickup (anacrusis) measure - partial measure before beat 1 */
+  isPickup?: boolean;
 }
 
 /**
