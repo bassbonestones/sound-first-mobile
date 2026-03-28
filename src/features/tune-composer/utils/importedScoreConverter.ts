@@ -14,7 +14,7 @@ import type {
   LyricInfo,
   ArticulationType as ImportArticulationType,
 } from "../../../types/import";
-import type {
+import {
   TuneComposerScore,
   Measure,
   DurationValue,
@@ -28,6 +28,7 @@ import type {
   ArticulationType,
 } from "../types/tuneComposerTypes";
 import {
+  getMeasureDuration,
   generateId,
   createNote,
   createMeasure,
@@ -319,6 +320,12 @@ export function importedScoreToComposerScore(
   // Convert all measures
   const measures = firstPart.measures.map(importedMeasureToMeasure);
 
+  // Calculate pickup duration if first measure is a pickup
+  let pickupDuration: number | undefined;
+  if (measures[0]?.isPickup) {
+    pickupDuration = getMeasureDuration(measures[0]);
+  }
+
   // Collect all notes for clef inference
   const allNotes = measures.flatMap((m) => m.notes);
   const clef = inferClefFromPitches(allNotes);
@@ -353,6 +360,7 @@ export function importedScoreToComposerScore(
     timeSignature: timeSig,
     tempo,
     measures,
+    pickupDuration,
     chordProgressions: [createDefaultProgression()],
     displaySettings: createDisplaySettings(),
     playbackSettings: createPlaybackSettings(),

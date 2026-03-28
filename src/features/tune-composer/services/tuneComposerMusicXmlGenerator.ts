@@ -30,6 +30,7 @@ import {
   getActiveProgression,
   getChordsForMeasure,
   getBeatUnitDuration,
+  getNoteDuration,
 } from "../types";
 import { recognizeChord } from "./chordRecognition";
 
@@ -648,6 +649,7 @@ function generateAttributesXml(
 function generateMeasureXml(
   measure: Measure,
   measureNumber: number,
+  measureIndex: number,
   isFirstMeasure: boolean,
   isLastMeasure: boolean,
   score: TuneComposerScore,
@@ -663,7 +665,7 @@ function generateMeasureXml(
 
   if (
     options.cursorPosition &&
-    options.cursorPosition.measureIndex === measureNumber - 1
+    options.cursorPosition.measureIndex === measureIndex
   ) {
     notesXml += `\n      <!-- cursor:${options.cursorPosition.noteIndex} -->`;
   }
@@ -674,7 +676,7 @@ function generateMeasureXml(
   const measureChords: Array<ChordSymbol & { beatPositionInQuarters: number }> =
     [];
   if (score.displaySettings.showChordSymbols) {
-    const chords = getChordsForMeasure(activeChords, measureNumber - 1);
+    const chords = getChordsForMeasure(activeChords, measureIndex);
     measureChords.push(
       ...chords
         .map((c) => ({
@@ -797,8 +799,8 @@ function generateMeasureXml(
     notesXml +=
       "\n" + generateNoteXml(note, preferFlats, options, score.clef, isLastInTriplet, beam, slurPlacement, isMelismaContinuation);
 
-    // Advance beat position by note duration
-    currentBeat += note.duration;
+    // Advance beat position by note duration (including dot)
+    currentBeat += getNoteDuration(note);
   }
 
   // Output any remaining harmony elements (chords at beat positions after all notes)
@@ -900,6 +902,7 @@ export function generateMusicXml(
       return generateMeasureXml(
         measure,
         measureNumber,
+        index,
         index === 0,
         index === score.measures.length - 1,
         score,

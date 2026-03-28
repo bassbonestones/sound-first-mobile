@@ -21,8 +21,33 @@ import {
   getActiveProgression,
   createChordProgression,
   getBeatUnitCount,
+  getBeatUnitDuration,
+  getMeasureDuration,
   duplicateProgression as duplicateProgressionUtil,
 } from "../types";
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+/**
+ * Get the number of beat positions for a specific measure.
+ * Pickup measures have fewer beats based on pickupDuration or actual notes.
+ */
+function getMeasureBeatCount(
+  measureIndex: number,
+  score: TuneComposerScore,
+): number {
+  const measure = score.measures[measureIndex];
+  if (measure?.isPickup) {
+    const beatUnitDuration = getBeatUnitDuration(score.timeSignature);
+    // Use pickupDuration if set, otherwise calculate from notes
+    const duration = score.pickupDuration ?? getMeasureDuration(measure);
+    return Math.max(1, Math.round(duration / beatUnitDuration));
+  }
+  // Regular measure
+  return getBeatUnitCount(score.timeSignature);
+}
 
 // =============================================================================
 // Types
@@ -156,15 +181,14 @@ export function useTuneComposerChords(
   const canChordCursorGoNext = useMemo((): boolean => {
     if (!state.chordCursor) return false;
     const { measureIndex, beatPosition } = state.chordCursor;
-    const beatUnitCount = getBeatUnitCount(state.score.timeSignature);
+    const beatUnitCount = getMeasureBeatCount(measureIndex, state.score);
     const totalMeasures = state.score.measures.length;
 
     // Can go next if not at last beat of last measure
     return measureIndex < totalMeasures - 1 || beatPosition < beatUnitCount - 1;
   }, [
     state.chordCursor,
-    state.score.timeSignature,
-    state.score.measures.length,
+    state.score,
   ]);
 
   // ===========================================================================
@@ -255,7 +279,7 @@ export function useTuneComposerChords(
     setState((prev) => {
       if (!prev.chordMode || !prev.chordCursor) return prev;
       const { measureIndex, beatPosition } = prev.chordCursor;
-      const beatUnitCount = getBeatUnitCount(prev.score.timeSignature);
+      const beatUnitCount = getMeasureBeatCount(measureIndex, prev.score);
       const nextBeat = beatPosition + 1;
 
       if (nextBeat >= beatUnitCount) {
@@ -294,12 +318,12 @@ export function useTuneComposerChords(
         };
       } else if (measureIndex > 0) {
         // Move to last beat of previous measure
-        const beatUnitCount = getBeatUnitCount(prev.score.timeSignature);
+        const prevMeasureBeatCount = getMeasureBeatCount(measureIndex - 1, prev.score);
         return {
           ...prev,
           chordCursor: {
             measureIndex: measureIndex - 1,
-            beatPosition: beatUnitCount - 1,
+            beatPosition: prevMeasureBeatCount - 1,
           },
         };
       }
