@@ -229,9 +229,7 @@ describe("Tune Composer Types", () => {
       });
 
       it("should return undefined when no chords exist before position", () => {
-        const chords: ChordSymbol[] = [
-          testChord("Cmaj7", 2, 0, "1"),
-        ];
+        const chords: ChordSymbol[] = [testChord("Cmaj7", 2, 0, "1")];
         const chord = getActiveChordAtPosition(chords, 0, 0);
         expect(chord).toBeUndefined();
       });
@@ -247,11 +245,17 @@ describe("Tune Composer Types", () => {
           testChord("Dm7", 0, 2.5, "2"),
         ];
         // Position 2.25 is before Dm7 (at 2.5), so should return Cmaj7
-        expect(chordSymbol(getActiveChordAtPosition(chords, 0, 2.25)!)).toBe("Cmaj7");
+        expect(chordSymbol(getActiveChordAtPosition(chords, 0, 2.25)!)).toBe(
+          "Cmaj7",
+        );
         // Position 2.5 should return Dm7
-        expect(chordSymbol(getActiveChordAtPosition(chords, 0, 2.5)!)).toBe("Dm7");
+        expect(chordSymbol(getActiveChordAtPosition(chords, 0, 2.5)!)).toBe(
+          "Dm7",
+        );
         // Position 3 is after Dm7, so should return Dm7
-        expect(chordSymbol(getActiveChordAtPosition(chords, 0, 3)!)).toBe("Dm7");
+        expect(chordSymbol(getActiveChordAtPosition(chords, 0, 3)!)).toBe(
+          "Dm7",
+        );
       });
     });
   });
@@ -541,9 +545,7 @@ describe("Tune Composer Types", () => {
       });
 
       it("should return unchanged progression if chord not found", () => {
-        const chords: ChordSymbol[] = [
-          testChord("Cmaj7", 0, 0, "c1"),
-        ];
+        const chords: ChordSymbol[] = [testChord("Cmaj7", 0, 0, "c1")];
         const progression: ChordProgression = {
           ...createChordProgression("Test"),
           chords,
@@ -555,9 +557,7 @@ describe("Tune Composer Types", () => {
       });
 
       it("should not mutate original progression", () => {
-        const chords: ChordSymbol[] = [
-          testChord("Cmaj7", 0, 0, "c1"),
-        ];
+        const chords: ChordSymbol[] = [testChord("Cmaj7", 0, 0, "c1")];
         const progression: ChordProgression = {
           ...createChordProgression("Test"),
           chords,
@@ -589,9 +589,7 @@ describe("Tune Composer Types", () => {
       });
 
       it("should update beat position of chord", () => {
-        const chords: ChordSymbol[] = [
-          testChord("Cmaj7", 0, 0, "c1"),
-        ];
+        const chords: ChordSymbol[] = [testChord("Cmaj7", 0, 0, "c1")];
         const progression: ChordProgression = {
           ...createChordProgression("Test"),
           chords,
@@ -607,9 +605,7 @@ describe("Tune Composer Types", () => {
       });
 
       it("should not mutate original progression", () => {
-        const chords: ChordSymbol[] = [
-          testChord("Cmaj7", 0, 0, "c1"),
-        ];
+        const chords: ChordSymbol[] = [testChord("Cmaj7", 0, 0, "c1")];
         const progression: ChordProgression = {
           ...createChordProgression("Test"),
           chords,
@@ -621,9 +617,7 @@ describe("Tune Composer Types", () => {
       });
 
       it("should return unchanged progression if chord ID not found", () => {
-        const chords: ChordSymbol[] = [
-          testChord("Cmaj7", 0, 0, "c1"),
-        ];
+        const chords: ChordSymbol[] = [testChord("Cmaj7", 0, 0, "c1")];
         const progression: ChordProgression = {
           ...createChordProgression("Test"),
           chords,

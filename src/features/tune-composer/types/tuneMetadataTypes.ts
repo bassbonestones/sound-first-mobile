@@ -5,6 +5,8 @@
  * This is separate from the score data and used for catalog/search purposes.
  */
 
+import type { PlaybackSettings } from "./tuneComposerTypes";
+
 /**
  * Metadata for a tune, stored in a JSON file alongside the MusicXML
  */
@@ -23,6 +25,8 @@ export interface TuneMetadata {
   style?: string;
   /** Notes about the tune */
   notes?: string;
+  /** Playback settings (swing, accompaniment style, etc.) */
+  playbackSettings?: PlaybackSettings;
   /** When metadata was last updated */
   updatedAt: string;
 }

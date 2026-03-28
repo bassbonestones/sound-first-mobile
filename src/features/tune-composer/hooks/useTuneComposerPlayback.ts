@@ -75,18 +75,30 @@ const SWING_RATIO = 2 / 3;
 
 /**
  * Calculate the half-beat duration based on time signature.
- * In 4/4 (beatUnit=4), half-beat is 0.5 (eighth note).
- * In 6/8 (beatUnit=8), half-beat is 0.5 (sixteenth note relative to eighth beat).
+ * Duration units are relative to quarter note = 1.
+ *
+ * In 4/4 (beatUnit=4): beat = 1.0, half-beat = 0.5 (eighth note)
+ * In 4/8 (beatUnit=8): beat = 0.5, half-beat = 0.25 (sixteenth note)
+ * In 2/2 (beatUnit=2): beat = 2.0, half-beat = 1.0 (quarter note)
  */
-function getHalfBeat(_beatUnit: number): number {
-  // Half of whatever the beat unit is
-  return 0.5;
+function getHalfBeat(beatUnit: number): number {
+  // One beat = 4/beatUnit in quarter-note units
+  // Half-beat = (4/beatUnit) / 2 = 2/beatUnit
+  return 2 / beatUnit;
+}
+
+/**
+ * Get the duration of one beat based on the beat unit.
+ * Duration units are relative to quarter note = 1.
+ */
+function getBeatDuration(beatUnit: number): number {
+  return 4 / beatUnit;
 }
 
 /**
  * Apply swing timing to a note's duration for playback.
  *
- * Swing works by shifting the off-beat position from 0.5 to ~0.67 within each beat.
+ * Swing works by shifting the off-beat position within each beat.
  * This affects:
  * 1. Notes that START on an off-beat (shortened to fit before the next beat)
  * 2. Notes that END on an off-beat (extended so the next note starts at swung position)
@@ -99,32 +111,34 @@ function getSwungDuration(
 ): number {
   if (!swingEnabled) return noteDuration;
 
+  const beatDuration = getBeatDuration(beatUnit);
   const halfBeat = getHalfBeat(beatUnit);
   const endPosition = beatPosition + noteDuration;
 
   // Check where this note starts and ends within a beat
-  const startInBeat = beatPosition % 1;
-  const endInBeat = endPosition % 1;
+  // Use modulo with actual beat duration, not hardcoded 1
+  const startInBeat = beatPosition % beatDuration;
+  const endInBeat = endPosition % beatDuration;
 
   const startsOnBeat = Math.abs(startInBeat) < 0.001;
   const startsOffBeat = Math.abs(startInBeat - halfBeat) < 0.001;
   const endsOnBeat = Math.abs(endInBeat) < 0.001;
   const endsOffBeat = Math.abs(endInBeat - halfBeat) < 0.001;
 
+  // Calculate swing extension relative to the beat size
+  // SWING_RATIO is 2/3 of a beat, so extension = (2/3 - 1/2) * beatDuration
+  const swingExtension = (SWING_RATIO - 0.5) * beatDuration;
+
   // Case 1: Note starts on-beat and ends off-beat (e.g., on-beat eighth, or dotted quarter)
   // Extend it so the next note starts at the swung off-beat position
   if (startsOnBeat && endsOffBeat) {
-    // Extend from X.5 to X + SWING_RATIO (e.g., 0.5 → 0.67)
-    const extension = SWING_RATIO - halfBeat;
-    return noteDuration + extension;
+    return noteDuration + swingExtension;
   }
 
   // Case 2: Note starts off-beat and ends on-beat (e.g., off-beat eighth)
   // Shorten it because swing pushed its start later
   if (startsOffBeat && endsOnBeat) {
-    // Started late (at SWING_RATIO instead of 0.5), so shorten
-    const reduction = SWING_RATIO - halfBeat;
-    return noteDuration - reduction;
+    return noteDuration - swingExtension;
   }
 
   // Case 3: Note starts on-beat and ends on-beat (e.g., quarter, half, whole)

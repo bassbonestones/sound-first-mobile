@@ -414,7 +414,9 @@ function CompactTopBarComponent({
                     <Feather
                       name={swingEnabled ? "toggle-right" : "toggle-left"}
                       size={24}
-                      color={swingEnabled ? colors.primary : colors.textSecondary}
+                      color={
+                        swingEnabled ? colors.primary : colors.textSecondary
+                      }
                     />
                   </TouchableOpacity>
                 </View>

@@ -128,7 +128,9 @@ export interface ChordSymbol {
 /**
  * Parse a chord root note and return its semitone value (0-11)
  */
-function parseRootSemitone(symbol: string): { root: string; semitone: number; rest: string } | null {
+function parseRootSemitone(
+  symbol: string,
+): { root: string; semitone: number; rest: string } | null {
   // Match root note at start: A-G with optional # or b
   const match = symbol.match(/^([A-Ga-g])([#b]?)/);
   if (!match) return null;
@@ -143,47 +145,48 @@ function parseRootSemitone(symbol: string): { root: string; semitone: number; re
 /**
  * Quality mapping for common chord suffixes
  */
-const QUALITY_MAP: Record<string, { quality: string; alterations: string[] }> = {
-  "": { quality: "major", alterations: [] },
-  maj: { quality: "major", alterations: [] },
-  M: { quality: "major", alterations: [] },
-  m: { quality: "minor", alterations: [] },
-  min: { quality: "minor", alterations: [] },
-  "-": { quality: "minor", alterations: [] },
-  dim: { quality: "dim", alterations: [] },
-  o: { quality: "dim", alterations: [] },
-  aug: { quality: "aug", alterations: [] },
-  "+": { quality: "aug", alterations: [] },
-  sus4: { quality: "sus4", alterations: [] },
-  sus2: { quality: "sus2", alterations: [] },
-  sus: { quality: "sus4", alterations: [] },
-  "6": { quality: "6", alterations: [] },
-  "7": { quality: "7", alterations: [] },
-  maj7: { quality: "maj7", alterations: [] },
-  M7: { quality: "maj7", alterations: [] },
-  "Δ7": { quality: "maj7", alterations: [] },
-  Δ: { quality: "maj7", alterations: [] },
-  m7: { quality: "m7", alterations: [] },
-  min7: { quality: "m7", alterations: [] },
-  "-7": { quality: "m7", alterations: [] },
-  dim7: { quality: "dim7", alterations: [] },
-  o7: { quality: "dim7", alterations: [] },
-  "m7b5": { quality: "m7b5", alterations: [] },
-  ø: { quality: "m7b5", alterations: [] },
-  ø7: { quality: "m7b5", alterations: [] },
-  "7b5": { quality: "7", alterations: ["b5"] },
-  "7#5": { quality: "7", alterations: ["#5"] },
-  "7b9": { quality: "7", alterations: ["b9"] },
-  "7#9": { quality: "7", alterations: ["#9"] },
-  "7alt": { quality: "7alt", alterations: [] },
-  "9": { quality: "9", alterations: [] },
-  maj9: { quality: "maj9", alterations: [] },
-  m9: { quality: "m9", alterations: [] },
-  "11": { quality: "11", alterations: [] },
-  "13": { quality: "13", alterations: [] },
-  add9: { quality: "add9", alterations: [] },
-  "6/9": { quality: "6/9", alterations: [] },
-};
+const QUALITY_MAP: Record<string, { quality: string; alterations: string[] }> =
+  {
+    "": { quality: "major", alterations: [] },
+    maj: { quality: "major", alterations: [] },
+    M: { quality: "major", alterations: [] },
+    m: { quality: "minor", alterations: [] },
+    min: { quality: "minor", alterations: [] },
+    "-": { quality: "minor", alterations: [] },
+    dim: { quality: "dim", alterations: [] },
+    o: { quality: "dim", alterations: [] },
+    aug: { quality: "aug", alterations: [] },
+    "+": { quality: "aug", alterations: [] },
+    sus4: { quality: "sus4", alterations: [] },
+    sus2: { quality: "sus2", alterations: [] },
+    sus: { quality: "sus4", alterations: [] },
+    "6": { quality: "6", alterations: [] },
+    "7": { quality: "7", alterations: [] },
+    maj7: { quality: "maj7", alterations: [] },
+    M7: { quality: "maj7", alterations: [] },
+    Δ7: { quality: "maj7", alterations: [] },
+    Δ: { quality: "maj7", alterations: [] },
+    m7: { quality: "m7", alterations: [] },
+    min7: { quality: "m7", alterations: [] },
+    "-7": { quality: "m7", alterations: [] },
+    dim7: { quality: "dim7", alterations: [] },
+    o7: { quality: "dim7", alterations: [] },
+    m7b5: { quality: "m7b5", alterations: [] },
+    ø: { quality: "m7b5", alterations: [] },
+    ø7: { quality: "m7b5", alterations: [] },
+    "7b5": { quality: "7", alterations: ["b5"] },
+    "7#5": { quality: "7", alterations: ["#5"] },
+    "7b9": { quality: "7", alterations: ["b9"] },
+    "7#9": { quality: "7", alterations: ["#9"] },
+    "7alt": { quality: "7alt", alterations: [] },
+    "9": { quality: "9", alterations: [] },
+    maj9: { quality: "maj9", alterations: [] },
+    m9: { quality: "m9", alterations: [] },
+    "11": { quality: "11", alterations: [] },
+    "13": { quality: "13", alterations: [] },
+    add9: { quality: "add9", alterations: [] },
+    "6/9": { quality: "6/9", alterations: [] },
+  };
 
 /**
  * Quality to display suffix mapping
@@ -245,18 +248,21 @@ export function parseChordToRelative(
 
   // Parse quality/suffix
   const suffix = rootInfo.rest;
-  const qualityInfo = QUALITY_MAP[suffix] ?? { quality: suffix || "major", alterations: [] };
+  const qualityInfo = QUALITY_MAP[suffix] ?? {
+    quality: suffix || "major",
+    alterations: [],
+  };
 
   // Calculate rootOffset relative to key
   const keySemitone = fifthsToSemitones(keyFifths);
-  const rootOffset = ((rootInfo.semitone - keySemitone) % 12 + 12) % 12;
+  const rootOffset = (((rootInfo.semitone - keySemitone) % 12) + 12) % 12;
 
   // Parse bass if present
   let bassOffset: number | undefined;
   if (bassPart) {
     const bassInfo = parseRootSemitone(bassPart);
     if (bassInfo) {
-      bassOffset = ((bassInfo.semitone - keySemitone) % 12 + 12) % 12;
+      bassOffset = (((bassInfo.semitone - keySemitone) % 12) + 12) % 12;
     }
   }
 
@@ -578,7 +584,12 @@ export function updateChordInProgression(
   updates: Partial<
     Pick<
       ChordSymbol,
-      "rootOffset" | "quality" | "alterations" | "bassOffset" | "beatPosition" | "measureIndex"
+      | "rootOffset"
+      | "quality"
+      | "alterations"
+      | "bassOffset"
+      | "beatPosition"
+      | "measureIndex"
     >
   >,
 ): ChordProgression {

@@ -19,9 +19,12 @@ import type {
  * Helper to resolve a chord to its display symbol for test assertions.
  * Uses key of C (0 fifths) by default.
  */
-function chordSymbol(
-  chord: { rootOffset: number; quality: string; alterations: string[]; bassOffset?: number },
-): string {
+function chordSymbol(chord: {
+  rootOffset: number;
+  quality: string;
+  alterations: string[];
+  bassOffset?: number;
+}): string {
   return resolveChordSymbol(chord as any, 0) ?? "";
 }
 
@@ -182,12 +185,16 @@ describe("importedScoreConverter", () => {
       expect(composerScore.chordProgressions[0].chords).toHaveLength(2);
 
       // First chord at beat 0
-      expect(chordSymbol(composerScore.chordProgressions[0].chords[0])).toBe("Cmaj7");
+      expect(chordSymbol(composerScore.chordProgressions[0].chords[0])).toBe(
+        "Cmaj7",
+      );
       expect(composerScore.chordProgressions[0].chords[0].measureIndex).toBe(0);
       expect(composerScore.chordProgressions[0].chords[0].beatPosition).toBe(0);
 
       // Second chord at beat 2
-      expect(chordSymbol(composerScore.chordProgressions[0].chords[1])).toBe("Dm7");
+      expect(chordSymbol(composerScore.chordProgressions[0].chords[1])).toBe(
+        "Dm7",
+      );
       expect(composerScore.chordProgressions[0].chords[1].measureIndex).toBe(0);
       expect(composerScore.chordProgressions[0].chords[1].beatPosition).toBe(2);
     });
@@ -323,7 +330,7 @@ describe("importedScoreConverter", () => {
       expect(originalScore.chordProgressions[0].chords).toHaveLength(2);
       expect(originalScore.chordProgressions[0].chords[0].beatPosition).toBe(0);
       expect(originalScore.chordProgressions[0].chords[1].beatPosition).toBe(
-        3.5
+        3.5,
       );
 
       // Export to MusicXML
@@ -345,11 +352,15 @@ describe("importedScoreConverter", () => {
 
       // Verify chords survived with correct positions
       expect(importedScore.chordProgressions[0].chords).toHaveLength(2);
-      expect(chordSymbol(importedScore.chordProgressions[0].chords[0])).toBe("C");
+      expect(chordSymbol(importedScore.chordProgressions[0].chords[0])).toBe(
+        "C",
+      );
       expect(importedScore.chordProgressions[0].chords[0].beatPosition).toBe(0);
-      expect(chordSymbol(importedScore.chordProgressions[0].chords[1])).toBe("F");
+      expect(chordSymbol(importedScore.chordProgressions[0].chords[1])).toBe(
+        "F",
+      );
       expect(importedScore.chordProgressions[0].chords[1].beatPosition).toBe(
-        3.5
+        3.5,
       );
     });
   });

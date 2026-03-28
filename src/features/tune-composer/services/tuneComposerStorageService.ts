@@ -7,6 +7,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import type { TuneComposerScore } from "../types";
+import { DEFAULT_PLAYBACK_SETTINGS } from "../types";
 import { generateMusicXml } from "./tuneComposerMusicXmlGenerator";
 
 // Safe logger import (optional in tests)
@@ -50,6 +51,29 @@ export interface TuneScoreListResult {
   scores: TuneScoreMeta[];
   total: number;
 }
+
+// =============================================================================
+// Migration
+// =============================================================================
+
+/**
+ * Migrate a loaded score to ensure all properties have defaults.
+ * This handles scores saved before new properties were added.
+ */
+function migrateScore(score: TuneComposerScore): TuneComposerScore {
+  return {
+    ...score,
+    // Ensure playbackSettings has all required properties with defaults
+    playbackSettings: {
+      ...DEFAULT_PLAYBACK_SETTINGS,
+      ...score.playbackSettings,
+    },
+  };
+}
+
+// =============================================================================
+// Service
+// =============================================================================
 
 export interface ExportOptions {
   includeMetadata?: boolean;
@@ -113,18 +137,23 @@ export const tuneComposerStorageService = {
       if (!json) return null;
 
       const saved: SavedTuneScore = JSON.parse(json);
-      
+
+      // Migrate score to ensure all properties have defaults
+      let score = migrateScore(saved.score);
+
       // Clear slurPlacement on all notes so it auto-calculates from stem direction
       // This ensures slurs adapt correctly when the tune is rendered
-      const score = saved.score;
-      score.measures = score.measures.map((measure) => ({
-        ...measure,
-        notes: measure.notes.map((note) => ({
-          ...note,
-          slurPlacement: undefined,
+      score = {
+        ...score,
+        measures: score.measures.map((measure) => ({
+          ...measure,
+          notes: measure.notes.map((note) => ({
+            ...note,
+            slurPlacement: undefined,
+          })),
         })),
-      }));
-      
+      };
+
       return score;
     } catch (error) {
       devLogger.error(
@@ -174,6 +203,23 @@ export const tuneComposerStorageService = {
     return result.scores.find((s) => s.id === id) ?? null;
   },
 
+  /**
+   * Find a saved score by its importedFrom filename.
+   * Used to preserve settings when re-importing a previously saved file.
+   */
+  async findScoreByImportedFrom(
+    filename: string,
+  ): Promise<TuneComposerScore | null> {
+    const result = await this.listScores();
+    for (const meta of result.scores) {
+      const score = await this.loadScore(meta.id);
+      if (score?.importedFrom === filename) {
+        return score;
+      }
+    }
+    return null;
+  },
+
   // Autosave
   async autosave(score: TuneComposerScore): Promise<void> {
     try {
@@ -193,17 +239,22 @@ export const tuneComposerStorageService = {
       if (!json) return null;
 
       const data = JSON.parse(json);
-      const score = data.score as TuneComposerScore;
-      
+
+      // Migrate score to ensure all properties have defaults
+      let score = migrateScore(data.score as TuneComposerScore);
+
       // Clear slurPlacement on all notes so it auto-calculates from stem direction
-      score.measures = score.measures.map((measure) => ({
-        ...measure,
-        notes: measure.notes.map((note) => ({
-          ...note,
-          slurPlacement: undefined,
+      score = {
+        ...score,
+        measures: score.measures.map((measure) => ({
+          ...measure,
+          notes: measure.notes.map((note) => ({
+            ...note,
+            slurPlacement: undefined,
+          })),
         })),
-      }));
-      
+      };
+
       return score;
     } catch (error) {
       devLogger.error("TuneComposerStorage", "Failed to load autosave", error);

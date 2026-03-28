@@ -272,7 +272,10 @@ const DIVISIONS_PER_QUARTER = 12;
  * @param offset Offset in divisions (12 per quarter note)
  * @param beatUnitDuration Duration of one beat in quarter notes (e.g., 1 for 4/4, 0.5 for 6/8)
  */
-function offsetToBeatPosition(offset: number, beatUnitDuration: number): number {
+function offsetToBeatPosition(
+  offset: number,
+  beatUnitDuration: number,
+): number {
   // Convert divisions to quarter notes, then to beat units
   const quarterNotes = offset / DIVISIONS_PER_QUARTER;
   return quarterNotes / beatUnitDuration;

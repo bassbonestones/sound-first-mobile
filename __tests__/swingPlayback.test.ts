@@ -68,7 +68,9 @@ describe("Swing Playback", () => {
         expect(getSwungDuration(0, EIGHTH_NOTE, 4, false)).toBe(EIGHTH_NOTE);
         expect(getSwungDuration(0.5, EIGHTH_NOTE, 4, false)).toBe(EIGHTH_NOTE);
         expect(getSwungDuration(0, QUARTER_NOTE, 4, false)).toBe(QUARTER_NOTE);
-        expect(getSwungDuration(0, DOTTED_QUARTER, 4, false)).toBe(DOTTED_QUARTER);
+        expect(getSwungDuration(0, DOTTED_QUARTER, 4, false)).toBe(
+          DOTTED_QUARTER,
+        );
       });
     });
 
@@ -127,7 +129,12 @@ describe("Swing Playback", () => {
         it("should preserve total duration of dotted-quarter + eighth pair", () => {
           // Dotted quarter (1.5) + eighth (0.5) = 2 beats
           // Both get adjusted but total should still be 2 beats
-          const dottedQuarterSwung = getSwungDuration(0, DOTTED_QUARTER, 4, true);
+          const dottedQuarterSwung = getSwungDuration(
+            0,
+            DOTTED_QUARTER,
+            4,
+            true,
+          );
           const eighthSwung = getSwungDuration(1.5, EIGHTH_NOTE, 4, true);
           expect(dottedQuarterSwung + eighthSwung).toBeCloseTo(2.0);
         });
@@ -142,22 +149,50 @@ describe("Swing Playback", () => {
       });
 
       describe("with sixteenth notes", () => {
-        it("should not swing sixteenth notes (don't align with off-beat)", () => {
-          // Sixteenths don't end on 0.5 boundaries
-          expect(getSwungDuration(0, SIXTEENTH_NOTE, 4, true)).toBe(SIXTEENTH_NOTE);
-          expect(getSwungDuration(0.25, SIXTEENTH_NOTE, 4, true)).toBe(SIXTEENTH_NOTE);
+        it("should not swing sixteenth notes in 4/4 (don't align with off-beat)", () => {
+          // In 4/4, half-beat = 0.5, so sixteenths (0.25) don't align
+          expect(getSwungDuration(0, SIXTEENTH_NOTE, 4, true)).toBe(
+            SIXTEENTH_NOTE,
+          );
+          expect(getSwungDuration(0.25, SIXTEENTH_NOTE, 4, true)).toBe(
+            SIXTEENTH_NOTE,
+          );
         });
       });
 
-      describe("in 6/8 time", () => {
-        it("should swing eighth note subdivisions", () => {
-          // In 6/8 with beatUnit=8, half-beat is still 0.5
-          const onBeat = getSwungDuration(0, EIGHTH_NOTE, 8, true);
-          const offBeat = getSwungDuration(0.5, EIGHTH_NOTE, 8, true);
+      describe("in 6/8 time (beatUnit=8)", () => {
+        // In 6/8: beatDuration = 0.5, halfBeat = 0.25, swingExtension = (2/3 - 0.5) * 0.5 = 0.0833
+        const BEAT_DURATION_6_8 = 0.5;
+        const SWING_EXTENSION_6_8 = (SWING_RATIO - 0.5) * BEAT_DURATION_6_8;
 
-          expect(onBeat).toBeGreaterThan(EIGHTH_NOTE);
-          expect(offBeat).toBeLessThan(EIGHTH_NOTE);
-          expect(onBeat + offBeat).toBeCloseTo(1.0);
+        it("should swing sixteenth note subdivisions", () => {
+          // In 6/8 with beatUnit=8, half-beat = 0.25 (sixteenth)
+          const onBeat = getSwungDuration(0, SIXTEENTH_NOTE, 8, true);
+          const offBeat = getSwungDuration(0.25, SIXTEENTH_NOTE, 8, true);
+
+          expect(onBeat).toBeCloseTo(SIXTEENTH_NOTE + SWING_EXTENSION_6_8);
+          expect(offBeat).toBeCloseTo(SIXTEENTH_NOTE - SWING_EXTENSION_6_8);
+          expect(onBeat + offBeat).toBeCloseTo(0.5); // One eighth-note beat
+        });
+
+        it("should not swing eighth notes in 6/8 (they are full beats)", () => {
+          // In 6/8, eighth = one beat, so it goes from on-beat to on-beat
+          expect(getSwungDuration(0, EIGHTH_NOTE, 8, true)).toBe(EIGHTH_NOTE);
+        });
+      });
+
+      describe("in 4/8 time (beatUnit=8)", () => {
+        // In 4/8: beatDuration = 0.5, halfBeat = 0.25, swingExtension = (2/3 - 0.5) * 0.5 = 0.0833
+        const BEAT_DURATION_4_8 = 0.5;
+        const SWING_EXTENSION_4_8 = (SWING_RATIO - 0.5) * BEAT_DURATION_4_8;
+
+        it("should swing sixteenth notes", () => {
+          // In 4/8 with beatUnit=8, half-beat = 0.25 (sixteenth)
+          const onBeat = getSwungDuration(0, SIXTEENTH_NOTE, 8, true);
+          const offBeat = getSwungDuration(0.25, SIXTEENTH_NOTE, 8, true);
+
+          expect(onBeat).toBeCloseTo(SIXTEENTH_NOTE + SWING_EXTENSION_4_8);
+          expect(offBeat).toBeCloseTo(SIXTEENTH_NOTE - SWING_EXTENSION_4_8);
         });
       });
     });

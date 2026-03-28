@@ -215,6 +215,14 @@ function TuneComposerScreenContent({
   // Composer state
   const composerState = useTuneComposerState(initialScore);
 
+  // Sync initialScore changes into composerState
+  // (useState only reads initial value once, so we need this effect)
+  useEffect(() => {
+    if (initialScore) {
+      composerState.loadScore(initialScore);
+    }
+  }, [initialScore]); // Don't include composerState.loadScore to avoid loops
+
   // Playback
   const {
     playback,
@@ -700,21 +708,34 @@ function TuneComposerScreenContent({
         }
 
         // Convert to ComposerScore
-        const composerScore = importedScoreToComposerScore(parseResult.score, {
+        let composerScore = importedScoreToComposerScore(parseResult.score, {
           title: preview.title,
         });
 
-        // Load into composer and track filename
-        composerState.loadScore(composerScore);
-        setCurrentFilename(filename);
-        setShowImportModal(false);
-
-        // Load metadata for this file
+        // Check if we have a previously saved score for this file
+        // and preserve its playback settings (like swing)
+        const existingSave =
+          await tuneComposerStorageService.findScoreByImportedFrom(filename);
+        // Load metadata for this file (do this before setting the score
+        // so we can apply saved playback settings)
         const metadata = await tuneMetadataService.loadOrCreateMetadata(
           filename,
           preview.title,
         );
         setTuneMetadata(metadata);
+
+        // Apply playbackSettings from metadata if present
+        if (metadata.playbackSettings) {
+          composerScore = {
+            ...composerScore,
+            playbackSettings: metadata.playbackSettings,
+          };
+        }
+
+        // Load into composer and track filename
+        composerState.loadScore(composerScore);
+        setCurrentFilename(filename);
+        setShowImportModal(false);
 
         // Show success message
         Alert.alert(
@@ -753,6 +774,16 @@ function TuneComposerScreenContent({
     try {
       const musicxml = generateMusicXml(composerState.score);
       await savePreviewFile(currentFilename, musicxml);
+
+      // Also save playback settings to metadata
+      const updatedMetadata: TuneMetadata = {
+        ...tuneMetadata,
+        playbackSettings: composerState.score.playbackSettings,
+        updatedAt: new Date().toISOString(),
+      };
+      await tuneMetadataService.saveMetadata(currentFilename, updatedMetadata);
+      setTuneMetadata(updatedMetadata);
+
       const msg = `File saved: ${formatFilename(currentFilename)}`;
       if (Platform.OS === "web") {
         window.alert(msg);
@@ -769,7 +800,7 @@ function TuneComposerScreenContent({
     } finally {
       setIsSaving(false);
     }
-  }, [currentFilename, composerState.score, formatFilename]);
+  }, [currentFilename, composerState.score, tuneMetadata, formatFilename]);
 
   // Open save new modal
   const handleSaveNew = useCallback(() => {
@@ -856,6 +887,8 @@ function TuneComposerScreenContent({
     setIsSaving(true);
     try {
       await deletePreviewFile(currentFilename);
+      // Also delete the metadata file (no error if it doesn't exist)
+      await tuneMetadataService.deleteMetadata(currentFilename);
       if (Platform.OS === "web") {
         window.alert(`File deleted: ${formatFilename(currentFilename)}`);
       } else {
@@ -1136,7 +1169,11 @@ function TuneComposerScreenContent({
           onClearScore={composerState.clearScore}
           onBack={handleBack}
           disabled={isPlaying}
-          displayTitle={tuneMetadata.title !== "Untitled Tune" ? tuneMetadata.title : undefined}
+          displayTitle={
+            tuneMetadata.title !== "Untitled Tune"
+              ? tuneMetadata.title
+              : undefined
+          }
           testID="composer-topbar"
           swingEnabled={composerState.swingEnabled}
           onSwingEnabledChange={composerState.setSwingEnabled}
