@@ -64,10 +64,7 @@ const MIDDLE_LINE_MIDI: Record<Clef, number> = {
  * - Otherwise, the clearly farthest note determines stem direction
  * Slurs go on the OPPOSITE side of stems.
  */
-function computeSlurPlacement(
-  midis: number[],
-  clef: Clef,
-): "above" | "below" {
+function computeSlurPlacement(midis: number[], clef: Clef): "above" | "below" {
   if (midis.length === 0) return "below";
 
   const middleLine = MIDDLE_LINE_MIDI[clef];
@@ -84,7 +81,7 @@ function computeSlurPlacement(
     // Near tie - favor higher note if any note is above middle line
     return distAbove > 0 ? "above" : "below";
   }
-  
+
   // Clear winner - farthest note determines
   return distAbove > distBelow ? "above" : "below";
 }
@@ -423,7 +420,7 @@ function generateLyricXml(lyric: Lyric | undefined): string {
   // Handle melisma (extend marks) - use plain <extend/> for compatibility
   const extendXml =
     lyric.melismaLength && lyric.melismaLength > 1
-      ? '\n          <extend/>'
+      ? "\n          <extend/>"
       : "";
 
   return `
@@ -755,7 +752,10 @@ function generateMeasureXml(
         if (m !== null) midis.push(m);
       }
       if (midis.length > 0) {
-        slurPlacements.set(slurStartNoteId, computeSlurPlacement(midis, score.clef));
+        slurPlacements.set(
+          slurStartNoteId,
+          computeSlurPlacement(midis, score.clef),
+        );
       }
       slurStartIndex = -1;
       slurStartNoteId = null;
@@ -797,7 +797,17 @@ function generateMeasureXml(
     const slurPlacement = slurPlacements.get(note.id);
     const isMelismaContinuation = melismaContinuationNotes.has(note.id);
     notesXml +=
-      "\n" + generateNoteXml(note, preferFlats, options, score.clef, isLastInTriplet, beam, slurPlacement, isMelismaContinuation);
+      "\n" +
+      generateNoteXml(
+        note,
+        preferFlats,
+        options,
+        score.clef,
+        isLastInTriplet,
+        beam,
+        slurPlacement,
+        isMelismaContinuation,
+      );
 
     // Advance beat position by note duration (including dot)
     currentBeat += getNoteDuration(note);
@@ -869,7 +879,7 @@ export function generateMusicXml(
   // that extends to cover this note
   const melismaContinuationNotes = new Set<string>();
   let melismaRemaining = 0;
-  
+
   for (const measure of score.measures) {
     for (const note of measure.notes) {
       // Only pitched notes can be part of melisma
@@ -889,7 +899,7 @@ export function generateMusicXml(
 
   // Check if first measure is pickup
   const hasPickup = score.measures[0]?.isPickup ?? false;
-  
+
   // Find index of first full (non-pickup) measure
   const firstFullMeasureIndex = hasPickup ? 1 : 0;
 
@@ -898,7 +908,7 @@ export function generateMusicXml(
       // Pickup measure = 0, then count from 1
       const measureNumber = hasPickup ? index : index + 1;
       const isFirstFullMeasure = index === firstFullMeasureIndex;
-      
+
       return generateMeasureXml(
         measure,
         measureNumber,

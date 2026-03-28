@@ -186,10 +186,7 @@ export function useTuneComposerChords(
 
     // Can go next if not at last beat of last measure
     return measureIndex < totalMeasures - 1 || beatPosition < beatUnitCount - 1;
-  }, [
-    state.chordCursor,
-    state.score,
-  ]);
+  }, [state.chordCursor, state.score]);
 
   // ===========================================================================
   // Chord Operations
@@ -318,7 +315,10 @@ export function useTuneComposerChords(
         };
       } else if (measureIndex > 0) {
         // Move to last beat of previous measure
-        const prevMeasureBeatCount = getMeasureBeatCount(measureIndex - 1, prev.score);
+        const prevMeasureBeatCount = getMeasureBeatCount(
+          measureIndex - 1,
+          prev.score,
+        );
         return {
           ...prev,
           chordCursor: {
