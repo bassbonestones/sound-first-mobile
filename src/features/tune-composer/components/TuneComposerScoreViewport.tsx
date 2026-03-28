@@ -69,6 +69,8 @@ export interface TuneComposerScoreViewportProps {
   selectedNoteId?: string | null;
   /** Chord cursor position (for chord entry mode) */
   chordCursor?: { measureIndex: number; beatPosition: number } | null;
+  /** Lyrics cursor position (for lyrics entry mode) - converted to measure/note position */
+  lyricsCursorPosition?: CursorPosition | null;
   /** Called when a note is tapped */
   onNoteTap?: (measureIndex: number, noteIndex: number) => void;
   /** Called when rendering completes */
@@ -119,6 +121,7 @@ function TuneComposerScoreViewportComponent({
   cursor,
   selectedNoteId,
   chordCursor,
+  lyricsCursorPosition,
   onNoteTap,
   onRenderComplete,
   onError,
@@ -159,6 +162,14 @@ function TuneComposerScoreViewportComponent({
     measureIndex: 0,
     noteIndex: 0,
   });
+  const prevChordCursorRef = useRef<{
+    measureIndex: number;
+    beatPosition: number;
+  } | null>(null);
+  const prevLyricsCursorRef = useRef<{
+    measureIndex: number;
+    noteIndex: number;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -176,6 +187,8 @@ function TuneComposerScoreViewportComponent({
   >([]);
   const [contentWidth, setContentWidth] = useState(2000);
   const [osmdZoom, setOsmdZoom] = useState(1);
+  // Track scroll position as state so chord cursor overlay re-renders during scroll
+  const [scrollX, setScrollX] = useState(0);
   const viewportWidthRef = useRef(400);
   // Refs for values used in playback scroll effect (to avoid dependency on state changes)
   const measurePositionsRef = useRef(measurePositions);
@@ -518,8 +531,14 @@ function TuneComposerScoreViewportComponent({
   // Rule: Scroll at 70% if next measure is NOT fully visible,
   //       otherwise wait until entering that next measure
   useEffect(() => {
-    // Only scroll for cursor when not playing
+    // Only scroll for cursor when not playing and not in special modes
     if (playbackState === "playing") {
+      return;
+    }
+
+    // Skip main cursor scroll when lyrics or chord mode is active
+    // (they have their own scroll effects)
+    if (lyricsCursorPosition || chordCursor) {
       return;
     }
 
@@ -635,9 +654,292 @@ function TuneComposerScoreViewportComponent({
         animated: true,
       });
     }
-  }, [cursor.measureIndex, cursor.noteIndex, playbackState, score.measures]);
+  }, [
+    cursor.measureIndex,
+    cursor.noteIndex,
+    playbackState,
+    score.measures,
+    lyricsCursorPosition,
+    chordCursor,
+  ]);
 
-  // Auto-scroll for chord cursor is disabled - user controls scroll manually
+  // Scroll the parent ScrollView when chord cursor moves
+  // Uses same 70%/30% threshold logic as main cursor
+  useEffect(() => {
+    // Only scroll for chord cursor when in chord mode
+    if (!chordCursor) {
+      prevChordCursorRef.current = null;
+      return;
+    }
+
+    // Determine chord cursor movement direction
+    const prevChordCursor = prevChordCursorRef.current;
+
+    // Skip scrolling on initial entry to chord mode (no previous position to compare)
+    if (!prevChordCursor) {
+      prevChordCursorRef.current = {
+        measureIndex: chordCursor.measureIndex,
+        beatPosition: chordCursor.beatPosition,
+      };
+      return;
+    }
+
+    // Check if position actually changed
+    const positionChanged =
+      chordCursor.measureIndex !== prevChordCursor.measureIndex ||
+      chordCursor.beatPosition !== prevChordCursor.beatPosition;
+
+    if (!positionChanged) {
+      return;
+    }
+
+    const movingLeft =
+      chordCursor.measureIndex < prevChordCursor.measureIndex ||
+      (chordCursor.measureIndex === prevChordCursor.measureIndex &&
+        chordCursor.beatPosition < prevChordCursor.beatPosition);
+
+    // Update prev chord cursor for next comparison
+    prevChordCursorRef.current = {
+      measureIndex: chordCursor.measureIndex,
+      beatPosition: chordCursor.beatPosition,
+    };
+
+    // If at start, scroll to beginning
+    if (chordCursor.measureIndex === 0 && chordCursor.beatPosition === 0) {
+      if (scrollViewRef.current) {
+        scrollViewRef.current.scrollTo({ x: 0, animated: true });
+      }
+      return;
+    }
+
+    // Get current measure position info
+    const currentMeasurePos = measurePositionsRef.current.find(
+      (m) => m.measureIndex === chordCursor.measureIndex,
+    );
+    if (!currentMeasurePos) {
+      return;
+    }
+
+    const zoom = osmdZoomRef.current;
+    const vw = viewportWidthRef.current;
+    const currentScrollX = currentScrollXRef.current;
+
+    // Calculate the X position of the chord cursor
+    let chordCursorX: number;
+
+    if (
+      currentMeasurePos.beatPositions &&
+      currentMeasurePos.beatPositions.length > 0
+    ) {
+      // Find the beat position closest to our chord beat
+      const beatPositions = currentMeasurePos.beatPositions;
+      let closestBeatPos = beatPositions[0];
+      for (const bp of beatPositions) {
+        if (bp.beat <= chordCursor.beatPosition) {
+          closestBeatPos = bp;
+        } else {
+          break;
+        }
+      }
+      chordCursorX = closestBeatPos.x * zoom;
+    } else {
+      // Fallback: use measure start position
+      chordCursorX = currentMeasurePos.x * zoom;
+    }
+
+    // Find next measure to check if it's fully visible
+    const nextMeasurePos = measurePositionsRef.current.find(
+      (m) => m.measureIndex === chordCursor.measureIndex + 1,
+    );
+
+    // Check if next measure's right edge is within the viewport
+    const viewportRightEdge = currentScrollX + vw;
+    const nextMeasureFullyVisible = nextMeasurePos
+      ? (nextMeasurePos.x + (nextMeasurePos.width || 100)) * zoom <=
+        viewportRightEdge
+      : false;
+
+    // Decide whether to scroll
+    const rightThreshold = currentScrollX + vw * 0.7;
+    const leftThreshold = currentScrollX + vw * 0.3;
+    const isPast70 = chordCursorX > rightThreshold;
+    const isBefore30 = chordCursorX < leftThreshold;
+    let shouldScroll = false;
+    let targetScrollX = 0;
+
+    if (!movingLeft && isPast70) {
+      // Moving right and past 70%
+      if (!nextMeasureFullyVisible) {
+        // Next measure not visible - scroll immediately
+        shouldScroll = true;
+        targetScrollX = Math.max(0, chordCursorX - vw * 0.15);
+      } else if (chordCursor.beatPosition === 0) {
+        // Just entered this measure - scroll now
+        shouldScroll = true;
+        targetScrollX = Math.max(0, chordCursorX - vw * 0.15);
+      }
+    } else if (movingLeft && isBefore30 && currentScrollX > 0) {
+      // Moving left and cursor is before 30%, scroll to put it at 70%
+      shouldScroll = true;
+      targetScrollX = Math.max(0, chordCursorX - vw * 0.7);
+    }
+
+    if (shouldScroll && scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({
+        x: targetScrollX,
+        animated: true,
+      });
+    }
+  }, [chordCursor?.measureIndex, chordCursor?.beatPosition]);
+
+  // Scroll the parent ScrollView when lyrics cursor moves
+  // Uses same 70%/30% threshold logic as main cursor
+  useEffect(() => {
+    // Only scroll when lyrics cursor is active
+    if (!lyricsCursorPosition) {
+      prevLyricsCursorRef.current = null;
+      return;
+    }
+
+    // Determine lyrics cursor movement direction
+    const prevLyricsCursor = prevLyricsCursorRef.current;
+
+    // Skip scrolling on initial entry to lyrics mode (no previous position to compare)
+    if (!prevLyricsCursor) {
+      prevLyricsCursorRef.current = {
+        measureIndex: lyricsCursorPosition.measureIndex,
+        noteIndex: lyricsCursorPosition.noteIndex,
+      };
+      return;
+    }
+
+    // Check if position actually changed
+    const positionChanged =
+      lyricsCursorPosition.measureIndex !== prevLyricsCursor.measureIndex ||
+      lyricsCursorPosition.noteIndex !== prevLyricsCursor.noteIndex;
+
+    if (!positionChanged) {
+      return;
+    }
+
+    const movingLeft =
+      lyricsCursorPosition.measureIndex < prevLyricsCursor.measureIndex ||
+      (lyricsCursorPosition.measureIndex === prevLyricsCursor.measureIndex &&
+        lyricsCursorPosition.noteIndex < prevLyricsCursor.noteIndex);
+
+    // Update prev lyrics cursor for next comparison
+    prevLyricsCursorRef.current = {
+      measureIndex: lyricsCursorPosition.measureIndex,
+      noteIndex: lyricsCursorPosition.noteIndex,
+    };
+
+    // If at start, scroll to beginning
+    if (
+      lyricsCursorPosition.measureIndex === 0 &&
+      lyricsCursorPosition.noteIndex === 0
+    ) {
+      if (scrollViewRef.current) {
+        scrollViewRef.current.scrollTo({ x: 0, animated: true });
+      }
+      return;
+    }
+
+    // Get current measure position info
+    const currentMeasurePos = measurePositionsRef.current.find(
+      (m) => m.measureIndex === lyricsCursorPosition.measureIndex,
+    );
+    if (!currentMeasurePos) {
+      return;
+    }
+
+    const zoom = osmdZoomRef.current;
+    const vw = viewportWidthRef.current;
+    const currentScrollX = currentScrollXRef.current;
+
+    // Calculate the X position of the lyrics cursor note
+    let lyricsCursorX: number;
+
+    if (
+      currentMeasurePos.beatPositions &&
+      currentMeasurePos.beatPositions.length > 0
+    ) {
+      // Calculate beat position from noteIndex by summing note durations
+      const measure = score.measures[lyricsCursorPosition.measureIndex];
+      let lyricsBeat = 0;
+      if (measure) {
+        for (
+          let i = 0;
+          i < lyricsCursorPosition.noteIndex && i < measure.notes.length;
+          i++
+        ) {
+          lyricsBeat += getNoteDuration(measure.notes[i]);
+        }
+      }
+
+      // Find the beat position closest to our lyrics beat
+      const beatPositions = currentMeasurePos.beatPositions;
+      let closestBeatPos = beatPositions[0];
+      for (const bp of beatPositions) {
+        if (bp.beat <= lyricsBeat) {
+          closestBeatPos = bp;
+        } else {
+          break;
+        }
+      }
+      lyricsCursorX = closestBeatPos.x * zoom;
+    } else {
+      // Fallback: use measure start position
+      lyricsCursorX = currentMeasurePos.x * zoom;
+    }
+
+    // Find next measure to check if it's fully visible
+    const nextMeasurePos = measurePositionsRef.current.find(
+      (m) => m.measureIndex === lyricsCursorPosition.measureIndex + 1,
+    );
+
+    // Check if next measure's right edge is within the viewport
+    const viewportRightEdge = currentScrollX + vw;
+    const nextMeasureFullyVisible = nextMeasurePos
+      ? (nextMeasurePos.x + (nextMeasurePos.width || 100)) * zoom <=
+        viewportRightEdge
+      : false;
+
+    // Decide whether to scroll
+    const rightThreshold = currentScrollX + vw * 0.7;
+    const leftThreshold = currentScrollX + vw * 0.3;
+    const isPast70 = lyricsCursorX > rightThreshold;
+    const isBefore30 = lyricsCursorX < leftThreshold;
+    let shouldScroll = false;
+    let targetScrollX = 0;
+
+    if (!movingLeft && isPast70) {
+      // Moving right and past 70%
+      if (!nextMeasureFullyVisible) {
+        // Next measure not visible - scroll immediately
+        shouldScroll = true;
+        targetScrollX = Math.max(0, lyricsCursorX - vw * 0.15);
+      } else if (lyricsCursorPosition.noteIndex === 0) {
+        // Just entered this measure - scroll now
+        shouldScroll = true;
+        targetScrollX = Math.max(0, lyricsCursorX - vw * 0.15);
+      }
+    } else if (movingLeft && isBefore30 && currentScrollX > 0) {
+      // Moving left and cursor is before 30%, scroll to put it at 70%
+      shouldScroll = true;
+      targetScrollX = Math.max(0, lyricsCursorX - vw * 0.7);
+    }
+
+    if (shouldScroll && scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({
+        x: targetScrollX,
+        animated: true,
+      });
+    }
+  }, [
+    lyricsCursorPosition?.measureIndex,
+    lyricsCursorPosition?.noteIndex,
+    score.measures,
+  ]);
 
   // Apply zoom when controlled zoom changes
   useEffect(() => {
@@ -647,9 +949,12 @@ function TuneComposerScoreViewportComponent({
   }, [isReady, controlledZoom, executeScript]);
 
   // Track scroll position so we can restore it after re-render
+  // Also updates state for chord cursor overlay positioning
   const handleScroll = useCallback(
     (event: { nativeEvent: { contentOffset: { x: number } } }) => {
-      currentScrollXRef.current = event.nativeEvent.contentOffset.x;
+      const newScrollX = event.nativeEvent.contentOffset.x;
+      currentScrollXRef.current = newScrollX;
+      setScrollX(newScrollX);
     },
     [],
   );
@@ -864,7 +1169,7 @@ function TuneComposerScoreViewportComponent({
           <View
             style={[
               styles.chordCursorOverlay,
-              { left: chordCursorX - currentScrollXRef.current },
+              { left: chordCursorX - scrollX },
             ]}
             pointerEvents="none"
             testID="chord-cursor-overlay"

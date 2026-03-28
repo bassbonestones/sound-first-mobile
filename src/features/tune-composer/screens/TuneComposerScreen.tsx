@@ -1002,6 +1002,12 @@ function TuneComposerScreenContent({
     const canGoPrev = lyricsCursor !== null && lyricsCursor > 0;
     const canGoNext = lyricsCursor !== null && lyricsCursor < totalNotes - 1;
 
+    // Get cursor position for scrolling
+    let lyricsCursorPosition: {
+      measureIndex: number;
+      noteIndex: number;
+    } | null = null;
+
     // Get current lyric text, syllabic type, and note id
     let currentLyricText = "";
     let currentSyllabic: "single" | "begin" | "middle" | "end" | undefined;
@@ -1010,6 +1016,10 @@ function TuneComposerScreenContent({
 
     if (lyricsCursor !== null && pitchedNotes[lyricsCursor]) {
       const noteInfo = pitchedNotes[lyricsCursor];
+      lyricsCursorPosition = {
+        measureIndex: noteInfo.measureIndex,
+        noteIndex: noteInfo.noteIndex,
+      };
       const note =
         composerState.score.measures[noteInfo.measureIndex]?.notes[
           noteInfo.noteIndex
@@ -1044,6 +1054,7 @@ function TuneComposerScreenContent({
       currentSyllabic,
       prevSyllabic,
       currentNoteId,
+      lyricsCursorPosition,
     };
   }, [composerState.score, composerState.lyricsCursor]);
 
@@ -1197,6 +1208,11 @@ function TuneComposerScreenContent({
               selectedNoteId={highlightedNoteId}
               chordCursor={
                 composerState.chordMode ? composerState.chordCursor : null
+              }
+              lyricsCursorPosition={
+                composerState.lyricsMode
+                  ? lyricsData.lyricsCursorPosition
+                  : null
               }
               onNoteTap={handleScoreTap}
               zoom={zoom}
