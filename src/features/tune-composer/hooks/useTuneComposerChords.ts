@@ -238,6 +238,7 @@ export function useTuneComposerChords(
 
         if (existingIndex !== -1) {
           // Update existing chord with new relative data
+          // IMPORTANT: Clear the symbol field so resolveChordSymbol uses the new quality
           const newChords = [...prog.chords];
           newChords[existingIndex] = {
             ...newChords[existingIndex],
@@ -245,6 +246,7 @@ export function useTuneComposerChords(
             quality: parsedChord.quality,
             alterations: parsedChord.alterations,
             bassOffset: parsedChord.bassOffset,
+            symbol: undefined, // Clear pre-resolved symbol so new quality is used
           };
           prog.chords = newChords;
         } else {

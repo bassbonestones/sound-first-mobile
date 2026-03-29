@@ -100,6 +100,8 @@ export interface CompactTopBarProps {
    * If not provided, uses clearScore from ScoreSettingsContext.
    */
   onClearScore?: () => void;
+  /** Called when new score is pressed (creates a blank score) */
+  onNewScore?: () => void;
   /** Called when back is pressed */
   onBack?: () => void;
   /** Whether controls are disabled */
@@ -133,6 +135,7 @@ function CompactTopBarComponent({
   zoom,
   onZoomChange,
   onClearScore: propOnClearScore,
+  onNewScore,
   onBack,
   disabled = false,
   displayTitle,
@@ -466,6 +469,46 @@ function CompactTopBarComponent({
                 </View>
               </View>
 
+              {/* New Score */}
+              {onNewScore && (
+                <View style={styles.settingRow}>
+                  <Text style={styles.settingLabel}>New</Text>
+                  <TouchableOpacity
+                    style={styles.newScoreButton}
+                    onPress={() => {
+                      const title = "Create New Score?";
+                      const message =
+                        "This will create a blank score. Any unsaved changes will be lost.";
+                      if (Platform.OS === "web") {
+                        if (window.confirm(`${title}\n\n${message}`)) {
+                          onNewScore();
+                          setShowSettingsModal(false);
+                        }
+                      } else {
+                        Alert.alert(title, message, [
+                          { text: "Cancel", style: "cancel" },
+                          {
+                            text: "Create New",
+                            onPress: () => {
+                              onNewScore();
+                              setShowSettingsModal(false);
+                            },
+                          },
+                        ]);
+                      }
+                    }}
+                    testID="settings-new-score"
+                  >
+                    <Text style={styles.newScoreButtonText}>New Score</Text>
+                    <Feather
+                      name="file-plus"
+                      size={18}
+                      color={colors.primary}
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Clear Score */}
               {onClearScore && (
                 <View style={styles.settingRow}>
@@ -741,6 +784,22 @@ const styles = StyleSheet.create({
   keyOptionText: {
     fontSize: 16,
     color: colors.textPrimary,
+  },
+  newScoreButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  newScoreButtonText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: colors.primary,
   },
   clearButton: {
     flexDirection: "row",

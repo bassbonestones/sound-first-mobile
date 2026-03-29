@@ -192,6 +192,18 @@ describe("Tune Composer MusicXML Generator", () => {
         expectKind(xml, "suspended-fourth");
       });
 
+      it("should generate harmony for 7sus4", () => {
+        const xml = generateHarmonyXml("C7sus4");
+
+        expect(xml).toContain("<root-step>C</root-step>");
+        // 7sus4 uses suspended-fourth kind with added 7th degree
+        expectKind(xml, "suspended-fourth");
+        expect(xml).toContain('text="7sus4"');
+        // Hidden degree element for the 7th (OSMD needs this)
+        expect(xml).toContain("<degree-value>7</degree-value>");
+        expect(xml).toContain('print-object="no"');
+      });
+
       it("should generate harmony for sixth chord", () => {
         const xml = generateHarmonyXml("C6");
 

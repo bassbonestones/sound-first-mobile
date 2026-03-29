@@ -316,6 +316,15 @@ function TuneComposerScreenContent({
     [composerState],
   );
 
+  // New score - reset to blank
+  const handleNewScore = useCallback(() => {
+    composerState.newScore();
+    setCurrentFilename(null);
+    setTuneMetadata(createDefaultMetadata());
+    // Clear autosave since we're starting fresh
+    tuneComposerStorageService.clearAutosave();
+  }, [composerState, setCurrentFilename]);
+
   // Clef change - with transposition prompt if there are notes
   const handleClefChange = useCallback(
     (newClef: Clef) => {
@@ -1182,6 +1191,7 @@ function TuneComposerScreenContent({
           zoom={zoom}
           onZoomChange={setZoom}
           onClearScore={composerState.clearScore}
+          onNewScore={handleNewScore}
           onBack={handleBack}
           disabled={isPlaying}
           displayTitle={

@@ -191,8 +191,10 @@ const CHORD_QUALITY_TO_MUSICXML_KIND: Record<string, string> = {
   dim7: "diminished-seventh",
   m7b5: "half-diminished",
   aug7: "augmented-seventh",
-  "7sus4": "dominant-suspended-fourth",
-  "7sus2": "dominant-suspended-second",
+  // 7sus chords: use suspended-fourth as base, text attribute contains full symbol
+  // (dominant-suspended-fourth is not a standard MusicXML kind)
+  "7sus4": "suspended-fourth",
+  "7sus2": "suspended-second",
   // Extended chords
   maj9: "major-ninth",
   "9": "dominant-ninth",
@@ -378,6 +380,17 @@ export function generateHarmonyXml(
           <root-step>${rootStep}</root-step>${alterToXml(rootAlter)}
         </root>
         <kind text="${displayText}">${kind}</kind>`;
+
+  // For 7sus chords, add a degree element for the 7th (OSMD needs this to render "7sus4")
+  // Based on Real Book MusicXML patterns
+  if (quality === "7sus4" || quality === "7sus2") {
+    harmonyXml += `
+        <degree print-object="no">
+          <degree-value>7</degree-value>
+          <degree-alter>0</degree-alter>
+          <degree-type>add</degree-type>
+        </degree>`;
+  }
 
   // Add degree elements for alterations
   for (const alteration of alterations) {
