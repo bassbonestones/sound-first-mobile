@@ -96,56 +96,98 @@ export interface RawHarmonyData {
 }
 
 /**
- * Extract harmony elements (chord symbols) from a measure
+ * Extract harmony elements (chord symbols) from a measure with proper beat positions.
+ * This function parses the measure content sequentially to determine harmony positions
+ * based on where they appear relative to notes.
+ *
+ * In MusicXML, harmony elements without explicit offset appear before their associated note.
+ * For harmonies WITH explicit position (after forward element), we capture the current offset.
+ * We track cumulative duration to calculate proper beat positions.
  */
 export function extractHarmonyFromMeasure(
   measureContent: string,
 ): RawHarmonyData[] {
   const harmonies: RawHarmonyData[] = [];
-  const harmonyRegex = /<harmony[^>]*>([\s\S]*?)<\/harmony>/gi;
+
+  // Parse elements sequentially to track beat position
+  // We look for note durations and harmony elements
+  let currentOffset = 0;
+
+  // Use a regex that captures the order of elements in the measure
+  // Match harmony, note (with duration), forward, and backup elements
+  const elementRegex = /<(harmony|note|forward|backup)[^>]*>([\s\S]*?)<\/\1>/gi;
 
   let match;
-  while ((match = harmonyRegex.exec(measureContent)) !== null) {
-    const harmonyContent = match[1];
+  while ((match = elementRegex.exec(measureContent)) !== null) {
+    const elementType = match[1].toLowerCase();
+    const elementContent = match[2];
 
-    // Extract root
-    const rootBlock = extractTagBlock(harmonyContent, "root");
-    if (!rootBlock) continue;
+    if (elementType === "harmony") {
+      // Parse harmony element
+      const rootBlock = extractTagBlock(elementContent, "root");
+      if (!rootBlock) continue;
 
-    const rootStep = extractTagContent(rootBlock, "root-step");
-    if (!rootStep) continue;
+      const rootStep = extractTagContent(rootBlock, "root-step");
+      if (!rootStep) continue;
 
-    const rootAlterStr = extractTagContent(rootBlock, "root-alter");
-    const rootAlter = rootAlterStr ? parseInt(rootAlterStr, 10) : undefined;
+      const rootAlterStr = extractTagContent(rootBlock, "root-alter");
+      const rootAlter = rootAlterStr ? parseInt(rootAlterStr, 10) : undefined;
 
-    // Extract kind (required)
-    const kind = extractTagContent(harmonyContent, "kind");
-    if (!kind) continue;
+      const kind = extractTagContent(elementContent, "kind");
+      if (!kind) continue;
 
-    // Extract optional bass (for slash chords)
-    let bass: { step: string; alter?: number } | undefined;
-    const bassBlock = extractTagBlock(harmonyContent, "bass");
-    if (bassBlock) {
-      const bassStep = extractTagContent(bassBlock, "bass-step");
-      if (bassStep) {
-        const bassAlterStr = extractTagContent(bassBlock, "bass-alter");
-        bass = {
-          step: bassStep,
-          alter: bassAlterStr ? parseInt(bassAlterStr, 10) : undefined,
-        };
+      // Extract optional bass
+      let bass: { step: string; alter?: number } | undefined;
+      const bassBlock = extractTagBlock(elementContent, "bass");
+      if (bassBlock) {
+        const bassStep = extractTagContent(bassBlock, "bass-step");
+        if (bassStep) {
+          const bassAlterStr = extractTagContent(bassBlock, "bass-alter");
+          bass = {
+            step: bassStep,
+            alter: bassAlterStr ? parseInt(bassAlterStr, 10) : undefined,
+          };
+        }
+      }
+
+      // Check for explicit offset within the harmony element
+      const offsetStr = extractTagContent(elementContent, "offset");
+      const explicitOffset = offsetStr ? parseInt(offsetStr, 10) : undefined;
+
+      // Assign harmony immediately at current position
+      // Use explicit offset if present, otherwise use current timeline position
+      harmonies.push({
+        root: { step: rootStep, alter: rootAlter },
+        kind,
+        bass,
+        offset: explicitOffset !== undefined ? explicitOffset : currentOffset,
+      });
+    } else if (elementType === "note") {
+      // Check if this is a chord note (not advancing timeline)
+      const isChord = /<chord\s*\/?>/.test(match[0]);
+
+      // Get note duration and advance timeline (unless it's a chord note)
+      if (!isChord) {
+        const durationStr = extractTagContent(elementContent, "duration");
+        if (durationStr) {
+          const duration = parseInt(durationStr, 10);
+          currentOffset += duration;
+        }
+      }
+    } else if (elementType === "forward") {
+      // Forward advances the timeline
+      const durationStr = extractTagContent(elementContent, "duration");
+      if (durationStr) {
+        currentOffset += parseInt(durationStr, 10);
+      }
+    } else if (elementType === "backup") {
+      // Backup moves timeline backward
+      const durationStr = extractTagContent(elementContent, "duration");
+      if (durationStr) {
+        currentOffset -= parseInt(durationStr, 10);
+        if (currentOffset < 0) currentOffset = 0;
       }
     }
-
-    // Extract optional offset
-    const offsetStr = extractTagContent(harmonyContent, "offset");
-    const offset = offsetStr ? parseInt(offsetStr, 10) : undefined;
-
-    harmonies.push({
-      root: { step: rootStep, alter: rootAlter },
-      kind,
-      bass,
-      offset,
-    });
   }
 
   return harmonies;

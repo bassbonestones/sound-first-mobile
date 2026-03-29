@@ -30,10 +30,10 @@ import {
   getActiveProgression,
   getChordsForMeasure,
   getBeatUnitDuration,
-  getNoteDuration,
   resolveChordSymbol,
 } from "../types";
 import { recognizeChord } from "./chordRecognition";
+import { devLog } from "../../../utils/devLogger";
 
 // =============================================================================
 // Types
@@ -773,33 +773,53 @@ function generateMeasureXml(
     }
   }
 
-  // Track chord index for interleaving with notes
-  let nextChordIndex = 0;
-  let currentBeat = 0;
+  // Generate harmony elements first using forward/backup for explicit positioning
+  // This ensures OSMD positions chords at the correct beat, not relative to adjacent notes
+  let harmoniesXml = "";
+  if (measureChords.length > 0) {
+    devLog(
+      `[MusicXML] Measure ${measureIndex}: ${measureChords.length} chords`,
+    );
+  }
+  for (const chord of measureChords) {
+    const offsetDivisions = Math.round(chord.beatPositionInQuarters * 12);
+    const resolvedSymbol = resolveChordSymbol(
+      chord,
+      score.keySignature,
+      preferFlats,
+    );
+    devLog(
+      `[MusicXML] Chord "${resolvedSymbol}" at beat ${chord.beatPosition} (${chord.beatPositionInQuarters} quarters), offset=${offsetDivisions} divisions`,
+    );
 
-  // Generate notes with directions, interleaving harmony at correct beat positions
-  for (const note of measure.notes) {
-    // Output any harmony elements that should appear at or before this beat position
-    while (
-      nextChordIndex < measureChords.length &&
-      measureChords[nextChordIndex].beatPositionInQuarters <=
-        currentBeat + 0.001
-    ) {
-      // Calculate offset in divisions (12 per quarter note)
-      // Use beatPositionInQuarters for correct handling of all time signatures
-      const offsetDivisions = Math.round(
-        measureChords[nextChordIndex].beatPositionInQuarters * 12,
-      );
-      // Resolve chord to symbol string using current key signature
-      const resolvedSymbol = resolveChordSymbol(
-        measureChords[nextChordIndex],
-        score.keySignature,
-        preferFlats,
-      );
-      notesXml += "\n" + generateHarmonyXml(resolvedSymbol, offsetDivisions);
-      nextChordIndex++;
+    if (offsetDivisions > 0) {
+      // Forward to the chord's position
+      harmoniesXml += `
+      <forward>
+        <duration>${offsetDivisions}</duration>
+      </forward>`;
     }
 
+    // Output harmony (no offset needed since forward already positioned us)
+    harmoniesXml += "\n" + generateHarmonyXml(resolvedSymbol, 0);
+
+    if (offsetDivisions > 0) {
+      // Backup to start of measure
+      harmoniesXml += `
+      <backup>
+        <duration>${offsetDivisions}</duration>
+      </backup>`;
+    }
+  }
+  if (measureChords.length > 0) {
+    devLog(
+      `[MusicXML] Generated harmoniesXml:`,
+      harmoniesXml.substring(0, 500),
+    );
+  }
+
+  // Generate notes with directions
+  for (const note of measure.notes) {
     // Add direction before note for dynamics/expression
     if (note.dynamic) {
       notesXml += "\n" + generateDynamicDirectionXml(note.dynamic);
@@ -830,25 +850,6 @@ function generateMeasureXml(
         slurPlacement,
         isMelismaContinuation,
       );
-
-    // Advance beat position by note duration (including dot)
-    currentBeat += getNoteDuration(note);
-  }
-
-  // Output any remaining harmony elements (chords at beat positions after all notes)
-  while (nextChordIndex < measureChords.length) {
-    // Calculate offset in divisions (12 per quarter note)
-    const offsetDivisions = Math.round(
-      measureChords[nextChordIndex].beatPositionInQuarters * 12,
-    );
-    // Resolve chord to symbol string using current key signature
-    const resolvedSymbol = resolveChordSymbol(
-      measureChords[nextChordIndex],
-      score.keySignature,
-      preferFlats,
-    );
-    notesXml += "\n" + generateHarmonyXml(resolvedSymbol, offsetDivisions);
-    nextChordIndex++;
   }
 
   // Attributes go on first measure (pickup or first full measure)
@@ -884,7 +885,7 @@ function generateMeasureXml(
     ? `number="${measureNumber}" implicit="yes"`
     : `number="${measureNumber}"`;
 
-  return `    <measure ${measureAttrs}>${attributesXml}${directionXml}${notesXml}${barlineXml}
+  return `    <measure ${measureAttrs}>${attributesXml}${directionXml}${harmoniesXml}${notesXml}${barlineXml}
     </measure>`;
 }
 

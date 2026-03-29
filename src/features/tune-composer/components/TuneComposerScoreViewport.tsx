@@ -40,6 +40,7 @@ import {
   getNoteDuration,
   getBeatUnitDuration,
   getMeasureDuration,
+  getDefaultProgression,
 } from "../types";
 import type { CursorPosition } from "../../composer/types";
 import { useOptionalPlaybackContext } from "../contexts";
@@ -411,6 +412,177 @@ function TuneComposerScoreViewportComponent({
       webViewRef.current.injectJavaScript(`${script}; true;`);
     }
   }, []);
+
+  // Send chord positions to WebView after measure positions are available
+  // This fixes OSMD's bug of rendering all chords at measure start
+  useEffect(() => {
+    if (!isReady || measurePositions.length === 0) return;
+
+    // Get default chord progression
+    const progression = getDefaultProgression(score.chordProgressions);
+    console.log(
+      "[ChordReposition] Progression:",
+      progression?.name,
+      "chords:",
+      progression?.chords.length,
+    );
+    if (!progression || progression.chords.length === 0) return;
+
+    // Calculate X positions for each chord
+    const chordPositions: {
+      measureIndex: number;
+      beatPosition: number;
+      x: number;
+    }[] = [];
+    const beatUnitDuration = getBeatUnitDuration(score.timeSignature);
+    const beatsPerMeasure = score.timeSignature.beats;
+    const measureDurationInQuarters = beatsPerMeasure * beatUnitDuration;
+
+    for (const chord of progression.chords) {
+      const measurePos = measurePositions.find(
+        (m) => m.measureIndex === chord.measureIndex,
+      );
+      if (!measurePos) {
+        console.log(
+          "[ChordReposition] No measurePos for measure",
+          chord.measureIndex,
+        );
+        continue;
+      }
+
+      // Get next measure for barline position
+      const nextMeasurePos = measurePositions.find(
+        (m) => m.measureIndex === chord.measureIndex + 1,
+      );
+
+      // Convert beat position (beat unit index) to quarter notes
+      const targetBeatInQuarters = chord.beatPosition * beatUnitDuration;
+
+      const measure = score.measures[chord.measureIndex];
+      const osmdPositions = measurePos.beatPositions ?? [];
+
+      // For pickup measures, use actual duration
+      const actualMeasureDuration = measure?.isPickup
+        ? (score.pickupDuration ?? getMeasureDuration(measure))
+        : measureDurationInQuarters;
+
+      // Build beat positions from score model + OSMD X positions
+      const noteBeatPositions: { beat: number; x: number }[] = [];
+
+      if (measure && osmdPositions.length > 0) {
+        let currentBeat = 0;
+        for (
+          let i = 0;
+          i < measure.notes.length && i < osmdPositions.length;
+          i++
+        ) {
+          const note = measure.notes[i];
+          const x = osmdPositions[i].x;
+          noteBeatPositions.push({ beat: currentBeat, x });
+          currentBeat += getNoteDuration(note);
+        }
+
+        // Add endpoint at barline
+        const measureEndBeat = actualMeasureDuration;
+        let barlineX: number;
+
+        if (nextMeasurePos) {
+          barlineX = nextMeasurePos.x - 10;
+        } else if (noteBeatPositions.length >= 2) {
+          const lastTwo = noteBeatPositions.slice(-2);
+          const beatRange = lastTwo[1].beat - lastTwo[0].beat;
+          const spacingPerBeat =
+            beatRange > 0 ? (lastTwo[1].x - lastTwo[0].x) / beatRange : 30;
+          const remainingBeats = measureEndBeat - lastTwo[1].beat;
+          barlineX = lastTwo[1].x + remainingBeats * spacingPerBeat;
+        } else {
+          barlineX = measurePos.x + (measurePos.width ?? 100);
+        }
+
+        noteBeatPositions.push({ beat: measureEndBeat, x: barlineX });
+      }
+
+      // Calculate X position for this chord's beat (same logic as chordCursorX)
+      let xPosition: number | null = null;
+
+      if (noteBeatPositions.length >= 2) {
+        // Interpolate between beat positions
+        for (let i = 0; i < noteBeatPositions.length - 1; i++) {
+          const bp1 = noteBeatPositions[i];
+          const bp2 = noteBeatPositions[i + 1];
+          if (
+            targetBeatInQuarters >= bp1.beat &&
+            targetBeatInQuarters <= bp2.beat
+          ) {
+            const beatRange = bp2.beat - bp1.beat;
+            if (beatRange > 0) {
+              const fraction = (targetBeatInQuarters - bp1.beat) / beatRange;
+              xPosition = bp1.x + fraction * (bp2.x - bp1.x);
+            }
+            break;
+          }
+        }
+
+        // If before first position, use first
+        if (
+          xPosition === null &&
+          targetBeatInQuarters <= noteBeatPositions[0].beat
+        ) {
+          xPosition = noteBeatPositions[0].x;
+        }
+
+        // If after last position, extrapolate
+        if (
+          xPosition === null &&
+          targetBeatInQuarters >
+            noteBeatPositions[noteBeatPositions.length - 1].beat
+        ) {
+          const lastTwo = noteBeatPositions.slice(-2);
+          const beatRange = lastTwo[1].beat - lastTwo[0].beat;
+          if (beatRange > 0) {
+            const spacingPerBeat = (lastTwo[1].x - lastTwo[0].x) / beatRange;
+            xPosition =
+              lastTwo[1].x +
+              (targetBeatInQuarters - lastTwo[1].beat) * spacingPerBeat;
+          }
+        }
+      }
+
+      // Fallback - use first note position
+      if (xPosition === null) {
+        xPosition = measurePos.noteStartX ?? measurePos.x + 50;
+      }
+
+      // Convert to OSMD units (divide by 10 since OSMD multiplies by 10)
+      chordPositions.push({
+        measureIndex: chord.measureIndex,
+        beatPosition: chord.beatPosition,
+        x: xPosition / 10,
+      });
+      console.log(
+        `[ChordReposition] Chord m${chord.measureIndex} beat${chord.beatPosition} -> x=${(xPosition / 10).toFixed(1)}`,
+      );
+    }
+
+    // Send to WebView
+    if (chordPositions.length > 0) {
+      console.log(
+        "[ChordReposition] Sending",
+        chordPositions.length,
+        "positions to WebView",
+      );
+      const json = JSON.stringify(chordPositions);
+      executeScript(`window.repositionChordSymbols(${json})`);
+    }
+  }, [
+    isReady,
+    measurePositions,
+    score.chordProgressions,
+    score.measures,
+    score.timeSignature,
+    score.pickupDuration,
+    executeScript,
+  ]);
 
   // Render MusicXML when ready
   useEffect(() => {
@@ -1044,10 +1216,14 @@ function TuneComposerScoreViewportComponent({
           }
 
           case "consoleLog": {
-            // Only log errors from WebView
+            // Log all messages from WebView in dev mode to help debug
             const log = data.payload as { level: string; message: string };
-            if (__DEV__ && log.level === "error") {
-              devError("[OSMD]", log.message);
+            if (__DEV__) {
+              if (log.level === "error") {
+                devError("[OSMD]", log.message);
+              } else {
+                console.log("[OSMD]", log.message);
+              }
             }
             break;
           }

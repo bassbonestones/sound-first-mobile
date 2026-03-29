@@ -221,10 +221,17 @@ export function generateComposerOsmdHtml(
           backend: "svg",
           autoBeam: true,
           renderSingleHorizontalStaffline: ${horizontalStaffline},
+          // Enable chord symbol rendering explicitly
+          drawChordSymbols: true,
         });
 
         // Configure chord symbol rendering
         if (osmd.EngravingRules) {
+          // CRITICAL: Enable chord symbol rendering (try multiple possible property names)
+          osmd.EngravingRules.RenderChordSymbols = true;
+          if (osmd.EngravingRules.DrawChordSymbols !== undefined) {
+            osmd.EngravingRules.DrawChordSymbols = true;
+          }
           // Increase spacing for chord symbols
           osmd.EngravingRules.ChordSymbolTextHeight = 2.0;
           osmd.EngravingRules.ChordSymbolXSpacing = 2.0;
@@ -234,6 +241,7 @@ export function generateComposerOsmdHtml(
           osmd.EngravingRules.RenderChordSymbolText = true;
           // Use Unicode symbols for alterations
           osmd.EngravingRules.ChordSymbolUseSharpFlat = true;
+          console.log('[OSMD] Chord settings: RenderChordSymbols=' + osmd.EngravingRules.RenderChordSymbols + ', DrawChordSymbols=' + osmd.EngravingRules.DrawChordSymbols);
         }
 
         if (loadingEl) {
@@ -275,6 +283,8 @@ export function generateComposerOsmdHtml(
         
         setZoom(currentZoom);
         shortenChordSymbols();
+        debugChordElements(); // Log what OSMD created
+        // Note: repositionChordSymbols is called from React Native after measurePositions are received
         buildNoteMap();
         addNoteClickHandlers();
         sendMeasurePositions();
@@ -285,6 +295,76 @@ export function generateComposerOsmdHtml(
         sendMessage('error', error.message);
       }
     };
+
+    // Debug: log all chord-related elements OSMD created
+    function debugChordElements() {
+      const svg = document.querySelector('#osmd-container svg');
+      if (!svg) {
+        console.log('[DEBUG] No SVG found');
+        return;
+      }
+
+      // Check OSMD's internal chord data
+      if (osmd && osmd.sheet) {
+        console.log('[DEBUG] OSMD sheet loaded, checking for harmony...');
+        if (osmd.sheet.sourceMeasures) {
+          let totalChordContainers = 0;
+          for (let m = 0; m < osmd.sheet.sourceMeasures.length; m++) {
+            const sm = osmd.sheet.sourceMeasures[m];
+            if (sm.VerticalSourceStaffEntryContainers) {
+              for (const vstec of sm.VerticalSourceStaffEntryContainers) {
+                if (vstec && vstec.StaffEntries) {
+                  for (const se of vstec.StaffEntries) {
+                    if (se && se.ChordContainers && se.ChordContainers.length > 0) {
+                      totalChordContainers += se.ChordContainers.length;
+                      console.log('[DEBUG] Measure ' + m + ' has ' + se.ChordContainers.length + ' chord containers');
+                    }
+                  }
+                }
+              }
+            }
+          }
+          console.log('[DEBUG] Total chord containers in sheet:', totalChordContainers);
+        }
+      }
+
+      // Try various selectors
+      const chordSymbolGroups = svg.querySelectorAll('g[class*="ChordSymbol"]');
+      const chordGroups = svg.querySelectorAll('g[class*="chord"]');
+      const chordTexts = svg.querySelectorAll('text[class*="chord"]');
+      const allGroups = svg.querySelectorAll('g[class]');
+      const allTexts = svg.querySelectorAll('text');
+      
+      console.log('[DEBUG] ChordSymbol groups:', chordSymbolGroups.length);
+      console.log('[DEBUG] chord groups:', chordGroups.length);
+      console.log('[DEBUG] chord texts:', chordTexts.length);
+      console.log('[DEBUG] Total text elements:', allTexts.length);
+      
+      // Log all text content to see if chords appear as plain text
+      const textContents = [];
+      allTexts.forEach(t => {
+        const content = t.textContent?.trim();
+        if (content && content.length > 0 && content.length < 20) {
+          textContents.push(content);
+        }
+      });
+      console.log('[DEBUG] Text contents:', textContents.slice(0, 20).join(', '));
+      
+      // Log all group classes to see what OSMD creates
+      const classNames = new Set();
+      allGroups.forEach(g => {
+        const cls = g.getAttribute('class');
+        if (cls) classNames.add(cls);
+      });
+      console.log('[DEBUG] All group classes:', Array.from(classNames).join(', '));
+      
+      // Log details of any chord-related elements
+      chordSymbolGroups.forEach((g, i) => {
+        const transform = g.getAttribute('transform');
+        const text = g.textContent?.trim();
+        console.log('[DEBUG] ChordSymbol ' + i + ':', text, 'transform:', transform);
+      });
+    }
 
     // Post-process SVG to shorten chord symbols using Unicode
     function shortenChordSymbols() {
@@ -331,6 +411,96 @@ export function generateComposerOsmdHtml(
         }
       });
     }
+
+    // Reposition chord symbols to their correct beat positions
+    // Called from React Native with pre-calculated X positions
+    // chordPositions: Array of { measureIndex, beatPosition, x, symbol }
+    window.repositionChordSymbols = function(chordPositions) {
+      const svgContainer = document.querySelector('#osmd-container svg');
+      if (!svgContainer) {
+        console.log('repositionChordSymbols: No SVG container');
+        return;
+      }
+
+      // OSMD renders chords as plain vf-text elements, not special ChordSymbol groups
+      // We need to find them by content matching against chord symbol patterns
+      // Collect all text elements and their parent groups
+      const allTextElements = Array.from(svgContainer.querySelectorAll('g.vf-text text, g.vf-modifiers text'));
+      
+      // Build regex pattern to match chord symbols:
+      // Root: A-G with optional b/#
+      // Quality: m, maj, min, dim, aug, sus, add, followed by numbers
+      // Extensions: numbers like 6, 7, 9, 11, 13
+      // Slash bass: /X or /Xb or /X#
+      const chordPatterns = /^[A-G][b#♭♯]?(maj|min|m|dim|aug|sus|add|Δ|°|ø|\\+)?[0-9]*(b5|#5|b9|#9|b11|#11|b13|#13)*(\\\/[A-G][b#♭♯]?)?$/i;
+      
+      // Find text elements that look like chord symbols
+      const chordTextElements = [];
+      allTextElements.forEach((textEl) => {
+        const content = textEl.textContent?.trim();
+        if (!content || content.length === 0 || content.length > 20) return;
+        
+        // Skip if it looks like a lyric (contains spaces, common punctuation)
+        if (/[,.'!?:]/.test(content) || content.includes(' ')) return;
+        
+        // Skip tempo marking and common non-chord text
+        if (/^(=|\\d+|Swing|Straight|Fast|Slow|Moderato|Allegro|Andante)$/i.test(content)) return;
+        
+        // Skip single lowercase words (likely lyrics)
+        if (/^[a-z]+$/.test(content) && content.length < 4) return;
+        
+        // Check if it matches chord pattern
+        if (chordPatterns.test(content) || 
+            // Also match explicit chord-like patterns
+            /^[A-G][b#♭♯]?(m|maj|min|dim|aug|sus|6|7|9|11|13)/.test(content)) {
+          const parentGroup = textEl.closest('g');
+          if (parentGroup) {
+            chordTextElements.push({ element: parentGroup, text: content });
+          }
+        }
+      });
+
+      console.log('repositionChordSymbols: Found ' + chordTextElements.length + ' chord text elements for ' + chordPositions.length + ' positions');
+      console.log('repositionChordSymbols: Chord texts found:', chordTextElements.map(c => c.text).join(', '));
+      
+      if (chordTextElements.length === 0) {
+        return;
+      }
+
+      // Sort chord positions by measure then beat (same order OSMD renders them)
+      const sortedPositions = chordPositions.slice().sort((a, b) => {
+        if (a.measureIndex !== b.measureIndex) return a.measureIndex - b.measureIndex;
+        return a.beatPosition - b.beatPosition;
+      });
+
+      // Match chord elements to positions in order
+      const numToProcess = Math.min(chordTextElements.length, sortedPositions.length);
+      
+      for (let i = 0; i < numToProcess; i++) {
+        const chordInfo = chordTextElements[i];
+        const chordGroup = chordInfo.element;
+        const position = sortedPositions[i];
+        
+        // Get current transform
+        const currentTransform = chordGroup.getAttribute('transform') || '';
+        const translateMatch = currentTransform.match(/translate\\(([^,]+),\\s*([^)]+)\\)/);
+        if (!translateMatch) {
+          console.log('repositionChordSymbols: No translate found for chord ' + i + ' (' + chordInfo.text + ')');
+          continue;
+        }
+
+        const currentX = parseFloat(translateMatch[1]);
+        const currentY = parseFloat(translateMatch[2]);
+        const targetX = position.x;
+
+        if (Math.abs(targetX - currentX) > 1) {
+          chordGroup.setAttribute('transform', 'translate(' + targetX + ', ' + currentY + ')');
+          console.log('Chord ' + i + ' ("' + chordInfo.text + '"): moved from x=' + currentX.toFixed(1) + ' to x=' + targetX.toFixed(1) + ' (measure ' + position.measureIndex + ', beat ' + position.beatPosition + ')');
+        } else {
+          console.log('Chord ' + i + ' ("' + chordInfo.text + '"): already at x=' + currentX.toFixed(1));
+        }
+      }
+    };
 
     // Send measure positions to parent for external scrolling
     function sendMeasurePositions() {

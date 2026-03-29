@@ -336,9 +336,12 @@ describe("importedScoreConverter", () => {
       // Export to MusicXML
       const musicXml = generateMusicXml(originalScore);
 
-      // Verify exported MusicXML contains offset elements
+      // Verify exported MusicXML contains harmony elements with forward/backup positioning
       expect(musicXml).toContain("<harmony");
-      expect(musicXml).toContain("<offset>42</offset>"); // offset for beat 3.5
+      // Now using forward/backup instead of offset for explicit timeline positioning
+      expect(musicXml).toContain("<forward>");
+      expect(musicXml).toContain("<duration>42</duration>"); // forward to beat 3.5
+      expect(musicXml).toContain("<backup>");
 
       // Import back
       const parseResult = await parseMusicXml(musicXml, {
