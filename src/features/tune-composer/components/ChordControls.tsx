@@ -508,29 +508,30 @@ function ChordControlsComponent({
           />
         )}
 
-        {/* Autocomplete suggestions */}
-        {showSuggestions && suggestions.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.suggestionsContainer}
-            contentContainerStyle={styles.suggestionsContent}
-            testID="chord-suggestions"
-          >
-            {suggestions.map((suggestion, index) => (
-              <TouchableOpacity
-                key={`${suggestion}-${index}`}
-                style={styles.suggestionChip}
-                onPress={() => handleSelectSuggestion(suggestion)}
-                accessibilityRole={"button" as AccessibilityRole}
-                accessibilityLabel={`Select ${suggestion}`}
-                testID={`chord-suggestion-${suggestion}`}
-              >
-                <Text style={styles.suggestionText}>{suggestion}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
+        {/* Autocomplete suggestions - always allocate space to prevent layout jumping */}
+        <View style={styles.suggestionsContainer} testID="chord-suggestions-container">
+          {showSuggestions && suggestions.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.suggestionsContent}
+              testID="chord-suggestions"
+            >
+              {suggestions.map((suggestion, index) => (
+                <TouchableOpacity
+                  key={`${suggestion}-${index}`}
+                  style={styles.suggestionChip}
+                  onPress={() => handleSelectSuggestion(suggestion)}
+                  accessibilityRole={"button" as AccessibilityRole}
+                  accessibilityLabel={`Select ${suggestion}`}
+                  testID={`chord-suggestion-${suggestion}`}
+                >
+                  <Text style={styles.suggestionText}>{suggestion}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : null}
+        </View>
 
         {/* Validation warnings */}
         {hasWarnings && (
@@ -874,7 +875,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   suggestionsContainer: {
-    maxHeight: 40,
+    height: 40,
     marginBottom: spacing.sm,
   },
   suggestionsContent: {
