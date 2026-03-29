@@ -530,6 +530,14 @@ export function generateComposerOsmdHtml(
           let entryIndex = 0;
           for (const entry of staffMeasure.staffEntries) {
             if (entry && entry.boundingBox) {
+              // Only include entries that have actual graphical notes/rests
+              // Skip entries that are just chord symbols or other non-note elements
+              const hasNotes = entry.graphicalVoiceEntries && 
+                entry.graphicalVoiceEntries.some(gve => 
+                  gve && gve.notes && gve.notes.length > 0
+                );
+              if (!hasNotes) continue; // Skip non-note entries like chord symbols
+              
               const entryX = entry.boundingBox.absolutePosition 
                 ? entry.boundingBox.absolutePosition.x 
                 : entry.boundingBox.x;
@@ -539,9 +547,11 @@ export function generateComposerOsmdHtml(
                 
                 const sourceEntry = entry.sourceStaffEntry;
                 if (sourceEntry?.Timestamp?.RealValue !== undefined) {
-                  // Get measure start from first entry
-                  const firstSourceEntry = staffMeasure.staffEntries[0]?.sourceStaffEntry;
-                  const measureStart = firstSourceEntry?.Timestamp?.RealValue || 0;
+                  // Get measure start from first entry with notes
+                  const firstNoteEntry = staffMeasure.staffEntries.find(e => 
+                    e?.graphicalVoiceEntries?.some(gve => gve?.notes?.length > 0)
+                  );
+                  const measureStart = firstNoteEntry?.sourceStaffEntry?.Timestamp?.RealValue || 0;
                   const relativeTimestamp = sourceEntry.Timestamp.RealValue - measureStart;
                   // Convert whole notes to quarter notes (beats) - keep fractional values!
                   beatNumber = relativeTimestamp * 4;
@@ -552,15 +562,20 @@ export function generateComposerOsmdHtml(
                   x: entryX * 10
                 });
                 
-                if (firstNoteX === null) {
+                if (firstNoteX === null || entryX < firstNoteX) {
                   firstNoteX = entryX;
                 }
-                lastNoteX = entryX;
+                if (lastNoteX === null || entryX > lastNoteX) {
+                  lastNoteX = entryX;
+                }
                 entryIndex++;
               }
             }
           }
         }
+        
+        // Sort beatPositions by x position (left-to-right) - OSMD entries may not be in order
+        beatPositions.sort((a, b) => a.x - b.x);
         
         // Convert to pixels (OSMD units * 10)
         const measureX = posX * 10;
@@ -570,6 +585,10 @@ export function generateComposerOsmdHtml(
         // Get actual measure width from bounding box for barline position
         const measureWidth = bbox.boundingRectangle ? bbox.boundingRectangle.width * 10 : null;
         const barlineX = measureWidth ? measureX + measureWidth : null;
+        
+        // DEBUG: Log beat positions for each measure
+        console.log('[OSMD] Measure ' + i + ' beatPositions:', beatPositions.length, 
+          JSON.stringify(beatPositions.map(bp => ({ beat: bp.beat.toFixed(2), x: Math.round(bp.x) }))));
         
         positions.push({
           measureIndex: i,

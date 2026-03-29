@@ -236,18 +236,20 @@ function TuneComposerScoreViewportComponent({
       ? (score.pickupDuration ?? getMeasureDuration(measure))
       : measureDurationInQuarters;
 
-    // Build beat positions from our score model (accurate beats) + OSMD X positions
+    // Build beat positions using our note model for beats, OSMD for x positions
+    // OSMD positions are sorted by x (left-to-right), so we match with our sequential beats
     const noteBeatPositions: { beat: number; x: number }[] = [];
 
     if (measure && osmdPositions.length > 0) {
+      // OSMD positions are sorted by x position (left to right)
+      // Our notes are in beat order - so they should correspond
+      // Use our note model for accurate beat timing
       let currentBeat = 0;
-      for (
-        let i = 0;
-        i < measure.notes.length && i < osmdPositions.length;
-        i++
-      ) {
+      const noteCount = Math.min(measure.notes.length, osmdPositions.length);
+
+      for (let i = 0; i < noteCount; i++) {
         const note = measure.notes[i];
-        const x = osmdPositions[i].x; // Use OSMD's exact X position
+        const x = osmdPositions[i].x; // Use OSMD's x position (sorted by x)
         noteBeatPositions.push({ beat: currentBeat, x });
         currentBeat += getNoteDuration(note);
       }
