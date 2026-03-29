@@ -23,6 +23,7 @@ import {
   DEFAULT_PRACTICE_OVER_CHANGES_STATE,
   getActiveProgression,
   getBeatsPerMeasure,
+  resolveChordSymbol,
 } from "../types";
 
 // =============================================================================
@@ -82,6 +83,7 @@ function buildChordEventsFromScore(
   }
 
   const beatsPerMeasure = getBeatsPerMeasure(score.timeSignature);
+  const keySignature = score.keySignature;
   const totalMeasures = score.measures.length;
   const totalBeats = totalMeasures * beatsPerMeasure;
 
@@ -118,8 +120,10 @@ function buildChordEventsFromScore(
 
     const duration = chordEndBeat - chordStartBeat;
     if (duration > 0) {
+      // Use pre-resolved symbol if available (API chords), otherwise resolve from rootOffset/quality
+      const symbol = chord.symbol || resolveChordSymbol(chord, keySignature);
       events.push({
-        symbol: chord.symbol,
+        symbol,
         duration_beats: duration,
       });
     }

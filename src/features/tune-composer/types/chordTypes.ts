@@ -123,6 +123,8 @@ export interface ChordSymbol {
   beatPosition: number;
   /** Measure index (0-based) */
   measureIndex: number;
+  /** Optional pre-resolved symbol string (from API inference) */
+  symbol?: string;
 }
 
 /**
@@ -290,6 +292,11 @@ export function resolveChordSymbol(
   keyFifths: KeySignature,
   preferFlats?: boolean,
 ): string {
+  // If chord has a pre-resolved symbol (from API), use it directly
+  if (chord.symbol) {
+    return chord.symbol;
+  }
+
   const keySemitone = fifthsToSemitones(keyFifths);
   const rootSemitone = (keySemitone + chord.rootOffset) % 12;
 
@@ -299,7 +306,7 @@ export function resolveChordSymbol(
 
   const rootName = noteNames[rootSemitone];
   const suffix = QUALITY_TO_SUFFIX[chord.quality] ?? chord.quality;
-  const alterations = chord.alterations.join("");
+  const alterations = (chord.alterations || []).join("");
 
   let result = rootName + suffix + alterations;
 
