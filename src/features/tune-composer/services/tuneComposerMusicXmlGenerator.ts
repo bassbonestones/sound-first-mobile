@@ -960,10 +960,8 @@ function generateMeasureXml(
       generateAttributesXml(score.timeSignature, score.keySignature, score.clef)
     : "";
 
-  // Metronome/tempo direction on first measure with notes (or first full measure)
-  const showDirection = isPickup
-    ? isFirstMeasure && scoreHasNotes
-    : isFirstFullMeasure && scoreHasNotes;
+  // Metronome/tempo direction on the first measure only (pickup or first full)
+  const showDirection = isFirstMeasure && scoreHasNotes;
   const directionXml = showDirection
     ? `\n      <direction placement="above">
         <direction-type>
