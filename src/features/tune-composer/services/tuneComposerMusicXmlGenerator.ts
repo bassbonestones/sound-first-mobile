@@ -775,51 +775,127 @@ function generateMeasureXml(
 
   // Generate harmony elements first using forward/backup for explicit positioning
   // This ensures OSMD positions chords at the correct beat, not relative to adjacent notes
+  // EXCEPTION: For the LAST measure, chords are interleaved with notes instead (see below)
   let harmoniesXml = "";
-  if (measureChords.length > 0) {
+  if (measureChords.length > 0 && !isLastMeasure) {
     devLog(
       `[MusicXML] Measure ${measureIndex}: ${measureChords.length} chords`,
     );
-  }
-  for (const chord of measureChords) {
-    const offsetDivisions = Math.round(chord.beatPositionInQuarters * 12);
-    const resolvedSymbol = resolveChordSymbol(
-      chord,
-      score.keySignature,
-      preferFlats,
-    );
-    devLog(
-      `[MusicXML] Chord "${resolvedSymbol}" at beat ${chord.beatPosition} (${chord.beatPositionInQuarters} quarters), offset=${offsetDivisions} divisions`,
-    );
+    for (const chord of measureChords) {
+      const offsetDivisions = Math.round(chord.beatPositionInQuarters * 12);
+      const resolvedSymbol = resolveChordSymbol(
+        chord,
+        score.keySignature,
+        preferFlats,
+      );
+      devLog(
+        `[MusicXML] Chord "${resolvedSymbol}" at beat ${chord.beatPosition} (${chord.beatPositionInQuarters} quarters), offset=${offsetDivisions} divisions`,
+      );
 
-    if (offsetDivisions > 0) {
-      // Forward to the chord's position
-      harmoniesXml += `
+      // Use forward/backup for non-zero offset positions
+      if (offsetDivisions > 0) {
+        // Forward to the chord's position
+        harmoniesXml += `
       <forward>
         <duration>${offsetDivisions}</duration>
       </forward>`;
-    }
+      }
 
-    // Output harmony (no offset needed since forward already positioned us)
-    harmoniesXml += "\n" + generateHarmonyXml(resolvedSymbol, 0);
+      // Output harmony
+      harmoniesXml += "\n" + generateHarmonyXml(resolvedSymbol, 0);
 
-    if (offsetDivisions > 0) {
-      // Backup to start of measure
-      harmoniesXml += `
+      if (offsetDivisions > 0) {
+        // Backup to start of measure
+        harmoniesXml += `
       <backup>
         <duration>${offsetDivisions}</duration>
       </backup>`;
+      }
     }
-  }
-  if (measureChords.length > 0) {
     devLog(
       `[MusicXML] Generated harmoniesXml:`,
       harmoniesXml.substring(0, 500),
     );
   }
 
-  // Generate notes with directions
-  for (const note of measure.notes) {
+  // For the LAST measure only, we need to interleave harmonies with notes
+  // because forward/backup crashes OSMD on the last measure.
+  // Build a map of which chords go before which note index.
+  const lastMeasureChordsBeforeNote = new Map<
+    number,
+    Array<{ chord: (typeof measureChords)[0]; offsetDivisions: number }>
+  >();
+  const lastMeasureChordsAtEnd: Array<{
+    chord: (typeof measureChords)[0];
+    offsetDivisions: number;
+  }> = [];
+
+  if (isLastMeasure && measureChords.length > 0) {
+    devLog(
+      `[MusicXML] Last measure ${measureIndex}: ${measureChords.length} chords (interleaving with notes)`,
+    );
+    // Calculate beat position for each note
+    const noteBeatPositions: number[] = [];
+    let currentBeat = 0;
+    for (const note of measure.notes) {
+      noteBeatPositions.push(currentBeat);
+      currentBeat += note.duration;
+    }
+    devLog(
+      `[MusicXML] Note beat positions:`,
+      noteBeatPositions.map((b) => b.toFixed(2)).join(", "),
+    );
+
+    // Assign each chord to appear before the appropriate note
+    for (const chord of measureChords) {
+      const chordBeat = chord.beatPositionInQuarters;
+      const offsetDivisions = Math.round(chordBeat * 12);
+      const resolvedSymbol = resolveChordSymbol(
+        chord,
+        score.keySignature,
+        preferFlats,
+      );
+
+      // Find the first note that starts at or after this chord's beat
+      const noteIndex = noteBeatPositions.findIndex(
+        (beat) => beat >= chordBeat,
+      );
+
+      if (noteIndex === -1) {
+        // No note at or after this beat - chord goes at end
+        lastMeasureChordsAtEnd.push({ chord, offsetDivisions });
+        devLog(
+          `[MusicXML] Chord "${resolvedSymbol}" at beat ${chordBeat} -> after all notes`,
+        );
+      } else {
+        // Chord goes before this note
+        const existing = lastMeasureChordsBeforeNote.get(noteIndex) || [];
+        existing.push({ chord, offsetDivisions });
+        lastMeasureChordsBeforeNote.set(noteIndex, existing);
+        devLog(
+          `[MusicXML] Chord "${resolvedSymbol}" at beat ${chordBeat} -> before note ${noteIndex} (at beat ${noteBeatPositions[noteIndex]})`,
+        );
+      }
+    }
+  }
+
+  // Generate notes with directions (and interleaved harmonies for last measure)
+  for (let noteIndex = 0; noteIndex < measure.notes.length; noteIndex++) {
+    const note = measure.notes[noteIndex];
+
+    // For last measure: output any chords that should appear before this note
+    if (isLastMeasure) {
+      const chordsHere = lastMeasureChordsBeforeNote.get(noteIndex) || [];
+      for (const { chord, offsetDivisions } of chordsHere) {
+        const resolvedSymbol = resolveChordSymbol(
+          chord,
+          score.keySignature,
+          preferFlats,
+        );
+        notesXml += "\n" + generateHarmonyXml(resolvedSymbol, offsetDivisions);
+      }
+    }
+
     // Add direction before note for dynamics/expression
     if (note.dynamic) {
       notesXml += "\n" + generateDynamicDirectionXml(note.dynamic);
@@ -850,6 +926,18 @@ function generateMeasureXml(
         slurPlacement,
         isMelismaContinuation,
       );
+  }
+
+  // For last measure: output any chords that come after all notes
+  if (isLastMeasure) {
+    for (const { chord, offsetDivisions } of lastMeasureChordsAtEnd) {
+      const resolvedSymbol = resolveChordSymbol(
+        chord,
+        score.keySignature,
+        preferFlats,
+      );
+      notesXml += "\n" + generateHarmonyXml(resolvedSymbol, offsetDivisions);
+    }
   }
 
   // Attributes go on first measure (pickup or first full measure)

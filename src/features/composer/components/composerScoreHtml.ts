@@ -473,6 +473,9 @@ export function generateComposerOsmdHtml(
         return a.beatPosition - b.beatPosition;
       });
 
+      // Find the last measure index to identify which chords need repositioning
+      const lastMeasureIndex = Math.max(...sortedPositions.map(p => p.measureIndex));
+
       // Match chord elements to positions in order
       const numToProcess = Math.min(chordTextElements.length, sortedPositions.length);
       
@@ -481,23 +484,31 @@ export function generateComposerOsmdHtml(
         const chordGroup = chordInfo.element;
         const position = sortedPositions[i];
         
-        // Get current transform
-        const currentTransform = chordGroup.getAttribute('transform') || '';
-        const translateMatch = currentTransform.match(/translate\\(([^,]+),\\s*([^)]+)\\)/);
-        if (!translateMatch) {
-          console.log('repositionChordSymbols: No translate found for chord ' + i + ' (' + chordInfo.text + ')');
+        // Only reposition chords in the last measure
+        // Other measures use forward/backup which positions them correctly
+        if (position.measureIndex !== lastMeasureIndex) {
           continue;
         }
-
-        const currentX = parseFloat(translateMatch[1]);
-        const currentY = parseFloat(translateMatch[2]);
-        const targetX = position.x;
-
-        if (Math.abs(targetX - currentX) > 1) {
-          chordGroup.setAttribute('transform', 'translate(' + targetX + ', ' + currentY + ')');
-          console.log('Chord ' + i + ' ("' + chordInfo.text + '"): moved from x=' + currentX.toFixed(1) + ' to x=' + targetX.toFixed(1) + ' (measure ' + position.measureIndex + ', beat ' + position.beatPosition + ')');
+        
+        // Get the text element inside the group
+        const textEl = chordGroup.querySelector('text');
+        if (!textEl) {
+          console.log('repositionChordSymbols: No text element for chord ' + i + ' (' + chordInfo.text + ')');
+          continue;
+        }
+        
+        // Get current x position from text element (in SVG pixels)
+        const currentX = parseFloat(textEl.getAttribute('x') || '0');
+        // Target position comes divided by 10, so multiply back to get pixels
+        const targetX = position.x * 10;
+        
+        if (Math.abs(targetX - currentX) > 10) {
+          // Move by adding a translate transform to shift the group
+          const deltaX = targetX - currentX;
+          chordGroup.setAttribute('transform', 'translate(' + deltaX + ', 0)');
+          console.log('Chord ' + i + ' ("' + chordInfo.text + '"): moved by delta=' + deltaX.toFixed(1) + ' to x=' + targetX.toFixed(1) + ' (measure ' + position.measureIndex + ', beat ' + position.beatPosition + ')');
         } else {
-          console.log('Chord ' + i + ' ("' + chordInfo.text + '"): already at x=' + currentX.toFixed(1));
+          console.log('Chord ' + i + ' ("' + chordInfo.text + '"): already at correct position x=' + currentX.toFixed(1));
         }
       }
     };
