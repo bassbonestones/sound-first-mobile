@@ -509,7 +509,10 @@ function ChordControlsComponent({
         )}
 
         {/* Autocomplete suggestions - always allocate space to prevent layout jumping */}
-        <View style={styles.suggestionsContainer} testID="chord-suggestions-container">
+        <View
+          style={styles.suggestionsContainer}
+          testID="chord-suggestions-container"
+        >
           {showSuggestions && suggestions.length > 0 ? (
             <ScrollView
               horizontal
