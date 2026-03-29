@@ -281,7 +281,7 @@ export const tuneComposerStorageService = {
 
   // Export
   exportToMusicXml(score: TuneComposerScore, _options?: ExportOptions): string {
-    return generateMusicXml(score);
+    return generateMusicXml(score, { exportMode: true });
   },
 
   getExportFilename(score: TuneComposerScore): string {

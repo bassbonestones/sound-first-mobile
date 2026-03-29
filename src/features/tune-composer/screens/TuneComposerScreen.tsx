@@ -772,7 +772,7 @@ function TuneComposerScreenContent({
 
     setIsSaving(true);
     try {
-      const musicxml = generateMusicXml(composerState.score);
+      const musicxml = generateMusicXml(composerState.score, { exportMode: true });
       await savePreviewFile(currentFilename, musicxml);
 
       // Also save playback settings to metadata
@@ -826,7 +826,7 @@ function TuneComposerScreenContent({
 
     setIsSaving(true);
     try {
-      const musicxml = generateMusicXml(composerState.score);
+      const musicxml = generateMusicXml(composerState.score, { exportMode: true });
       // Add folder prefix (beginner by default) and extension
       const fullFilename = `beginner/${newFilename.trim()}`;
       const result = await createPreviewFile(fullFilename, musicxml);
