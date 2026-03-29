@@ -144,9 +144,13 @@ export function useTuneComposerLyrics(
         state.score.measures[noteInfo.measureIndex]?.notes[noteInfo.noteIndex];
       if (!note) return;
 
+      // Preserve melismaLength from existing lyric when only changing text/syllabic
       const newLyric: Lyric = {
         text,
         syllabic: syllabic || "single",
+        ...(note.lyric?.melismaLength && {
+          melismaLength: note.lyric.melismaLength,
+        }),
       };
 
       const action = createSetLyricAction(
