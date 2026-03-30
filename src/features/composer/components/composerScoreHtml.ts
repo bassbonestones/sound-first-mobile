@@ -438,13 +438,6 @@ export function generateComposerOsmdHtml(
       allTextElements.forEach(function(textEl) {
         const text = (textEl.textContent || '').trim();
         
-        // Check if this looks like a modulation
-        if (text.includes('@m')) {
-          console.log('[DEBUG] Testing pattern on:', JSON.stringify(text), 'pattern:', MODULATION_PATTERN.toString());
-          const testMatch = MODULATION_PATTERN.exec(text);
-          console.log('[DEBUG] Pattern match result:', testMatch);
-        }
-        
         const match = text.match(MODULATION_PATTERN);
         if (!match) return;
 
@@ -454,8 +447,6 @@ export function generateComposerOsmdHtml(
         const toDotted = !!match[3];
         const toUnit = match[4].toLowerCase();
         const measureNum = parseInt(match[5], 10);
-
-        console.log('[DEBUG] Found modulation:', text, 'measureNum=', measureNum, 'textX=', textEl.getAttribute('x'));
 
         const fromGlyph = SMUFL_METRONOME_GLYPHS[fromUnit];
         const toGlyph = SMUFL_METRONOME_GLYPHS[toUnit];
@@ -472,10 +463,8 @@ export function generateComposerOsmdHtml(
         let x;
         if (measurePos && measurePos.noteStartX !== undefined) {
           x = measurePos.noteStartX;
-          console.log('[DEBUG] Using measure position:', measureNum, 'noteStartX=', x);
         } else {
           x = parseFloat(textEl.getAttribute('x') || '0');
-          console.log('[DEBUG] Fallback to text position:', x);
         }
         const y = parseFloat(textEl.getAttribute('y') || '0');
 
