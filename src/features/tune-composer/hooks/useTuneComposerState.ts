@@ -1045,36 +1045,70 @@ export function useTuneComposerState(
         newKey: key,
       });
 
+      // Calculate the key signature delta to apply to per-measure overrides
+      const keyDelta = key - prevKey;
+
       setState((prev) => {
-        const newMeasures = prev.score.measures.map((measure) => ({
-          ...measure,
-          notes: measure.notes.map((note) => {
-            if (note.midi === null) return note;
+        // Track both old and new effective keys through the measures (for inheritance)
+        let oldEffectiveKey = prev.score.keySignature;
+        let newEffectiveKey = key;
 
-            if (transposeSemitones === 0) {
-              const newAccidental = getAccidentalForMidi(note.midi, key);
-              return { ...note, accidental: newAccidental };
-            }
+        const newMeasures = prev.score.measures.map((measure) => {
+          // Calculate old effective key for this measure (what the notes were in)
+          if (measure.keySignature !== undefined) {
+            oldEffectiveKey = measure.keySignature;
+          }
 
-            const transposed = transposeNoteByFunction(
-              note.midi,
-              note.accidental,
-              prev.score.keySignature,
-              key,
-              transposeSemitones,
-            );
+          // Transpose per-measure key signature overrides by the same delta
+          let newMeasureKey = measure.keySignature;
+          if (measure.keySignature !== undefined) {
+            const transposedKey = measure.keySignature + keyDelta;
+            // Clamp to valid key signature range (-7 to +7)
+            newMeasureKey = Math.max(
+              -7,
+              Math.min(7, transposedKey),
+            ) as KeySignature;
+          }
 
-            if (transposed.midi < 0 || transposed.midi > 127) return note;
+          // Update new effective key: use transposed measure key if present, otherwise inherit
+          if (newMeasureKey !== undefined) {
+            newEffectiveKey = newMeasureKey;
+          }
 
-            return {
-              ...note,
-              midi: transposed.midi,
-              accidental: transposed.accidental,
-              // Clear slurPlacement so it auto-recalculates based on new stem direction
-              slurPlacement: undefined,
-            };
-          }),
-        }));
+          return {
+            ...measure,
+            keySignature: newMeasureKey,
+            notes: measure.notes.map((note) => {
+              if (note.midi === null) return note;
+
+              if (transposeSemitones === 0) {
+                const newAccidental = getAccidentalForMidi(
+                  note.midi,
+                  newEffectiveKey,
+                );
+                return { ...note, accidental: newAccidental };
+              }
+
+              const transposed = transposeNoteByFunction(
+                note.midi,
+                note.accidental,
+                oldEffectiveKey,
+                newEffectiveKey,
+                transposeSemitones,
+              );
+
+              if (transposed.midi < 0 || transposed.midi > 127) return note;
+
+              return {
+                ...note,
+                midi: transposed.midi,
+                accidental: transposed.accidental,
+                // Clear slurPlacement so it auto-recalculates based on new stem direction
+                slurPlacement: undefined,
+              };
+            }),
+          };
+        });
 
         // NOTE: Chord progressions don't need to be modified here!
         // Chords are stored as relative scale degrees (rootOffset) and
