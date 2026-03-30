@@ -33,4 +33,7 @@ export type { RhythmChangeModalProps } from "./RhythmChangeModal";
 export { TuneMetadataModal } from "./TuneMetadataModal";
 export type { TuneMetadataModalProps } from "./TuneMetadataModal";
 
+export { MeasureTempoModal } from "./MeasureTempoModal";
+export type { MeasureTempoModalProps } from "./MeasureTempoModal";
+
 export { modalStyles } from "./modalStyles";

@@ -410,6 +410,8 @@ export interface Measure {
   notes: Note[];
   /** If true, this is a pickup (anacrusis) measure - partial measure before beat 1 */
   isPickup?: boolean;
+  /** Optional tempo override for this measure (BPM). If undefined, inherits from previous measure or score default. */
+  tempo?: number;
 }
 
 /**

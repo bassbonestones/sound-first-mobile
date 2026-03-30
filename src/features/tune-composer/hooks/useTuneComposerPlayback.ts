@@ -202,6 +202,25 @@ export function useTuneComposerPlayback(
     return 60 / bpm;
   }, []);
 
+  /**
+   * Get effective tempo for a measure, considering per-measure overrides.
+   * Walks backward through measures to find closest defined tempo.
+   */
+  const getEffectiveTempo = useCallback(
+    (measureIndex: number): number => {
+      // Walk back through measures to find the most recent tempo override
+      for (let i = measureIndex; i >= 0; i--) {
+        const measure = score.measures[i];
+        if (measure?.tempo !== undefined) {
+          return measure.tempo;
+        }
+      }
+      // Fall back to score-level tempo
+      return score.tempo;
+    },
+    [score.measures, score.tempo],
+  );
+
   const getNextPosition = useCallback(
     (
       current: PlaybackPosition,
@@ -289,7 +308,8 @@ export function useTuneComposerPlayback(
         const firstNote = getNoteAtPosition(position);
         // Only play if this is not a tie continuation
         if (firstNote && !firstNote.tieEnd) {
-          const secondsPerBeat = getSecondsPerBeat(tempo);
+          const effectiveTempo = getEffectiveTempo(position.measureIndex);
+          const secondsPerBeat = getSecondsPerBeat(effectiveTempo);
           // Use tied duration if note has tieStart
           const totalBeats = firstNote.tieStart
             ? getTiedNoteDuration(position)
@@ -317,7 +337,8 @@ export function useTuneComposerPlayback(
         return;
       }
 
-      const secondsPerBeat = getSecondsPerBeat(tempo);
+      const effectiveTempo = getEffectiveTempo(position.measureIndex);
+      const secondsPerBeat = getSecondsPerBeat(effectiveTempo);
       const rawDuration = getNoteDuration(currentNote);
       // Apply swing timing - affects when we move to the next note
       const swungDuration = getSwungDuration(
@@ -350,7 +371,10 @@ export function useTuneComposerPlayback(
               const totalBeats = nextNote.tieStart
                 ? getTiedNoteDuration(nextPos)
                 : getNoteDuration(nextNote);
-              const nextDuration = totalBeats * secondsPerBeat;
+              // Use effective tempo for the new measure
+              const nextTempo = getEffectiveTempo(nextPos.measureIndex);
+              const nextSecondsPerBeat = getSecondsPerBeat(nextTempo);
+              const nextDuration = totalBeats * nextSecondsPerBeat;
               composerSynth.playNote(nextNote.midi, nextDuration * 1000);
             }
             lastPlayedPositionRef.current = `${nextPos.measureIndex}-${nextPos.noteIndex}`;
@@ -366,7 +390,10 @@ export function useTuneComposerPlayback(
             const totalBeats = firstNote.tieStart
               ? getTiedNoteDuration(INITIAL_POSITION)
               : getNoteDuration(firstNote);
-            const firstDuration = totalBeats * secondsPerBeat;
+            // Use effective tempo for measure 0 on repeat
+            const repeatTempo = getEffectiveTempo(0);
+            const repeatSecondsPerBeat = getSecondsPerBeat(repeatTempo);
+            const firstDuration = totalBeats * repeatSecondsPerBeat;
             composerSynth.playNote(firstNote.midi, firstDuration * 1000);
             lastPlayedPositionRef.current = `0-0`;
           }
@@ -387,7 +414,7 @@ export function useTuneComposerPlayback(
     [
       state,
       position,
-      tempo,
+      getEffectiveTempo,
       getNoteAtPosition,
       getNextPosition,
       getSecondsPerBeat,

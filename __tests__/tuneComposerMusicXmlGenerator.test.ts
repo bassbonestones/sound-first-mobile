@@ -13,6 +13,7 @@ import {
 } from "../src/features/tune-composer/services";
 import {
   createScore,
+  createMeasure,
   createChordSymbol,
   createChordProgression,
   type TuneComposerScore,
@@ -359,6 +360,80 @@ describe("Tune Composer MusicXML Generator", () => {
         expect(xml).toContain("<harmony");
         expect(xml).toContain("<root-step>D</root-step>");
         expectKind(xml, "minor-seventh");
+      });
+    });
+
+    describe("Mid-piece tempo changes", () => {
+      it("should output tempo direction on first measure", () => {
+        const score = createScore({ tempo: 100 });
+        const xml = generateMusicXml(score);
+
+        expect(xml).toContain("<per-minute>100</per-minute>");
+        expect(xml).toContain('<sound tempo="100"/>');
+      });
+
+      it("should output tempo direction when measure has tempo override", () => {
+        const score = createScore({ tempo: 120 });
+        // Add a second measure and set its tempo to 80
+        score.measures.push(createMeasure(score.timeSignature));
+        score.measures[1].tempo = 80;
+
+        const xml = generateMusicXml(score);
+
+        // Should have both tempos
+        expect(xml).toContain("<per-minute>120</per-minute>");
+        expect(xml).toContain("<per-minute>80</per-minute>");
+        expect(xml).toContain('<sound tempo="120"/>');
+        expect(xml).toContain('<sound tempo="80"/>');
+      });
+
+      it("should not output tempo direction if measure tempo matches previous", () => {
+        const score = createScore({ tempo: 120 });
+        // Add a second measure with same tempo as score (should not output direction)
+        score.measures.push(createMeasure(score.timeSignature));
+        score.measures[1].tempo = 120;
+
+        const xml = generateMusicXml(score);
+
+        // Count occurrences of tempo - should only be one (first measure)
+        const tempoMatches = xml.match(/<per-minute>120<\/per-minute>/g);
+        expect(tempoMatches).toHaveLength(1);
+      });
+
+      it("should inherit tempo from previous measure when undefined", () => {
+        const score = createScore({ tempo: 120 });
+        // Add measures 2 and 3
+        score.measures.push(createMeasure(score.timeSignature));
+        score.measures.push(createMeasure(score.timeSignature));
+        // Measure 2 has tempo 80
+        score.measures[1].tempo = 80;
+        // Measure 3 has no tempo (undefined) - should inherit 80
+
+        const xml = generateMusicXml(score);
+
+        // Should have 120 on measure 1, 80 on measure 2, no tempo on measure 3
+        const tempo120Matches = xml.match(/<per-minute>120<\/per-minute>/g);
+        const tempo80Matches = xml.match(/<per-minute>80<\/per-minute>/g);
+        expect(tempo120Matches).toHaveLength(1);
+        expect(tempo80Matches).toHaveLength(1);
+      });
+
+      it("should output tempo change back to original tempo", () => {
+        const score = createScore({ tempo: 120 });
+        // Add measures 2 and 3
+        score.measures.push(createMeasure(score.timeSignature));
+        score.measures.push(createMeasure(score.timeSignature));
+        // Measure 2: 80, Measure 3: back to 120
+        score.measures[1].tempo = 80;
+        score.measures[2].tempo = 120;
+
+        const xml = generateMusicXml(score);
+
+        // Should have 120 twice (first measure and measure 3) and 80 once
+        const tempo120Matches = xml.match(/<per-minute>120<\/per-minute>/g);
+        const tempo80Matches = xml.match(/<per-minute>80<\/per-minute>/g);
+        expect(tempo120Matches).toHaveLength(2);
+        expect(tempo80Matches).toHaveLength(1);
       });
     });
   });

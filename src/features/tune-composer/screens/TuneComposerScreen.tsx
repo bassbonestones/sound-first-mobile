@@ -73,6 +73,7 @@ import {
   SaveNewFileModal,
   RhythmChangeModal,
   TuneMetadataModal,
+  MeasureTempoModal,
 } from "../components";
 import {
   ChordProgressionProvider,
@@ -205,6 +206,9 @@ function TuneComposerScreenContent({
 
   // Pickup modal state
   const [showPickupModal, setShowPickupModal] = useState(false);
+
+  // Tempo modal state
+  const [showTempoModal, setShowTempoModal] = useState(false);
 
   // Metadata state
   const [tuneMetadata, setTuneMetadata] = useState<TuneMetadata>(() =>
@@ -1323,6 +1327,12 @@ function TuneComposerScreenContent({
                 onAddPickup={() => setShowPickupModal(true)}
                 hasPickup={composerState.hasPickup}
                 onEditMetadata={handleOpenMetadata}
+                onSetMeasureTempo={() => setShowTempoModal(true)}
+                measureTempo={
+                  composerState.score.measures[
+                    composerState.cursor.measureIndex
+                  ]?.tempo
+                }
                 hasSelection={hasSelection}
                 canDeleteMeasure={canDeleteMeasure}
                 disabled={isPlaying}
@@ -1836,6 +1846,32 @@ function TuneComposerScreenContent({
           onSave={handleSaveMetadata}
           onCancel={() => setShowMetadataModal(false)}
           isSaving={isMetadataSaving}
+        />
+
+        {/* Measure Tempo Modal */}
+        <MeasureTempoModal
+          visible={showTempoModal}
+          onClose={() => setShowTempoModal(false)}
+          measureNumber={composerState.cursor.measureIndex + 1}
+          currentTempo={
+            composerState.score.measures[composerState.cursor.measureIndex]
+              ?.tempo
+          }
+          effectiveTempo={composerState.getMeasureEffectiveTempo(
+            composerState.cursor.measureIndex,
+          )}
+          scoreTempo={composerState.score.tempo}
+          onSetTempo={(tempo) => {
+            composerState.setMeasureTempo(
+              composerState.cursor.measureIndex,
+              tempo,
+            );
+            setShowTempoModal(false);
+          }}
+          onClearTempo={() => {
+            composerState.clearCurrentMeasureTempo();
+            setShowTempoModal(false);
+          }}
         />
       </KeyboardAvoidingView>
     </SafeAreaView>

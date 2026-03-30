@@ -687,6 +687,10 @@ function generateMeasureXml(
   activeChords: ChordSymbol[],
   isFirstFullMeasure: boolean = false,
   melismaContinuationNotes: Set<string> = new Set(),
+  tempoInfo: { effectiveTempo: number; hasTempoChange: boolean } = {
+    effectiveTempo: 120,
+    hasTempoChange: false,
+  },
 ): string {
   const preferFlats = score.keySignature < 0;
   const isPickup = measure.isPickup ?? false;
@@ -973,17 +977,18 @@ function generateMeasureXml(
       generateAttributesXml(score.timeSignature, score.keySignature, score.clef)
     : "";
 
-  // Metronome/tempo direction on the first measure only (pickup or first full)
-  const showDirection = isFirstMeasure && scoreHasNotes;
+  // Metronome/tempo direction on first measure OR when tempo changes mid-piece
+  const showDirection =
+    (isFirstMeasure && scoreHasNotes) || tempoInfo.hasTempoChange;
   const directionXml = showDirection
     ? `\n      <direction placement="above">
         <direction-type>
           <metronome parentheses="no">
             <beat-unit>quarter</beat-unit>
-            <per-minute>${score.tempo}</per-minute>
+            <per-minute>${tempoInfo.effectiveTempo}</per-minute>
           </metronome>
         </direction-type>
-        <sound tempo="${score.tempo}"/>
+        <sound tempo="${tempoInfo.effectiveTempo}"/>
       </direction>`
     : "";
 
@@ -1049,11 +1054,27 @@ export function generateMusicXml(
   // Find index of first full (non-pickup) measure
   const firstFullMeasureIndex = hasPickup ? 1 : 0;
 
+  // Pre-compute effective tempo for each measure and detect tempo changes
+  // A tempo change occurs when the measure's tempo differs from the previous effective tempo
+  const measureTempoInfo: Array<{
+    effectiveTempo: number;
+    hasTempoChange: boolean;
+  }> = [];
+  let currentTempo = score.tempo;
+  for (let i = 0; i < score.measures.length; i++) {
+    const measure = score.measures[i];
+    const measureTempo = measure.tempo ?? currentTempo;
+    const hasTempoChange = i > 0 && measureTempo !== currentTempo;
+    measureTempoInfo.push({ effectiveTempo: measureTempo, hasTempoChange });
+    currentTempo = measureTempo;
+  }
+
   const measuresXml = score.measures
     .map((measure, index) => {
       // Pickup measure = 0, then count from 1
       const measureNumber = hasPickup ? index : index + 1;
       const isFirstFullMeasure = index === firstFullMeasureIndex;
+      const tempoInfo = measureTempoInfo[index];
 
       return generateMeasureXml(
         measure,
@@ -1067,6 +1088,7 @@ export function generateMusicXml(
         activeChords,
         isFirstFullMeasure,
         melismaContinuationNotes,
+        tempoInfo,
       );
     })
     .join("\n");

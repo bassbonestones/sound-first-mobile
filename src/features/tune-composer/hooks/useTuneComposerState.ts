@@ -117,6 +117,12 @@ export interface UseTuneComposerStateReturn {
   deleteMeasure: () => void;
   deleteLastMeasure: () => void;
   fillMeasureWithRests: () => void;
+  /** Set a tempo override for a specific measure (undefined to clear) */
+  setMeasureTempo: (measureIndex: number, tempo: number | undefined) => void;
+  /** Clear tempo override on current measure */
+  clearCurrentMeasureTempo: () => void;
+  /** Get effective tempo for a measure (considering inheritance) */
+  getMeasureEffectiveTempo: (measureIndex: number) => number;
 
   // Pickup Measure
   /** Whether the score has a pickup measure */
@@ -647,6 +653,63 @@ export function useTuneComposerState(
       ),
     }));
   }, [state.score, state.cursor.measureIndex, updateScore]);
+
+  // ==========================================================================
+  // Measure Tempo Operations
+  // ==========================================================================
+
+  /**
+   * Set a tempo override on a specific measure.
+   * Pass undefined to clear the tempo override (inherit from previous measure or score).
+   */
+  const setMeasureTempo = useCallback(
+    (measureIndex: number, tempo: number | undefined) => {
+      const measure = state.score.measures[measureIndex];
+      if (!measure) return;
+
+      const prevTempo = measure.tempo;
+      if (tempo === prevTempo) return;
+
+      // Note: We don't add undo action for measure tempo changes yet
+      // This can be added later if needed
+
+      updateScore((score) => ({
+        ...score,
+        measures: score.measures.map((m, i) =>
+          i === measureIndex ? { ...m, tempo } : m,
+        ),
+      }));
+    },
+    [state.score.measures, updateScore],
+  );
+
+  /**
+   * Clear the tempo override on the current measure.
+   */
+  const clearCurrentMeasureTempo = useCallback(() => {
+    setMeasureTempo(state.cursor.measureIndex, undefined);
+  }, [state.cursor.measureIndex, setMeasureTempo]);
+
+  /**
+   * Get the effective tempo for a measure (considering inheritance).
+   */
+  const getMeasureEffectiveTempo = useCallback(
+    (measureIndex: number): number => {
+      let effectiveTempo = state.score.tempo;
+      for (
+        let i = 0;
+        i <= measureIndex && i < state.score.measures.length;
+        i++
+      ) {
+        const measure = state.score.measures[i];
+        if (measure.tempo !== undefined) {
+          effectiveTempo = measure.tempo;
+        }
+      }
+      return effectiveTempo;
+    },
+    [state.score.measures, state.score.tempo],
+  );
 
   // ==========================================================================
   // Pickup Measure Operations
@@ -1202,6 +1265,9 @@ export function useTuneComposerState(
     deleteMeasure,
     deleteLastMeasure,
     fillMeasureWithRests,
+    setMeasureTempo,
+    clearCurrentMeasureTempo,
+    getMeasureEffectiveTempo,
 
     // Pickup Measure
     hasPickup,

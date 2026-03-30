@@ -35,6 +35,10 @@ export interface MeasureControlsProps {
   onDeleteMeasure: () => void;
   /** Called when fill with rests is pressed */
   onFillWithRests: () => void;
+  /** Called when tempo button is pressed */
+  onOpenTempoModal?: () => void;
+  /** Current measure's tempo override (undefined if inheriting) */
+  measureTempo?: number;
   /** Whether delete is allowed (not last measure) */
   canDelete?: boolean;
   /** Whether controls are disabled */
@@ -54,6 +58,8 @@ function MeasureControlsComponent({
   onAddMeasure,
   onDeleteMeasure,
   onFillWithRests,
+  onOpenTempoModal,
+  measureTempo,
   canDelete = true,
   disabled = false,
   testID,
@@ -70,8 +76,13 @@ function MeasureControlsComponent({
     if (!disabled && !validation.isComplete) onFillWithRests();
   }, [disabled, validation.isComplete, onFillWithRests]);
 
+  const handleOpenTempo = useCallback(() => {
+    if (!disabled && onOpenTempoModal) onOpenTempoModal();
+  }, [disabled, onOpenTempoModal]);
+
   const showIncompleteWarning = !validation.isComplete;
   const beatsRemaining = validation.difference;
+  const hasMeasureTempo = measureTempo !== undefined;
 
   return (
     <View style={styles.container} testID={testID}>
@@ -81,6 +92,9 @@ function MeasureControlsComponent({
         <Text style={styles.measureNumber}>
           {currentMeasure} / {totalMeasures}
         </Text>
+        {hasMeasureTempo && (
+          <Text style={styles.measureTempo}>♩={measureTempo}</Text>
+        )}
       </View>
 
       {/* Action buttons */}
@@ -103,6 +117,35 @@ function MeasureControlsComponent({
           >
             <Feather name="pause" size={16} color={colors.primary} />
             <Text style={styles.fillButtonText}>Fill Rests</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Measure tempo */}
+        {onOpenTempoModal && (
+          <TouchableOpacity
+            style={[
+              styles.button,
+              styles.tempoButton,
+              hasMeasureTempo && styles.tempoButtonActive,
+              disabled && styles.buttonDisabled,
+            ]}
+            onPress={handleOpenTempo}
+            disabled={disabled}
+            accessibilityRole={"button" as AccessibilityRole}
+            accessibilityLabel="Set measure tempo"
+            accessibilityHint={
+              hasMeasureTempo
+                ? `Current tempo: ${measureTempo}`
+                : "Set a tempo change for this measure"
+            }
+            accessibilityState={{ disabled }}
+            testID="measure-tempo"
+          >
+            <Feather
+              name="activity"
+              size={16}
+              color={hasMeasureTempo ? colors.primary : colors.textSecondary}
+            />
           </TouchableOpacity>
         )}
 
@@ -178,6 +221,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.textPrimary,
   },
+  measureTempo: {
+    fontSize: 10,
+    color: colors.primary,
+    fontWeight: "500",
+  },
   validationContainer: {
     flex: 1,
   },
@@ -232,6 +280,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: colors.primary,
+  },
+  tempoButton: {
+    width: 36,
+    height: 36,
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+  },
+  tempoButtonActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
   },
   addButton: {
     width: 36,

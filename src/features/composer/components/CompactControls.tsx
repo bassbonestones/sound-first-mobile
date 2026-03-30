@@ -49,6 +49,10 @@ export interface CompactControlsProps {
   hasPickup?: boolean;
   /** Called when edit metadata is pressed (optional - tune composer only) */
   onEditMetadata?: () => void;
+  /** Called when set measure tempo is pressed (optional - tune composer only) */
+  onSetMeasureTempo?: () => void;
+  /** Current measure's tempo override if any (optional - tune composer only) */
+  measureTempo?: number;
   /** Whether there's a selected note (for delete) */
   hasSelection?: boolean;
   /** Whether delete measure is allowed */
@@ -75,6 +79,8 @@ function CompactControlsComponent({
   onAddPickup,
   hasPickup = false,
   onEditMetadata,
+  onSetMeasureTempo,
+  measureTempo,
   hasSelection = false,
   canDeleteMeasure = true,
   disabled = false,
@@ -123,6 +129,13 @@ function CompactControlsComponent({
       setShowMenu(false);
     }
   }, [disabled, onEditMetadata]);
+
+  const handleSetMeasureTempo = useCallback(() => {
+    if (!disabled && onSetMeasureTempo) {
+      onSetMeasureTempo();
+      setShowMenu(false);
+    }
+  }, [disabled, onSetMeasureTempo]);
 
   const canFill = !validation.isComplete && validation.difference < 0;
 
@@ -234,6 +247,22 @@ function CompactControlsComponent({
               >
                 <Feather name="info" size={18} color={colors.primary} />
                 <Text style={styles.menuItemText}>Edit Tune Info</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Set measure tempo - only show if onSetMeasureTempo is provided */}
+            {onSetMeasureTempo && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={handleSetMeasureTempo}
+                testID="menu-tempo"
+              >
+                <Feather name="activity" size={18} color={colors.primary} />
+                <Text style={styles.menuItemText}>
+                  {measureTempo
+                    ? `Tempo: ♩=${measureTempo}`
+                    : "Set Measure Tempo"}
+                </Text>
               </TouchableOpacity>
             )}
 
