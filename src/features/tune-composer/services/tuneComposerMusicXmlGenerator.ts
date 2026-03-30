@@ -348,21 +348,8 @@ function parseTempoBeatUnit(beatUnit: TempoBeatUnit): {
 }
 
 /**
- * Unicode symbols for note values in metric modulation text.
- * Uses widely-supported Unicode musical symbols.
- * Note: Half and whole use quarter/eighth with text clarification since
- * the Musical Symbols Unicode block (U+1D100) has poor font support.
- */
-const BEAT_UNIT_UNICODE: Record<string, string> = {
-  whole: "𝅝",
-  half: "𝅗𝅥",
-  quarter: "♩",
-  eighth: "♪",
-  sixteenth: "♬",
-};
-
-/**
- * Simple text labels for note values (fallback for poor Unicode support).
+ * Simple text labels for note values.
+ * OSMD doesn't support custom fonts in <words>, so we use plain text.
  */
 const BEAT_UNIT_TEXT: Record<string, string> = {
   whole: "whole",
@@ -373,20 +360,8 @@ const BEAT_UNIT_TEXT: Record<string, string> = {
 };
 
 /**
- * SMuFL codepoints for Bravura font note symbols.
- * These are the same codepoints used in the UI beat unit picker.
- */
-const BEAT_UNIT_SMUFL: Record<string, string> = {
-  whole: "\uE1D2", // noteWhole
-  half: "\uE1D3", // noteHalfUp
-  quarter: "\uE1D5", // noteQuarterUp
-  eighth: "\uE1D7", // note8thUp
-  "16th": "\uE1D9", // note16thUp
-};
-
-/**
  * Get text representation of a beat unit for display in MusicXML <words>.
- * Uses simple text labels for reliable rendering across all fonts.
+ * Uses simple text labels for reliable rendering.
  * E.g., "dotted-quarter" → "dotted quarter"
  */
 function getBeatUnitUnicodeText(beatUnit: TempoBeatUnit): string {
@@ -1120,17 +1095,20 @@ function generateMeasureXml(
   let directionXml = "";
   if (showDirection) {
     if (tempoInfo.modulation) {
-      // Metric modulation: show the new tempo with toUnit as the beat unit
+      // Metric modulation: Use <words> with text that we'll replace in post-render.
+      // OSMD doesn't render the two-beat-unit metronome format.
+      const { beatUnitXml: fromBeatUnitXml, isDotted: fromIsDotted } =
+        parseTempoBeatUnit(tempoInfo.modulation.fromUnit);
       const { beatUnitXml: toBeatUnitXml, isDotted: toIsDotted } =
         parseTempoBeatUnit(tempoInfo.modulation.toUnit);
-      const toDotXml = toIsDotted ? "\n            <beat-unit-dot/>" : "";
+      const fromText = fromIsDotted
+        ? `dotted-${fromBeatUnitXml}`
+        : fromBeatUnitXml;
+      const toText = toIsDotted ? `dotted-${toBeatUnitXml}` : toBeatUnitXml;
 
       directionXml = `\n      <direction placement="above">
         <direction-type>
-          <metronome parentheses="no">
-            <beat-unit>${toBeatUnitXml}</beat-unit>${toDotXml}
-            <per-minute>${Math.round(tempoInfo.effectiveTempo)}</per-minute>
-          </metronome>
+          <words font-weight="bold">${fromText}=${toText}</words>
         </direction-type>
         <sound tempo="${Math.round(tempoInfo.effectiveTempo)}"/>
       </direction>`;

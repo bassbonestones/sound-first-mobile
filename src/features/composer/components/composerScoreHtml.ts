@@ -58,6 +58,22 @@ export function generateComposerOsmdHtml(
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Composer Score</title>
   <style>
+    /* Load Bravura fonts from Steinberg CDN for SMuFL metronome glyphs */
+    @font-face {
+      font-family: 'Bravura Text';
+      src: url('https://cdn.jsdelivr.net/gh/steinbergmedia/bravura@master/redist/woff/BravuraText.woff2') format('woff2');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Bravura';
+      src: url('https://cdn.jsdelivr.net/gh/steinbergmedia/bravura@master/redist/woff/Bravura.woff2') format('woff2');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
     * {
       margin: 0;
       padding: 0;
@@ -283,6 +299,7 @@ export function generateComposerOsmdHtml(
         
         setZoom(currentZoom);
         shortenChordSymbols();
+        replaceMetricModulations();
         debugChordElements(); // Log what OSMD created
         // Note: repositionChordSymbols is called from React Native after measurePositions are received
         buildNoteMap();
@@ -363,6 +380,97 @@ export function generateComposerOsmdHtml(
         const transform = g.getAttribute('transform');
         const text = g.textContent?.trim();
         // console.log('[DEBUG] ChordSymbol ' + i + ':', text, 'transform:', transform);
+      });
+    }
+
+    // SMuFL metronome glyph codepoints (Bravura font)
+    // These are from the Standard Music Font Layout specification
+    const SMUFL_METRONOME_GLYPHS = {
+      'whole': '\uECA2',        // metNoteWhole
+      'half': '\uECA3',         // metNoteHalfUp
+      'quarter': '\uECA5',      // metNoteQuarterUp
+      'eighth': '\uECA7',       // metNote8thUp
+      '16th': '\uECA9',         // metNote16thUp
+      '32nd': '\uECAB',         // metNote32ndUp
+      '64th': '\uECAD',         // metNote64thUp
+      'dot': '\uECB7'           // metAugmentationDot
+    };
+
+    // Pattern to match "quarter=half" or "dotted-quarter=eighth" (no spaces)
+    const MODULATION_PATTERN = /^(dotted-)?(whole|half|quarter|eighth|16th|32nd|64th)=(dotted-)?(whole|half|quarter|eighth|16th|32nd|64th)$/i;
+
+    /**
+     * Replace metric modulation text with proper SMuFL glyphs.
+     * Since OSMD doesn't render two-beat-unit metronomes, we use <words>
+     * and find the resulting text elements to replace them.
+     */
+    function replaceMetricModulations() {
+      const container = document.getElementById('osmd-container');
+      if (!container) return;
+
+      const svg = container.querySelector('svg');
+      if (!svg) return;
+
+      // Find ALL text elements in the SVG
+      const allTextElements = svg.querySelectorAll('text');
+      
+      allTextElements.forEach(function(textEl) {
+        const text = (textEl.textContent || '').trim();
+        
+        const match = text.match(MODULATION_PATTERN);
+        if (!match) return;
+
+        // Parse the modulation: [fullMatch, fromDotted, fromUnit, toDotted, toUnit]
+        const fromDotted = !!match[1];
+        const fromUnit = match[2].toLowerCase();
+        const toDotted = !!match[3];
+        const toUnit = match[4].toLowerCase();
+
+        const fromGlyph = SMUFL_METRONOME_GLYPHS[fromUnit];
+        const toGlyph = SMUFL_METRONOME_GLYPHS[toUnit];
+        const dotGlyph = SMUFL_METRONOME_GLYPHS.dot;
+
+        if (!fromGlyph || !toGlyph) return;
+
+        // Get position from the text element
+        const x = parseFloat(textEl.getAttribute('x') || '0');
+        const y = parseFloat(textEl.getAttribute('y') || '0');
+
+        // Hide the original text element
+        textEl.setAttribute('visibility', 'hidden');
+
+        // Create new group for our custom rendering
+        const custom = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        custom.setAttribute('class', 'soundfirst-tempo-mod');
+
+        // Left note glyph
+        const left = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        left.setAttribute('x', String(x));
+        left.setAttribute('y', String(y));
+        left.setAttribute('font-family', 'Bravura Text, Bravura, serif');
+        left.setAttribute('font-size', '24');
+        left.textContent = fromGlyph + (fromDotted ? dotGlyph : '');
+
+        // Equals sign
+        const eq = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        eq.setAttribute('x', String(x + 20));
+        eq.setAttribute('y', String(y));
+        eq.setAttribute('font-size', '16');
+        eq.textContent = '=';
+
+        // Right note glyph
+        const right = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        right.setAttribute('x', String(x + 36));
+        right.setAttribute('y', String(y));
+        right.setAttribute('font-family', 'Bravura Text, Bravura, serif');
+        right.setAttribute('font-size', '24');
+        right.textContent = toGlyph + (toDotted ? dotGlyph : '');
+
+        custom.appendChild(left);
+        custom.appendChild(eq);
+        custom.appendChild(right);
+
+        svg.appendChild(custom);
       });
     }
 

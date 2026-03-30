@@ -705,21 +705,24 @@ describe("Tune Composer MusicXML Generator", () => {
 
         const xml = generateMusicXml(score);
 
-        // Measure 2 should have the tempo direction with half note beat unit
-        // The BPM stays 120 because quarter=half means the pulse continues at same rate
+        // Measure 2 should have the tempo direction with note equivalence as <words>
+        // Uses SMuFL symbols in Bravura font for proper rendering
         const measure2Match = xml.match(
           /measure number="2"[\s\S]*?<\/measure>/,
         );
         expect(measure2Match).not.toBeNull();
-        expect(measure2Match![0]).toContain("<per-minute>120</per-minute>");
-        expect(measure2Match![0]).toContain("<beat-unit>half</beat-unit>");
+        // Should use words element with modulation text that post-render replaces
+        expect(measure2Match![0]).toContain("<words");
+        expect(measure2Match![0]).toContain("quarter=half");
+        // Should have sound element for playback
+        expect(measure2Match![0]).toContain('<sound tempo="120"/>');
 
-        // Measure 1 should NOT have the half note tempo direction
+        // Measure 1 should NOT have the modulation
         const measure1Match = xml.match(
           /measure number="1"[\s\S]*?<\/measure>/,
         );
         expect(measure1Match).not.toBeNull();
-        expect(measure1Match![0]).not.toContain("<beat-unit>half</beat-unit>");
+        expect(measure1Match![0]).not.toContain("quarter=half");
       });
 
       it("should correctly number measures with pickup (pickup=0, first full=1)", () => {
@@ -752,12 +755,13 @@ describe("Tune Composer MusicXML Generator", () => {
 
         const xml = generateMusicXml(score);
 
-        // Verify measure 9 (index 9) has the modulation
+        // Verify measure 9 (index 9) has the modulation using words element
         const measure9Match = xml.match(
           /measure number="9"[\s\S]*?<\/measure>/,
         );
         expect(measure9Match).not.toBeNull();
-        expect(measure9Match![0]).toContain("<beat-unit>half</beat-unit>");
+        expect(measure9Match![0]).toContain("<words");
+        expect(measure9Match![0]).toContain("quarter=half");
         expect(measure9Match![0]).toContain("<direction");
 
         // Verify measure 8 does NOT have the modulation
@@ -765,8 +769,8 @@ describe("Tune Composer MusicXML Generator", () => {
           /measure number="8"[\s\S]*?<\/measure>/,
         );
         expect(measure8Match).not.toBeNull();
-        expect(measure8Match![0]).not.toContain("<beat-unit>half</beat-unit>");
-        expect(measure8Match![0]).not.toContain("<direction");
+        expect(measure8Match![0]).not.toContain("quarter=half");
+        expect(measure8Match![0]).not.toContain("<words");
       });
     });
   });
