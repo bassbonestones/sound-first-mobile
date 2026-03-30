@@ -348,6 +348,55 @@ function parseTempoBeatUnit(beatUnit: TempoBeatUnit): {
 }
 
 /**
+ * Unicode symbols for note values in metric modulation text.
+ * Uses widely-supported Unicode musical symbols.
+ * Note: Half and whole use quarter/eighth with text clarification since
+ * the Musical Symbols Unicode block (U+1D100) has poor font support.
+ */
+const BEAT_UNIT_UNICODE: Record<string, string> = {
+  whole: "𝅝",
+  half: "𝅗𝅥",
+  quarter: "♩",
+  eighth: "♪",
+  sixteenth: "♬",
+};
+
+/**
+ * Simple text labels for note values (fallback for poor Unicode support).
+ */
+const BEAT_UNIT_TEXT: Record<string, string> = {
+  whole: "whole",
+  half: "half",
+  quarter: "quarter",
+  eighth: "eighth",
+  sixteenth: "16th",
+};
+
+/**
+ * SMuFL codepoints for Bravura font note symbols.
+ * These are the same codepoints used in the UI beat unit picker.
+ */
+const BEAT_UNIT_SMUFL: Record<string, string> = {
+  whole: "\uE1D2", // noteWhole
+  half: "\uE1D3", // noteHalfUp
+  quarter: "\uE1D5", // noteQuarterUp
+  eighth: "\uE1D7", // note8thUp
+  "16th": "\uE1D9", // note16thUp
+};
+
+/**
+ * Get text representation of a beat unit for display in MusicXML <words>.
+ * Uses simple text labels for reliable rendering across all fonts.
+ * E.g., "dotted-quarter" → "dotted quarter"
+ */
+function getBeatUnitUnicodeText(beatUnit: TempoBeatUnit): string {
+  const isDotted = beatUnit.startsWith("dotted-");
+  const baseUnit = isDotted ? beatUnit.replace("dotted-", "") : beatUnit;
+  const text = BEAT_UNIT_TEXT[baseUnit] ?? baseUnit;
+  return isDotted ? `dotted ${text}` : text;
+}
+
+/**
  * Generate MusicXML <harmony> element from a resolved chord symbol string.
  * Returns empty string if chord cannot be parsed.
  * @param symbol The resolved chord symbol string (e.g., "Cmaj7")
@@ -1071,18 +1120,16 @@ function generateMeasureXml(
   let directionXml = "";
   if (showDirection) {
     if (tempoInfo.modulation) {
-      // Metric modulation: output two beat units (e.g., "dotted-quarter = quarter")
-      const { beatUnitXml: fromBeatUnitXml, isDotted: fromIsDotted } =
-        parseTempoBeatUnit(tempoInfo.modulation.fromUnit);
+      // Metric modulation: show the new tempo with toUnit as the beat unit
       const { beatUnitXml: toBeatUnitXml, isDotted: toIsDotted } =
         parseTempoBeatUnit(tempoInfo.modulation.toUnit);
-      const fromDotXml = fromIsDotted ? "\n            <beat-unit-dot/>" : "";
       const toDotXml = toIsDotted ? "\n            <beat-unit-dot/>" : "";
+
       directionXml = `\n      <direction placement="above">
         <direction-type>
           <metronome parentheses="no">
-            <beat-unit>${fromBeatUnitXml}</beat-unit>${fromDotXml}
             <beat-unit>${toBeatUnitXml}</beat-unit>${toDotXml}
+            <per-minute>${Math.round(tempoInfo.effectiveTempo)}</per-minute>
           </metronome>
         </direction-type>
         <sound tempo="${Math.round(tempoInfo.effectiveTempo)}"/>
@@ -1199,6 +1246,8 @@ export function generateMusicXml(
       measureBeatUnit = measure.tempoBeatUnit ?? currentBeatUnit;
     }
 
+    // A tempo change occurs when the measure's tempo, beat unit, or modulation differs from previous
+    // Skip measure 0 as that's handled by the initial tempo display (on first measure)
     const hasTempoChange =
       i > 0 &&
       (measureTempo !== currentTempo ||
@@ -1331,4 +1380,93 @@ export function validateScoreForExport(score: TuneComposerScore): {
   }
 
   return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Apply OSMD rendering workaround for pickup measures.
+ * OSMD has a bug where metronome directions render one measure early when there's a pickup.
+ * This function moves metronome directions from measure N to measure N+1 (for N > 0).
+ * Only apply this to XML sent to OSMD for rendering, NOT to saved XML files.
+ */
+export function applyOsmdPickupWorkaround(musicXml: string): string {
+  // Check if there's a pickup measure (measure number="0" implicit="yes")
+  const hasPickup = /<measure[^>]*number="0"[^>]*implicit="yes"/.test(musicXml);
+  if (!hasPickup) {
+    return musicXml; // No workaround needed
+  }
+
+  // Find all measures and their contents
+  const measureRegex =
+    /<measure[^>]*number="(\d+)"[^>]*>([\s\S]*?)<\/measure>/g;
+  const measures: Array<{
+    number: string;
+    content: string;
+    fullMatch: string;
+  }> = [];
+  let match;
+
+  while ((match = measureRegex.exec(musicXml)) !== null) {
+    measures.push({
+      number: match[1],
+      content: match[2],
+      fullMatch: match[0],
+    });
+  }
+
+  // Find metronome directions in each measure (except measure 0 and 1)
+  // and move them to the next measure
+  let result = musicXml;
+
+  for (let i = measures.length - 1; i >= 0; i--) {
+    const measure = measures[i];
+    const measureNum = parseInt(measure.number, 10);
+
+    // Skip pickup (0) and first full measure (1) - their tempos are correct
+    if (measureNum <= 1) continue;
+
+    // Find metronome direction in this measure
+    const metronomeDirectionRegex =
+      /(\s*<direction[^>]*>\s*<direction-type>\s*<metronome[\s\S]*?<\/direction>)/g;
+    const metronomeMatch = metronomeDirectionRegex.exec(measure.content);
+
+    if (metronomeMatch) {
+      const metronomeDirection = metronomeMatch[1];
+
+      // Check if there's a next measure to move the tempo to
+      const nextMeasure = measures[i + 1];
+      if (!nextMeasure) {
+        // Can't shift forward - no next measure. Leave tempo in place (will render early but at least visible)
+        continue;
+      }
+
+      // Remove from current measure
+      const newContent = measure.content.replace(metronomeDirection, "");
+      const newMeasure = measure.fullMatch.replace(measure.content, newContent);
+      result = result.replace(measure.fullMatch, newMeasure);
+
+      // Add to the next measure (after attributes if present, else at start)
+      if (nextMeasure) {
+        const nextMeasureContent = nextMeasure.content;
+        // Insert after </attributes> if present, else at start of measure content
+        const attrsEndMatch = nextMeasureContent.match(/<\/attributes>/);
+        let newNextContent: string;
+        if (attrsEndMatch) {
+          newNextContent = nextMeasureContent.replace(
+            "</attributes>",
+            "</attributes>" + metronomeDirection,
+          );
+        } else {
+          // Insert at the start (after measure tag)
+          newNextContent = metronomeDirection + nextMeasureContent;
+        }
+        const newNextMeasure = nextMeasure.fullMatch.replace(
+          nextMeasure.content,
+          newNextContent,
+        );
+        result = result.replace(nextMeasure.fullMatch, newNextMeasure);
+      }
+    }
+  }
+
+  return result;
 }

@@ -658,5 +658,116 @@ describe("Tune Composer MusicXML Generator", () => {
         expect(measure2Match![0]).toContain("<beats>3</beats>");
       });
     });
+
+    describe("Pickup measures with tempo changes", () => {
+      it("should place tempo change on correct measure with pickup", () => {
+        const score = createScore({ tempo: 120 });
+        // Make first measure a pickup
+        score.measures[0].isPickup = true;
+        // Add measure 1 (first full measure)
+        score.measures.push(createMeasure(score.timeSignature));
+        // Add measure 2 with tempo change
+        score.measures.push(createMeasure(score.timeSignature));
+        score.measures[2].tempo = 80;
+
+        const xml = generateMusicXml(score);
+
+        // Pickup = measure 0 (implicit)
+        // First full = measure 1
+        // Second full = measure 2 (should have tempo 80)
+        const measure2Match = xml.match(
+          /measure number="2"[\s\S]*?<\/measure>/,
+        );
+        expect(measure2Match).not.toBeNull();
+        expect(measure2Match![0]).toContain("<per-minute>80</per-minute>");
+
+        // Measure 1 should NOT have the 80 BPM tempo
+        const measure1Match = xml.match(
+          /measure number="1"[\s\S]*?<\/measure>/,
+        );
+        expect(measure1Match).not.toBeNull();
+        expect(measure1Match![0]).not.toContain("<per-minute>80</per-minute>");
+      });
+
+      it("should place tempo modulation on correct measure with pickup", () => {
+        const score = createScore({ tempo: 120, tempoBeatUnit: "quarter" });
+        // Make first measure a pickup
+        score.measures[0].isPickup = true;
+        // Add measure 1 (first full measure)
+        score.measures.push(createMeasure(score.timeSignature));
+        // Add measure 2 with modulation (quarter = half means same pulse, different unit)
+        // Formula: newBPM = oldBPM * (previousBeatUnit / fromUnit) = 120 * (1/1) = 120
+        score.measures.push(createMeasure(score.timeSignature));
+        score.measures[2].tempoModulation = {
+          fromUnit: "quarter",
+          toUnit: "half",
+        };
+
+        const xml = generateMusicXml(score);
+
+        // Measure 2 should have the tempo direction with half note beat unit
+        // The BPM stays 120 because quarter=half means the pulse continues at same rate
+        const measure2Match = xml.match(
+          /measure number="2"[\s\S]*?<\/measure>/,
+        );
+        expect(measure2Match).not.toBeNull();
+        expect(measure2Match![0]).toContain("<per-minute>120</per-minute>");
+        expect(measure2Match![0]).toContain("<beat-unit>half</beat-unit>");
+
+        // Measure 1 should NOT have the half note tempo direction
+        const measure1Match = xml.match(
+          /measure number="1"[\s\S]*?<\/measure>/,
+        );
+        expect(measure1Match).not.toBeNull();
+        expect(measure1Match![0]).not.toContain("<beat-unit>half</beat-unit>");
+      });
+
+      it("should correctly number measures with pickup (pickup=0, first full=1)", () => {
+        const score = createScore({ tempo: 120 });
+        score.measures[0].isPickup = true;
+        score.measures.push(createMeasure(score.timeSignature));
+        score.measures.push(createMeasure(score.timeSignature));
+
+        const xml = generateMusicXml(score);
+
+        // Should have measure numbers 0, 1, 2
+        expect(xml).toContain('measure number="0" implicit="yes"');
+        expect(xml).toContain('measure number="1"');
+        expect(xml).toContain('measure number="2"');
+      });
+
+      it("should place tempo on measure 9 with pickup and many measures", () => {
+        const score = createScore({ tempo: 120, tempoBeatUnit: "quarter" });
+        // Make first measure a pickup
+        score.measures[0].isPickup = true;
+        // Add measures 1-9 (10 measures total including pickup)
+        for (let i = 1; i <= 9; i++) {
+          score.measures.push(createMeasure(score.timeSignature));
+        }
+        // Set modulation on measure index 9 (which should be measure number 9)
+        score.measures[9].tempoModulation = {
+          fromUnit: "quarter",
+          toUnit: "half",
+        };
+
+        const xml = generateMusicXml(score);
+
+        // Verify measure 9 (index 9) has the modulation
+        const measure9Match = xml.match(
+          /measure number="9"[\s\S]*?<\/measure>/,
+        );
+        expect(measure9Match).not.toBeNull();
+        expect(measure9Match![0]).toContain("<beat-unit>half</beat-unit>");
+        expect(measure9Match![0]).toContain("<direction");
+
+        // Verify measure 8 does NOT have the modulation
+        const measure8Match = xml.match(
+          /measure number="8"[\s\S]*?<\/measure>/,
+        );
+        expect(measure8Match).not.toBeNull();
+        expect(measure8Match![0]).not.toContain("<beat-unit>half</beat-unit>");
+        expect(measure8Match![0]).not.toContain("<direction");
+      });
+    });
   });
 });

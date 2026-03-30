@@ -34,7 +34,10 @@ import { colors, spacing } from "../../../constants";
 import { devError } from "../../../utils/devLogger";
 import type { WebViewRef } from "../../../types/webview";
 import { generateComposerOsmdHtml } from "../../composer/components/composerScoreHtml";
-import { generateMusicXml } from "../services/tuneComposerMusicXmlGenerator";
+import {
+  generateMusicXml,
+  applyOsmdPickupWorkaround,
+} from "../services/tuneComposerMusicXmlGenerator";
 import type { TuneComposerScore, Note } from "../types";
 import {
   getNoteDuration,
@@ -422,12 +425,12 @@ function TuneComposerScoreViewportComponent({
 
     // Get default chord progression
     const progression = getDefaultProgression(score.chordProgressions);
-    console.log(
-      "[ChordReposition] Progression:",
-      progression?.name,
-      "chords:",
-      progression?.chords.length,
-    );
+    // console.log(
+    //   "[ChordReposition] Progression:",
+    //   progression?.name,
+    //   "chords:",
+    //   progression?.chords.length,
+    // );
     if (!progression || progression.chords.length === 0) return;
 
     // Calculate X positions for each chord
@@ -445,10 +448,10 @@ function TuneComposerScoreViewportComponent({
         (m) => m.measureIndex === chord.measureIndex,
       );
       if (!measurePos) {
-        console.log(
-          "[ChordReposition] No measurePos for measure",
-          chord.measureIndex,
-        );
+        // console.log(
+        //   "[ChordReposition] No measurePos for measure",
+        //   chord.measureIndex,
+        // );
         continue;
       }
 
@@ -561,18 +564,18 @@ function TuneComposerScoreViewportComponent({
         beatPosition: chord.beatPosition,
         x: xPosition / 10,
       });
-      console.log(
-        `[ChordReposition] Chord m${chord.measureIndex} beat${chord.beatPosition} -> x=${(xPosition / 10).toFixed(1)}`,
-      );
+      // console.log(
+      //   `[ChordReposition] Chord m${chord.measureIndex} beat${chord.beatPosition} -> x=${(xPosition / 10).toFixed(1)}`,
+      // );
     }
 
     // Send to WebView
     if (chordPositions.length > 0) {
-      console.log(
-        "[ChordReposition] Sending",
-        chordPositions.length,
-        "positions to WebView",
-      );
+      // console.log(
+      //   "[ChordReposition] Sending",
+      //   chordPositions.length,
+      //   "positions to WebView",
+      // );
       const json = JSON.stringify(chordPositions);
       executeScript(`window.repositionChordSymbols(${json})`);
     }
@@ -589,8 +592,11 @@ function TuneComposerScoreViewportComponent({
   // Render MusicXML when ready
   useEffect(() => {
     if (isReady && musicXml) {
+      // Apply OSMD pickup measure workaround for metronome rendering
+      const xmlForOsmd = applyOsmdPickupWorkaround(musicXml);
+
       // Scroll position is tracked via onScroll handler and restored in "rendered" message handler
-      const escapedXml = musicXml.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
+      const escapedXml = xmlForOsmd.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
       executeScript(`window.renderMusicXML(\`${escapedXml}\`)`);
     }
   }, [isReady, musicXml, executeScript]);

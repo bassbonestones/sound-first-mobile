@@ -306,7 +306,7 @@ export function generateComposerOsmdHtml(
 
       // Check OSMD's internal chord data
       if (osmd && osmd.sheet) {
-        console.log('[DEBUG] OSMD sheet loaded, checking for harmony...');
+        // console.log('[DEBUG] OSMD sheet loaded, checking for harmony...');
         if (osmd.sheet.sourceMeasures) {
           let totalChordContainers = 0;
           for (let m = 0; m < osmd.sheet.sourceMeasures.length; m++) {
@@ -317,14 +317,14 @@ export function generateComposerOsmdHtml(
                   for (const se of vstec.StaffEntries) {
                     if (se && se.ChordContainers && se.ChordContainers.length > 0) {
                       totalChordContainers += se.ChordContainers.length;
-                      console.log('[DEBUG] Measure ' + m + ' has ' + se.ChordContainers.length + ' chord containers');
+                      // console.log('[DEBUG] Measure ' + m + ' has ' + se.ChordContainers.length + ' chord containers');
                     }
                   }
                 }
               }
             }
           }
-          console.log('[DEBUG] Total chord containers in sheet:', totalChordContainers);
+          // console.log('[DEBUG] Total chord containers in sheet:', totalChordContainers);
         }
       }
 
@@ -335,10 +335,10 @@ export function generateComposerOsmdHtml(
       const allGroups = svg.querySelectorAll('g[class]');
       const allTexts = svg.querySelectorAll('text');
       
-      console.log('[DEBUG] ChordSymbol groups:', chordSymbolGroups.length);
-      console.log('[DEBUG] chord groups:', chordGroups.length);
-      console.log('[DEBUG] chord texts:', chordTexts.length);
-      console.log('[DEBUG] Total text elements:', allTexts.length);
+      // console.log('[DEBUG] ChordSymbol groups:', chordSymbolGroups.length);
+      // console.log('[DEBUG] chord groups:', chordGroups.length);
+      // console.log('[DEBUG] chord texts:', chordTexts.length);
+      // console.log('[DEBUG] Total text elements:', allTexts.length);
       
       // Log all text content to see if chords appear as plain text
       const textContents = [];
@@ -348,7 +348,7 @@ export function generateComposerOsmdHtml(
           textContents.push(content);
         }
       });
-      console.log('[DEBUG] Text contents:', textContents.slice(0, 20).join(', '));
+      // console.log('[DEBUG] Text contents:', textContents.slice(0, 20).join(', '));
       
       // Log all group classes to see what OSMD creates
       const classNames = new Set();
@@ -356,13 +356,13 @@ export function generateComposerOsmdHtml(
         const cls = g.getAttribute('class');
         if (cls) classNames.add(cls);
       });
-      console.log('[DEBUG] All group classes:', Array.from(classNames).join(', '));
+      // console.log('[DEBUG] All group classes:', Array.from(classNames).join(', '));
       
       // Log details of any chord-related elements
       chordSymbolGroups.forEach((g, i) => {
         const transform = g.getAttribute('transform');
         const text = g.textContent?.trim();
-        console.log('[DEBUG] ChordSymbol ' + i + ':', text, 'transform:', transform);
+        // console.log('[DEBUG] ChordSymbol ' + i + ':', text, 'transform:', transform);
       });
     }
 
@@ -598,8 +598,8 @@ export function generateComposerOsmdHtml(
         const barlineX = measureWidth ? measureX + measureWidth : null;
         
         // DEBUG: Log beat positions for each measure
-        console.log('[OSMD] Measure ' + i + ' beatPositions:', beatPositions.length, 
-          JSON.stringify(beatPositions.map(bp => ({ beat: bp.beat.toFixed(2), x: Math.round(bp.x) }))));
+        // console.log('[OSMD] Measure ' + i + ' beatPositions:', beatPositions.length, 
+        //   JSON.stringify(beatPositions.map(bp => ({ beat: bp.beat.toFixed(2), x: Math.round(bp.x) }))));
         
         positions.push({
           measureIndex: i,
@@ -655,7 +655,7 @@ export function generateComposerOsmdHtml(
         }
       }
 
-      console.log('Built note map with ' + noteElements.length + ' notes');
+      // console.log('Built note map with ' + noteElements.length + ' notes');
     }
 
     // Add click handlers for note selection

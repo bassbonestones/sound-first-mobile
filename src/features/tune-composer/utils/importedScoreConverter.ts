@@ -247,17 +247,38 @@ export function importedNoteEventToNote(event: ImportedNoteEvent): Note {
 }
 
 /**
- * Convert an ImportedMeasure to a composer Measure
+ * Convert an ImportedMeasure to a composer Measure.
+ * Preserves per-measure time signature and key signature overrides.
+ * @param importedMeasure The imported measure to convert
+ * @param isFirstMeasure Whether this is the first measure (score-level signatures are used instead)
  */
 export function importedMeasureToMeasure(
   importedMeasure: ImportedMeasure,
+  isFirstMeasure: boolean = false,
 ): Measure {
   const notes = importedMeasure.events.map(importedNoteEventToNote);
+
+  // Only set per-measure overrides for non-first measures that have changes
+  // First measure signatures go on the score level, not as measure overrides
+  const timeSignature =
+    !isFirstMeasure && importedMeasure.timeSignature
+      ? {
+          beats: importedMeasure.timeSignature.beats,
+          beatUnit: importedMeasure.timeSignature.beatType,
+        }
+      : undefined;
+
+  const keySignature =
+    !isFirstMeasure && importedMeasure.keySignature
+      ? importedMeasure.keySignature.fifths
+      : undefined;
 
   return {
     id: generateId(),
     notes: notes.length > 0 ? notes : [createNote(null, DURATION.WHOLE)],
     isPickup: importedMeasure.isPickup || undefined,
+    timeSignature,
+    keySignature,
   };
 }
 
@@ -405,8 +426,10 @@ export function importedScoreToComposerScore(
     };
   }
 
-  // Convert all measures
-  const measures = firstPart.measures.map(importedMeasureToMeasure);
+  // Convert all measures, passing isFirstMeasure flag
+  const measures = firstPart.measures.map((m, i) =>
+    importedMeasureToMeasure(m, i === 0),
+  );
 
   // Calculate pickup duration if first measure is a pickup
   let pickupDuration: number | undefined;

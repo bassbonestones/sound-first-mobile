@@ -210,14 +210,16 @@ function TuneComposerScreenContent({
   // Pickup modal state
   const [showPickupModal, setShowPickupModal] = useState(false);
 
-  // Tempo modal state
-  const [showTempoModal, setShowTempoModal] = useState(false);
-
-  // Key signature modal state
-  const [showKeyModal, setShowKeyModal] = useState(false);
-
-  // Time signature modal state
-  const [showTimeModal, setShowTimeModal] = useState(false);
+  // Modal measure index state - will define open/close callbacks after composerState
+  const [tempoModalMeasureIndex, setTempoModalMeasureIndex] = useState<
+    number | null
+  >(null);
+  const [keyModalMeasureIndex, setKeyModalMeasureIndex] = useState<
+    number | null
+  >(null);
+  const [timeModalMeasureIndex, setTimeModalMeasureIndex] = useState<
+    number | null
+  >(null);
 
   // Metadata state
   const [tuneMetadata, setTuneMetadata] = useState<TuneMetadata>(() =>
@@ -227,6 +229,31 @@ function TuneComposerScreenContent({
 
   // Composer state
   const composerState = useTuneComposerState(initialScore);
+
+  // Modal open/close callbacks - must be after composerState
+  const showTempoModal = tempoModalMeasureIndex !== null;
+  const openTempoModal = useCallback(() => {
+    setTempoModalMeasureIndex(composerState.cursor.measureIndex);
+  }, [composerState.cursor.measureIndex]);
+  const closeTempoModal = useCallback(() => {
+    setTempoModalMeasureIndex(null);
+  }, []);
+
+  const showKeyModal = keyModalMeasureIndex !== null;
+  const openKeyModal = useCallback(() => {
+    setKeyModalMeasureIndex(composerState.cursor.measureIndex);
+  }, [composerState.cursor.measureIndex]);
+  const closeKeyModal = useCallback(() => {
+    setKeyModalMeasureIndex(null);
+  }, []);
+
+  const showTimeModal = timeModalMeasureIndex !== null;
+  const openTimeModal = useCallback(() => {
+    setTimeModalMeasureIndex(composerState.cursor.measureIndex);
+  }, [composerState.cursor.measureIndex]);
+  const closeTimeModal = useCallback(() => {
+    setTimeModalMeasureIndex(null);
+  }, []);
 
   // Sync initialScore changes into composerState
   // (useState only reads initial value once, so we need this effect)
@@ -1327,7 +1354,11 @@ function TuneComposerScreenContent({
 
               {/* Compact measure controls with overflow menu */}
               <CompactControls
-                currentMeasure={composerState.cursor.measureIndex + 1}
+                currentMeasure={
+                  composerState.hasPickup
+                    ? composerState.cursor.measureIndex
+                    : composerState.cursor.measureIndex + 1
+                }
                 totalMeasures={composerState.score.measures.length}
                 validation={measureValidation}
                 onDelete={handleDelete}
@@ -1338,13 +1369,13 @@ function TuneComposerScreenContent({
                 onAddPickup={() => setShowPickupModal(true)}
                 hasPickup={composerState.hasPickup}
                 onEditMetadata={handleOpenMetadata}
-                onSetMeasureTempo={() => setShowTempoModal(true)}
+                onSetMeasureTempo={openTempoModal}
                 measureTempo={
                   composerState.score.measures[
                     composerState.cursor.measureIndex
                   ]?.tempo
                 }
-                onSetMeasureKey={() => setShowKeyModal(true)}
+                onSetMeasureKey={openKeyModal}
                 measureKeyDisplay={
                   composerState.score.measures[
                     composerState.cursor.measureIndex
@@ -1356,7 +1387,7 @@ function TuneComposerScreenContent({
                       )
                     : undefined
                 }
-                onSetMeasureTime={() => setShowTimeModal(true)}
+                onSetMeasureTime={openTimeModal}
                 measureTimeDisplay={
                   composerState.score.measures[
                     composerState.cursor.measureIndex
@@ -1882,119 +1913,183 @@ function TuneComposerScreenContent({
         {/* Measure Tempo Modal */}
         <MeasureTempoModal
           visible={showTempoModal}
-          onClose={() => setShowTempoModal(false)}
-          measureNumber={composerState.cursor.measureIndex + 1}
-          currentTempo={
-            composerState.score.measures[composerState.cursor.measureIndex]
-              ?.tempo
+          onClose={closeTempoModal}
+          measureNumber={
+            composerState.hasPickup
+              ? (tempoModalMeasureIndex ?? 0)
+              : (tempoModalMeasureIndex ?? 0) + 1
           }
-          effectiveTempo={composerState.getMeasureEffectiveTempo(
-            composerState.cursor.measureIndex,
-          )}
+          currentTempo={
+            tempoModalMeasureIndex !== null
+              ? composerState.score.measures[tempoModalMeasureIndex]?.tempo
+              : undefined
+          }
+          effectiveTempo={
+            tempoModalMeasureIndex !== null
+              ? composerState.getMeasureEffectiveTempo(tempoModalMeasureIndex)
+              : composerState.score.tempo
+          }
           scoreTempo={composerState.score.tempo}
           onSetTempo={(tempo) => {
-            composerState.setMeasureTempo(
-              composerState.cursor.measureIndex,
-              tempo,
-            );
-            setShowTempoModal(false);
+            if (tempoModalMeasureIndex !== null) {
+              composerState.setMeasureTempo(tempoModalMeasureIndex, tempo);
+            }
+            closeTempoModal();
           }}
           onClearTempo={() => {
-            composerState.clearCurrentMeasureTempo();
-            setShowTempoModal(false);
+            if (tempoModalMeasureIndex !== null) {
+              composerState.setMeasureTempo(tempoModalMeasureIndex, undefined);
+            }
+            closeTempoModal();
           }}
           currentBeatUnit={
-            composerState.score.measures[composerState.cursor.measureIndex]
-              ?.tempoBeatUnit
+            tempoModalMeasureIndex !== null
+              ? composerState.score.measures[tempoModalMeasureIndex]
+                  ?.tempoBeatUnit
+              : undefined
           }
-          effectiveBeatUnit={composerState.getMeasureEffectiveTempoBeatUnit(
-            composerState.cursor.measureIndex,
-          )}
+          effectiveBeatUnit={
+            tempoModalMeasureIndex !== null
+              ? composerState.getMeasureEffectiveTempoBeatUnit(
+                  tempoModalMeasureIndex,
+                )
+              : (composerState.score.tempoBeatUnit ?? "quarter")
+          }
           onSetBeatUnit={(beatUnit) => {
-            composerState.setMeasureTempoBeatUnit(
-              composerState.cursor.measureIndex,
-              beatUnit,
-            );
+            if (tempoModalMeasureIndex !== null) {
+              composerState.setMeasureTempoBeatUnit(
+                tempoModalMeasureIndex,
+                beatUnit,
+              );
+            }
           }}
           onClearBeatUnit={() => {
-            composerState.clearCurrentMeasureTempoBeatUnit();
+            if (tempoModalMeasureIndex !== null) {
+              composerState.setMeasureTempoBeatUnit(
+                tempoModalMeasureIndex,
+                undefined,
+              );
+            }
           }}
           currentModulation={
-            composerState.score.measures[composerState.cursor.measureIndex]
-              ?.tempoModulation
+            tempoModalMeasureIndex !== null
+              ? composerState.score.measures[tempoModalMeasureIndex]
+                  ?.tempoModulation
+              : undefined
           }
-          previousBeatUnit={composerState.getMeasureEffectiveTempoBeatUnit(
-            Math.max(0, composerState.cursor.measureIndex - 1),
-          )}
+          previousBeatUnit={
+            tempoModalMeasureIndex !== null
+              ? composerState.getMeasureEffectiveTempoBeatUnit(
+                  Math.max(0, tempoModalMeasureIndex - 1),
+                )
+              : (composerState.score.tempoBeatUnit ?? "quarter")
+          }
           onSetModulation={(modulation) => {
-            composerState.setMeasureModulation(
-              composerState.cursor.measureIndex,
-              modulation,
-            );
-            setShowTempoModal(false);
+            if (tempoModalMeasureIndex !== null) {
+              composerState.setMeasureModulation(
+                tempoModalMeasureIndex,
+                modulation,
+              );
+            }
+            closeTempoModal();
           }}
           onClearModulation={() => {
-            composerState.clearCurrentMeasureModulation();
-            setShowTempoModal(false);
+            if (tempoModalMeasureIndex !== null) {
+              composerState.setMeasureModulation(
+                tempoModalMeasureIndex,
+                undefined,
+              );
+            }
+            closeTempoModal();
           }}
         />
 
         {/* Measure Key Signature Modal */}
         <MeasureKeySignatureModal
           visible={showKeyModal}
-          onClose={() => setShowKeyModal(false)}
-          measureNumber={composerState.cursor.measureIndex + 1}
-          currentKey={
-            composerState.score.measures[composerState.cursor.measureIndex]
-              ?.keySignature
+          onClose={closeKeyModal}
+          measureNumber={
+            composerState.hasPickup
+              ? (keyModalMeasureIndex ?? 0)
+              : (keyModalMeasureIndex ?? 0) + 1
           }
-          effectiveKey={composerState.getMeasureEffectiveKeySignature(
-            composerState.cursor.measureIndex,
-          )}
+          currentKey={
+            keyModalMeasureIndex !== null
+              ? composerState.score.measures[keyModalMeasureIndex]?.keySignature
+              : undefined
+          }
+          effectiveKey={
+            keyModalMeasureIndex !== null
+              ? composerState.getMeasureEffectiveKeySignature(
+                  keyModalMeasureIndex,
+                )
+              : composerState.score.keySignature
+          }
           scoreKey={composerState.score.keySignature}
           onSetKey={(key) => {
-            composerState.setMeasureKeySignature(
-              composerState.cursor.measureIndex,
-              key,
-            );
-            setShowKeyModal(false);
+            if (keyModalMeasureIndex !== null) {
+              composerState.setMeasureKeySignature(keyModalMeasureIndex, key);
+            }
+            closeKeyModal();
           }}
           onClearKey={() => {
-            composerState.clearCurrentMeasureKeySignature();
-            setShowKeyModal(false);
+            if (keyModalMeasureIndex !== null) {
+              composerState.setMeasureKeySignature(
+                keyModalMeasureIndex,
+                undefined,
+              );
+            }
+            closeKeyModal();
           }}
         />
 
         {/* Measure Time Signature Modal */}
         <MeasureTimeSignatureModal
           visible={showTimeModal}
-          onClose={() => setShowTimeModal(false)}
-          measureNumber={composerState.cursor.measureIndex + 1}
-          currentTime={
-            composerState.score.measures[composerState.cursor.measureIndex]
-              ?.timeSignature
+          onClose={closeTimeModal}
+          measureNumber={
+            composerState.hasPickup
+              ? (timeModalMeasureIndex ?? 0)
+              : (timeModalMeasureIndex ?? 0) + 1
           }
-          effectiveTime={composerState.getMeasureEffectiveTimeSignature(
-            composerState.cursor.measureIndex,
-          )}
+          currentTime={
+            timeModalMeasureIndex !== null
+              ? composerState.score.measures[timeModalMeasureIndex]
+                  ?.timeSignature
+              : undefined
+          }
+          effectiveTime={
+            timeModalMeasureIndex !== null
+              ? composerState.getMeasureEffectiveTimeSignature(
+                  timeModalMeasureIndex,
+                )
+              : composerState.score.timeSignature
+          }
           pitchedNoteDuration={
             // Only count pitched notes (not rests) for overflow validation
-            composerState.score.measures[
-              composerState.cursor.measureIndex
-            ]?.notes
-              .filter((n) => n.midi !== null)
-              .reduce((sum, n) => sum + getNoteDuration(n), 0) ?? 0
+            timeModalMeasureIndex !== null
+              ? (composerState.score.measures[timeModalMeasureIndex]?.notes
+                  .filter((n) => n.midi !== null)
+                  .reduce((sum, n) => sum + getNoteDuration(n), 0) ?? 0)
+              : 0
           }
           onSetTime={(time) => {
-            composerState.setMeasureTimeSignature(
-              composerState.cursor.measureIndex,
-              time,
-            );
-            setShowTimeModal(false);
+            if (timeModalMeasureIndex !== null) {
+              composerState.setMeasureTimeSignature(
+                timeModalMeasureIndex,
+                time,
+              );
+            }
+            closeTimeModal();
           }}
           onClearTime={() => {
-            composerState.clearCurrentMeasureTimeSignature();
-            setShowTimeModal(false);
+            if (timeModalMeasureIndex !== null) {
+              composerState.setMeasureTimeSignature(
+                timeModalMeasureIndex,
+                undefined,
+              );
+            }
+            closeTimeModal();
           }}
         />
       </KeyboardAvoidingView>
