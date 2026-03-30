@@ -1046,14 +1046,28 @@ function TuneComposerScreenContent({
       }
 
       // Get previous note's syllabic (if there is a previous note)
-      if (lyricsCursor > 0 && pitchedNotes[lyricsCursor - 1]) {
-        const prevNoteInfo = pitchedNotes[lyricsCursor - 1];
-        const prevNote =
-          composerState.score.measures[prevNoteInfo.measureIndex]?.notes[
-            prevNoteInfo.noteIndex
-          ];
-        if (prevNote?.lyric) {
-          prevSyllabic = prevNote.lyric.syllabic;
+      // Trace back through melisma continuation notes to find actual syllabic
+      if (lyricsCursor > 0) {
+        for (let i = lyricsCursor - 1; i >= 0; i--) {
+          const prevNoteInfo = pitchedNotes[i];
+          if (!prevNoteInfo) break;
+          const prevNote =
+            composerState.score.measures[prevNoteInfo.measureIndex]?.notes[
+              prevNoteInfo.noteIndex
+            ];
+          if (prevNote?.lyric?.syllabic) {
+            prevSyllabic = prevNote.lyric.syllabic;
+            break;
+          }
+          // If note has lyric with melismaLength > 1, we're in a melisma
+          // Keep the syllabic from that note (begin/middle means word continues)
+          if (
+            prevNote?.lyric?.melismaLength &&
+            prevNote.lyric.melismaLength > 1
+          ) {
+            prevSyllabic = prevNote.lyric.syllabic || "middle";
+            break;
+          }
         }
       }
     }

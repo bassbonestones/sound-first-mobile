@@ -88,16 +88,29 @@ function LyricsControlsComponent({
   testID,
 }: LyricsControlsProps): React.ReactElement {
   const [inputText, setInputText] = useState(currentLyricText);
-  const [syllabic, setSyllabic] = useState<SyllabicType>(
-    currentSyllabic || "single",
-  );
+
+  // Infer syllabic: if no current syllabic but prev was begin/middle, default to middle
+  const inferredSyllabic = (): SyllabicType => {
+    if (currentSyllabic) return currentSyllabic;
+    if (prevSyllabic === "begin" || prevSyllabic === "middle") return "middle";
+    return "single";
+  };
+
+  const [syllabic, setSyllabic] = useState<SyllabicType>(inferredSyllabic());
   const isDisabled = disabled || !hasSelection;
 
   // Sync input text and syllabic with current lyric when note changes
   useEffect(() => {
     setInputText(currentLyricText);
-    setSyllabic(currentSyllabic || "single");
-  }, [currentLyricText, currentSyllabic]);
+    // If note has no lyric but we're continuing a word, default to middle
+    if (currentSyllabic) {
+      setSyllabic(currentSyllabic);
+    } else if (prevSyllabic === "begin" || prevSyllabic === "middle") {
+      setSyllabic("middle");
+    } else {
+      setSyllabic("single");
+    }
+  }, [currentLyricText, currentSyllabic, prevSyllabic]);
 
   // Handle text change - save with current syllabic type
   const handleTextChange = useCallback(
