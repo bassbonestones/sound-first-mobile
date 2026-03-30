@@ -441,9 +441,6 @@ export function generateComposerOsmdHtml(
       // Without pickup: MusicXML measure numbers start at 1
       const hasPickup = window.hasPickupMeasure || false;
       
-      // DEBUG: Log pickup detection
-      console.log('[DEBUG replaceMetricModulations] hasPickup:', hasPickup, 'measurePositions.length:', measurePositions.length);
-      
       allTextElements.forEach(function(textEl) {
         const text = (textEl.textContent || '').trim();
         
@@ -467,16 +464,6 @@ export function generateComposerOsmdHtml(
         // measurePositions now includes measureNumber from OSMD
         const measurePos = measurePositions.find(function(pos) {
           return pos.measureNumber === measureNum;
-        });
-        
-        // DEBUG: Log measure position lookup
-        console.log('[DEBUG replaceMetricModulations] Modulation found:', {
-          text,
-          measureNum,
-          hasPickup,
-          measurePosExists: !!measurePos,
-          measurePosNumber: measurePos?.measureNumber,
-          noteStartX: measurePos?.noteStartX
         });
         
         // Use measure's noteStartX if available, otherwise fall back to text element position

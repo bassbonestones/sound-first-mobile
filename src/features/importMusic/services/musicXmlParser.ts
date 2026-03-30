@@ -125,6 +125,8 @@ interface RawAttributes {
 
 interface RawDirection {
   readonly metronome?: { beatUnit: string; perMinute: number };
+  /** Metric modulation: two beat-units in a metronome element (e.g., quarter = half) */
+  readonly metronomeModulation?: { fromUnit: string; toUnit: string };
   readonly words?: string;
   readonly dynamics?: string;
 }
@@ -491,17 +493,52 @@ function extractDirections(measureContent: string): RawDirection[] {
     // Metronome (visual tempo marking)
     const metronomeBlock = extractTagBlock(dirContent, "metronome");
     let metronome: { beatUnit: string; perMinute: number } | undefined;
+    let metronomeModulation: { fromUnit: string; toUnit: string } | undefined;
     if (metronomeBlock) {
-      const beatUnit = extractTagContent(metronomeBlock, "beat-unit");
+      // Check for metric modulation: two <beat-unit> elements without <per-minute>
+      // Format: <metronome><beat-unit>quarter</beat-unit><beat-unit>half</beat-unit></metronome>
+      const beatUnitMatches = metronomeBlock.match(
+        /<beat-unit>([^<]+)<\/beat-unit>/gi,
+      );
       const perMinuteStr = extractTagContent(metronomeBlock, "per-minute");
-      if (beatUnit && perMinuteStr) {
-        metronome = { beatUnit, perMinute: parseInt(perMinuteStr, 10) };
+
+      if (beatUnitMatches && beatUnitMatches.length >= 2 && !perMinuteStr) {
+        // Two beat-units without per-minute = metric modulation
+        const fromMatch = beatUnitMatches[0].match(
+          /<beat-unit>([^<]+)<\/beat-unit>/i,
+        );
+        const toMatch = beatUnitMatches[1].match(
+          /<beat-unit>([^<]+)<\/beat-unit>/i,
+        );
+        // Check for beat-unit-dot after each beat-unit
+        const firstBeatUnitEnd =
+          metronomeBlock.indexOf(beatUnitMatches[0]) +
+          beatUnitMatches[0].length;
+        const secondBeatUnitStart = metronomeBlock.indexOf(beatUnitMatches[1]);
+        const fromDotted = metronomeBlock
+          .substring(firstBeatUnitEnd, secondBeatUnitStart)
+          .includes("<beat-unit-dot");
+        const toDotted = metronomeBlock
+          .substring(secondBeatUnitStart + beatUnitMatches[1].length)
+          .includes("<beat-unit-dot");
+
+        if (fromMatch && toMatch) {
+          const fromUnit = fromDotted ? `dotted-${fromMatch[1]}` : fromMatch[1];
+          const toUnit = toDotted ? `dotted-${toMatch[1]}` : toMatch[1];
+          metronomeModulation = { fromUnit, toUnit };
+        }
+      } else {
+        // Standard tempo marking: one beat-unit with per-minute
+        const beatUnit = extractTagContent(metronomeBlock, "beat-unit");
+        if (beatUnit && perMinuteStr) {
+          metronome = { beatUnit, perMinute: parseInt(perMinuteStr, 10) };
+        }
       }
     }
 
     // Sound element (playback tempo) - fallback if no metronome
     // Format: <sound tempo="100"/> or <sound tempo="100"></sound>
-    if (!metronome) {
+    if (!metronome && !metronomeModulation) {
       const soundMatch = dirContent.match(
         /<sound[^>]*tempo=["'](\d+(?:\.\d+)?)["'][^>]*\/?>/i,
       );
@@ -529,8 +566,13 @@ function extractDirections(measureContent: string): RawDirection[] {
       }
     }
 
-    if (metronome || words || dynamics) {
-      directions.push({ metronome, words: words ?? undefined, dynamics });
+    if (metronome || metronomeModulation || words || dynamics) {
+      directions.push({
+        metronome,
+        metronomeModulation,
+        words: words ?? undefined,
+        dynamics,
+      });
     }
   }
 
@@ -917,15 +959,6 @@ function convertMeasures(rawMeasures: RawMeasure[]): ImportedMeasure[] {
     // Extract tempo info (metronome or modulation)
     const tempo = extractTempoFromDirections(rawMeasure.direction);
 
-    // DEBUG: Log when we find a tempo modulation
-    if (tempo?.modulation) {
-      console.log("[DEBUG convertMeasures] Found tempo modulation:", {
-        measureNumber: rawMeasure.number,
-        isPickup: rawMeasure.isPickup,
-        modulation: tempo.modulation,
-      });
-    }
-
     return {
       number: rawMeasure.number,
       events: convertNotes(rawMeasure.notes, initialDynamic, initialExpression),
@@ -1030,7 +1063,18 @@ function extractTempoFromDirections(
   if (!directions) return null;
 
   for (const dir of directions) {
-    // Check for tempo modulation in words (e.g., "quarter=half@m5")
+    // Check for proper MusicXML metric modulation (two beat-units in metronome element)
+    // Format: <metronome><beat-unit>quarter</beat-unit><beat-unit>half</beat-unit></metronome>
+    if (dir.metronomeModulation) {
+      return {
+        bpm: 0, // Will be calculated from the modulation relationship
+        beatUnit: dir.metronomeModulation.toUnit,
+        marking: null,
+        modulation: dir.metronomeModulation,
+      };
+    }
+
+    // Check for our legacy words-based tempo modulation (e.g., "quarter=half@m5")
     if (dir.words) {
       const modulation = parseTempoModulation(dir.words);
       if (modulation) {

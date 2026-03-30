@@ -105,16 +105,6 @@ function scoreHasLyrics(score: TuneComposerScore): boolean {
 
 export const tuneComposerStorageService = {
   async saveScore(score: TuneComposerScore): Promise<TuneScoreMeta> {
-    // DEBUG: Log time signatures with symbols
-    score.measures.forEach((m, i) => {
-      if (m.timeSignature?.symbol) {
-        console.log(
-          `[DEBUG saveScore] Measure ${i} has timeSignature with symbol:`,
-          m.timeSignature,
-        );
-      }
-    });
-
     const now = Date.now();
     const scoreKey = `${SCORE_PREFIX}${score.id}`;
 
@@ -147,16 +137,6 @@ export const tuneComposerStorageService = {
       if (!json) return null;
 
       const saved: SavedTuneScore = JSON.parse(json);
-
-      // DEBUG: Log time signatures with symbols
-      saved.score.measures.forEach((m, i) => {
-        if (m.timeSignature?.symbol) {
-          console.log(
-            `[DEBUG loadScore] Measure ${i} has timeSignature with symbol:`,
-            m.timeSignature,
-          );
-        }
-      });
 
       // Migrate score to ensure all properties have defaults
       let score = migrateScore(saved.score);

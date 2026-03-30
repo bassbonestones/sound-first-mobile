@@ -1097,36 +1097,46 @@ function generateMeasureXml(
   const showDirection =
     (isFirstMeasure && scoreHasNotes) || tempoInfo.hasTempoChange;
   let directionXml = "";
+  // Ensure effectiveTempo is a valid number (guard against NaN)
+  const safeTempo = !isNaN(tempoInfo.effectiveTempo)
+    ? tempoInfo.effectiveTempo
+    : 120;
   if (showDirection) {
     if (tempoInfo.modulation) {
-      // Metric modulation: Use <words> with text that we'll replace in post-render.
-      // OSMD doesn't render the two-beat-unit metronome format.
-      // Include measure number so post-render can position correctly (OSMD positions text inconsistently)
       const { beatUnitXml: fromBeatUnitXml, isDotted: fromIsDotted } =
         parseTempoBeatUnit(tempoInfo.modulation.fromUnit);
       const { beatUnitXml: toBeatUnitXml, isDotted: toIsDotted } =
         parseTempoBeatUnit(tempoInfo.modulation.toUnit);
-      const fromText = fromIsDotted
-        ? `dotted-${fromBeatUnitXml}`
-        : fromBeatUnitXml;
-      const toText = toIsDotted ? `dotted-${toBeatUnitXml}` : toBeatUnitXml;
 
-      // DEBUG: Log modulation generation
-      console.log("[DEBUG generateMeasureXml] Generating modulation:", {
-        measureIndex,
-        measureNumber,
-        isPickup,
-        fromText,
-        toText,
-        tag: `@m${measureNumber}`,
-      });
+      if (options.exportMode) {
+        // Proper MusicXML format for external apps (MuseScore, Finale, etc.)
+        // Uses two <beat-unit> elements to represent the modulation relationship
+        const fromDotXml = fromIsDotted ? "\n            <beat-unit-dot/>" : "";
+        const toDotXml = toIsDotted ? "\n            <beat-unit-dot/>" : "";
+        directionXml = `\n      <direction placement="above">
+        <direction-type>
+          <metronome parentheses="no">
+            <beat-unit>${fromBeatUnitXml}</beat-unit>${fromDotXml}
+            <beat-unit>${toBeatUnitXml}</beat-unit>${toDotXml}
+          </metronome>
+        </direction-type>
+        <sound tempo="${Math.round(safeTempo)}"/>
+      </direction>`;
+      } else {
+        // OSMD workaround format: Use <words> with @m marker for positioning
+        // OSMD doesn't render the two-beat-unit metronome format properly
+        const fromText = fromIsDotted
+          ? `dotted-${fromBeatUnitXml}`
+          : fromBeatUnitXml;
+        const toText = toIsDotted ? `dotted-${toBeatUnitXml}` : toBeatUnitXml;
 
-      directionXml = `\n      <direction placement="above">
+        directionXml = `\n      <direction placement="above">
         <direction-type>
           <words font-weight="bold">${fromText}=${toText}@m${measureNumber}</words>
         </direction-type>
-        <sound tempo="${Math.round(tempoInfo.effectiveTempo)}"/>
+        <sound tempo="${Math.round(safeTempo)}"/>
       </direction>`;
+      }
     } else {
       // Regular tempo marking: beat-unit = BPM
       const { beatUnitXml, isDotted } = parseTempoBeatUnit(
@@ -1137,10 +1147,10 @@ function generateMeasureXml(
         <direction-type>
           <metronome parentheses="no">
             <beat-unit>${beatUnitXml}</beat-unit>${beatUnitDotXml}
-            <per-minute>${tempoInfo.effectiveTempo}</per-minute>
+            <per-minute>${safeTempo}</per-minute>
           </metronome>
         </direction-type>
-        <sound tempo="${tempoInfo.effectiveTempo}"/>
+        <sound tempo="${safeTempo}"/>
       </direction>`;
     }
   }
@@ -1390,14 +1400,17 @@ export function applyOsmdPickupWorkaround(musicXml: string): string {
     return musicXml; // No workaround needed
   }
 
-  // Find all measures and their contents
+  // Find all measures with their positions
   const measureRegex =
     /<measure[^>]*number="(\d+)"[^>]*>([\s\S]*?)<\/measure>/g;
-  const measures: Array<{
+  interface MeasureInfo {
     number: string;
     content: string;
     fullMatch: string;
-  }> = [];
+    startIndex: number;
+    endIndex: number;
+  }
+  const measures: MeasureInfo[] = [];
   let match;
 
   while ((match = measureRegex.exec(musicXml)) !== null) {
@@ -1405,65 +1418,102 @@ export function applyOsmdPickupWorkaround(musicXml: string): string {
       number: match[1],
       content: match[2],
       fullMatch: match[0],
+      startIndex: match.index,
+      endIndex: match.index + match[0].length,
     });
   }
 
-  // Find tempo directions (metronome or words with tempo modulation) in each measure
-  // (except measure 0 and 1) and move them to the next measure
-  let result = musicXml;
+  // Identify which measures need tempo directions moved
+  // Build a list of modifications to apply
+  interface Modification {
+    measureIndex: number;
+    tempoDirection: string;
+    newContent: string; // content with direction removed
+  }
+  const modifications: Modification[] = [];
 
-  for (let i = measures.length - 1; i >= 0; i--) {
+  for (let i = 0; i < measures.length; i++) {
     const measure = measures[i];
     const measureNum = parseInt(measure.number, 10);
 
     // Skip pickup (0) and first full measure (1) - their tempos are correct
     if (measureNum <= 1) continue;
 
+    // Check if there's a next measure to move to
+    const nextMeasure = measures[i + 1];
+    if (!nextMeasure) continue;
+
     // Find metronome direction OR words direction (for metric modulations) in this measure
-    // This matches both:
-    //   <direction>...<metronome>...</direction>
-    //   <direction>...<words>quarter=half@m3</words>...</direction>
     const tempoDirectionRegex =
       /(\s*<direction[^>]*>\s*<direction-type>\s*(?:<metronome[\s\S]*?<\/metronome>|<words[^>]*>(?:dotted-)?(?:whole|half|quarter|eighth|16th|32nd|64th)=(?:dotted-)?(?:whole|half|quarter|eighth|16th|32nd|64th)@m\d+<\/words>)\s*<\/direction-type>[\s\S]*?<\/direction>)/gi;
     const tempoMatch = tempoDirectionRegex.exec(measure.content);
 
     if (tempoMatch) {
-      const tempoDirection = tempoMatch[1];
-
-      // Check if there's a next measure to move the tempo to
-      const nextMeasure = measures[i + 1];
-      if (!nextMeasure) {
-        // Can't shift forward - no next measure. Leave tempo in place (will render early but at least visible)
-        continue;
-      }
-
-      // Remove from current measure
-      const newContent = measure.content.replace(tempoDirection, "");
-      const newMeasure = measure.fullMatch.replace(measure.content, newContent);
-      result = result.replace(measure.fullMatch, newMeasure);
-
-      // Add to the next measure (after attributes if present, else at start)
-      if (nextMeasure) {
-        const nextMeasureContent = nextMeasure.content;
-        // Insert after </attributes> if present, else at start of measure content
-        const attrsEndMatch = nextMeasureContent.match(/<\/attributes>/);
-        let newNextContent: string;
-        if (attrsEndMatch) {
-          newNextContent = nextMeasureContent.replace(
-            "</attributes>",
-            "</attributes>" + tempoDirection,
-          );
-        } else {
-          // Insert at the start (after measure tag)
-          newNextContent = tempoDirection + nextMeasureContent;
-        }
-        const newNextMeasure = nextMeasure.fullMatch.replace(
-          nextMeasure.content,
-          newNextContent,
-        );
-        result = result.replace(nextMeasure.fullMatch, newNextMeasure);
-      }
+      modifications.push({
+        measureIndex: i,
+        tempoDirection: tempoMatch[1],
+        newContent: measure.content.replace(tempoMatch[1], ""),
+      });
     }
+  }
+
+  // No modifications needed
+  if (modifications.length === 0) {
+    return musicXml;
+  }
+
+  // Build the result by processing from the end to preserve indices
+  // Sort modifications by measureIndex descending to process from end
+  modifications.sort((a, b) => b.measureIndex - a.measureIndex);
+
+  let result = musicXml;
+
+  for (const mod of modifications) {
+    const measure = measures[mod.measureIndex];
+    const nextMeasure = measures[mod.measureIndex + 1];
+
+    // Calculate the new measure content (direction removed)
+    const measureTag = measure.fullMatch.substring(
+      0,
+      measure.fullMatch.indexOf(">") + 1,
+    );
+    const newMeasure = measureTag + mod.newContent + "</measure>";
+
+    // Calculate the new next measure content (direction added)
+    const nextMeasureTag = nextMeasure.fullMatch.substring(
+      0,
+      nextMeasure.fullMatch.indexOf(">") + 1,
+    );
+
+    // Insert after </attributes> if present, else at start
+    let newNextContent: string;
+    const attrsEndIndex = nextMeasure.content.indexOf("</attributes>");
+    if (attrsEndIndex !== -1) {
+      const insertPos = attrsEndIndex + "</attributes>".length;
+      newNextContent =
+        nextMeasure.content.substring(0, insertPos) +
+        mod.tempoDirection +
+        nextMeasure.content.substring(insertPos);
+    } else {
+      newNextContent = mod.tempoDirection + nextMeasure.content;
+    }
+    const newNextMeasure = nextMeasureTag + newNextContent + "</measure>";
+
+    // Apply replacements using exact positions (process from end to preserve indices)
+    // Replace next measure first (it's later in the string)
+    result =
+      result.substring(0, nextMeasure.startIndex) +
+      newNextMeasure +
+      result.substring(nextMeasure.endIndex);
+
+    // Replace current measure (now the indices are still valid since we worked from end)
+    result =
+      result.substring(0, measure.startIndex) +
+      newMeasure +
+      result.substring(measure.endIndex);
+
+    // Update indices for any remaining modifications that reference earlier measures
+    // (Since we're processing from end to start, earlier measures' indices are still valid)
   }
 
   return result;

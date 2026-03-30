@@ -287,19 +287,6 @@ export function importedMeasureToMeasure(
       }
     : undefined;
 
-  // DEBUG: Log when we convert a measure with tempo modulation
-  if (tempoModulation) {
-    console.log(
-      "[DEBUG importedMeasureToMeasure] Converting measure with modulation:",
-      {
-        measureNumber: importedMeasure.number,
-        isPickup: importedMeasure.isPickup,
-        isFirstMeasure,
-        tempoModulation,
-      },
-    );
-  }
-
   return {
     id: generateId(),
     notes: notes.length > 0 ? notes : [createNote(null, DURATION.WHOLE)],
