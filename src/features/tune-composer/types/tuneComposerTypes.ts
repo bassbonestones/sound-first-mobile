@@ -68,6 +68,69 @@ export const DURATION_VALUE_TO_NAME: Record<DurationValue, DurationName> = {
 };
 
 // =============================================================================
+// Tempo Beat Unit (for metronome marking)
+// =============================================================================
+
+/**
+ * Beat unit for tempo markings (e.g., "quarter" = quarter note gets one beat).
+ * Dotted variants are for compound meters (e.g., "dotted-quarter" for 6/8).
+ */
+export type TempoBeatUnit =
+  | "whole"
+  | "half"
+  | "quarter"
+  | "eighth"
+  | "sixteenth"
+  | "dotted-whole"
+  | "dotted-half"
+  | "dotted-quarter"
+  | "dotted-eighth";
+
+/**
+ * Human-readable labels for tempo beat units.
+ * Uses SMuFL codepoints for Bravura font (same as DurationSelector).
+ */
+export const TEMPO_BEAT_UNIT_LABELS: Record<TempoBeatUnit, string> = {
+  whole: "\uE1D2", // noteWhole
+  half: "\uE1D3", // noteHalfUp
+  quarter: "\uE1D5", // noteQuarterUp
+  eighth: "\uE1D7", // note8thUp
+  sixteenth: "\uE1D9", // note16thUp
+  "dotted-whole": "\uE1D2.", // noteWhole + dot
+  "dotted-half": "\uE1D3.", // noteHalfUp + dot
+  "dotted-quarter": "\uE1D5.", // noteQuarterUp + dot
+  "dotted-eighth": "\uE1D7.", // note8thUp + dot
+};
+
+/** Common tempo beat units for the picker UI */
+export const COMMON_TEMPO_BEAT_UNITS: TempoBeatUnit[] = [
+  "half",
+  "dotted-half",
+  "quarter",
+  "dotted-quarter",
+  "eighth",
+  "dotted-eighth",
+];
+
+/**
+ * Duration of each beat unit in quarter note beats.
+ * Used to convert tempo marking to actual playback speed.
+ * E.g., if tempo is "dotted-quarter = 100", each dotted-quarter takes 0.6 seconds,
+ * so each quarter note takes 0.6 / 1.5 = 0.4 seconds.
+ */
+export const TEMPO_BEAT_UNIT_DURATION: Record<TempoBeatUnit, number> = {
+  whole: 4.0,
+  "dotted-whole": 6.0,
+  half: 2.0,
+  "dotted-half": 3.0,
+  quarter: 1.0,
+  "dotted-quarter": 1.5,
+  eighth: 0.5,
+  "dotted-eighth": 0.75,
+  sixteenth: 0.25,
+};
+
+// =============================================================================
 // Pitch & Clef
 // =============================================================================
 
@@ -412,6 +475,8 @@ export interface Measure {
   isPickup?: boolean;
   /** Optional tempo override for this measure (BPM). If undefined, inherits from previous measure or score default. */
   tempo?: number;
+  /** Optional tempo beat unit override (e.g., "dotted-quarter" for compound meters). If undefined, inherits from previous measure or score default. */
+  tempoBeatUnit?: TempoBeatUnit;
   /** Optional key signature override for this measure. If undefined, inherits from previous measure or score default. */
   keySignature?: KeySignature;
   /** Optional time signature override for this measure. If undefined, inherits from previous measure or score default. */
@@ -585,6 +650,8 @@ export interface TuneComposerScore {
   timeSignature: TimeSignature;
   /** Tempo in BPM */
   tempo: number;
+  /** Tempo beat unit (e.g., "quarter", "dotted-quarter" for compound meters). Defaults to "quarter". */
+  tempoBeatUnit?: TempoBeatUnit;
   /** Measures in the score */
   measures: Measure[];
   /** Chord progressions for accompaniment */

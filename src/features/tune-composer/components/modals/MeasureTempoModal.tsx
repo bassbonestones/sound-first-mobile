@@ -2,7 +2,7 @@
  * MeasureTempoModal Component
  *
  * Modal for setting or clearing tempo override on a specific measure.
- * Allows mid-piece tempo changes.
+ * Allows mid-piece tempo changes including beat unit selection.
  */
 
 import React, { useState, useCallback, memo } from "react";
@@ -18,6 +18,8 @@ import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../../constants";
 import { TempoSlider } from "../../../../components/TempoSlider";
+import type { TempoBeatUnit } from "../../types";
+import { COMMON_TEMPO_BEAT_UNITS, TEMPO_BEAT_UNIT_LABELS } from "../../types";
 
 // =============================================================================
 // Types
@@ -40,6 +42,14 @@ export interface MeasureTempoModalProps {
   onSetTempo: (tempo: number) => void;
   /** Called when tempo is cleared (inherit from previous) */
   onClearTempo: () => void;
+  /** Current beat unit override for the measure (undefined if inheriting) */
+  currentBeatUnit?: TempoBeatUnit | undefined;
+  /** Effective beat unit for the measure (including inheritance) */
+  effectiveBeatUnit?: TempoBeatUnit;
+  /** Called when beat unit is set */
+  onSetBeatUnit?: (beatUnit: TempoBeatUnit) => void;
+  /** Called when beat unit is cleared (inherit from previous) */
+  onClearBeatUnit?: () => void;
 }
 
 // =============================================================================
@@ -55,30 +65,64 @@ function MeasureTempoModalComponent({
   scoreTempo,
   onSetTempo,
   onClearTempo,
+  currentBeatUnit,
+  effectiveBeatUnit = "quarter",
+  onSetBeatUnit,
+  onClearBeatUnit,
 }: MeasureTempoModalProps): React.ReactElement {
   const [pendingTempo, setPendingTempo] = useState(effectiveTempo);
-  const hasOverride = currentTempo !== undefined;
+  const [pendingBeatUnit, setPendingBeatUnit] =
+    useState<TempoBeatUnit>(effectiveBeatUnit);
+  const hasTempoOverride = currentTempo !== undefined;
+  const hasBeatUnitOverride = currentBeatUnit !== undefined;
+  const hasAnyOverride = hasTempoOverride || hasBeatUnitOverride;
 
-  // Reset pending tempo when modal opens
+  // Reset pending values when modal opens
   React.useEffect(() => {
     if (visible) {
       setPendingTempo(effectiveTempo);
+      setPendingBeatUnit(effectiveBeatUnit);
     }
-  }, [visible, effectiveTempo]);
+  }, [visible, effectiveTempo, effectiveBeatUnit]);
 
   const handleApply = useCallback(() => {
-    onSetTempo(pendingTempo);
+    // Apply tempo if changed or if current measure has tempo override
+    if (pendingTempo !== effectiveTempo || hasTempoOverride) {
+      onSetTempo(pendingTempo);
+    }
+    // Apply beat unit if callback provided and value changed
+    if (
+      onSetBeatUnit &&
+      (pendingBeatUnit !== effectiveBeatUnit || hasBeatUnitOverride)
+    ) {
+      onSetBeatUnit(pendingBeatUnit);
+    }
     onClose();
-  }, [pendingTempo, onSetTempo, onClose]);
+  }, [
+    pendingTempo,
+    pendingBeatUnit,
+    effectiveTempo,
+    effectiveBeatUnit,
+    hasTempoOverride,
+    hasBeatUnitOverride,
+    onSetTempo,
+    onSetBeatUnit,
+    onClose,
+  ]);
 
   const handleClear = useCallback(() => {
     onClearTempo();
+    if (onClearBeatUnit) {
+      onClearBeatUnit();
+    }
     onClose();
-  }, [onClearTempo, onClose]);
+  }, [onClearTempo, onClearBeatUnit, onClose]);
 
   const handleCancel = useCallback(() => {
     onClose();
   }, [onClose]);
+
+  const beatUnitLabel = TEMPO_BEAT_UNIT_LABELS[effectiveBeatUnit];
 
   return (
     <Modal
@@ -105,16 +149,49 @@ function MeasureTempoModalComponent({
 
           {/* Status */}
           <View style={styles.statusRow}>
-            {hasOverride ? (
+            {hasAnyOverride ? (
               <Text style={styles.statusText}>
-                ♩ = {currentTempo} (custom tempo)
+                <Text style={styles.statusBeatUnit}>{beatUnitLabel}</Text> ={" "}
+                {effectiveTempo} (custom)
               </Text>
             ) : (
               <Text style={styles.statusTextInherited}>
-                ♩ = {effectiveTempo} (inherited)
+                <Text style={styles.statusBeatUnit}>{beatUnitLabel}</Text> ={" "}
+                {effectiveTempo} (inherited)
               </Text>
             )}
           </View>
+
+          {/* Beat Unit Picker */}
+          {onSetBeatUnit && (
+            <View style={styles.beatUnitSection}>
+              <Text style={styles.sectionLabel}>Beat Unit</Text>
+              <View style={styles.beatUnitRow}>
+                {COMMON_TEMPO_BEAT_UNITS.map((unit) => (
+                  <TouchableOpacity
+                    key={unit}
+                    style={[
+                      styles.beatUnitButton,
+                      pendingBeatUnit === unit && styles.beatUnitButtonActive,
+                    ]}
+                    onPress={() => setPendingBeatUnit(unit)}
+                    accessibilityRole={"button" as AccessibilityRole}
+                    accessibilityLabel={`Beat unit ${unit}`}
+                    testID={`measure-tempo-beat-unit-${unit}`}
+                  >
+                    <Text
+                      style={[
+                        styles.beatUnitText,
+                        pendingBeatUnit === unit && styles.beatUnitTextActive,
+                      ]}
+                    >
+                      {TEMPO_BEAT_UNIT_LABELS[unit]}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
 
           {/* Tempo Slider */}
           <View style={styles.sliderContainer}>
@@ -129,7 +206,7 @@ function MeasureTempoModalComponent({
 
           {/* Buttons */}
           <View style={styles.buttonRow}>
-            {hasOverride && (
+            {hasAnyOverride && (
               <TouchableOpacity
                 style={[styles.button, styles.clearButton]}
                 onPress={handleClear}
@@ -216,6 +293,44 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontStyle: "italic",
     textAlign: "center",
+  },
+  statusBeatUnit: {
+    fontFamily: "Bravura",
+    fontSize: 20,
+  },
+  beatUnitSection: {
+    marginBottom: spacing.md,
+  },
+  sectionLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  beatUnitRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+  },
+  beatUnitButton: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: spacing.sm,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  beatUnitButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  beatUnitText: {
+    fontSize: 22,
+    fontFamily: "Bravura",
+    color: colors.textPrimary,
+  },
+  beatUnitTextActive: {
+    color: colors.textOnPrimary,
   },
   sliderContainer: {
     marginBottom: spacing.lg,

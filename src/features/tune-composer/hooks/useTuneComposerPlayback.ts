@@ -7,8 +7,8 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 
-import type { Note, TuneComposerScore } from "../types";
-import { getNoteDuration } from "../types";
+import type { Note, TuneComposerScore, TempoBeatUnit } from "../types";
+import { getNoteDuration, TEMPO_BEAT_UNIT_DURATION } from "../types";
 // Re-use the composer synth service
 import { composerSynth } from "../../composer/services/composerSynth";
 
@@ -198,9 +198,20 @@ export function useTuneComposerPlayback(
     position.noteIndex >=
       (score.measures[position.measureIndex]?.notes.length ?? 1) - 1;
 
-  const getSecondsPerBeat = useCallback((bpm: number) => {
-    return 60 / bpm;
-  }, []);
+  /**
+   * Calculate seconds per quarter-note beat based on tempo and beat unit.
+   * If tempo is "dotted-quarter = 100", that means 100 dotted-quarters per minute.
+   * A dotted-quarter = 1.5 quarter notes, so we need to convert.
+   */
+  const getSecondsPerBeat = useCallback(
+    (bpm: number, beatUnit: TempoBeatUnit = "quarter") => {
+      const beatUnitDuration = TEMPO_BEAT_UNIT_DURATION[beatUnit];
+      // Seconds per beat-unit = 60 / bpm
+      // Seconds per quarter = (60 / bpm) / beatUnitDuration
+      return 60 / bpm / beatUnitDuration;
+    },
+    [],
+  );
 
   /**
    * Get effective tempo for a measure, considering per-measure overrides.
@@ -219,6 +230,25 @@ export function useTuneComposerPlayback(
       return score.tempo;
     },
     [score.measures, score.tempo],
+  );
+
+  /**
+   * Get effective tempo beat unit for a measure, considering per-measure overrides.
+   * Walks backward through measures to find closest defined beat unit.
+   */
+  const getEffectiveBeatUnit = useCallback(
+    (measureIndex: number): TempoBeatUnit => {
+      // Walk back through measures to find the most recent beat unit override
+      for (let i = measureIndex; i >= 0; i--) {
+        const measure = score.measures[i];
+        if (measure?.tempoBeatUnit !== undefined) {
+          return measure.tempoBeatUnit;
+        }
+      }
+      // Fall back to score-level beat unit
+      return score.tempoBeatUnit ?? "quarter";
+    },
+    [score.measures, score.tempoBeatUnit],
   );
 
   const getNextPosition = useCallback(
@@ -309,7 +339,13 @@ export function useTuneComposerPlayback(
         // Only play if this is not a tie continuation
         if (firstNote && !firstNote.tieEnd) {
           const effectiveTempo = getEffectiveTempo(position.measureIndex);
-          const secondsPerBeat = getSecondsPerBeat(effectiveTempo);
+          const effectiveBeatUnitValue = getEffectiveBeatUnit(
+            position.measureIndex,
+          );
+          const secondsPerBeat = getSecondsPerBeat(
+            effectiveTempo,
+            effectiveBeatUnitValue,
+          );
           // Use tied duration if note has tieStart
           const totalBeats = firstNote.tieStart
             ? getTiedNoteDuration(position)
@@ -338,7 +374,13 @@ export function useTuneComposerPlayback(
       }
 
       const effectiveTempo = getEffectiveTempo(position.measureIndex);
-      const secondsPerBeat = getSecondsPerBeat(effectiveTempo);
+      const effectiveBeatUnitValue = getEffectiveBeatUnit(
+        position.measureIndex,
+      );
+      const secondsPerBeat = getSecondsPerBeat(
+        effectiveTempo,
+        effectiveBeatUnitValue,
+      );
       const rawDuration = getNoteDuration(currentNote);
       // Apply swing timing - affects when we move to the next note
       const swungDuration = getSwungDuration(
@@ -371,9 +413,13 @@ export function useTuneComposerPlayback(
               const totalBeats = nextNote.tieStart
                 ? getTiedNoteDuration(nextPos)
                 : getNoteDuration(nextNote);
-              // Use effective tempo for the new measure
+              // Use effective tempo and beat unit for the new measure
               const nextTempo = getEffectiveTempo(nextPos.measureIndex);
-              const nextSecondsPerBeat = getSecondsPerBeat(nextTempo);
+              const nextBeatUnit = getEffectiveBeatUnit(nextPos.measureIndex);
+              const nextSecondsPerBeat = getSecondsPerBeat(
+                nextTempo,
+                nextBeatUnit,
+              );
               const nextDuration = totalBeats * nextSecondsPerBeat;
               composerSynth.playNote(nextNote.midi, nextDuration * 1000);
             }
@@ -390,9 +436,13 @@ export function useTuneComposerPlayback(
             const totalBeats = firstNote.tieStart
               ? getTiedNoteDuration(INITIAL_POSITION)
               : getNoteDuration(firstNote);
-            // Use effective tempo for measure 0 on repeat
+            // Use effective tempo and beat unit for measure 0 on repeat
             const repeatTempo = getEffectiveTempo(0);
-            const repeatSecondsPerBeat = getSecondsPerBeat(repeatTempo);
+            const repeatBeatUnit = getEffectiveBeatUnit(0);
+            const repeatSecondsPerBeat = getSecondsPerBeat(
+              repeatTempo,
+              repeatBeatUnit,
+            );
             const firstDuration = totalBeats * repeatSecondsPerBeat;
             composerSynth.playNote(firstNote.midi, firstDuration * 1000);
             lastPlayedPositionRef.current = `0-0`;

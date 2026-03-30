@@ -30,6 +30,11 @@ import TimeSignaturePickerModal from "../../../components/Metronome/TimeSignatur
 import { getKeyName, ALL_KEY_SIGNATURES } from "../constants";
 import { useOptionalScoreSettingsContext } from "../contexts";
 import type { Clef, TimeSignature, KeySignature } from "../types";
+import type { TempoBeatUnit } from "../../tune-composer/types";
+import {
+  COMMON_TEMPO_BEAT_UNITS,
+  TEMPO_BEAT_UNIT_LABELS,
+} from "../../tune-composer/types";
 
 // =============================================================================
 // Types
@@ -91,6 +96,15 @@ export interface CompactTopBarProps {
    * If not provided, uses setTempo from ScoreSettingsContext.
    */
   onTempoChange?: (tempo: number) => void;
+  /**
+   * Current tempo beat unit (e.g., "quarter", "dotted-quarter").
+   * Defaults to "quarter".
+   */
+  tempoBeatUnit?: TempoBeatUnit;
+  /**
+   * Called when tempo beat unit changes.
+   */
+  onTempoBeatUnitChange?: (beatUnit: TempoBeatUnit) => void;
   /** Current zoom level (0.5-2.5) */
   zoom: number;
   /** Called when zoom changes */
@@ -132,6 +146,8 @@ function CompactTopBarComponent({
   onKeySignatureChange: propOnKeySignatureChange,
   tempo: propTempo,
   onTempoChange: propOnTempoChange,
+  tempoBeatUnit = "quarter",
+  onTempoBeatUnitChange,
   zoom,
   onZoomChange,
   onClearScore: propOnClearScore,
@@ -401,6 +417,37 @@ function CompactTopBarComponent({
                   <Text style={styles.bpmLabel}>BPM</Text>
                 </View>
               </View>
+
+              {/* Beat Unit (only shown for TuneComposer) */}
+              {onTempoBeatUnitChange && (
+                <View style={styles.settingRow}>
+                  <Text style={styles.settingLabel}>Beat Unit</Text>
+                  <View style={styles.beatUnitRow}>
+                    {COMMON_TEMPO_BEAT_UNITS.map((unit) => (
+                      <TouchableOpacity
+                        key={unit}
+                        style={[
+                          styles.beatUnitButton,
+                          tempoBeatUnit === unit && styles.beatUnitButtonActive,
+                        ]}
+                        onPress={() => onTempoBeatUnitChange(unit)}
+                        accessibilityRole={"button" as AccessibilityRole}
+                        accessibilityLabel={`Beat unit ${unit}`}
+                        testID={`settings-beat-unit-${unit}`}
+                      >
+                        <Text
+                          style={[
+                            styles.beatUnitText,
+                            tempoBeatUnit === unit && styles.beatUnitTextActive,
+                          ]}
+                        >
+                          {TEMPO_BEAT_UNIT_LABELS[unit]}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
 
               {/* Swing */}
               {onSwingEnabledChange && (
@@ -728,6 +775,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     marginLeft: 2,
+  },
+  beatUnitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  beatUnitButton: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 8,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  beatUnitButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  beatUnitText: {
+    fontSize: 22,
+    fontFamily: "Bravura",
+    color: colors.textPrimary,
+  },
+  beatUnitTextActive: {
+    color: colors.textOnPrimary,
   },
   zoomDisplay: {
     paddingVertical: 8,

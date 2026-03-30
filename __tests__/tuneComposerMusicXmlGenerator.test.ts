@@ -435,6 +435,54 @@ describe("Tune Composer MusicXML Generator", () => {
         expect(tempo120Matches).toHaveLength(2);
         expect(tempo80Matches).toHaveLength(1);
       });
+
+      it("should output quarter note beat unit by default", () => {
+        const score = createScore({ tempo: 100 });
+        const xml = generateMusicXml(score);
+
+        expect(xml).toContain("<beat-unit>quarter</beat-unit>");
+        expect(xml).not.toContain("<beat-unit-dot/>");
+      });
+
+      it("should output dotted-quarter beat unit for compound meter", () => {
+        const score = createScore({
+          tempo: 100,
+          tempoBeatUnit: "dotted-quarter",
+        });
+        const xml = generateMusicXml(score);
+
+        expect(xml).toContain("<beat-unit>quarter</beat-unit>");
+        expect(xml).toContain("<beat-unit-dot/>");
+      });
+
+      it("should output half note beat unit", () => {
+        const score = createScore({
+          tempo: 60,
+          tempoBeatUnit: "half",
+        });
+        const xml = generateMusicXml(score);
+
+        expect(xml).toContain("<beat-unit>half</beat-unit>");
+        expect(xml).not.toContain("<beat-unit-dot/>");
+      });
+
+      it("should output beat unit change mid-piece", () => {
+        const score = createScore({
+          tempo: 120,
+          tempoBeatUnit: "quarter",
+        });
+        // Add a second measure with dotted-quarter beat unit
+        score.measures.push(createMeasure(score.timeSignature));
+        score.measures[1].tempoBeatUnit = "dotted-quarter";
+
+        const xml = generateMusicXml(score);
+
+        // First measure: quarter, no dot
+        // Second measure: should trigger tempo direction with dotted-quarter
+        expect(xml).toMatch(
+          /<beat-unit>quarter<\/beat-unit>\s*<beat-unit-dot\/>/,
+        );
+      });
     });
 
     describe("Mid-piece key signature changes", () => {

@@ -23,6 +23,7 @@ import type {
   WedgeMark,
   Lyric,
   ChordSymbol,
+  TempoBeatUnit,
 } from "../types";
 import {
   DURATION,
@@ -327,6 +328,21 @@ function shortenChordSymbol(symbol: string): string {
 function alterToXml(alter: number): string {
   if (alter === 0) return "";
   return `\n        <root-alter>${alter}</root-alter>`;
+}
+
+/**
+ * Parse tempo beat unit into MusicXML beat-unit value and dotted flag.
+ * MusicXML uses "quarter" (not "dotted-quarter") plus a separate <beat-unit-dot/> element.
+ */
+function parseTempoBeatUnit(beatUnit: TempoBeatUnit): {
+  beatUnitXml: string;
+  isDotted: boolean;
+} {
+  const isDotted = beatUnit.startsWith("dotted-");
+  const baseUnit = isDotted ? beatUnit.replace("dotted-", "") : beatUnit;
+  // MusicXML uses "16th" instead of "sixteenth"
+  const beatUnitXml = baseUnit === "sixteenth" ? "16th" : baseUnit;
+  return { beatUnitXml, isDotted };
 }
 
 /**
@@ -1044,17 +1060,22 @@ function generateMeasureXml(
   // Metronome/tempo direction on first measure OR when tempo changes mid-piece
   const showDirection =
     (isFirstMeasure && scoreHasNotes) || tempoInfo.hasTempoChange;
-  const directionXml = showDirection
-    ? `\n      <direction placement="above">
+  let directionXml = "";
+  if (showDirection) {
+    const { beatUnitXml, isDotted } = parseTempoBeatUnit(
+      tempoInfo.effectiveBeatUnit,
+    );
+    const beatUnitDotXml = isDotted ? "\n            <beat-unit-dot/>" : "";
+    directionXml = `\n      <direction placement="above">
         <direction-type>
           <metronome parentheses="no">
-            <beat-unit>quarter</beat-unit>
+            <beat-unit>${beatUnitXml}</beat-unit>${beatUnitDotXml}
             <per-minute>${tempoInfo.effectiveTempo}</per-minute>
           </metronome>
         </direction-type>
         <sound tempo="${tempoInfo.effectiveTempo}"/>
-      </direction>`
-    : "";
+      </direction>`;
+  }
 
   const barlineXml = isLastMeasure
     ? `\n      <barline location="right">
@@ -1118,19 +1139,29 @@ export function generateMusicXml(
   // Find index of first full (non-pickup) measure
   const firstFullMeasureIndex = hasPickup ? 1 : 0;
 
-  // Pre-compute effective tempo for each measure and detect tempo changes
-  // A tempo change occurs when the measure's tempo differs from the previous effective tempo
+  // Pre-compute effective tempo and beat unit for each measure and detect changes
+  // A tempo change occurs when the measure's tempo or beat unit differs from the previous
   const measureTempoInfo: Array<{
     effectiveTempo: number;
+    effectiveBeatUnit: TempoBeatUnit;
     hasTempoChange: boolean;
   }> = [];
   let currentTempo = score.tempo;
+  let currentBeatUnit: TempoBeatUnit = score.tempoBeatUnit ?? "quarter";
   for (let i = 0; i < score.measures.length; i++) {
     const measure = score.measures[i];
     const measureTempo = measure.tempo ?? currentTempo;
-    const hasTempoChange = i > 0 && measureTempo !== currentTempo;
-    measureTempoInfo.push({ effectiveTempo: measureTempo, hasTempoChange });
+    const measureBeatUnit = measure.tempoBeatUnit ?? currentBeatUnit;
+    const hasTempoChange =
+      i > 0 &&
+      (measureTempo !== currentTempo || measureBeatUnit !== currentBeatUnit);
+    measureTempoInfo.push({
+      effectiveTempo: measureTempo,
+      effectiveBeatUnit: measureBeatUnit,
+      hasTempoChange,
+    });
     currentTempo = measureTempo;
+    currentBeatUnit = measureBeatUnit;
   }
 
   // Pre-compute effective key signature for each measure and detect key changes

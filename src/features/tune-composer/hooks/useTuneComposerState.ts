@@ -18,6 +18,7 @@ import type {
   MeasureValidation,
   Note,
   PitchName,
+  TempoBeatUnit,
   TimeSignature,
   TuneComposerScore,
   TuneComposerState,
@@ -124,6 +125,15 @@ export interface UseTuneComposerStateReturn {
   clearCurrentMeasureTempo: () => void;
   /** Get effective tempo for a measure (considering inheritance) */
   getMeasureEffectiveTempo: (measureIndex: number) => number;
+  /** Set a tempo beat unit override for a specific measure (undefined to clear) */
+  setMeasureTempoBeatUnit: (
+    measureIndex: number,
+    beatUnit: TempoBeatUnit | undefined,
+  ) => void;
+  /** Clear tempo beat unit override on current measure */
+  clearCurrentMeasureTempoBeatUnit: () => void;
+  /** Get effective tempo beat unit for a measure (considering inheritance) */
+  getMeasureEffectiveTempoBeatUnit: (measureIndex: number) => TempoBeatUnit;
   /** Set a key signature override for a specific measure (undefined to clear) */
   setMeasureKeySignature: (
     measureIndex: number,
@@ -164,6 +174,7 @@ export interface UseTuneComposerStateReturn {
   ) => void;
   setTimeSignature: (timeSig: TimeSignature) => boolean;
   setTempo: (tempo: number) => void;
+  setTempoBeatUnit: (beatUnit: TempoBeatUnit) => void;
   setTitle: (title: string) => void;
 
   // Undo/Redo
@@ -731,6 +742,57 @@ export function useTuneComposerState(
   );
 
   /**
+   * Set a tempo beat unit override on a specific measure.
+   * Pass undefined to clear the tempo beat unit override (inherit from previous measure or score).
+   */
+  const setMeasureTempoBeatUnit = useCallback(
+    (measureIndex: number, beatUnit: TempoBeatUnit | undefined) => {
+      const measure = state.score.measures[measureIndex];
+      if (!measure) return;
+
+      const prevBeatUnit = measure.tempoBeatUnit;
+      if (beatUnit === prevBeatUnit) return;
+
+      updateScore((score) => ({
+        ...score,
+        measures: score.measures.map((m, i) =>
+          i === measureIndex ? { ...m, tempoBeatUnit: beatUnit } : m,
+        ),
+      }));
+    },
+    [state.score.measures, updateScore],
+  );
+
+  /**
+   * Clear the tempo beat unit override on the current measure.
+   */
+  const clearCurrentMeasureTempoBeatUnit = useCallback(() => {
+    setMeasureTempoBeatUnit(state.cursor.measureIndex, undefined);
+  }, [state.cursor.measureIndex, setMeasureTempoBeatUnit]);
+
+  /**
+   * Get the effective tempo beat unit for a measure (considering inheritance).
+   */
+  const getMeasureEffectiveTempoBeatUnit = useCallback(
+    (measureIndex: number): TempoBeatUnit => {
+      let effectiveBeatUnit: TempoBeatUnit =
+        state.score.tempoBeatUnit ?? "quarter";
+      for (
+        let i = 0;
+        i <= measureIndex && i < state.score.measures.length;
+        i++
+      ) {
+        const measure = state.score.measures[i];
+        if (measure.tempoBeatUnit !== undefined) {
+          effectiveBeatUnit = measure.tempoBeatUnit;
+        }
+      }
+      return effectiveBeatUnit;
+    },
+    [state.score.measures, state.score.tempoBeatUnit],
+  );
+
+  /**
    * Set a key signature override on a specific measure.
    * Pass undefined to clear the key signature override (inherit from previous measure or score).
    */
@@ -1285,6 +1347,22 @@ export function useTuneComposerState(
     [state.score.tempo, undoManager, updateScore],
   );
 
+  const setTempoBeatUnit = useCallback(
+    (beatUnit: TempoBeatUnit) => {
+      const prevBeatUnit = state.score.tempoBeatUnit ?? "quarter";
+      if (beatUnit === prevBeatUnit) return;
+
+      undoManager.pushAction({
+        type: "CHANGE_TEMPO_BEAT_UNIT",
+        previousBeatUnit: prevBeatUnit,
+        newBeatUnit: beatUnit,
+      });
+
+      updateScore((score) => ({ ...score, tempoBeatUnit: beatUnit }));
+    },
+    [state.score.tempoBeatUnit, undoManager, updateScore],
+  );
+
   const setTitle = useCallback(
     (title: string) => {
       const prevTitle = state.score.title;
@@ -1460,6 +1538,9 @@ export function useTuneComposerState(
     setMeasureTempo,
     clearCurrentMeasureTempo,
     getMeasureEffectiveTempo,
+    setMeasureTempoBeatUnit,
+    clearCurrentMeasureTempoBeatUnit,
+    getMeasureEffectiveTempoBeatUnit,
     setMeasureKeySignature,
     clearCurrentMeasureKeySignature,
     getMeasureEffectiveKeySignature,
@@ -1481,6 +1562,7 @@ export function useTuneComposerState(
     setKeySignatureWithTransposition,
     setTimeSignature,
     setTempo,
+    setTempoBeatUnit,
     setTitle,
 
     // Undo/Redo

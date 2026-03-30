@@ -1215,6 +1215,8 @@ function TuneComposerScreenContent({
           onKeySignatureChange={handleKeySignatureChange}
           tempo={composerState.score.tempo}
           onTempoChange={handleTempoChange}
+          tempoBeatUnit={composerState.score.tempoBeatUnit ?? "quarter"}
+          onTempoBeatUnitChange={composerState.setTempoBeatUnit}
           zoom={zoom}
           onZoomChange={setZoom}
           onClearScore={composerState.clearScore}
@@ -1900,6 +1902,22 @@ function TuneComposerScreenContent({
           onClearTempo={() => {
             composerState.clearCurrentMeasureTempo();
             setShowTempoModal(false);
+          }}
+          currentBeatUnit={
+            composerState.score.measures[composerState.cursor.measureIndex]
+              ?.tempoBeatUnit
+          }
+          effectiveBeatUnit={composerState.getMeasureEffectiveTempoBeatUnit(
+            composerState.cursor.measureIndex,
+          )}
+          onSetBeatUnit={(beatUnit) => {
+            composerState.setMeasureTempoBeatUnit(
+              composerState.cursor.measureIndex,
+              beatUnit,
+            );
+          }}
+          onClearBeatUnit={() => {
+            composerState.clearCurrentMeasureTempoBeatUnit();
           }}
         />
 

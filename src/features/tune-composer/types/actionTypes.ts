@@ -16,6 +16,7 @@ import type {
   Lyric,
   Measure,
   Note,
+  TempoBeatUnit,
   TimeSignature,
   WedgeMark,
 } from "./tuneComposerTypes";
@@ -38,6 +39,7 @@ export type TuneComposerActionType =
   | "CHANGE_KEY_SIGNATURE"
   | "CHANGE_TIME_SIGNATURE"
   | "CHANGE_TEMPO"
+  | "CHANGE_TEMPO_BEAT_UNIT"
   | "CHANGE_TITLE"
   // Extended actions for tune composition
   | "SET_LYRIC"
@@ -148,6 +150,12 @@ export interface ChangeTempoAction {
   type: "CHANGE_TEMPO";
   previousTempo: number;
   newTempo: number;
+}
+
+export interface ChangeTempoBeatUnitAction {
+  type: "CHANGE_TEMPO_BEAT_UNIT";
+  previousBeatUnit: TempoBeatUnit;
+  newBeatUnit: TempoBeatUnit;
 }
 
 export interface ChangeTitleAction {

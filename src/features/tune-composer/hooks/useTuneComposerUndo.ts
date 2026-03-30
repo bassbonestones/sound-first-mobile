@@ -259,6 +259,9 @@ export function reverseAction(
     case "CHANGE_TEMPO":
       return { ...updatedScore, tempo: action.previousTempo };
 
+    case "CHANGE_TEMPO_BEAT_UNIT":
+      return { ...updatedScore, tempoBeatUnit: action.previousBeatUnit };
+
     case "CHANGE_TITLE":
       return { ...updatedScore, title: action.previousTitle };
 
@@ -627,6 +630,9 @@ export function reapplyAction(
 
     case "CHANGE_TEMPO":
       return { ...updatedScore, tempo: action.newTempo };
+
+    case "CHANGE_TEMPO_BEAT_UNIT":
+      return { ...updatedScore, tempoBeatUnit: action.newBeatUnit };
 
     case "CHANGE_TITLE":
       return { ...updatedScore, title: action.newTitle };
