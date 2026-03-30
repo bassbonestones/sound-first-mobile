@@ -299,12 +299,12 @@ export function generateComposerOsmdHtml(
         
         setZoom(currentZoom);
         shortenChordSymbols();
-        replaceMetricModulations();
         debugChordElements(); // Log what OSMD created
         // Note: repositionChordSymbols is called from React Native after measurePositions are received
         buildNoteMap();
         addNoteClickHandlers();
-        sendMeasurePositions();
+        sendMeasurePositions(); // Must run before replaceMetricModulations to populate window.lastMeasurePositions
+        replaceMetricModulations(); // Uses measure positions for correct placement
         sendMessage('rendered');
       } catch (error) {
         console.error('Render error:', error);
@@ -396,32 +396,37 @@ export function generateComposerOsmdHtml(
       'dot': '\uECB7'           // metAugmentationDot
     };
 
-    // Pattern to match "quarter=half" or "dotted-quarter=eighth" (no spaces)
-    const MODULATION_PATTERN = /^(dotted-)?(whole|half|quarter|eighth|16th|32nd|64th)=(dotted-)?(whole|half|quarter|eighth|16th|32nd|64th)$/i;
+    // Pattern to match "quarter=half@m1" or "dotted-quarter=eighth@m3" (with measure marker)
+    // The @m{number} suffix tells us which measure to position the glyph at
+    // Note: \\d is double-escaped because this is inside a template string
+    const MODULATION_PATTERN = /^(dotted-)?(whole|half|quarter|eighth|16th|32nd|64th)=(dotted-)?(whole|half|quarter|eighth|16th|32nd|64th)@m(\\d+)$/i;
 
     /**
      * Replace metric modulation text with proper SMuFL glyphs.
      * Since OSMD doesn't render two-beat-unit metronomes, we use <words>
      * and find the resulting text elements to replace them.
-     * Uses OSMD's positioning - it knows where the tempo should appear.
+     * Uses measure positions from OSMD since text positioning is inconsistent.
      */
     function replaceMetricModulations() {
       const container = document.getElementById('osmd-container');
       if (!container) return;
 
+      // Clean up ALL previous glyph replacements from the container level
+      // This handles cases where OSMD creates a new SVG and leaves old ones
+      const allOldGlyphs = container.querySelectorAll('.soundfirst-tempo-mod');
+      allOldGlyphs.forEach(function(el) { el.remove(); });
+
       const svg = container.querySelector('svg');
       if (!svg) return;
-
-      // Clean up any previous glyph replacements before processing
-      // This prevents stale elements from back-to-back tempo changes
-      const oldGlyphs = svg.querySelectorAll('.soundfirst-tempo-mod');
-      oldGlyphs.forEach(function(el) { el.remove(); });
       
+      // Get measure positions from OSMD (stored during sendMeasurePositions)
+      const measurePositions = window.lastMeasurePositions || [];
+
       // Also unhide any previously hidden modulation text (in case they're no longer valid)
       const hiddenTexts = svg.querySelectorAll('text[visibility="hidden"]');
       hiddenTexts.forEach(function(el) {
         const text = (el.textContent || '').trim();
-        if (MODULATION_PATTERN.test(text)) {
+        if (MODULATION_PATTERN.test(text.replace(/@m\d+$/, '@m0'))) { // Normalize for check
           el.removeAttribute('visibility');
         }
       });
@@ -433,16 +438,24 @@ export function generateComposerOsmdHtml(
       allTextElements.forEach(function(textEl) {
         const text = (textEl.textContent || '').trim();
         
+        // Check if this looks like a modulation
+        if (text.includes('@m')) {
+          console.log('[DEBUG] Testing pattern on:', JSON.stringify(text), 'pattern:', MODULATION_PATTERN.toString());
+          const testMatch = MODULATION_PATTERN.exec(text);
+          console.log('[DEBUG] Pattern match result:', testMatch);
+        }
+        
         const match = text.match(MODULATION_PATTERN);
         if (!match) return;
 
-        console.log('[DEBUG] Found modulation:', text, 'x=', textEl.getAttribute('x'), 'y=', textEl.getAttribute('y'));
-
-        // Parse the modulation: [fullMatch, fromDotted, fromUnit, toDotted, toUnit]
+        // Parse the modulation: [fullMatch, fromDotted, fromUnit, toDotted, toUnit, measureNum]
         const fromDotted = !!match[1];
         const fromUnit = match[2].toLowerCase();
         const toDotted = !!match[3];
         const toUnit = match[4].toLowerCase();
+        const measureNum = parseInt(match[5], 10);
+
+        console.log('[DEBUG] Found modulation:', text, 'measureNum=', measureNum, 'textX=', textEl.getAttribute('x'));
 
         const fromGlyph = SMUFL_METRONOME_GLYPHS[fromUnit];
         const toGlyph = SMUFL_METRONOME_GLYPHS[toUnit];
@@ -450,8 +463,20 @@ export function generateComposerOsmdHtml(
 
         if (!fromGlyph || !toGlyph) return;
 
-        // Use OSMD's original position - it knows where the tempo should appear
-        const x = parseFloat(textEl.getAttribute('x') || '0');
+        // Find the measure position for this measure number
+        // measurePositions is 0-indexed, measureNum is 1-indexed (from MusicXML)
+        const measureIndex = measureNum - 1;
+        const measurePos = measurePositions[measureIndex];
+        
+        // Use measure's noteStartX if available, otherwise fall back to text element position
+        let x;
+        if (measurePos && measurePos.noteStartX !== undefined) {
+          x = measurePos.noteStartX;
+          console.log('[DEBUG] Using measure position:', measureNum, 'noteStartX=', x);
+        } else {
+          x = parseFloat(textEl.getAttribute('x') || '0');
+          console.log('[DEBUG] Fallback to text position:', x);
+        }
         const y = parseFloat(textEl.getAttribute('y') || '0');
 
         // Hide the original text element immediately
@@ -766,6 +791,9 @@ export function generateComposerOsmdHtml(
       // Also get total content width
       const container = document.getElementById('osmd-container');
       const contentWidth = container ? container.scrollWidth : 0;
+      
+      // Store positions globally for replaceMetricModulations to use
+      window.lastMeasurePositions = positions;
       
       sendMessage('measurePositions', { positions, contentWidth, zoom: currentZoom });
     }

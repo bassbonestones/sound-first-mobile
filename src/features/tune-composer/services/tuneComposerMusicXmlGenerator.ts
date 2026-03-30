@@ -1097,6 +1097,7 @@ function generateMeasureXml(
     if (tempoInfo.modulation) {
       // Metric modulation: Use <words> with text that we'll replace in post-render.
       // OSMD doesn't render the two-beat-unit metronome format.
+      // Include measure number so post-render can position correctly (OSMD positions text inconsistently)
       const { beatUnitXml: fromBeatUnitXml, isDotted: fromIsDotted } =
         parseTempoBeatUnit(tempoInfo.modulation.fromUnit);
       const { beatUnitXml: toBeatUnitXml, isDotted: toIsDotted } =
@@ -1108,7 +1109,7 @@ function generateMeasureXml(
 
       directionXml = `\n      <direction placement="above">
         <direction-type>
-          <words font-weight="bold">${fromText}=${toText}</words>
+          <words font-weight="bold">${fromText}=${toText}@m${measureNumber}</words>
         </direction-type>
         <sound tempo="${Math.round(tempoInfo.effectiveTempo)}"/>
       </direction>`;
@@ -1405,9 +1406,9 @@ export function applyOsmdPickupWorkaround(musicXml: string): string {
     // Find metronome direction OR words direction (for metric modulations) in this measure
     // This matches both:
     //   <direction>...<metronome>...</direction>
-    //   <direction>...<words>quarter=half</words>...</direction>
+    //   <direction>...<words>quarter=half@m3</words>...</direction>
     const tempoDirectionRegex =
-      /(\s*<direction[^>]*>\s*<direction-type>\s*(?:<metronome[\s\S]*?<\/metronome>|<words[^>]*>(?:dotted-)?(?:whole|half|quarter|eighth|16th|32nd|64th)=(?:dotted-)?(?:whole|half|quarter|eighth|16th|32nd|64th)<\/words>)\s*<\/direction-type>[\s\S]*?<\/direction>)/gi;
+      /(\s*<direction[^>]*>\s*<direction-type>\s*(?:<metronome[\s\S]*?<\/metronome>|<words[^>]*>(?:dotted-)?(?:whole|half|quarter|eighth|16th|32nd|64th)=(?:dotted-)?(?:whole|half|quarter|eighth|16th|32nd|64th)@m\d+<\/words>)\s*<\/direction-type>[\s\S]*?<\/direction>)/gi;
     const tempoMatch = tempoDirectionRegex.exec(measure.content);
 
     if (tempoMatch) {

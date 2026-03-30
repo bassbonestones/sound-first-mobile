@@ -592,6 +592,16 @@ function TuneComposerScoreViewportComponent({
   // Render MusicXML when ready
   useEffect(() => {
     if (isReady && musicXml) {
+      // DEBUG: Count modulations in MusicXML
+      const modulationMatches = musicXml.match(
+        /<words[^>]*>(?:dotted-)?(?:whole|half|quarter|eighth|16th|32nd|64th)=(?:dotted-)?(?:whole|half|quarter|eighth|16th|32nd|64th)@m\d+<\/words>/gi,
+      );
+      console.log(
+        "[DEBUG MusicXML] Modulations found:",
+        modulationMatches?.length ?? 0,
+        modulationMatches,
+      );
+
       // Apply OSMD pickup measure workaround for metronome rendering
       const xmlForOsmd = applyOsmdPickupWorkaround(musicXml);
 
