@@ -403,6 +403,7 @@ export function generateComposerOsmdHtml(
      * Replace metric modulation text with proper SMuFL glyphs.
      * Since OSMD doesn't render two-beat-unit metronomes, we use <words>
      * and find the resulting text elements to replace them.
+     * Waits for Bravura font to load before showing glyphs.
      */
     function replaceMetricModulations() {
       const container = document.getElementById('osmd-container');
@@ -413,6 +414,7 @@ export function generateComposerOsmdHtml(
 
       // Find ALL text elements in the SVG
       const allTextElements = svg.querySelectorAll('text');
+      const modulationsToReplace = [];
       
       allTextElements.forEach(function(textEl) {
         const text = (textEl.textContent || '').trim();
@@ -436,42 +438,66 @@ export function generateComposerOsmdHtml(
         const x = parseFloat(textEl.getAttribute('x') || '0');
         const y = parseFloat(textEl.getAttribute('y') || '0');
 
-        // Hide the original text element
+        // Hide the original text element immediately
         textEl.setAttribute('visibility', 'hidden');
 
-        // Create new group for our custom rendering
-        const custom = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        custom.setAttribute('class', 'soundfirst-tempo-mod');
-
-        // Left note glyph
-        const left = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        left.setAttribute('x', String(x));
-        left.setAttribute('y', String(y));
-        left.setAttribute('font-family', 'Bravura Text, Bravura, serif');
-        left.setAttribute('font-size', '24');
-        left.textContent = fromGlyph + (fromDotted ? dotGlyph : '');
-
-        // Equals sign
-        const eq = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        eq.setAttribute('x', String(x + 20));
-        eq.setAttribute('y', String(y));
-        eq.setAttribute('font-size', '16');
-        eq.textContent = '=';
-
-        // Right note glyph
-        const right = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        right.setAttribute('x', String(x + 36));
-        right.setAttribute('y', String(y));
-        right.setAttribute('font-family', 'Bravura Text, Bravura, serif');
-        right.setAttribute('font-size', '24');
-        right.textContent = toGlyph + (toDotted ? dotGlyph : '');
-
-        custom.appendChild(left);
-        custom.appendChild(eq);
-        custom.appendChild(right);
-
-        svg.appendChild(custom);
+        // Store info for after font loads
+        modulationsToReplace.push({
+          x, y, fromGlyph, toGlyph, dotGlyph, fromDotted, toDotted
+        });
       });
+
+      if (modulationsToReplace.length === 0) return;
+
+      // Create the replacement glyphs but keep hidden until font loads
+      function createGlyphs() {
+        modulationsToReplace.forEach(function(mod) {
+          const custom = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          custom.setAttribute('class', 'soundfirst-tempo-mod');
+
+          // Left note glyph
+          const left = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          left.setAttribute('x', String(mod.x));
+          left.setAttribute('y', String(mod.y));
+          left.setAttribute('font-family', 'Bravura Text, Bravura, serif');
+          left.setAttribute('font-size', '24');
+          left.textContent = mod.fromGlyph + (mod.fromDotted ? mod.dotGlyph : '');
+
+          // Equals sign
+          const eq = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          eq.setAttribute('x', String(mod.x + 20));
+          eq.setAttribute('y', String(mod.y));
+          eq.setAttribute('font-size', '16');
+          eq.textContent = '=';
+
+          // Right note glyph
+          const right = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          right.setAttribute('x', String(mod.x + 36));
+          right.setAttribute('y', String(mod.y));
+          right.setAttribute('font-family', 'Bravura Text, Bravura, serif');
+          right.setAttribute('font-size', '24');
+          right.textContent = mod.toGlyph + (mod.toDotted ? mod.dotGlyph : '');
+
+          custom.appendChild(left);
+          custom.appendChild(eq);
+          custom.appendChild(right);
+
+          svg.appendChild(custom);
+        });
+      }
+
+      // Wait for Bravura font to load before showing glyphs
+      if (document.fonts && document.fonts.load) {
+        document.fonts.load('24px "Bravura Text"').then(function() {
+          createGlyphs();
+        }).catch(function() {
+          // Fallback: create glyphs anyway after timeout
+          setTimeout(createGlyphs, 500);
+        });
+      } else {
+        // No Font Loading API, just wait a bit
+        setTimeout(createGlyphs, 300);
+      }
     }
 
     // Post-process SVG to shorten chord symbols using Unicode
