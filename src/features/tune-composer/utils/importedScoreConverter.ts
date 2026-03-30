@@ -27,6 +27,8 @@ import {
   Lyric,
   DynamicType,
   ArticulationType,
+  TempoModulation,
+  TempoBeatUnit,
 } from "../types/tuneComposerTypes";
 import {
   getMeasureDuration,
@@ -276,12 +278,35 @@ export function importedMeasureToMeasure(
       ? importedMeasure.keySignature.fifths
       : undefined;
 
+  // Extract tempo modulation if present
+  const tempoModulation: TempoModulation | undefined = importedMeasure.tempo
+    ?.modulation
+    ? {
+        fromUnit: importedMeasure.tempo.modulation.fromUnit as TempoBeatUnit,
+        toUnit: importedMeasure.tempo.modulation.toUnit as TempoBeatUnit,
+      }
+    : undefined;
+
+  // DEBUG: Log when we convert a measure with tempo modulation
+  if (tempoModulation) {
+    console.log(
+      "[DEBUG importedMeasureToMeasure] Converting measure with modulation:",
+      {
+        measureNumber: importedMeasure.number,
+        isPickup: importedMeasure.isPickup,
+        isFirstMeasure,
+        tempoModulation,
+      },
+    );
+  }
+
   return {
     id: generateId(),
     notes: notes.length > 0 ? notes : [createNote(null, DURATION.WHOLE)],
     isPickup: importedMeasure.isPickup || undefined,
     timeSignature,
     keySignature,
+    tempoModulation,
   };
 }
 

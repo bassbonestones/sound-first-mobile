@@ -326,6 +326,11 @@ export interface TempoInfo {
   readonly beatUnit: string;
   /** Text marking (e.g., "Allegro") */
   readonly marking: string | null;
+  /** Metric modulation if this is a tempo change via modulation */
+  readonly modulation?: {
+    readonly fromUnit: string;
+    readonly toUnit: string;
+  };
 }
 
 /**
@@ -378,6 +383,8 @@ export interface ImportedMeasure {
   readonly isPickup?: boolean;
   /** Chord symbols in this measure */
   readonly harmony?: ImportedHarmony[];
+  /** Tempo information if this measure has a tempo marking */
+  readonly tempo?: TempoInfo;
 }
 
 /**

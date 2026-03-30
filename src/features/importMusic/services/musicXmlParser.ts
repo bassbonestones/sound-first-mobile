@@ -914,6 +914,18 @@ function convertMeasures(rawMeasures: RawMeasure[]): ImportedMeasure[] {
       ? convertHarmoniesToSymbols(rawMeasure.harmony)
       : undefined;
 
+    // Extract tempo info (metronome or modulation)
+    const tempo = extractTempoFromDirections(rawMeasure.direction);
+
+    // DEBUG: Log when we find a tempo modulation
+    if (tempo?.modulation) {
+      console.log("[DEBUG convertMeasures] Found tempo modulation:", {
+        measureNumber: rawMeasure.number,
+        isPickup: rawMeasure.isPickup,
+        modulation: tempo.modulation,
+      });
+    }
+
     return {
       number: rawMeasure.number,
       events: convertNotes(rawMeasure.notes, initialDynamic, initialExpression),
@@ -926,6 +938,7 @@ function convertMeasures(rawMeasures: RawMeasure[]): ImportedMeasure[] {
       confidence: null,
       isPickup: rawMeasure.isPickup || undefined,
       harmony: harmony && harmony.length > 0 ? harmony : undefined,
+      tempo: tempo ?? undefined,
     };
   });
 }
@@ -953,6 +966,96 @@ function isTempoWord(word: string): boolean {
     /=\s*\d+/i,
   ];
   return tempoPatterns.some((p) => p.test(word));
+}
+
+/**
+ * Valid tempo beat units for modulation parsing
+ */
+const VALID_BEAT_UNITS = [
+  "whole",
+  "half",
+  "quarter",
+  "eighth",
+  "sixteenth",
+  "dotted-whole",
+  "dotted-half",
+  "dotted-quarter",
+  "dotted-eighth",
+];
+
+/**
+ * Parse a metric modulation from a words string.
+ * Format: "fromUnit=toUnit" or "fromUnit=toUnit@m{number}" (measure number suffix is ignored)
+ * Examples: "quarter=half", "dotted-quarter=quarter@m5"
+ * Returns null if not a valid modulation format.
+ */
+function parseTempoModulation(
+  words: string,
+): { fromUnit: string; toUnit: string } | null {
+  // Strip measure number suffix if present (e.g., "@m5")
+  const withoutMeasure = words.replace(/@m\d+$/, "").trim();
+
+  // Match pattern: word=word (with optional dotted- prefix)
+  const modulationMatch = withoutMeasure.match(
+    /^(dotted-)?(\w+)=(dotted-)?(\w+)$/i,
+  );
+  if (!modulationMatch) return null;
+
+  const fromDotted = modulationMatch[1] ? "dotted-" : "";
+  const fromBase = modulationMatch[2].toLowerCase();
+  const toDotted = modulationMatch[3] ? "dotted-" : "";
+  const toBase = modulationMatch[4].toLowerCase();
+
+  const fromUnit = `${fromDotted}${fromBase}`;
+  const toUnit = `${toDotted}${toBase}`;
+
+  // Validate both are recognized beat units
+  if (
+    !VALID_BEAT_UNITS.includes(fromUnit) ||
+    !VALID_BEAT_UNITS.includes(toUnit)
+  ) {
+    return null;
+  }
+
+  return { fromUnit, toUnit };
+}
+
+/**
+ * Extract tempo info from measure directions.
+ * Returns TempoInfo if a metronome or tempo modulation is found, null otherwise.
+ */
+function extractTempoFromDirections(
+  directions: RawDirection[] | undefined,
+): TempoInfo | null {
+  if (!directions) return null;
+
+  for (const dir of directions) {
+    // Check for tempo modulation in words (e.g., "quarter=half@m5")
+    if (dir.words) {
+      const modulation = parseTempoModulation(dir.words);
+      if (modulation) {
+        // For modulations, we need to extract tempo from sound element if present
+        // The BPM here is from the <sound tempo="..."/> element
+        return {
+          bpm: dir.metronome?.perMinute ?? 0, // May be 0 if only words, not metronome
+          beatUnit: modulation.toUnit, // New beat unit is the "to" unit
+          marking: null,
+          modulation,
+        };
+      }
+    }
+
+    // Check for regular metronome marking
+    if (dir.metronome) {
+      return {
+        bpm: dir.metronome.perMinute,
+        beatUnit: dir.metronome.beatUnit,
+        marking: dir.words ?? null,
+      };
+    }
+  }
+
+  return null;
 }
 
 /**

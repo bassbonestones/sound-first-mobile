@@ -435,6 +435,15 @@ export function generateComposerOsmdHtml(
       const allTextElements = svg.querySelectorAll('text');
       const modulationsToReplace = [];
       
+      // First pass: detect if we have a pickup measure
+      // Use the global hasPickupMeasure set by sendMeasurePositions (reliable detection from OSMD)
+      // With pickup: MusicXML measure numbers start at 0 (pickup is measure 0)
+      // Without pickup: MusicXML measure numbers start at 1
+      const hasPickup = window.hasPickupMeasure || false;
+      
+      // DEBUG: Log pickup detection
+      console.log('[DEBUG replaceMetricModulations] hasPickup:', hasPickup, 'measurePositions.length:', measurePositions.length);
+      
       allTextElements.forEach(function(textEl) {
         const text = (textEl.textContent || '').trim();
         
@@ -454,10 +463,21 @@ export function generateComposerOsmdHtml(
 
         if (!fromGlyph || !toGlyph) return;
 
-        // Find the measure position for this measure number
-        // measurePositions is 0-indexed, measureNum is 1-indexed (from MusicXML)
-        const measureIndex = measureNum - 1;
-        const measurePos = measurePositions[measureIndex];
+        // Find the measure position by matching measureNumber
+        // measurePositions now includes measureNumber from OSMD
+        const measurePos = measurePositions.find(function(pos) {
+          return pos.measureNumber === measureNum;
+        });
+        
+        // DEBUG: Log measure position lookup
+        console.log('[DEBUG replaceMetricModulations] Modulation found:', {
+          text,
+          measureNum,
+          hasPickup,
+          measurePosExists: !!measurePos,
+          measurePosNumber: measurePos?.measureNumber,
+          noteStartX: measurePos?.noteStartX
+        });
         
         // Use measure's noteStartX if available, otherwise fall back to text element position
         let x;
@@ -696,6 +716,14 @@ export function generateComposerOsmdHtml(
         
         if (posX === undefined || isNaN(posX)) continue;
         
+        // Get actual MusicXML measure number from OSMD
+        // With pickup: measure 0 is the pickup, then 1, 2, 3...
+        // Without pickup: measure 1, 2, 3...
+        let measureNumber = i; // fallback to index
+        if (staffMeasure.parentSourceMeasure && staffMeasure.parentSourceMeasure.MeasureNumber !== undefined) {
+          measureNumber = staffMeasure.parentSourceMeasure.MeasureNumber;
+        }
+        
         // Collect all beat positions from staff entries
         const beatPositions = [];
         let firstNoteX = null;
@@ -767,6 +795,7 @@ export function generateComposerOsmdHtml(
         
         positions.push({
           measureIndex: i,
+          measureNumber: measureNumber,
           x: measureX,
           noteStartX: noteStartX,
           noteEndX: noteEndX,
@@ -776,6 +805,10 @@ export function generateComposerOsmdHtml(
           width: (noteEndX - noteStartX) + 40,
         });
       }
+      
+      // Detect pickup: if first measure has measureNumber 0, we have a pickup
+      const hasPickupMeasure = positions.length > 0 && positions[0].measureNumber === 0;
+      window.hasPickupMeasure = hasPickupMeasure;
       
       // Also get total content width
       const container = document.getElementById('osmd-container');

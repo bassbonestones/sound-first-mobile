@@ -1111,6 +1111,16 @@ function generateMeasureXml(
         : fromBeatUnitXml;
       const toText = toIsDotted ? `dotted-${toBeatUnitXml}` : toBeatUnitXml;
 
+      // DEBUG: Log modulation generation
+      console.log("[DEBUG generateMeasureXml] Generating modulation:", {
+        measureIndex,
+        measureNumber,
+        isPickup,
+        fromText,
+        toText,
+        tag: `@m${measureNumber}`,
+      });
+
       directionXml = `\n      <direction placement="above">
         <direction-type>
           <words font-weight="bold">${fromText}=${toText}@m${measureNumber}</words>
