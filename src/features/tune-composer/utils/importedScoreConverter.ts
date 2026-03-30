@@ -265,6 +265,9 @@ export function importedMeasureToMeasure(
       ? {
           beats: importedMeasure.timeSignature.beats,
           beatUnit: importedMeasure.timeSignature.beatType,
+          ...(importedMeasure.timeSignature.symbol
+            ? { symbol: importedMeasure.timeSignature.symbol }
+            : {}),
         }
       : undefined;
 

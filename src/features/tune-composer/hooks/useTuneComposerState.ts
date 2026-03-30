@@ -887,10 +887,11 @@ export function useTuneComposerState(
       if (!measure) return;
 
       const prevTime = measure.timeSignature;
-      // Check equality for TimeSignature objects
+      // Check equality for TimeSignature objects (including symbol for cut time)
       if (
         timeSignature?.beats === prevTime?.beats &&
-        timeSignature?.beatUnit === prevTime?.beatUnit
+        timeSignature?.beatUnit === prevTime?.beatUnit &&
+        timeSignature?.symbol === prevTime?.symbol
       ) {
         return;
       }

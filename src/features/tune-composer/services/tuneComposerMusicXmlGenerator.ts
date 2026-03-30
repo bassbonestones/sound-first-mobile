@@ -1078,13 +1078,11 @@ function generateMeasureXml(
   // Attributes: full on first measure, key/time changes mid-piece
   let attributesXml = "";
   if (isFirstMeasure) {
+    // Use measure's time signature override if present (e.g., for cut time symbol on first measure)
+    const firstMeasureTime = timeInfo.effectiveTime;
     attributesXml =
       "\n" +
-      generateAttributesXml(
-        score.timeSignature,
-        score.keySignature,
-        score.clef,
-      );
+      generateAttributesXml(firstMeasureTime, score.keySignature, score.clef);
   } else if (keyInfo.hasKeyChange || timeInfo.hasTimeChange) {
     // Mid-piece changes: output only the changed attributes
     attributesXml =
@@ -1273,10 +1271,12 @@ export function generateMusicXml(
   for (let i = 0; i < score.measures.length; i++) {
     const measure = score.measures[i];
     const measureTime = measure.timeSignature ?? currentTime;
+    // Check if time signature changed (including symbol for cut time)
     const hasTimeChange =
       i > 0 &&
       (measureTime.beats !== currentTime.beats ||
-        measureTime.beatUnit !== currentTime.beatUnit);
+        measureTime.beatUnit !== currentTime.beatUnit ||
+        measureTime.symbol !== currentTime.symbol);
     measureTimeInfo.push({ effectiveTime: measureTime, hasTimeChange });
     currentTime = measureTime;
   }

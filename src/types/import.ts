@@ -314,6 +314,8 @@ export interface TimeSignatureInfo {
   readonly beatType: number;
   /** Human-readable (e.g., "4/4", "3/4") */
   readonly displayName: string;
+  /** Optional symbol for common/cut time display */
+  readonly symbol?: "common" | "cut";
 }
 
 /**

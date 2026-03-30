@@ -115,7 +115,11 @@ interface RawMeasure {
 interface RawAttributes {
   readonly divisions?: number;
   readonly key?: { fifths: number; mode?: string };
-  readonly time?: { beats: number; beatType: number };
+  readonly time?: {
+    beats: number;
+    beatType: number;
+    symbol?: "common" | "cut";
+  };
   readonly clef?: { sign: string; line: number };
 }
 
@@ -448,14 +452,24 @@ function extractAttributes(measureContent: string): RawAttributes | undefined {
 
   // Time signature
   const timeBlock = extractTagBlock(attrBlock, "time");
-  let time: { beats: number; beatType: number } | undefined;
+  let time:
+    | { beats: number; beatType: number; symbol?: "common" | "cut" }
+    | undefined;
   if (timeBlock) {
     const beatsStr = extractTagContent(timeBlock, "beats");
     const beatTypeStr = extractTagContent(timeBlock, "beat-type");
     if (beatsStr && beatTypeStr) {
+      // Check for symbol attribute on the <time> tag (e.g., symbol="cut" for cut time)
+      // Note: We search attrBlock (not timeBlock) because extractTagBlock returns only inner content
+      const symbolMatch = attrBlock.match(
+        /<time[^>]*symbol="(common|cut)"[^>]*>/i,
+      );
       time = {
         beats: parseInt(beatsStr, 10),
         beatType: parseInt(beatTypeStr, 10),
+        ...(symbolMatch
+          ? { symbol: symbolMatch[1].toLowerCase() as "common" | "cut" }
+          : {}),
       };
     }
   }
@@ -852,11 +866,13 @@ function convertKeySignature(key: {
 function convertTimeSignature(time: {
   beats: number;
   beatType: number;
+  symbol?: "common" | "cut";
 }): TimeSignatureInfo {
   return {
     beats: time.beats,
     beatType: time.beatType,
     displayName: `${time.beats}/${time.beatType}`,
+    ...(time.symbol ? { symbol: time.symbol } : {}),
   };
 }
 
