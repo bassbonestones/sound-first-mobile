@@ -525,5 +525,90 @@ describe("Tune Composer MusicXML Generator", () => {
         expect(xml).toContain("<fifths>6</fifths>");
       });
     });
+
+    describe("mid-piece time signature changes", () => {
+      it("should output time signature on first measure", () => {
+        const score = createScore({
+          timeSignature: { beats: 3, beatUnit: 4 },
+        });
+
+        const xml = generateMusicXml(score);
+
+        expect(xml).toContain("<beats>3</beats>");
+        expect(xml).toContain("<beat-type>4</beat-type>");
+      });
+
+      it("should output time signature change on measure with override", () => {
+        const score = createScore({
+          timeSignature: { beats: 4, beatUnit: 4 },
+        }); // 4/4
+        // Add second measure with 3/4
+        score.measures.push(createMeasure(score.timeSignature));
+        score.measures[1].timeSignature = { beats: 3, beatUnit: 4 };
+
+        const xml = generateMusicXml(score);
+
+        // Should have 4/4 on first measure, 3/4 on second
+        expect(xml).toContain("<beats>4</beats>");
+        expect(xml).toContain("<beats>3</beats>");
+      });
+
+      it("should not output time when it matches previous", () => {
+        const score = createScore({
+          timeSignature: { beats: 4, beatUnit: 4 },
+        }); // 4/4
+        // Add second measure without override (inherits 4/4)
+        score.measures.push(createMeasure(score.timeSignature));
+
+        const xml = generateMusicXml(score);
+
+        // Should only have one occurrence of 4/4 (on first measure)
+        const beats4Matches = xml.match(/<beats>4<\/beats>/g);
+        expect(beats4Matches).toHaveLength(1);
+      });
+
+      it("should handle multiple time changes", () => {
+        const score = createScore({
+          timeSignature: { beats: 4, beatUnit: 4 },
+        }); // 4/4
+        score.measures.push(createMeasure(score.timeSignature)); // Measure 2
+        score.measures.push(createMeasure(score.timeSignature)); // Measure 3
+        // Measure 2: 3/4, Measure 3: 6/8
+        score.measures[1].timeSignature = { beats: 3, beatUnit: 4 };
+        score.measures[2].timeSignature = { beats: 6, beatUnit: 8 };
+
+        const xml = generateMusicXml(score);
+
+        expect(xml).toContain("<beats>4</beats>");
+        expect(xml).toContain("<beats>3</beats>");
+        expect(xml).toContain("<beats>6</beats>");
+        expect(xml).toContain("<beat-type>8</beat-type>");
+      });
+
+      it("should output combined key and time change in same attributes element", () => {
+        const score = createScore({
+          timeSignature: { beats: 4, beatUnit: 4 },
+          keySignature: 0,
+        });
+        score.measures.push(createMeasure(score.timeSignature));
+        // Change both key and time on measure 2
+        score.measures[1].keySignature = -3; // Eb major
+        score.measures[1].timeSignature = { beats: 3, beatUnit: 4 };
+
+        const xml = generateMusicXml(score);
+
+        // Should have both in attributes on measure 2
+        // The second measure should contain both key and time changes
+        expect(xml).toContain("<fifths>-3</fifths>");
+        expect(xml).toContain("<beats>3</beats>");
+        // Verify they appear after measure number 2 (not just anywhere)
+        const measure2Match = xml.match(
+          /measure number="2"[\s\S]*?<\/measure>/,
+        );
+        expect(measure2Match).not.toBeNull();
+        expect(measure2Match![0]).toContain("<fifths>-3</fifths>");
+        expect(measure2Match![0]).toContain("<beats>3</beats>");
+      });
+    });
   });
 });

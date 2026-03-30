@@ -29,6 +29,7 @@ import {
   createRest,
   DEFAULT_OCTAVE_MIDI,
   DURATION,
+  generateMeasureRests,
   getBeatsPerMeasure,
   getMeasureDuration,
   getNoteDuration,
@@ -132,6 +133,15 @@ export interface UseTuneComposerStateReturn {
   clearCurrentMeasureKeySignature: () => void;
   /** Get effective key signature for a measure (considering inheritance) */
   getMeasureEffectiveKeySignature: (measureIndex: number) => KeySignature;
+  /** Set a time signature override for a specific measure (undefined to clear) */
+  setMeasureTimeSignature: (
+    measureIndex: number,
+    timeSignature: TimeSignature | undefined,
+  ) => void;
+  /** Clear time signature override on current measure */
+  clearCurrentMeasureTimeSignature: () => void;
+  /** Get effective time signature for a measure (considering inheritance) */
+  getMeasureEffectiveTimeSignature: (measureIndex: number) => TimeSignature;
 
   // Pickup Measure
   /** Whether the score has a pickup measure */
@@ -770,6 +780,95 @@ export function useTuneComposerState(
     [state.score.measures, state.score.keySignature],
   );
 
+  /**
+   * Set a time signature override on a specific measure.
+   * Pass undefined to clear the time signature override (inherit from previous measure or score).
+   * If the measure has only rests, regenerates them for the new time signature.
+   */
+  const setMeasureTimeSignature = useCallback(
+    (measureIndex: number, timeSignature: TimeSignature | undefined) => {
+      const measure = state.score.measures[measureIndex];
+      if (!measure) return;
+
+      const prevTime = measure.timeSignature;
+      // Check equality for TimeSignature objects
+      if (
+        timeSignature?.beats === prevTime?.beats &&
+        timeSignature?.beatUnit === prevTime?.beatUnit
+      ) {
+        return;
+      }
+
+      updateScore((score) => {
+        // Determine the effective time signature for this measure
+        // If setting a new time sig, use it. If clearing, find inherited value.
+        let effectiveTimeSig = timeSignature;
+        if (effectiveTimeSig === undefined) {
+          // Inherit from previous measures or score default
+          effectiveTimeSig = score.timeSignature;
+          for (let i = 0; i < measureIndex; i++) {
+            const m = score.measures[i];
+            if (m.timeSignature !== undefined) {
+              effectiveTimeSig = m.timeSignature;
+            }
+          }
+        }
+
+        // Check if the measure has only rests (no pitched notes)
+        const hasPitchedNotes = measure.notes.some((n) => n.midi !== null);
+
+        return {
+          ...score,
+          measures: score.measures.map((m, i) => {
+            if (i !== measureIndex) return m;
+
+            // If only rests, regenerate them for the new time signature
+            if (!hasPitchedNotes) {
+              return {
+                ...m,
+                timeSignature,
+                notes: generateMeasureRests(effectiveTimeSig),
+              };
+            }
+
+            // Has pitched notes - just update the time signature
+            // (the overflow check in the modal prevents invalid states)
+            return { ...m, timeSignature };
+          }),
+        };
+      });
+    },
+    [state.score.measures, updateScore],
+  );
+
+  /**
+   * Clear the time signature override on the current measure.
+   */
+  const clearCurrentMeasureTimeSignature = useCallback(() => {
+    setMeasureTimeSignature(state.cursor.measureIndex, undefined);
+  }, [state.cursor.measureIndex, setMeasureTimeSignature]);
+
+  /**
+   * Get the effective time signature for a measure (considering inheritance).
+   */
+  const getMeasureEffectiveTimeSignature = useCallback(
+    (measureIndex: number): TimeSignature => {
+      let effectiveTime = state.score.timeSignature;
+      for (
+        let i = 0;
+        i <= measureIndex && i < state.score.measures.length;
+        i++
+      ) {
+        const measure = state.score.measures[i];
+        if (measure.timeSignature !== undefined) {
+          effectiveTime = measure.timeSignature;
+        }
+      }
+      return effectiveTime;
+    },
+    [state.score.measures, state.score.timeSignature],
+  );
+
   // ==========================================================================
   // Pickup Measure Operations
   // ==========================================================================
@@ -1364,6 +1463,9 @@ export function useTuneComposerState(
     setMeasureKeySignature,
     clearCurrentMeasureKeySignature,
     getMeasureEffectiveKeySignature,
+    setMeasureTimeSignature,
+    clearCurrentMeasureTimeSignature,
+    getMeasureEffectiveTimeSignature,
 
     // Pickup Measure
     hasPickup,

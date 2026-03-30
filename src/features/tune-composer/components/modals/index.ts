@@ -39,4 +39,7 @@ export type { MeasureTempoModalProps } from "./MeasureTempoModal";
 export { MeasureKeySignatureModal } from "./MeasureKeySignatureModal";
 export type { MeasureKeySignatureModalProps } from "./MeasureKeySignatureModal";
 
+export { MeasureTimeSignatureModal } from "./MeasureTimeSignatureModal";
+export type { MeasureTimeSignatureModalProps } from "./MeasureTimeSignatureModal";
+
 export { modalStyles } from "./modalStyles";

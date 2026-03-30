@@ -414,6 +414,8 @@ export interface Measure {
   tempo?: number;
   /** Optional key signature override for this measure. If undefined, inherits from previous measure or score default. */
   keySignature?: KeySignature;
+  /** Optional time signature override for this measure. If undefined, inherits from previous measure or score default. */
+  timeSignature?: TimeSignature;
 }
 
 /**

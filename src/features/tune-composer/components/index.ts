@@ -46,6 +46,7 @@ export {
   TuneMetadataModal,
   MeasureTempoModal,
   MeasureKeySignatureModal,
+  MeasureTimeSignatureModal,
   modalStyles,
 } from "./modals";
 export type {
@@ -61,4 +62,5 @@ export type {
   TuneMetadataModalProps,
   MeasureTempoModalProps,
   MeasureKeySignatureModalProps,
+  MeasureTimeSignatureModalProps,
 } from "./modals";

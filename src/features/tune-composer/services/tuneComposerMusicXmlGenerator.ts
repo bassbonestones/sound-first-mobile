@@ -686,6 +686,36 @@ function generateKeyChangeAttributesXml(keySignature: KeySignature): string {
       </attributes>`;
 }
 
+/**
+ * Generate attributes element for mid-piece changes (key and/or time signature).
+ * MusicXML requires a specific order: divisions, key, time, clef.
+ */
+function generateMidPieceAttributesXml(
+  keySignature?: KeySignature,
+  timeSignature?: TimeSignature,
+): string {
+  const parts: string[] = [];
+
+  if (keySignature !== undefined) {
+    parts.push(`        <key>
+          <fifths>${keySignature}</fifths>
+        </key>`);
+  }
+
+  if (timeSignature !== undefined) {
+    parts.push(`        <time>
+          <beats>${timeSignature.beats}</beats>
+          <beat-type>${timeSignature.beatUnit}</beat-type>
+        </time>`);
+  }
+
+  if (parts.length === 0) return "";
+
+  return `      <attributes>
+${parts.join("\n")}
+      </attributes>`;
+}
+
 function generateMeasureXml(
   measure: Measure,
   measureNumber: number,
@@ -705,6 +735,10 @@ function generateMeasureXml(
   keyInfo: { effectiveKey: KeySignature; hasKeyChange: boolean } = {
     effectiveKey: 0,
     hasKeyChange: false,
+  },
+  timeInfo: { effectiveTime: TimeSignature; hasTimeChange: boolean } = {
+    effectiveTime: { beats: 4, beatUnit: 4 },
+    hasTimeChange: false,
   },
 ): string {
   // Use effective key signature for accidental preference (e.g., prefer flats in Eb)
@@ -987,7 +1021,7 @@ function generateMeasureXml(
     }
   }
 
-  // Attributes: full on first measure, key-only on key change mid-piece
+  // Attributes: full on first measure, key/time changes mid-piece
   let attributesXml = "";
   if (isFirstMeasure) {
     attributesXml =
@@ -997,8 +1031,14 @@ function generateMeasureXml(
         score.keySignature,
         score.clef,
       );
-  } else if (keyInfo.hasKeyChange) {
-    attributesXml = "\n" + generateKeyChangeAttributesXml(keyInfo.effectiveKey);
+  } else if (keyInfo.hasKeyChange || timeInfo.hasTimeChange) {
+    // Mid-piece changes: output only the changed attributes
+    attributesXml =
+      "\n" +
+      generateMidPieceAttributesXml(
+        keyInfo.hasKeyChange ? keyInfo.effectiveKey : undefined,
+        timeInfo.hasTimeChange ? timeInfo.effectiveTime : undefined,
+      );
   }
 
   // Metronome/tempo direction on first measure OR when tempo changes mid-piece
@@ -1108,6 +1148,24 @@ export function generateMusicXml(
     currentKey = measureKey;
   }
 
+  // Pre-compute effective time signature for each measure and detect time changes
+  // A time change occurs when the measure's time sig differs from the previous effective time
+  const measureTimeInfo: Array<{
+    effectiveTime: TimeSignature;
+    hasTimeChange: boolean;
+  }> = [];
+  let currentTime = score.timeSignature;
+  for (let i = 0; i < score.measures.length; i++) {
+    const measure = score.measures[i];
+    const measureTime = measure.timeSignature ?? currentTime;
+    const hasTimeChange =
+      i > 0 &&
+      (measureTime.beats !== currentTime.beats ||
+        measureTime.beatUnit !== currentTime.beatUnit);
+    measureTimeInfo.push({ effectiveTime: measureTime, hasTimeChange });
+    currentTime = measureTime;
+  }
+
   const measuresXml = score.measures
     .map((measure, index) => {
       // Pickup measure = 0, then count from 1
@@ -1115,6 +1173,7 @@ export function generateMusicXml(
       const isFirstFullMeasure = index === firstFullMeasureIndex;
       const tempoInfo = measureTempoInfo[index];
       const keyInfo = measureKeyInfo[index];
+      const timeInfo = measureTimeInfo[index];
 
       return generateMeasureXml(
         measure,
@@ -1130,6 +1189,7 @@ export function generateMusicXml(
         melismaContinuationNotes,
         tempoInfo,
         keyInfo,
+        timeInfo,
       );
     })
     .join("\n");

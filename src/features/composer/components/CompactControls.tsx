@@ -57,6 +57,10 @@ export interface CompactControlsProps {
   onSetMeasureKey?: () => void;
   /** Current measure's key signature override display (optional - tune composer only) */
   measureKeyDisplay?: string;
+  /** Called when set measure time signature is pressed (optional - tune composer only) */
+  onSetMeasureTime?: () => void;
+  /** Current measure's time signature override display (optional - tune composer only) */
+  measureTimeDisplay?: string;
   /** Whether there's a selected note (for delete) */
   hasSelection?: boolean;
   /** Whether delete measure is allowed */
@@ -87,6 +91,8 @@ function CompactControlsComponent({
   measureTempo,
   onSetMeasureKey,
   measureKeyDisplay,
+  onSetMeasureTime,
+  measureTimeDisplay,
   hasSelection = false,
   canDeleteMeasure = true,
   disabled = false,
@@ -149,6 +155,13 @@ function CompactControlsComponent({
       setShowMenu(false);
     }
   }, [disabled, onSetMeasureKey]);
+
+  const handleSetMeasureTime = useCallback(() => {
+    if (!disabled && onSetMeasureTime) {
+      onSetMeasureTime();
+      setShowMenu(false);
+    }
+  }, [disabled, onSetMeasureTime]);
 
   const canFill = !validation.isComplete && validation.difference < 0;
 
@@ -291,6 +304,22 @@ function CompactControlsComponent({
                   {measureKeyDisplay
                     ? `Key: ${measureKeyDisplay}`
                     : "Set Measure Key"}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Set measure time signature - only show if onSetMeasureTime is provided */}
+            {onSetMeasureTime && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={handleSetMeasureTime}
+                testID="menu-time"
+              >
+                <Feather name="clock" size={18} color={colors.primary} />
+                <Text style={styles.menuItemText}>
+                  {measureTimeDisplay
+                    ? `Time: ${measureTimeDisplay}`
+                    : "Set Measure Time"}
                 </Text>
               </TouchableOpacity>
             )}

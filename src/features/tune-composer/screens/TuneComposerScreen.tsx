@@ -75,6 +75,7 @@ import {
   TuneMetadataModal,
   MeasureTempoModal,
   MeasureKeySignatureModal,
+  MeasureTimeSignatureModal,
 } from "../components";
 import {
   ChordProgressionProvider,
@@ -96,7 +97,7 @@ import type {
   KeySignature,
   PitchName,
 } from "../types";
-import { getPitchedNotes } from "../types";
+import { getPitchedNotes, getMeasureDuration, getNoteDuration } from "../types";
 import ErrorBoundary from "../../../components/ErrorBoundary";
 import { composerScoreToImportedScore } from "../../composer/utils";
 import { getKeyName } from "../../composer/constants/keySignatures";
@@ -214,6 +215,9 @@ function TuneComposerScreenContent({
 
   // Key signature modal state
   const [showKeyModal, setShowKeyModal] = useState(false);
+
+  // Time signature modal state
+  const [showTimeModal, setShowTimeModal] = useState(false);
 
   // Metadata state
   const [tuneMetadata, setTuneMetadata] = useState<TuneMetadata>(() =>
@@ -1350,6 +1354,14 @@ function TuneComposerScreenContent({
                       )
                     : undefined
                 }
+                onSetMeasureTime={() => setShowTimeModal(true)}
+                measureTimeDisplay={
+                  composerState.score.measures[
+                    composerState.cursor.measureIndex
+                  ]?.timeSignature !== undefined
+                    ? `${composerState.score.measures[composerState.cursor.measureIndex]!.timeSignature!.beats}/${composerState.score.measures[composerState.cursor.measureIndex]!.timeSignature!.beatUnit}`
+                    : undefined
+                }
                 hasSelection={hasSelection}
                 canDeleteMeasure={canDeleteMeasure}
                 disabled={isPlaying}
@@ -1914,6 +1926,39 @@ function TuneComposerScreenContent({
           onClearKey={() => {
             composerState.clearCurrentMeasureKeySignature();
             setShowKeyModal(false);
+          }}
+        />
+
+        {/* Measure Time Signature Modal */}
+        <MeasureTimeSignatureModal
+          visible={showTimeModal}
+          onClose={() => setShowTimeModal(false)}
+          measureNumber={composerState.cursor.measureIndex + 1}
+          currentTime={
+            composerState.score.measures[composerState.cursor.measureIndex]
+              ?.timeSignature
+          }
+          effectiveTime={composerState.getMeasureEffectiveTimeSignature(
+            composerState.cursor.measureIndex,
+          )}
+          pitchedNoteDuration={
+            // Only count pitched notes (not rests) for overflow validation
+            composerState.score.measures[
+              composerState.cursor.measureIndex
+            ]?.notes
+              .filter((n) => n.midi !== null)
+              .reduce((sum, n) => sum + getNoteDuration(n), 0) ?? 0
+          }
+          onSetTime={(time) => {
+            composerState.setMeasureTimeSignature(
+              composerState.cursor.measureIndex,
+              time,
+            );
+            setShowTimeModal(false);
+          }}
+          onClearTime={() => {
+            composerState.clearCurrentMeasureTimeSignature();
+            setShowTimeModal(false);
           }}
         />
       </KeyboardAvoidingView>
