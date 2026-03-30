@@ -701,12 +701,15 @@ function generateAttributesXml(
 ): string {
   const { sign, line } = CLEF_TO_XML[clef];
 
+  // Add symbol attribute for cut time (2/2 displayed as ₵)
+  const timeSymbolAttr = timeSig.symbol === "cut" ? ' symbol="cut"' : "";
+
   return `      <attributes>
         <divisions>${DIVISIONS}</divisions>
         <key>
           <fifths>${keySignature}</fifths>
         </key>
-        <time>
+        <time${timeSymbolAttr}>
           <beats>${timeSig.beats}</beats>
           <beat-type>${timeSig.beatUnit}</beat-type>
         </time>
@@ -745,7 +748,10 @@ function generateMidPieceAttributesXml(
   }
 
   if (timeSignature !== undefined) {
-    parts.push(`        <time>
+    // Add symbol attribute for cut time (2/2 displayed as ₵)
+    const timeSymbolAttr =
+      timeSignature.symbol === "cut" ? ' symbol="cut"' : "";
+    parts.push(`        <time${timeSymbolAttr}>
           <beats>${timeSignature.beats}</beats>
           <beat-type>${timeSignature.beatUnit}</beat-type>
         </time>`);

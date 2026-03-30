@@ -153,6 +153,8 @@ export interface TimeSignature {
   beats: number;
   /** Beat unit (4 = quarter, 8 = eighth, etc.) */
   beatUnit: number;
+  /** Optional symbol display: 'common' for C (4/4), 'cut' for ₵ (2/2) */
+  symbol?: "common" | "cut";
 }
 
 /** Common time signatures */

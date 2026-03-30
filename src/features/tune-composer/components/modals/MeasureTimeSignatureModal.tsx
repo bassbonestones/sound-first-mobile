@@ -68,12 +68,19 @@ function MeasureTimeSignatureModalComponent({
   onClearTime,
 }: MeasureTimeSignatureModalProps): React.ReactElement {
   const [pendingTime, setPendingTime] = useState<TimeSignature>(effectiveTime);
+  const [displayAsCutTime, setDisplayAsCutTime] = useState(
+    effectiveTime.symbol === "cut",
+  );
   const hasOverride = currentTime !== undefined;
+
+  // Check if current selection is 2/2 (eligible for cut time display)
+  const isTwoTwo = pendingTime.beats === 2 && pendingTime.beatUnit === 2;
 
   // Reset pending time when modal opens
   React.useEffect(() => {
     if (visible) {
       setPendingTime(effectiveTime);
+      setDisplayAsCutTime(effectiveTime.symbol === "cut");
     }
   }, [visible, effectiveTime]);
 
@@ -83,9 +90,15 @@ function MeasureTimeSignatureModalComponent({
   const notesWillOverflow = pitchedNoteDuration > pendingBeats;
 
   const handleApply = useCallback(() => {
-    onSetTime(pendingTime);
+    // Include cut time symbol if applicable
+    const timeToSet: TimeSignature = {
+      beats: pendingTime.beats,
+      beatUnit: pendingTime.beatUnit,
+      ...(isTwoTwo && displayAsCutTime ? { symbol: "cut" as const } : {}),
+    };
+    onSetTime(timeToSet);
     onClose();
-  }, [pendingTime, onSetTime, onClose]);
+  }, [pendingTime, isTwoTwo, displayAsCutTime, onSetTime, onClose]);
 
   const handleClear = useCallback(() => {
     onClearTime();
@@ -96,13 +109,27 @@ function MeasureTimeSignatureModalComponent({
     onClose();
   }, [onClose]);
 
-  const handleBeatsChange = useCallback((beats: number) => {
-    setPendingTime((prev) => ({ ...prev, beats }));
-  }, []);
+  const handleBeatsChange = useCallback(
+    (beats: number) => {
+      setPendingTime((prev) => ({ ...prev, beats }));
+      // Reset cut time display if no longer 2/2
+      if (!(beats === 2 && pendingTime.beatUnit === 2)) {
+        setDisplayAsCutTime(false);
+      }
+    },
+    [pendingTime.beatUnit],
+  );
 
-  const handleBeatUnitChange = useCallback((beatUnit: number) => {
-    setPendingTime((prev) => ({ ...prev, beatUnit }));
-  }, []);
+  const handleBeatUnitChange = useCallback(
+    (beatUnit: number) => {
+      setPendingTime((prev) => ({ ...prev, beatUnit }));
+      // Reset cut time display if no longer 2/2
+      if (!(pendingTime.beats === 2 && beatUnit === 2)) {
+        setDisplayAsCutTime(false);
+      }
+    },
+    [pendingTime.beats],
+  );
 
   return (
     <Modal
@@ -213,6 +240,32 @@ function MeasureTimeSignatureModalComponent({
                 {formatTimeSignature(pendingTime)}
               </Text>
             </View>
+
+            {/* Cut time checkbox - only show for 2/2 */}
+            {isTwoTwo && (
+              <TouchableOpacity
+                style={styles.checkboxRow}
+                onPress={() => setDisplayAsCutTime(!displayAsCutTime)}
+                accessibilityRole={"checkbox" as AccessibilityRole}
+                accessibilityState={{ checked: displayAsCutTime }}
+                accessibilityLabel="Display as cut time symbol"
+                testID="measure-time-cut-checkbox"
+              >
+                <View
+                  style={[
+                    styles.checkbox,
+                    displayAsCutTime && styles.checkboxChecked,
+                  ]}
+                >
+                  {displayAsCutTime && (
+                    <Feather name="check" size={14} color={colors.surface} />
+                  )}
+                </View>
+                <Text style={styles.checkboxLabel}>
+                  Display as cut time (₵)
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Warning when notes would overflow */}
@@ -414,6 +467,29 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     color: colors.primary,
+  },
+  checkboxRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  checkboxChecked: {
+    backgroundColor: colors.primary,
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    color: colors.textPrimary,
   },
   buttonRow: {
     flexDirection: "row",
