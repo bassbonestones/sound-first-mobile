@@ -19,6 +19,7 @@ import type {
   Note,
   PitchName,
   TempoBeatUnit,
+  TempoModulation,
   TimeSignature,
   TuneComposerScore,
   TuneComposerState,
@@ -134,6 +135,13 @@ export interface UseTuneComposerStateReturn {
   clearCurrentMeasureTempoBeatUnit: () => void;
   /** Get effective tempo beat unit for a measure (considering inheritance) */
   getMeasureEffectiveTempoBeatUnit: (measureIndex: number) => TempoBeatUnit;
+  /** Set a metric modulation for a specific measure (undefined to clear) */
+  setMeasureModulation: (
+    measureIndex: number,
+    modulation: TempoModulation | undefined,
+  ) => void;
+  /** Clear metric modulation on current measure */
+  clearCurrentMeasureModulation: () => void;
   /** Set a key signature override for a specific measure (undefined to clear) */
   setMeasureKeySignature: (
     measureIndex: number,
@@ -791,6 +799,32 @@ export function useTuneComposerState(
     },
     [state.score.measures, state.score.tempoBeatUnit],
   );
+
+  /**
+   * Set a metric modulation on a specific measure.
+   * Pass undefined to clear the modulation.
+   */
+  const setMeasureModulation = useCallback(
+    (measureIndex: number, modulation: TempoModulation | undefined) => {
+      const measure = state.score.measures[measureIndex];
+      if (!measure) return;
+
+      updateScore((score) => ({
+        ...score,
+        measures: score.measures.map((m, i) =>
+          i === measureIndex ? { ...m, tempoModulation: modulation } : m,
+        ),
+      }));
+    },
+    [state.score.measures, updateScore],
+  );
+
+  /**
+   * Clear the metric modulation on the current measure.
+   */
+  const clearCurrentMeasureModulation = useCallback(() => {
+    setMeasureModulation(state.cursor.measureIndex, undefined);
+  }, [state.cursor.measureIndex, setMeasureModulation]);
 
   /**
    * Set a key signature override on a specific measure.
@@ -1541,6 +1575,8 @@ export function useTuneComposerState(
     setMeasureTempoBeatUnit,
     clearCurrentMeasureTempoBeatUnit,
     getMeasureEffectiveTempoBeatUnit,
+    setMeasureModulation,
+    clearCurrentMeasureModulation,
     setMeasureKeySignature,
     clearCurrentMeasureKeySignature,
     getMeasureEffectiveKeySignature,

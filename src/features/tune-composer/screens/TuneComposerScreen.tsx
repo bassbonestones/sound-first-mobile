@@ -1919,6 +1919,24 @@ function TuneComposerScreenContent({
           onClearBeatUnit={() => {
             composerState.clearCurrentMeasureTempoBeatUnit();
           }}
+          currentModulation={
+            composerState.score.measures[composerState.cursor.measureIndex]
+              ?.tempoModulation
+          }
+          previousBeatUnit={composerState.getMeasureEffectiveTempoBeatUnit(
+            Math.max(0, composerState.cursor.measureIndex - 1),
+          )}
+          onSetModulation={(modulation) => {
+            composerState.setMeasureModulation(
+              composerState.cursor.measureIndex,
+              modulation,
+            );
+            setShowTempoModal(false);
+          }}
+          onClearModulation={() => {
+            composerState.clearCurrentMeasureModulation();
+            setShowTempoModal(false);
+          }}
         />
 
         {/* Measure Key Signature Modal */}

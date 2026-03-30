@@ -8,7 +8,11 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 
 import type { Note, TuneComposerScore, TempoBeatUnit } from "../types";
-import { getNoteDuration, TEMPO_BEAT_UNIT_DURATION } from "../types";
+import {
+  getNoteDuration,
+  TEMPO_BEAT_UNIT_DURATION,
+  calculateModulatedTempo,
+} from "../types";
 // Re-use the composer synth service
 import { composerSynth } from "../../composer/services/composerSynth";
 
@@ -214,39 +218,54 @@ export function useTuneComposerPlayback(
   );
 
   /**
-   * Get effective tempo for a measure, considering per-measure overrides.
-   * Walks backward through measures to find closest defined tempo.
+   * Get effective tempo for a measure, considering per-measure overrides and modulations.
+   * Walks through measures from the start to compute cumulative tempo changes.
    */
   const getEffectiveTempo = useCallback(
     (measureIndex: number): number => {
-      // Walk back through measures to find the most recent tempo override
-      for (let i = measureIndex; i >= 0; i--) {
+      let effectiveTempo = score.tempo;
+      let effectiveBeatUnit: TempoBeatUnit = score.tempoBeatUnit ?? "quarter";
+      for (let i = 0; i <= measureIndex && i < score.measures.length; i++) {
         const measure = score.measures[i];
-        if (measure?.tempo !== undefined) {
-          return measure.tempo;
+        if (measure?.tempoModulation) {
+          // Metric modulation: calculate new tempo based on the relationship
+          effectiveTempo = calculateModulatedTempo(
+            effectiveTempo,
+            measure.tempoModulation,
+            effectiveBeatUnit,
+          );
+          effectiveBeatUnit = measure.tempoModulation.toUnit;
+        } else {
+          if (measure?.tempo !== undefined) {
+            effectiveTempo = measure.tempo;
+          }
+          if (measure?.tempoBeatUnit !== undefined) {
+            effectiveBeatUnit = measure.tempoBeatUnit;
+          }
         }
       }
-      // Fall back to score-level tempo
-      return score.tempo;
+      return effectiveTempo;
     },
-    [score.measures, score.tempo],
+    [score.measures, score.tempo, score.tempoBeatUnit],
   );
 
   /**
-   * Get effective tempo beat unit for a measure, considering per-measure overrides.
-   * Walks backward through measures to find closest defined beat unit.
+   * Get effective tempo beat unit for a measure, considering per-measure overrides and modulations.
+   * Walks through measures from the start to track beat unit changes.
    */
   const getEffectiveBeatUnit = useCallback(
     (measureIndex: number): TempoBeatUnit => {
-      // Walk back through measures to find the most recent beat unit override
-      for (let i = measureIndex; i >= 0; i--) {
+      let effectiveBeatUnit: TempoBeatUnit = score.tempoBeatUnit ?? "quarter";
+      for (let i = 0; i <= measureIndex && i < score.measures.length; i++) {
         const measure = score.measures[i];
-        if (measure?.tempoBeatUnit !== undefined) {
-          return measure.tempoBeatUnit;
+        if (measure?.tempoModulation) {
+          // Metric modulation: the toUnit becomes the new beat unit
+          effectiveBeatUnit = measure.tempoModulation.toUnit;
+        } else if (measure?.tempoBeatUnit !== undefined) {
+          effectiveBeatUnit = measure.tempoBeatUnit;
         }
       }
-      // Fall back to score-level beat unit
-      return score.tempoBeatUnit ?? "quarter";
+      return effectiveBeatUnit;
     },
     [score.measures, score.tempoBeatUnit],
   );

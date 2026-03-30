@@ -2,10 +2,10 @@
  * MeasureTempoModal Component
  *
  * Modal for setting or clearing tempo override on a specific measure.
- * Allows mid-piece tempo changes including beat unit selection.
+ * Allows mid-piece tempo changes including beat unit selection and metric modulation.
  */
 
-import React, { useState, useCallback, memo } from "react";
+import React, { useState, useCallback, memo, useMemo } from "react";
 import {
   View,
   Modal,
@@ -13,17 +13,24 @@ import {
   Text,
   StyleSheet,
   AccessibilityRole,
+  ScrollView,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
 import { colors, spacing } from "../../../../constants";
 import { TempoSlider } from "../../../../components/TempoSlider";
-import type { TempoBeatUnit } from "../../types";
-import { COMMON_TEMPO_BEAT_UNITS, TEMPO_BEAT_UNIT_LABELS } from "../../types";
+import type { TempoBeatUnit, TempoModulation } from "../../types";
+import {
+  COMMON_TEMPO_BEAT_UNITS,
+  TEMPO_BEAT_UNIT_LABELS,
+  calculateModulatedTempo,
+} from "../../types";
 
 // =============================================================================
 // Types
 // =============================================================================
+
+type TempoMode = "bpm" | "modulation";
 
 export interface MeasureTempoModalProps {
   /** Whether the modal is visible */
@@ -38,7 +45,7 @@ export interface MeasureTempoModalProps {
   effectiveTempo: number;
   /** Score-level default tempo */
   scoreTempo: number;
-  /** Called when tempo is set */
+  /** Called when tempo is set (BPM mode) */
   onSetTempo: (tempo: number) => void;
   /** Called when tempo is cleared (inherit from previous) */
   onClearTempo: () => void;
@@ -50,6 +57,14 @@ export interface MeasureTempoModalProps {
   onSetBeatUnit?: (beatUnit: TempoBeatUnit) => void;
   /** Called when beat unit is cleared (inherit from previous) */
   onClearBeatUnit?: () => void;
+  /** Current modulation for the measure (undefined if none) */
+  currentModulation?: TempoModulation | undefined;
+  /** Called when modulation is set */
+  onSetModulation?: (modulation: TempoModulation) => void;
+  /** Called when modulation is cleared */
+  onClearModulation?: () => void;
+  /** Previous measure's effective beat unit (for modulation "from" default) */
+  previousBeatUnit?: TempoBeatUnit;
 }
 
 // =============================================================================
@@ -69,44 +84,107 @@ function MeasureTempoModalComponent({
   effectiveBeatUnit = "quarter",
   onSetBeatUnit,
   onClearBeatUnit,
+  currentModulation,
+  onSetModulation,
+  onClearModulation,
+  previousBeatUnit = "quarter",
 }: MeasureTempoModalProps): React.ReactElement {
+  // Determine initial mode based on current state
+  const initialMode: TempoMode = currentModulation ? "modulation" : "bpm";
+
+  const [mode, setMode] = useState<TempoMode>(initialMode);
   const [pendingTempo, setPendingTempo] = useState(effectiveTempo);
   const [pendingBeatUnit, setPendingBeatUnit] =
     useState<TempoBeatUnit>(effectiveBeatUnit);
+  const [pendingModulationFrom, setPendingModulationFrom] =
+    useState<TempoBeatUnit>(currentModulation?.fromUnit ?? previousBeatUnit);
+  const [pendingModulationTo, setPendingModulationTo] = useState<TempoBeatUnit>(
+    currentModulation?.toUnit ?? "quarter",
+  );
+
   const hasTempoOverride = currentTempo !== undefined;
   const hasBeatUnitOverride = currentBeatUnit !== undefined;
-  const hasAnyOverride = hasTempoOverride || hasBeatUnitOverride;
+  const hasModulation = currentModulation !== undefined;
+  const hasAnyOverride =
+    hasTempoOverride || hasBeatUnitOverride || hasModulation;
+
+  // Calculate preview of modulated tempo
+  const modulatedTempoPreview = useMemo(() => {
+    // Use the previous measure's effective tempo for preview
+    const previousTempo = effectiveTempo;
+    return Math.round(
+      calculateModulatedTempo(
+        previousTempo,
+        {
+          fromUnit: pendingModulationFrom,
+          toUnit: pendingModulationTo,
+        },
+        previousBeatUnit,
+      ),
+    );
+  }, [
+    effectiveTempo,
+    pendingModulationFrom,
+    pendingModulationTo,
+    previousBeatUnit,
+  ]);
 
   // Reset pending values when modal opens
   React.useEffect(() => {
     if (visible) {
+      setMode(currentModulation ? "modulation" : "bpm");
       setPendingTempo(effectiveTempo);
       setPendingBeatUnit(effectiveBeatUnit);
+      setPendingModulationFrom(currentModulation?.fromUnit ?? previousBeatUnit);
+      setPendingModulationTo(currentModulation?.toUnit ?? "quarter");
     }
-  }, [visible, effectiveTempo, effectiveBeatUnit]);
+  }, [
+    visible,
+    effectiveTempo,
+    effectiveBeatUnit,
+    currentModulation,
+    previousBeatUnit,
+  ]);
 
   const handleApply = useCallback(() => {
-    // Apply tempo if changed or if current measure has tempo override
-    if (pendingTempo !== effectiveTempo || hasTempoOverride) {
-      onSetTempo(pendingTempo);
-    }
-    // Apply beat unit if callback provided and value changed
-    if (
-      onSetBeatUnit &&
-      (pendingBeatUnit !== effectiveBeatUnit || hasBeatUnitOverride)
-    ) {
-      onSetBeatUnit(pendingBeatUnit);
+    if (mode === "modulation" && onSetModulation) {
+      // Apply modulation
+      onSetModulation({
+        fromUnit: pendingModulationFrom,
+        toUnit: pendingModulationTo,
+      });
+    } else {
+      // BPM mode: apply tempo and beat unit
+      if (pendingTempo !== effectiveTempo || hasTempoOverride) {
+        onSetTempo(pendingTempo);
+      }
+      if (
+        onSetBeatUnit &&
+        (pendingBeatUnit !== effectiveBeatUnit || hasBeatUnitOverride)
+      ) {
+        onSetBeatUnit(pendingBeatUnit);
+      }
+      // Clear any existing modulation when switching to BPM mode
+      if (onClearModulation && hasModulation) {
+        onClearModulation();
+      }
     }
     onClose();
   }, [
+    mode,
     pendingTempo,
     pendingBeatUnit,
+    pendingModulationFrom,
+    pendingModulationTo,
     effectiveTempo,
     effectiveBeatUnit,
     hasTempoOverride,
     hasBeatUnitOverride,
+    hasModulation,
     onSetTempo,
     onSetBeatUnit,
+    onSetModulation,
+    onClearModulation,
     onClose,
   ]);
 
@@ -115,8 +193,11 @@ function MeasureTempoModalComponent({
     if (onClearBeatUnit) {
       onClearBeatUnit();
     }
+    if (onClearModulation) {
+      onClearModulation();
+    }
     onClose();
-  }, [onClearTempo, onClearBeatUnit, onClose]);
+  }, [onClearTempo, onClearBeatUnit, onClearModulation, onClose]);
 
   const handleCancel = useCallback(() => {
     onClose();
@@ -133,114 +214,259 @@ function MeasureTempoModalComponent({
       accessibilityViewIsModal
     >
       <View style={styles.overlay}>
-        <View style={styles.modalContainer}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>Measure {measureNumber} Tempo</Text>
-            <TouchableOpacity
-              onPress={handleCancel}
-              accessibilityRole={"button" as AccessibilityRole}
-              accessibilityLabel="Close"
-              testID="measure-tempo-close"
-            >
-              <Feather name="x" size={24} color={colors.textPrimary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Status */}
-          <View style={styles.statusRow}>
-            {hasAnyOverride ? (
-              <Text style={styles.statusText}>
-                <Text style={styles.statusBeatUnit}>{beatUnitLabel}</Text> ={" "}
-                {effectiveTempo} (custom)
-              </Text>
-            ) : (
-              <Text style={styles.statusTextInherited}>
-                <Text style={styles.statusBeatUnit}>{beatUnitLabel}</Text> ={" "}
-                {effectiveTempo} (inherited)
-              </Text>
-            )}
-          </View>
-
-          {/* Beat Unit Picker */}
-          {onSetBeatUnit && (
-            <View style={styles.beatUnitSection}>
-              <Text style={styles.sectionLabel}>Beat Unit</Text>
-              <View style={styles.beatUnitRow}>
-                {COMMON_TEMPO_BEAT_UNITS.map((unit) => (
-                  <TouchableOpacity
-                    key={unit}
-                    style={[
-                      styles.beatUnitButton,
-                      pendingBeatUnit === unit && styles.beatUnitButtonActive,
-                    ]}
-                    onPress={() => setPendingBeatUnit(unit)}
-                    accessibilityRole={"button" as AccessibilityRole}
-                    accessibilityLabel={`Beat unit ${unit}`}
-                    testID={`measure-tempo-beat-unit-${unit}`}
-                  >
-                    <Text
-                      style={[
-                        styles.beatUnitText,
-                        pendingBeatUnit === unit && styles.beatUnitTextActive,
-                      ]}
-                    >
-                      {TEMPO_BEAT_UNIT_LABELS[unit]}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* Tempo Slider */}
-          <View style={styles.sliderContainer}>
-            <TempoSlider
-              tempo={pendingTempo}
-              tempoRange={[20, 300]}
-              onTempoChange={setPendingTempo}
-              label="Tempo"
-              accessibilityLabel={`Set tempo for measure ${measureNumber}`}
-            />
-          </View>
-
-          {/* Buttons */}
-          <View style={styles.buttonRow}>
-            {hasAnyOverride && (
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.modalContainer}>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.title}>Measure {measureNumber} Tempo</Text>
               <TouchableOpacity
-                style={[styles.button, styles.clearButton]}
-                onPress={handleClear}
+                onPress={handleCancel}
                 accessibilityRole={"button" as AccessibilityRole}
-                accessibilityLabel="Clear tempo override and inherit from previous measure"
-                testID="measure-tempo-clear"
+                accessibilityLabel="Close"
+                testID="measure-tempo-close"
               >
-                <Feather name="rotate-ccw" size={16} color={colors.warning} />
-                <Text style={styles.clearButtonText}>Inherit</Text>
+                <Feather name="x" size={24} color={colors.textPrimary} />
               </TouchableOpacity>
+            </View>
+
+            {/* Status */}
+            <View style={styles.statusRow}>
+              {hasModulation && currentModulation ? (
+                <Text style={styles.statusText}>
+                  <Text style={styles.statusBeatUnit}>
+                    {TEMPO_BEAT_UNIT_LABELS[currentModulation.fromUnit]}
+                  </Text>{" "}
+                  ={" "}
+                  <Text style={styles.statusBeatUnit}>
+                    {TEMPO_BEAT_UNIT_LABELS[currentModulation.toUnit]}
+                  </Text>{" "}
+                  (modulation)
+                </Text>
+              ) : hasAnyOverride ? (
+                <Text style={styles.statusText}>
+                  <Text style={styles.statusBeatUnit}>{beatUnitLabel}</Text> ={" "}
+                  {effectiveTempo} (custom)
+                </Text>
+              ) : (
+                <Text style={styles.statusTextInherited}>
+                  <Text style={styles.statusBeatUnit}>{beatUnitLabel}</Text> ={" "}
+                  {effectiveTempo} (inherited)
+                </Text>
+              )}
+            </View>
+
+            {/* Mode Toggle */}
+            {onSetModulation && (
+              <View style={styles.modeToggleRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.modeButton,
+                    mode === "bpm" && styles.modeButtonActive,
+                  ]}
+                  onPress={() => setMode("bpm")}
+                  accessibilityRole={"button" as AccessibilityRole}
+                  accessibilityLabel="BPM mode"
+                  testID="measure-tempo-mode-bpm"
+                >
+                  <Text
+                    style={[
+                      styles.modeButtonText,
+                      mode === "bpm" && styles.modeButtonTextActive,
+                    ]}
+                  >
+                    BPM
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modeButton,
+                    mode === "modulation" && styles.modeButtonActive,
+                  ]}
+                  onPress={() => setMode("modulation")}
+                  accessibilityRole={"button" as AccessibilityRole}
+                  accessibilityLabel="Modulation mode"
+                  testID="measure-tempo-mode-modulation"
+                >
+                  <Text
+                    style={[
+                      styles.modeButtonText,
+                      mode === "modulation" && styles.modeButtonTextActive,
+                    ]}
+                  >
+                    Modulation
+                  </Text>
+                </TouchableOpacity>
+              </View>
             )}
 
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={handleCancel}
-              accessibilityRole={"button" as AccessibilityRole}
-              accessibilityLabel="Cancel"
-              testID="measure-tempo-cancel"
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
+            {mode === "bpm" ? (
+              <>
+                {/* Beat Unit Picker (BPM mode) */}
+                {onSetBeatUnit && (
+                  <View style={styles.beatUnitSection}>
+                    <Text style={styles.sectionLabel}>Beat Unit</Text>
+                    <View style={styles.beatUnitRow}>
+                      {COMMON_TEMPO_BEAT_UNITS.map((unit) => (
+                        <TouchableOpacity
+                          key={unit}
+                          style={[
+                            styles.beatUnitButton,
+                            pendingBeatUnit === unit &&
+                              styles.beatUnitButtonActive,
+                          ]}
+                          onPress={() => setPendingBeatUnit(unit)}
+                          accessibilityRole={"button" as AccessibilityRole}
+                          accessibilityLabel={`Beat unit ${unit}`}
+                          testID={`measure-tempo-beat-unit-${unit}`}
+                        >
+                          <Text
+                            style={[
+                              styles.beatUnitText,
+                              pendingBeatUnit === unit &&
+                                styles.beatUnitTextActive,
+                            ]}
+                          >
+                            {TEMPO_BEAT_UNIT_LABELS[unit]}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
 
-            <TouchableOpacity
-              style={[styles.button, styles.applyButton]}
-              onPress={handleApply}
-              accessibilityRole={"button" as AccessibilityRole}
-              accessibilityLabel={`Set tempo to ${pendingTempo}`}
-              testID="measure-tempo-apply"
-            >
-              <Feather name="check" size={16} color={colors.textOnPrimary} />
-              <Text style={styles.applyButtonText}>Apply</Text>
-            </TouchableOpacity>
+                {/* Tempo Slider */}
+                <View style={styles.sliderContainer}>
+                  <TempoSlider
+                    tempo={pendingTempo}
+                    tempoRange={[20, 300]}
+                    onTempoChange={setPendingTempo}
+                    label="Tempo"
+                    accessibilityLabel={`Set tempo for measure ${measureNumber}`}
+                  />
+                </View>
+              </>
+            ) : (
+              <>
+                {/* Modulation Mode */}
+                <View style={styles.modulationSection}>
+                  <Text style={styles.sectionLabel}>
+                    Previous note value (from)
+                  </Text>
+                  <View style={styles.beatUnitRow}>
+                    {COMMON_TEMPO_BEAT_UNITS.map((unit) => (
+                      <TouchableOpacity
+                        key={unit}
+                        style={[
+                          styles.beatUnitButton,
+                          pendingModulationFrom === unit &&
+                            styles.beatUnitButtonActive,
+                        ]}
+                        onPress={() => setPendingModulationFrom(unit)}
+                        accessibilityRole={"button" as AccessibilityRole}
+                        accessibilityLabel={`From unit ${unit}`}
+                        testID={`measure-tempo-mod-from-${unit}`}
+                      >
+                        <Text
+                          style={[
+                            styles.beatUnitText,
+                            pendingModulationFrom === unit &&
+                              styles.beatUnitTextActive,
+                          ]}
+                        >
+                          {TEMPO_BEAT_UNIT_LABELS[unit]}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text
+                    style={[styles.sectionLabel, { marginTop: spacing.md }]}
+                  >
+                    = New note value (to)
+                  </Text>
+                  <View style={styles.beatUnitRow}>
+                    {COMMON_TEMPO_BEAT_UNITS.map((unit) => (
+                      <TouchableOpacity
+                        key={unit}
+                        style={[
+                          styles.beatUnitButton,
+                          pendingModulationTo === unit &&
+                            styles.beatUnitButtonActive,
+                        ]}
+                        onPress={() => setPendingModulationTo(unit)}
+                        accessibilityRole={"button" as AccessibilityRole}
+                        accessibilityLabel={`To unit ${unit}`}
+                        testID={`measure-tempo-mod-to-${unit}`}
+                      >
+                        <Text
+                          style={[
+                            styles.beatUnitText,
+                            pendingModulationTo === unit &&
+                              styles.beatUnitTextActive,
+                          ]}
+                        >
+                          {TEMPO_BEAT_UNIT_LABELS[unit]}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Preview */}
+                  <View style={styles.modulationPreview}>
+                    <Text style={styles.previewLabel}>Result:</Text>
+                    <Text style={styles.previewText}>
+                      <Text style={styles.statusBeatUnit}>
+                        {TEMPO_BEAT_UNIT_LABELS[pendingModulationTo]}
+                      </Text>{" "}
+                      = {modulatedTempoPreview} BPM
+                    </Text>
+                  </View>
+                </View>
+              </>
+            )}
+
+            {/* Buttons */}
+            <View style={styles.buttonRow}>
+              {hasAnyOverride && (
+                <TouchableOpacity
+                  style={[styles.button, styles.clearButton]}
+                  onPress={handleClear}
+                  accessibilityRole={"button" as AccessibilityRole}
+                  accessibilityLabel="Clear tempo override and inherit from previous measure"
+                  testID="measure-tempo-clear"
+                >
+                  <Feather name="rotate-ccw" size={16} color={colors.warning} />
+                  <Text style={styles.clearButtonText}>Inherit</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={handleCancel}
+                accessibilityRole={"button" as AccessibilityRole}
+                accessibilityLabel="Cancel"
+                testID="measure-tempo-cancel"
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, styles.applyButton]}
+                onPress={handleApply}
+                accessibilityRole={"button" as AccessibilityRole}
+                accessibilityLabel={
+                  mode === "modulation"
+                    ? `Apply modulation`
+                    : `Set tempo to ${pendingTempo}`
+                }
+                testID="measure-tempo-apply"
+              >
+                <Feather name="check" size={16} color="#fff" />
+                <Text style={styles.applyButtonText}>Apply</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -257,11 +483,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing.md,
+  },
   modalContainer: {
     backgroundColor: colors.surface,
     borderRadius: spacing.md,
     padding: spacing.lg,
-    width: "85%",
+    width: "100%",
     maxWidth: 400,
   },
   header: {
@@ -330,10 +562,61 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   beatUnitTextActive: {
-    color: colors.textOnPrimary,
+    color: colors.white,
   },
   sliderContainer: {
     marginBottom: spacing.lg,
+  },
+  modeToggleRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: spacing.sm,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+  },
+  modeButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  modeButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: colors.textPrimary,
+  },
+  modeButtonTextActive: {
+    color: "#fff",
+  },
+  modulationSection: {
+    marginBottom: spacing.md,
+  },
+  modulationPreview: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.background,
+    borderRadius: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+  },
+  previewLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  previewText: {
+    fontSize: 16,
+    color: colors.primary,
+    fontWeight: "500",
   },
   buttonRow: {
     flexDirection: "row",
@@ -349,7 +632,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   clearButton: {
-    backgroundColor: colors.warningBackground,
+    backgroundColor: colors.warningLight,
     marginRight: "auto",
   },
   clearButtonText: {
@@ -366,7 +649,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   applyButtonText: {
-    color: colors.textOnPrimary,
+    color: colors.white,
     fontWeight: "500",
   },
 });

@@ -130,6 +130,44 @@ export const TEMPO_BEAT_UNIT_DURATION: Record<TempoBeatUnit, number> = {
   sixteenth: 0.25,
 };
 
+/**
+ * Metric modulation: specifies a tempo change as a relationship between note values.
+ * E.g., { fromUnit: "dotted-quarter", toUnit: "quarter" } means
+ * "the old dotted-quarter equals the new quarter" (pulse stays same, BPM changes).
+ */
+export interface TempoModulation {
+  /** The note value from the previous tempo */
+  fromUnit: TempoBeatUnit;
+  /** The note value in the new tempo that equals the fromUnit duration */
+  toUnit: TempoBeatUnit;
+}
+
+/**
+ * Calculate the new BPM after a metric modulation.
+ *
+ * Metric modulation "fromUnit = toUnit" means the duration of the old fromUnit
+ * equals the duration of the new toUnit. The result is the BPM in terms of toUnit.
+ *
+ * Formula: newBPM = oldBPM * (previousBeatUnitDuration / fromUnitDuration)
+ *
+ * Example: Previous tempo "quarter = 120", modulation "quarter = dotted-quarter":
+ * - previousBeatUnit = quarter (1.0), fromUnit = quarter (1.0)
+ * - newBPM = 120 * (1.0 / 1.0) = 120 (dotted-quarter = 120)
+ *
+ * Example: Previous tempo "quarter = 120", modulation "eighth = dotted-quarter":
+ * - previousBeatUnit = quarter (1.0), fromUnit = eighth (0.5)
+ * - newBPM = 120 * (1.0 / 0.5) = 240 (dotted-quarter = 240)
+ */
+export function calculateModulatedTempo(
+  oldBPM: number,
+  modulation: TempoModulation,
+  previousBeatUnit: TempoBeatUnit,
+): number {
+  const previousDuration = TEMPO_BEAT_UNIT_DURATION[previousBeatUnit];
+  const fromDuration = TEMPO_BEAT_UNIT_DURATION[modulation.fromUnit];
+  return oldBPM * (previousDuration / fromDuration);
+}
+
 // =============================================================================
 // Pitch & Clef
 // =============================================================================
@@ -477,6 +515,13 @@ export interface Measure {
   tempo?: number;
   /** Optional tempo beat unit override (e.g., "dotted-quarter" for compound meters). If undefined, inherits from previous measure or score default. */
   tempoBeatUnit?: TempoBeatUnit;
+  /**
+   * Optional metric modulation for this measure. When set, the new tempo is calculated
+   * based on the previous tempo and this modulation relationship.
+   * E.g., { fromUnit: "dotted-quarter", toUnit: "quarter" } means the old dotted-quarter
+   * becomes the new quarter note.
+   */
+  tempoModulation?: TempoModulation;
   /** Optional key signature override for this measure. If undefined, inherits from previous measure or score default. */
   keySignature?: KeySignature;
   /** Optional time signature override for this measure. If undefined, inherits from previous measure or score default. */

@@ -24,6 +24,7 @@ import type {
   Lyric,
   ChordSymbol,
   TempoBeatUnit,
+  TempoModulation,
 } from "../types";
 import {
   DURATION,
@@ -32,6 +33,7 @@ import {
   getChordsForMeasure,
   getBeatUnitDuration,
   resolveChordSymbol,
+  calculateModulatedTempo,
 } from "../types";
 import { recognizeChord } from "./chordRecognition";
 import { devLog } from "../../../utils/devLogger";
@@ -744,8 +746,14 @@ function generateMeasureXml(
   activeChords: ChordSymbol[],
   isFirstFullMeasure: boolean = false,
   melismaContinuationNotes: Set<string> = new Set(),
-  tempoInfo: { effectiveTempo: number; hasTempoChange: boolean } = {
+  tempoInfo: {
+    effectiveTempo: number;
+    effectiveBeatUnit: TempoBeatUnit;
+    hasTempoChange: boolean;
+    modulation?: TempoModulation;
+  } = {
     effectiveTempo: 120,
+    effectiveBeatUnit: "quarter",
     hasTempoChange: false,
   },
   keyInfo: { effectiveKey: KeySignature; hasKeyChange: boolean } = {
@@ -1062,11 +1070,30 @@ function generateMeasureXml(
     (isFirstMeasure && scoreHasNotes) || tempoInfo.hasTempoChange;
   let directionXml = "";
   if (showDirection) {
-    const { beatUnitXml, isDotted } = parseTempoBeatUnit(
-      tempoInfo.effectiveBeatUnit,
-    );
-    const beatUnitDotXml = isDotted ? "\n            <beat-unit-dot/>" : "";
-    directionXml = `\n      <direction placement="above">
+    if (tempoInfo.modulation) {
+      // Metric modulation: output two beat units (e.g., "dotted-quarter = quarter")
+      const { beatUnitXml: fromBeatUnitXml, isDotted: fromIsDotted } =
+        parseTempoBeatUnit(tempoInfo.modulation.fromUnit);
+      const { beatUnitXml: toBeatUnitXml, isDotted: toIsDotted } =
+        parseTempoBeatUnit(tempoInfo.modulation.toUnit);
+      const fromDotXml = fromIsDotted ? "\n            <beat-unit-dot/>" : "";
+      const toDotXml = toIsDotted ? "\n            <beat-unit-dot/>" : "";
+      directionXml = `\n      <direction placement="above">
+        <direction-type>
+          <metronome parentheses="no">
+            <beat-unit>${fromBeatUnitXml}</beat-unit>${fromDotXml}
+            <beat-unit>${toBeatUnitXml}</beat-unit>${toDotXml}
+          </metronome>
+        </direction-type>
+        <sound tempo="${Math.round(tempoInfo.effectiveTempo)}"/>
+      </direction>`;
+    } else {
+      // Regular tempo marking: beat-unit = BPM
+      const { beatUnitXml, isDotted } = parseTempoBeatUnit(
+        tempoInfo.effectiveBeatUnit,
+      );
+      const beatUnitDotXml = isDotted ? "\n            <beat-unit-dot/>" : "";
+      directionXml = `\n      <direction placement="above">
         <direction-type>
           <metronome parentheses="no">
             <beat-unit>${beatUnitXml}</beat-unit>${beatUnitDotXml}
@@ -1075,6 +1102,7 @@ function generateMeasureXml(
         </direction-type>
         <sound tempo="${tempoInfo.effectiveTempo}"/>
       </direction>`;
+    }
   }
 
   const barlineXml = isLastMeasure
@@ -1140,25 +1168,47 @@ export function generateMusicXml(
   const firstFullMeasureIndex = hasPickup ? 1 : 0;
 
   // Pre-compute effective tempo and beat unit for each measure and detect changes
-  // A tempo change occurs when the measure's tempo or beat unit differs from the previous
+  // A tempo change occurs when the measure's tempo, beat unit, or modulation differs from previous
   const measureTempoInfo: Array<{
     effectiveTempo: number;
     effectiveBeatUnit: TempoBeatUnit;
     hasTempoChange: boolean;
+    /** If this tempo change is a metric modulation, the modulation relationship */
+    modulation?: TempoModulation;
   }> = [];
   let currentTempo = score.tempo;
   let currentBeatUnit: TempoBeatUnit = score.tempoBeatUnit ?? "quarter";
   for (let i = 0; i < score.measures.length; i++) {
     const measure = score.measures[i];
-    const measureTempo = measure.tempo ?? currentTempo;
-    const measureBeatUnit = measure.tempoBeatUnit ?? currentBeatUnit;
+    let measureTempo: number;
+    let measureBeatUnit: TempoBeatUnit;
+    let modulation: TempoModulation | undefined;
+
+    if (measure.tempoModulation) {
+      // Metric modulation: calculate new tempo based on the relationship
+      modulation = measure.tempoModulation;
+      measureTempo = calculateModulatedTempo(
+        currentTempo,
+        modulation,
+        currentBeatUnit,
+      );
+      measureBeatUnit = modulation.toUnit;
+    } else {
+      // Regular tempo/beat unit override or inheritance
+      measureTempo = measure.tempo ?? currentTempo;
+      measureBeatUnit = measure.tempoBeatUnit ?? currentBeatUnit;
+    }
+
     const hasTempoChange =
       i > 0 &&
-      (measureTempo !== currentTempo || measureBeatUnit !== currentBeatUnit);
+      (measureTempo !== currentTempo ||
+        measureBeatUnit !== currentBeatUnit ||
+        measure.tempoModulation !== undefined);
     measureTempoInfo.push({
       effectiveTempo: measureTempo,
       effectiveBeatUnit: measureBeatUnit,
       hasTempoChange,
+      modulation,
     });
     currentTempo = measureTempo;
     currentBeatUnit = measureBeatUnit;
