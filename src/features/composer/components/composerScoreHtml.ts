@@ -403,7 +403,7 @@ export function generateComposerOsmdHtml(
      * Replace metric modulation text with proper SMuFL glyphs.
      * Since OSMD doesn't render two-beat-unit metronomes, we use <words>
      * and find the resulting text elements to replace them.
-     * Waits for Bravura font to load before showing glyphs.
+     * Uses OSMD's positioning - it knows where the tempo should appear.
      */
     function replaceMetricModulations() {
       const container = document.getElementById('osmd-container');
@@ -411,6 +411,20 @@ export function generateComposerOsmdHtml(
 
       const svg = container.querySelector('svg');
       if (!svg) return;
+
+      // Clean up any previous glyph replacements before processing
+      // This prevents stale elements from back-to-back tempo changes
+      const oldGlyphs = svg.querySelectorAll('.soundfirst-tempo-mod');
+      oldGlyphs.forEach(function(el) { el.remove(); });
+      
+      // Also unhide any previously hidden modulation text (in case they're no longer valid)
+      const hiddenTexts = svg.querySelectorAll('text[visibility="hidden"]');
+      hiddenTexts.forEach(function(el) {
+        const text = (el.textContent || '').trim();
+        if (MODULATION_PATTERN.test(text)) {
+          el.removeAttribute('visibility');
+        }
+      });
 
       // Find ALL text elements in the SVG
       const allTextElements = svg.querySelectorAll('text');
@@ -421,6 +435,8 @@ export function generateComposerOsmdHtml(
         
         const match = text.match(MODULATION_PATTERN);
         if (!match) return;
+
+        console.log('[DEBUG] Found modulation:', text, 'x=', textEl.getAttribute('x'), 'y=', textEl.getAttribute('y'));
 
         // Parse the modulation: [fullMatch, fromDotted, fromUnit, toDotted, toUnit]
         const fromDotted = !!match[1];
@@ -434,7 +450,7 @@ export function generateComposerOsmdHtml(
 
         if (!fromGlyph || !toGlyph) return;
 
-        // Get position from the text element
+        // Use OSMD's original position - it knows where the tempo should appear
         const x = parseFloat(textEl.getAttribute('x') || '0');
         const y = parseFloat(textEl.getAttribute('y') || '0');
 

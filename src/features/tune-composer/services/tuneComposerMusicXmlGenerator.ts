@@ -1391,8 +1391,8 @@ export function applyOsmdPickupWorkaround(musicXml: string): string {
     });
   }
 
-  // Find metronome directions in each measure (except measure 0 and 1)
-  // and move them to the next measure
+  // Find tempo directions (metronome or words with tempo modulation) in each measure
+  // (except measure 0 and 1) and move them to the next measure
   let result = musicXml;
 
   for (let i = measures.length - 1; i >= 0; i--) {
@@ -1402,13 +1402,16 @@ export function applyOsmdPickupWorkaround(musicXml: string): string {
     // Skip pickup (0) and first full measure (1) - their tempos are correct
     if (measureNum <= 1) continue;
 
-    // Find metronome direction in this measure
-    const metronomeDirectionRegex =
-      /(\s*<direction[^>]*>\s*<direction-type>\s*<metronome[\s\S]*?<\/direction>)/g;
-    const metronomeMatch = metronomeDirectionRegex.exec(measure.content);
+    // Find metronome direction OR words direction (for metric modulations) in this measure
+    // This matches both:
+    //   <direction>...<metronome>...</direction>
+    //   <direction>...<words>quarter=half</words>...</direction>
+    const tempoDirectionRegex =
+      /(\s*<direction[^>]*>\s*<direction-type>\s*(?:<metronome[\s\S]*?<\/metronome>|<words[^>]*>(?:dotted-)?(?:whole|half|quarter|eighth|16th|32nd|64th)=(?:dotted-)?(?:whole|half|quarter|eighth|16th|32nd|64th)<\/words>)\s*<\/direction-type>[\s\S]*?<\/direction>)/gi;
+    const tempoMatch = tempoDirectionRegex.exec(measure.content);
 
-    if (metronomeMatch) {
-      const metronomeDirection = metronomeMatch[1];
+    if (tempoMatch) {
+      const tempoDirection = tempoMatch[1];
 
       // Check if there's a next measure to move the tempo to
       const nextMeasure = measures[i + 1];
@@ -1418,7 +1421,7 @@ export function applyOsmdPickupWorkaround(musicXml: string): string {
       }
 
       // Remove from current measure
-      const newContent = measure.content.replace(metronomeDirection, "");
+      const newContent = measure.content.replace(tempoDirection, "");
       const newMeasure = measure.fullMatch.replace(measure.content, newContent);
       result = result.replace(measure.fullMatch, newMeasure);
 
@@ -1431,11 +1434,11 @@ export function applyOsmdPickupWorkaround(musicXml: string): string {
         if (attrsEndMatch) {
           newNextContent = nextMeasureContent.replace(
             "</attributes>",
-            "</attributes>" + metronomeDirection,
+            "</attributes>" + tempoDirection,
           );
         } else {
           // Insert at the start (after measure tag)
-          newNextContent = metronomeDirection + nextMeasureContent;
+          newNextContent = tempoDirection + nextMeasureContent;
         }
         const newNextMeasure = nextMeasure.fullMatch.replace(
           nextMeasure.content,
