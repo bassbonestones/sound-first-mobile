@@ -53,6 +53,10 @@ export interface CompactControlsProps {
   onSetMeasureTempo?: () => void;
   /** Current measure's tempo override if any (optional - tune composer only) */
   measureTempo?: number;
+  /** Called when set measure key signature is pressed (optional - tune composer only) */
+  onSetMeasureKey?: () => void;
+  /** Current measure's key signature override display (optional - tune composer only) */
+  measureKeyDisplay?: string;
   /** Whether there's a selected note (for delete) */
   hasSelection?: boolean;
   /** Whether delete measure is allowed */
@@ -81,6 +85,8 @@ function CompactControlsComponent({
   onEditMetadata,
   onSetMeasureTempo,
   measureTempo,
+  onSetMeasureKey,
+  measureKeyDisplay,
   hasSelection = false,
   canDeleteMeasure = true,
   disabled = false,
@@ -136,6 +142,13 @@ function CompactControlsComponent({
       setShowMenu(false);
     }
   }, [disabled, onSetMeasureTempo]);
+
+  const handleSetMeasureKey = useCallback(() => {
+    if (!disabled && onSetMeasureKey) {
+      onSetMeasureKey();
+      setShowMenu(false);
+    }
+  }, [disabled, onSetMeasureKey]);
 
   const canFill = !validation.isComplete && validation.difference < 0;
 
@@ -262,6 +275,22 @@ function CompactControlsComponent({
                   {measureTempo
                     ? `Tempo: ♩=${measureTempo}`
                     : "Set Measure Tempo"}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Set measure key signature - only show if onSetMeasureKey is provided */}
+            {onSetMeasureKey && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={handleSetMeasureKey}
+                testID="menu-key"
+              >
+                <Feather name="music" size={18} color={colors.primary} />
+                <Text style={styles.menuItemText}>
+                  {measureKeyDisplay
+                    ? `Key: ${measureKeyDisplay}`
+                    : "Set Measure Key"}
                 </Text>
               </TouchableOpacity>
             )}

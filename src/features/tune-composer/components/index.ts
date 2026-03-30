@@ -45,6 +45,7 @@ export {
   RhythmChangeModal,
   TuneMetadataModal,
   MeasureTempoModal,
+  MeasureKeySignatureModal,
   modalStyles,
 } from "./modals";
 export type {
@@ -59,4 +60,5 @@ export type {
   RhythmChangeModalProps,
   TuneMetadataModalProps,
   MeasureTempoModalProps,
+  MeasureKeySignatureModalProps,
 } from "./modals";

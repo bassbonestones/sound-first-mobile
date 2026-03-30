@@ -412,6 +412,8 @@ export interface Measure {
   isPickup?: boolean;
   /** Optional tempo override for this measure (BPM). If undefined, inherits from previous measure or score default. */
   tempo?: number;
+  /** Optional key signature override for this measure. If undefined, inherits from previous measure or score default. */
+  keySignature?: KeySignature;
 }
 
 /**

@@ -436,5 +436,94 @@ describe("Tune Composer MusicXML Generator", () => {
         expect(tempo80Matches).toHaveLength(1);
       });
     });
+
+    describe("Mid-piece key signature changes", () => {
+      it("should output key signature on first measure", () => {
+        const score = createScore({ keySignature: -3 }); // Eb major (3 flats)
+        const xml = generateMusicXml(score);
+
+        expect(xml).toContain("<fifths>-3</fifths>");
+      });
+
+      it("should output key signature change when measure has key override", () => {
+        const score = createScore({ keySignature: 0 }); // C major
+        // Add a second measure and set its key to G major (1 sharp)
+        score.measures.push(createMeasure(score.timeSignature));
+        score.measures[1].keySignature = 1;
+
+        const xml = generateMusicXml(score);
+
+        // Should have both keys
+        expect(xml).toContain("<fifths>0</fifths>");
+        expect(xml).toContain("<fifths>1</fifths>");
+      });
+
+      it("should not output key attributes if measure key matches previous", () => {
+        const score = createScore({ keySignature: 2 }); // D major
+        // Add a second measure with same key (should not output attributes)
+        score.measures.push(createMeasure(score.timeSignature));
+        score.measures[1].keySignature = 2;
+
+        const xml = generateMusicXml(score);
+
+        // Count occurrences of fifths - should only be one (first measure)
+        const keyMatches = xml.match(/<fifths>2<\/fifths>/g);
+        expect(keyMatches).toHaveLength(1);
+      });
+
+      it("should inherit key from previous measure when undefined", () => {
+        const score = createScore({ keySignature: 0 }); // C major
+        // Add measures 2 and 3
+        score.measures.push(createMeasure(score.timeSignature));
+        score.measures.push(createMeasure(score.timeSignature));
+        // Measure 2 has key Bb major (-2)
+        score.measures[1].keySignature = -2;
+        // Measure 3 has no key (undefined) - should inherit -2, no output
+
+        const xml = generateMusicXml(score);
+
+        // Should have 0 on measure 1, -2 on measure 2, no key on measure 3
+        const key0Matches = xml.match(/<fifths>0<\/fifths>/g);
+        const keyNeg2Matches = xml.match(/<fifths>-2<\/fifths>/g);
+        expect(key0Matches).toHaveLength(1);
+        expect(keyNeg2Matches).toHaveLength(1);
+      });
+
+      it("should output key change back to original key", () => {
+        const score = createScore({ keySignature: 1 }); // G major
+        // Add measures 2 and 3
+        score.measures.push(createMeasure(score.timeSignature));
+        score.measures.push(createMeasure(score.timeSignature));
+        // Measure 2: D major (2), Measure 3: back to G major (1)
+        score.measures[1].keySignature = 2;
+        score.measures[2].keySignature = 1;
+
+        const xml = generateMusicXml(score);
+
+        // Should have 1 twice (first measure and measure 3) and 2 once
+        const key1Matches = xml.match(/<fifths>1<\/fifths>/g);
+        const key2Matches = xml.match(/<fifths>2<\/fifths>/g);
+        expect(key1Matches).toHaveLength(2);
+        expect(key2Matches).toHaveLength(1);
+      });
+
+      it("should use effective key for chord rendering", () => {
+        const score = createScore({ keySignature: 0 }); // C major
+        // Add measure 2 with F# major (6 sharps)
+        score.measures.push(createMeasure(score.timeSignature));
+        score.measures[1].keySignature = 6;
+
+        // Add a chord in measure 2 - should prefer sharps
+        score.chordProgression = [
+          { id: "1", name: "A#m7", measureIndex: 1, beatPosition: 0 },
+        ];
+        score.displaySettings.showChordSymbols = true;
+
+        const xml = generateMusicXml(score);
+
+        // Key should affect accidental preference
+        expect(xml).toContain("<fifths>6</fifths>");
+      });
+    });
   });
 });

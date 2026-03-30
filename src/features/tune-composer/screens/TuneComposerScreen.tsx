@@ -74,6 +74,7 @@ import {
   RhythmChangeModal,
   TuneMetadataModal,
   MeasureTempoModal,
+  MeasureKeySignatureModal,
 } from "../components";
 import {
   ChordProgressionProvider,
@@ -98,6 +99,7 @@ import type {
 import { getPitchedNotes } from "../types";
 import ErrorBoundary from "../../../components/ErrorBoundary";
 import { composerScoreToImportedScore } from "../../composer/utils";
+import { getKeyName } from "../../composer/constants/keySignatures";
 import {
   listPreviewFiles,
   previewMaterial,
@@ -209,6 +211,9 @@ function TuneComposerScreenContent({
 
   // Tempo modal state
   const [showTempoModal, setShowTempoModal] = useState(false);
+
+  // Key signature modal state
+  const [showKeyModal, setShowKeyModal] = useState(false);
 
   // Metadata state
   const [tuneMetadata, setTuneMetadata] = useState<TuneMetadata>(() =>
@@ -1333,6 +1338,18 @@ function TuneComposerScreenContent({
                     composerState.cursor.measureIndex
                   ]?.tempo
                 }
+                onSetMeasureKey={() => setShowKeyModal(true)}
+                measureKeyDisplay={
+                  composerState.score.measures[
+                    composerState.cursor.measureIndex
+                  ]?.keySignature !== undefined
+                    ? getKeyName(
+                        composerState.score.measures[
+                          composerState.cursor.measureIndex
+                        ]!.keySignature!,
+                      )
+                    : undefined
+                }
                 hasSelection={hasSelection}
                 canDeleteMeasure={canDeleteMeasure}
                 disabled={isPlaying}
@@ -1871,6 +1888,32 @@ function TuneComposerScreenContent({
           onClearTempo={() => {
             composerState.clearCurrentMeasureTempo();
             setShowTempoModal(false);
+          }}
+        />
+
+        {/* Measure Key Signature Modal */}
+        <MeasureKeySignatureModal
+          visible={showKeyModal}
+          onClose={() => setShowKeyModal(false)}
+          measureNumber={composerState.cursor.measureIndex + 1}
+          currentKey={
+            composerState.score.measures[composerState.cursor.measureIndex]
+              ?.keySignature
+          }
+          effectiveKey={composerState.getMeasureEffectiveKeySignature(
+            composerState.cursor.measureIndex,
+          )}
+          scoreKey={composerState.score.keySignature}
+          onSetKey={(key) => {
+            composerState.setMeasureKeySignature(
+              composerState.cursor.measureIndex,
+              key,
+            );
+            setShowKeyModal(false);
+          }}
+          onClearKey={() => {
+            composerState.clearCurrentMeasureKeySignature();
+            setShowKeyModal(false);
           }}
         />
       </KeyboardAvoidingView>

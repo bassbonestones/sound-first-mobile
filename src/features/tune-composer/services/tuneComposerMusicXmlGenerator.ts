@@ -675,6 +675,17 @@ function generateAttributesXml(
       </attributes>`;
 }
 
+/**
+ * Generate attributes element containing only key signature (for mid-piece key changes).
+ */
+function generateKeyChangeAttributesXml(keySignature: KeySignature): string {
+  return `      <attributes>
+        <key>
+          <fifths>${keySignature}</fifths>
+        </key>
+      </attributes>`;
+}
+
 function generateMeasureXml(
   measure: Measure,
   measureNumber: number,
@@ -691,8 +702,13 @@ function generateMeasureXml(
     effectiveTempo: 120,
     hasTempoChange: false,
   },
+  keyInfo: { effectiveKey: KeySignature; hasKeyChange: boolean } = {
+    effectiveKey: 0,
+    hasKeyChange: false,
+  },
 ): string {
-  const preferFlats = score.keySignature < 0;
+  // Use effective key signature for accidental preference (e.g., prefer flats in Eb)
+  const preferFlats = keyInfo.effectiveKey < 0;
   const isPickup = measure.isPickup ?? false;
   let notesXml = "";
 
@@ -812,7 +828,7 @@ function generateMeasureXml(
       const offsetDivisions = Math.round(chord.beatPositionInQuarters * 12);
       const resolvedSymbol = resolveChordSymbol(
         chord,
-        score.keySignature,
+        keyInfo.effectiveKey,
         preferFlats,
       );
       devLog(
@@ -881,7 +897,7 @@ function generateMeasureXml(
       const offsetDivisions = Math.round(chordBeat * 12);
       const resolvedSymbol = resolveChordSymbol(
         chord,
-        score.keySignature,
+        keyInfo.effectiveKey,
         preferFlats,
       );
 
@@ -918,7 +934,7 @@ function generateMeasureXml(
       for (const { chord } of chordsHere) {
         const resolvedSymbol = resolveChordSymbol(
           chord,
-          score.keySignature,
+          keyInfo.effectiveKey,
           preferFlats,
         );
         // Don't use offset for interleaved chords - position is determined by document order
@@ -963,7 +979,7 @@ function generateMeasureXml(
     for (const { chord } of lastMeasureChordsAtEnd) {
       const resolvedSymbol = resolveChordSymbol(
         chord,
-        score.keySignature,
+        keyInfo.effectiveKey,
         preferFlats,
       );
       // Don't use offset - these come after all notes
@@ -971,11 +987,19 @@ function generateMeasureXml(
     }
   }
 
-  // Attributes go on first measure (pickup or first full measure)
-  const attributesXml = isFirstMeasure
-    ? "\n" +
-      generateAttributesXml(score.timeSignature, score.keySignature, score.clef)
-    : "";
+  // Attributes: full on first measure, key-only on key change mid-piece
+  let attributesXml = "";
+  if (isFirstMeasure) {
+    attributesXml =
+      "\n" +
+      generateAttributesXml(
+        score.timeSignature,
+        score.keySignature,
+        score.clef,
+      );
+  } else if (keyInfo.hasKeyChange) {
+    attributesXml = "\n" + generateKeyChangeAttributesXml(keyInfo.effectiveKey);
+  }
 
   // Metronome/tempo direction on first measure OR when tempo changes mid-piece
   const showDirection =
@@ -1069,12 +1093,28 @@ export function generateMusicXml(
     currentTempo = measureTempo;
   }
 
+  // Pre-compute effective key signature for each measure and detect key changes
+  // A key change occurs when the measure's key differs from the previous effective key
+  const measureKeyInfo: Array<{
+    effectiveKey: KeySignature;
+    hasKeyChange: boolean;
+  }> = [];
+  let currentKey = score.keySignature;
+  for (let i = 0; i < score.measures.length; i++) {
+    const measure = score.measures[i];
+    const measureKey = measure.keySignature ?? currentKey;
+    const hasKeyChange = i > 0 && measureKey !== currentKey;
+    measureKeyInfo.push({ effectiveKey: measureKey, hasKeyChange });
+    currentKey = measureKey;
+  }
+
   const measuresXml = score.measures
     .map((measure, index) => {
       // Pickup measure = 0, then count from 1
       const measureNumber = hasPickup ? index : index + 1;
       const isFirstFullMeasure = index === firstFullMeasureIndex;
       const tempoInfo = measureTempoInfo[index];
+      const keyInfo = measureKeyInfo[index];
 
       return generateMeasureXml(
         measure,
@@ -1089,6 +1129,7 @@ export function generateMusicXml(
         isFirstFullMeasure,
         melismaContinuationNotes,
         tempoInfo,
+        keyInfo,
       );
     })
     .join("\n");

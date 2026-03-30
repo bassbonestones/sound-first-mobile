@@ -14,6 +14,7 @@ import type {
   ChordSymbol,
   CursorPosition,
   DurationValue,
+  KeySignature,
   Note,
   PitchName,
   TuneComposerScore,
@@ -59,6 +60,28 @@ import {
   noteToMidi,
 } from "../../composer/utils/pitchUtils";
 import type { UseTuneComposerUndoReturn } from "./useTuneComposerUndo";
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
+/**
+ * Get the effective key signature for a measure, considering mid-piece key changes.
+ * Walks through measures from the start and returns the most recent key signature.
+ */
+function getEffectiveKeySignature(
+  score: TuneComposerScore,
+  measureIndex: number,
+): KeySignature {
+  let effectiveKey = score.keySignature;
+  for (let i = 0; i <= measureIndex && i < score.measures.length; i++) {
+    const measure = score.measures[i];
+    if (measure.keySignature !== undefined) {
+      effectiveKey = measure.keySignature;
+    }
+  }
+  return effectiveKey;
+}
 
 // =============================================================================
 // Types
@@ -356,10 +379,16 @@ export function useTuneComposerNotes(
       const referenceMidi =
         previousPitchedNote?.midi ?? STAFF_CENTER_MIDI[state.score.clef];
 
+      // Get effective key signature for the current measure (handles mid-piece key changes)
+      const effectiveKey = getEffectiveKeySignature(
+        state.score,
+        currentCursor.measureIndex,
+      );
+
       const { midi, accidental } = getNearestMidiForPitch(
         pitchName,
         referenceMidi,
-        state.score.keySignature,
+        effectiveKey,
       );
 
       const note = createNote(midi, state.selectedDuration, {

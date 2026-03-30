@@ -123,6 +123,15 @@ export interface UseTuneComposerStateReturn {
   clearCurrentMeasureTempo: () => void;
   /** Get effective tempo for a measure (considering inheritance) */
   getMeasureEffectiveTempo: (measureIndex: number) => number;
+  /** Set a key signature override for a specific measure (undefined to clear) */
+  setMeasureKeySignature: (
+    measureIndex: number,
+    keySignature: KeySignature | undefined,
+  ) => void;
+  /** Clear key signature override on current measure */
+  clearCurrentMeasureKeySignature: () => void;
+  /** Get effective key signature for a measure (considering inheritance) */
+  getMeasureEffectiveKeySignature: (measureIndex: number) => KeySignature;
 
   // Pickup Measure
   /** Whether the score has a pickup measure */
@@ -711,6 +720,56 @@ export function useTuneComposerState(
     [state.score.measures, state.score.tempo],
   );
 
+  /**
+   * Set a key signature override on a specific measure.
+   * Pass undefined to clear the key signature override (inherit from previous measure or score).
+   */
+  const setMeasureKeySignature = useCallback(
+    (measureIndex: number, keySignature: KeySignature | undefined) => {
+      const measure = state.score.measures[measureIndex];
+      if (!measure) return;
+
+      const prevKey = measure.keySignature;
+      if (keySignature === prevKey) return;
+
+      updateScore((score) => ({
+        ...score,
+        measures: score.measures.map((m, i) =>
+          i === measureIndex ? { ...m, keySignature } : m,
+        ),
+      }));
+    },
+    [state.score.measures, updateScore],
+  );
+
+  /**
+   * Clear the key signature override on the current measure.
+   */
+  const clearCurrentMeasureKeySignature = useCallback(() => {
+    setMeasureKeySignature(state.cursor.measureIndex, undefined);
+  }, [state.cursor.measureIndex, setMeasureKeySignature]);
+
+  /**
+   * Get the effective key signature for a measure (considering inheritance).
+   */
+  const getMeasureEffectiveKeySignature = useCallback(
+    (measureIndex: number): KeySignature => {
+      let effectiveKey = state.score.keySignature;
+      for (
+        let i = 0;
+        i <= measureIndex && i < state.score.measures.length;
+        i++
+      ) {
+        const measure = state.score.measures[i];
+        if (measure.keySignature !== undefined) {
+          effectiveKey = measure.keySignature;
+        }
+      }
+      return effectiveKey;
+    },
+    [state.score.measures, state.score.keySignature],
+  );
+
   // ==========================================================================
   // Pickup Measure Operations
   // ==========================================================================
@@ -1268,6 +1327,9 @@ export function useTuneComposerState(
     setMeasureTempo,
     clearCurrentMeasureTempo,
     getMeasureEffectiveTempo,
+    setMeasureKeySignature,
+    clearCurrentMeasureKeySignature,
+    getMeasureEffectiveKeySignature,
 
     // Pickup Measure
     hasPickup,
