@@ -809,7 +809,8 @@ function generateMeasureXml(
 
   // Get sorted chords for this measure (only if chord symbols are visible)
   // Convert beat unit index to quarter note position for comparison with currentBeat
-  const beatUnitDuration = getBeatUnitDuration(score.timeSignature);
+  // Use the EFFECTIVE time signature for this measure, not the initial score time signature
+  const beatUnitDuration = getBeatUnitDuration(timeInfo.effectiveTime);
   const measureChords: Array<ChordSymbol & { beatPositionInQuarters: number }> =
     [];
   if (score.displaySettings.showChordSymbols) {
