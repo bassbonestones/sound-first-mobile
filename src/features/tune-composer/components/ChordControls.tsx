@@ -370,8 +370,12 @@ function ChordControlsComponent({
     setShowPreview(false);
   }, [inputText]);
 
-  // Clear input
+  // Clear input - cancel any pending blur timeout to prevent it from re-setting the chord
   const handleClear = useCallback(() => {
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
     setInputText("");
     onRemoveChord();
   }, [onRemoveChord]);

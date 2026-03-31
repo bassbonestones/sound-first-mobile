@@ -778,5 +778,28 @@ describe("Chord Recognition Service", () => {
       expect(xml).toContain("<step>D</step>");
       expect(xml).toContain("<alter>1</alter>");
     });
+
+    it("should spell D major third as F# not Gb", () => {
+      const xml = generateChordPreviewMusicXml("D", 62, "treble");
+      expect(xml).toBeTruthy();
+      // D major = D, F#, A (the 3rd is F raised, not Gb)
+      expect(xml).toContain("<step>D</step>");
+      expect(xml).toContain("<step>F</step>");
+      expect(xml).toContain("<step>A</step>");
+      // F# means step=F with alter=1
+      expect(xml).toContain("<alter>1</alter>");
+      // Should NOT have Gb (step=G with alter=-1 for the third)
+      const gbPattern = /<step>G<\/step>\s*<alter>-1<\/alter>/;
+      expect(xml).not.toMatch(gbPattern);
+    });
+
+    it("should spell Bb major third as D not C##", () => {
+      const xml = generateChordPreviewMusicXml("Bb", 70, "treble");
+      expect(xml).toBeTruthy();
+      // Bb major = Bb, D, F
+      expect(xml).toContain("<step>B</step>");
+      expect(xml).toContain("<step>D</step>");
+      expect(xml).toContain("<step>F</step>");
+    });
   });
 });
