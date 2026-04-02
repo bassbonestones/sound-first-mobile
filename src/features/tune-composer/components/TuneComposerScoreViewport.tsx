@@ -488,7 +488,10 @@ function TuneComposerScoreViewportComponent({
         } else if (measure) {
           // Fall back to calculating beats from score model
           let currentBeat = 0;
-          const noteCount = Math.min(measure.notes.length, osmdPositions.length);
+          const noteCount = Math.min(
+            measure.notes.length,
+            osmdPositions.length,
+          );
           for (let i = 0; i < noteCount; i++) {
             const note = measure.notes[i];
             const x = osmdPositions[i].x;
