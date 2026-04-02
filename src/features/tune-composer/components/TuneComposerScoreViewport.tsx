@@ -239,22 +239,14 @@ function TuneComposerScoreViewportComponent({
       ? (score.pickupDuration ?? getMeasureDuration(measure))
       : measureDurationInQuarters;
 
-    // Build beat positions using our note model for beats, OSMD for x positions
-    // OSMD positions are sorted by x (left-to-right), so we match with our sequential beats
+    // Use OSMD's beat positions directly - they already have correct beat values
+    // and X positions from the rendered score
     const noteBeatPositions: { beat: number; x: number }[] = [];
 
-    if (measure && osmdPositions.length > 0) {
-      // OSMD positions are sorted by x position (left to right)
-      // Our notes are in beat order - so they should correspond
-      // Use our note model for accurate beat timing
-      let currentBeat = 0;
-      const noteCount = Math.min(measure.notes.length, osmdPositions.length);
-
-      for (let i = 0; i < noteCount; i++) {
-        const note = measure.notes[i];
-        const x = osmdPositions[i].x; // Use OSMD's x position (sorted by x)
-        noteBeatPositions.push({ beat: currentBeat, x });
-        currentBeat += getNoteDuration(note);
+    if (osmdPositions.length > 0) {
+      // OSMD positions are already sorted by X and have correct beat values
+      for (const pos of osmdPositions) {
+        noteBeatPositions.push({ beat: pos.beat, x: pos.x });
       }
 
       // Add a virtual endpoint at the measure end (barline position)
@@ -477,20 +469,32 @@ function TuneComposerScoreViewportComponent({
         ? (score.pickupDuration ?? getMeasureDuration(measure))
         : measureDurationInQuarters;
 
-      // Build beat positions from score model + OSMD X positions
+      // Build beat positions - use OSMD's beat values if they look valid,
+      // otherwise fall back to calculating from the score model
       const noteBeatPositions: { beat: number; x: number }[] = [];
 
-      if (measure && osmdPositions.length > 0) {
-        let currentBeat = 0;
-        for (
-          let i = 0;
-          i < measure.notes.length && i < osmdPositions.length;
-          i++
-        ) {
-          const note = measure.notes[i];
-          const x = osmdPositions[i].x;
-          noteBeatPositions.push({ beat: currentBeat, x });
-          currentBeat += getNoteDuration(note);
+      if (osmdPositions.length > 0) {
+        // Check if OSMD's beat values are valid (have distinct values)
+        const distinctBeats = new Set(
+          osmdPositions.map((p) => Math.round(p.beat * 100)),
+        );
+        const useOsmdBeats = distinctBeats.size >= osmdPositions.length;
+
+        if (useOsmdBeats) {
+          // OSMD beat values are valid - use them directly
+          for (const pos of osmdPositions) {
+            noteBeatPositions.push({ beat: pos.beat, x: pos.x });
+          }
+        } else if (measure) {
+          // Fall back to calculating beats from score model
+          let currentBeat = 0;
+          const noteCount = Math.min(measure.notes.length, osmdPositions.length);
+          for (let i = 0; i < noteCount; i++) {
+            const note = measure.notes[i];
+            const x = osmdPositions[i].x;
+            noteBeatPositions.push({ beat: currentBeat, x });
+            currentBeat += getNoteDuration(note);
+          }
         }
 
         // Add endpoint at barline

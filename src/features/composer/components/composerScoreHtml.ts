@@ -294,6 +294,9 @@ export function generateComposerOsmdHtml(
       if (!osmd) {
         if (!initOsmd()) return;
       }
+      
+      // Clear any stale chord positions from previous render
+      pendingChordPositions = null;
 
       const loadingEl = document.getElementById('loading');
       
