@@ -417,18 +417,22 @@ function TuneComposerScoreViewportComponent({
 
     // Get default chord progression
     const progression = getDefaultProgression(score.chordProgressions);
-    // console.log(
-    //   "[ChordReposition] Progression:",
-    //   progression?.name,
-    //   "chords:",
-    //   progression?.chords.length,
-    // );
     if (!progression || progression.chords.length === 0) return;
 
-    // Find the last measure with chords for repositioning logic
-    const lastMeasureWithChords = Math.max(
-      ...progression.chords.map((c) => c.measureIndex),
+    // Check if we have measurePositions for ALL measures with chords
+    const measuresWithChords = new Set(
+      progression.chords.map((c) => c.measureIndex),
     );
+    const havingAllMeasures = [...measuresWithChords].every((mi) =>
+      measurePositions.some((mp) => mp.measureIndex === mi),
+    );
+    if (!havingAllMeasures) {
+      // Wait until we have all measure data
+      return;
+    }
+
+    // Find the last measure with chords for repositioning logic
+    const lastMeasureWithChords = Math.max(...measuresWithChords);
 
     // Calculate X positions for each chord
     const chordPositions: {
@@ -593,11 +597,6 @@ function TuneComposerScoreViewportComponent({
 
     // Send to WebView
     if (chordPositions.length > 0) {
-      // console.log(
-      //   "[ChordReposition] Sending",
-      //   chordPositions.length,
-      //   "positions to WebView",
-      // );
       const json = JSON.stringify(chordPositions);
       executeScript(`window.repositionChordSymbols(${json})`);
     }

@@ -37,6 +37,10 @@ export interface CompactControlsProps {
   onDelete: () => void;
   /** Called when add measure is pressed */
   onAddMeasure: () => void;
+  /** Called to insert measure before current (optional - tune composer only) */
+  onInsertMeasureBefore?: () => void;
+  /** Called to insert measure after current (optional - tune composer only) */
+  onInsertMeasureAfter?: () => void;
   /** Called when delete measure is pressed */
   onDeleteMeasure: () => void;
   /** Called when delete last measure is pressed */
@@ -81,6 +85,8 @@ function CompactControlsComponent({
   validation,
   onDelete,
   onAddMeasure,
+  onInsertMeasureBefore,
+  onInsertMeasureAfter,
   onDeleteMeasure,
   onDeleteLastMeasure,
   onFillWithRests,
@@ -113,6 +119,20 @@ function CompactControlsComponent({
       setShowMenu(false);
     }
   }, [disabled, onAddMeasure]);
+
+  const handleInsertMeasureBefore = useCallback(() => {
+    if (!disabled && onInsertMeasureBefore) {
+      onInsertMeasureBefore();
+      setShowMenu(false);
+    }
+  }, [disabled, onInsertMeasureBefore]);
+
+  const handleInsertMeasureAfter = useCallback(() => {
+    if (!disabled && onInsertMeasureAfter) {
+      onInsertMeasureAfter();
+      setShowMenu(false);
+    }
+  }, [disabled, onInsertMeasureAfter]);
 
   const handleDeleteMeasure = useCallback(() => {
     if (!disabled && canDeleteMeasure) {
@@ -249,6 +269,38 @@ function CompactControlsComponent({
               <Feather name="plus-square" size={18} color={colors.success} />
               <Text style={styles.menuItemText}>Add Measure at End</Text>
             </TouchableOpacity>
+
+            {/* Insert measure before current - only show if handler provided */}
+            {onInsertMeasureBefore && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={handleInsertMeasureBefore}
+                testID="menu-insert-before"
+              >
+                <Feather
+                  name="corner-left-up"
+                  size={18}
+                  color={colors.success}
+                />
+                <Text style={styles.menuItemText}>Insert Measure Before</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Insert measure after current - only show if handler provided */}
+            {onInsertMeasureAfter && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={handleInsertMeasureAfter}
+                testID="menu-insert-after"
+              >
+                <Feather
+                  name="corner-right-down"
+                  size={18}
+                  color={colors.success}
+                />
+                <Text style={styles.menuItemText}>Insert Measure After</Text>
+              </TouchableOpacity>
+            )}
 
             {/* Add/Edit pickup measure - only show if onAddPickup is provided */}
             {onAddPickup && (

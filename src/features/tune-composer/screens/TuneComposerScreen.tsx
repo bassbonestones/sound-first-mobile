@@ -516,6 +516,14 @@ function TuneComposerScreenContent({
     composerState.addMeasure();
   }, [composerState]);
 
+  const handleInsertMeasureBefore = useCallback(() => {
+    composerState.insertMeasureBefore();
+  }, [composerState]);
+
+  const handleInsertMeasureAfter = useCallback(() => {
+    composerState.insertMeasureAfter();
+  }, [composerState]);
+
   const handleDeleteMeasure = useCallback(() => {
     composerState.deleteMeasure();
   }, [composerState]);
@@ -1363,6 +1371,8 @@ function TuneComposerScreenContent({
                 validation={measureValidation}
                 onDelete={handleDelete}
                 onAddMeasure={handleAddMeasure}
+                onInsertMeasureBefore={handleInsertMeasureBefore}
+                onInsertMeasureAfter={handleInsertMeasureAfter}
                 onDeleteMeasure={handleDeleteMeasure}
                 onDeleteLastMeasure={handleDeleteLastMeasure}
                 onFillWithRests={handleFillWithRests}

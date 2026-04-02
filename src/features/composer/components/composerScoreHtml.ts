@@ -148,18 +148,6 @@ export function generateComposerOsmdHtml(
       font-size: 85% !important;
     }
 
-    /* Hide chord symbols initially - they'll be shown after JS repositioning.
-       This prevents visible flicker when chords need repositioning. */
-    svg g.vf-text.chord-needs-reposition,
-    svg g.vf-modifiers.chord-needs-reposition {
-      opacity: 0;
-    }
-    svg g.vf-text.chord-repositioned,
-    svg g.vf-modifiers.chord-repositioned {
-      opacity: 1;
-      transition: opacity 0.05s ease-in;
-    }
-
     /* Make notes clickable */
     svg .vf-notehead,
     svg .vf-stavenote,
@@ -185,6 +173,7 @@ export function generateComposerOsmdHtml(
     let currentZoom = ${initialZoom};
     let pendingMusicXml = null;
     let pendingChordPositions = null; // Chord positions waiting to be applied after render
+    let hasEverReceivedPositions = false; // Track if we've ever received chord positions
     let noteElements = []; // Map of note IDs to SVG elements
     let lastSelectedNoteId = null;
     let lastSmoothScrolledMeasure = -1; // Track last smooth-scrolled measure (for playback only)
@@ -294,9 +283,6 @@ export function generateComposerOsmdHtml(
       if (!osmd) {
         if (!initOsmd()) return;
       }
-      
-      // Clear any stale chord positions from previous render
-      pendingChordPositions = null;
 
       const loadingEl = document.getElementById('loading');
       
@@ -315,12 +301,13 @@ export function generateComposerOsmdHtml(
         
         setZoom(currentZoom);
         shortenChordSymbols();
-        debugChordElements(); // Log what OSMD created
-        
+
         // Apply any pending chord positions immediately (before browser paints)
-        if (pendingChordPositions) {
+        // This reuses cached positions from previous render to prevent flicker
+        if (pendingChordPositions && pendingChordPositions.length > 0) {
           applyChordPositions(pendingChordPositions);
         }
+        // For first load, positions will be sent after measurePositions are received
         
         buildNoteMap();
         addNoteClickHandlers();
@@ -338,13 +325,11 @@ export function generateComposerOsmdHtml(
     function debugChordElements() {
       const svg = document.querySelector('#osmd-container svg');
       if (!svg) {
-        console.log('[DEBUG] No SVG found');
         return;
       }
 
       // Check OSMD's internal chord data
       if (osmd && osmd.sheet) {
-        // console.log('[DEBUG] OSMD sheet loaded, checking for harmony...');
         if (osmd.sheet.sourceMeasures) {
           let totalChordContainers = 0;
           for (let m = 0; m < osmd.sheet.sourceMeasures.length; m++) {
@@ -355,14 +340,12 @@ export function generateComposerOsmdHtml(
                   for (const se of vstec.StaffEntries) {
                     if (se && se.ChordContainers && se.ChordContainers.length > 0) {
                       totalChordContainers += se.ChordContainers.length;
-                      // console.log('[DEBUG] Measure ' + m + ' has ' + se.ChordContainers.length + ' chord containers');
                     }
                   }
                 }
               }
             }
           }
-          // console.log('[DEBUG] Total chord containers in sheet:', totalChordContainers);
         }
       }
 
@@ -604,14 +587,159 @@ export function generateComposerOsmdHtml(
       });
     }
 
+    // Count chord text elements in the SVG (used to detect stale cache)
+    function countChordElements() {
+      const svgContainer = document.querySelector('#osmd-container svg');
+      if (!svgContainer) return 0;
+      
+      const allTextElements = Array.from(svgContainer.querySelectorAll('g.vf-text text, g.vf-modifiers text'));
+      const chordPatterns = /^[A-G][b#]?(maj|min|m|dim|aug|sus|add|7|6|9|11|13)?/i;
+      
+      let count = 0;
+      allTextElements.forEach((textEl) => {
+        const content = textEl.textContent?.trim();
+        if (!content || content.length === 0 || content.length > 20) return;
+        if (/[,.'!?:]/.test(content) || content.includes(' ')) return;
+        if (/^(=|[0-9]+|Swing|Straight|Fast|Slow|Moderato|Allegro|Andante)$/i.test(content)) return;
+        if (/^[a-z]+$/.test(content) && content.length < 4) return;
+        
+        if (chordPatterns.test(content)) {
+          count++;
+        }
+      });
+      return count;
+    }
+
+    // Track elements hidden for repositioning
+    let hiddenRepositionElements = [];
+
+    // Hide only the specific chords that need repositioning (to prevent flicker)
+    function hideRepositionChords(chordPositions) {
+      hiddenRepositionElements = [];
+      const svgContainer = document.querySelector('#osmd-container svg');
+      if (!svgContainer) return;
+      
+      const allTextElements = Array.from(svgContainer.querySelectorAll('g.vf-text text, g.vf-modifiers text'));
+      const chordPatterns = /^[A-G][b#]?(maj|min|m|dim|aug|sus|add|7|6|9|11|13)?/i;
+      
+      // Find all chord elements
+      const chordTextElements = [];
+      allTextElements.forEach((textEl) => {
+        const content = textEl.textContent?.trim();
+        if (!content || content.length === 0 || content.length > 20) return;
+        if (/[,.'!?:]/.test(content) || content.includes(' ')) return;
+        if (/^(=|[0-9]+|Swing|Straight|Fast|Slow|Moderato|Allegro|Andante)$/i.test(content)) return;
+        if (/^[a-z]+$/.test(content) && content.length < 4) return;
+        
+        if (chordPatterns.test(content)) {
+          const parentGroup = textEl.closest('g');
+          if (parentGroup) {
+            chordTextElements.push(parentGroup);
+          }
+        }
+      });
+      
+      // Sort positions to match chord element order
+      const sortedPositions = chordPositions.slice().sort((a, b) => {
+        if (a.measureIndex !== b.measureIndex) return a.measureIndex - b.measureIndex;
+        return a.beatPosition - b.beatPosition;
+      });
+      
+      // Hide only chords that need repositioning
+      const numToProcess = Math.min(chordTextElements.length, sortedPositions.length);
+      for (let i = 0; i < numToProcess; i++) {
+        if (sortedPositions[i].needsRepositioning) {
+          const el = chordTextElements[i];
+          el.style.visibility = 'hidden';
+          hiddenRepositionElements.push(el);
+        }
+      }
+    }
+
+    // Show the repositioned chords
+    function showRepositionChords() {
+      for (const el of hiddenRepositionElements) {
+        el.style.visibility = 'visible';
+      }
+      hiddenRepositionElements = [];
+    }
+
     // Reposition chord symbols to their correct beat positions
     // Called from React Native with pre-calculated X positions
     // chordPositions: Array of { measureIndex, beatPosition, x, needsRepositioning }
     window.repositionChordSymbols = function(chordPositions) {
-      // Store positions for use when rendering completes
+      // Store positions for reuse on subsequent renders (prevents flicker)
       pendingChordPositions = chordPositions;
-      // Also apply immediately if OSMD has already rendered
+      hasEverReceivedPositions = true;
+      
+      // Apply positions
       applyChordPositions(chordPositions);
+    };
+
+    // Highlight a note by measure and note index
+    // Uses an overlay rectangle instead of modifying OSMD's SVG elements
+    // This allows us to highlight without re-rendering OSMD
+    window.highlightNote = function(measureIndex, noteIndex) {
+      // Hide overlay if clearing
+      const existingOverlay = document.getElementById('note-highlight-overlay');
+      if (measureIndex < 0 || noteIndex < 0) {
+        if (existingOverlay) existingOverlay.style.display = 'none';
+        return;
+      }
+
+      // Find the note element
+      const noteInfo = noteElements.find(
+        n => n.measureIndex === measureIndex && n.noteIndex === noteIndex
+      );
+      if (!noteInfo || !noteInfo.element) {
+        console.log('[highlightNote] Note not found:', measureIndex, noteIndex, 'total notes:', noteElements.length);
+        if (existingOverlay) existingOverlay.style.display = 'none';
+        return;
+      }
+
+      // Get the bounding box from OSMD's graphical note
+      const graphicalNote = noteInfo.element;
+      if (!graphicalNote.boundingBox) {
+        console.log('[highlightNote] No bounding box for note', measureIndex, noteIndex);
+        return;
+      }
+
+      const bbox = graphicalNote.boundingBox;
+      // OSMD stores absolute position separately
+      const absPos = bbox.absolutePosition || { x: 0, y: 0 };
+      
+      // Calculate position in SVG units (OSMD uses units that need *10 for pixels)
+      const x = (absPos.x + bbox.borderLeft) * 10 * currentZoom;
+      const y = (absPos.y + bbox.borderTop) * 10 * currentZoom;
+      const width = bbox.width * 10 * currentZoom;
+      const height = bbox.height * 10 * currentZoom;
+
+      // Create or update highlight overlay
+      const svg = document.querySelector('#osmd-container svg');
+      if (!svg) return;
+
+      let highlightEl = document.getElementById('note-highlight-overlay');
+      if (!highlightEl) {
+        highlightEl = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        highlightEl.id = 'note-highlight-overlay';
+        highlightEl.setAttribute('fill', '#0066CC');
+        highlightEl.setAttribute('fill-opacity', '0.3');
+        highlightEl.setAttribute('stroke', '#0066CC');
+        highlightEl.setAttribute('stroke-width', '2');
+        highlightEl.setAttribute('rx', '4');
+        highlightEl.setAttribute('ry', '4');
+        highlightEl.style.pointerEvents = 'none';
+        svg.appendChild(highlightEl);
+      }
+
+      // Position the highlight
+      highlightEl.setAttribute('x', x - 4);
+      highlightEl.setAttribute('y', y - 4);
+      highlightEl.setAttribute('width', width + 8);
+      highlightEl.setAttribute('height', height + 8);
+      highlightEl.style.display = 'block';
+      
+      console.log('[highlightNote] Positioned overlay at', x, y, 'size', width, height);
     };
 
     // Apply stored chord positions to SVG elements
@@ -621,6 +749,9 @@ export function generateComposerOsmdHtml(
         console.log('applyChordPositions: No SVG container');
         return;
       }
+      
+      // Normalize input
+      const positions = Array.isArray(chordPositions) ? chordPositions : [];
 
       // OSMD renders chords as plain vf-text elements, not special ChordSymbol groups
       // We need to find them by content matching against chord symbol patterns
@@ -660,7 +791,7 @@ export function generateComposerOsmdHtml(
         }
       });
 
-      console.log('applyChordPositions: Found ' + chordTextElements.length + ' chord text elements for ' + chordPositions.length + ' positions');
+      console.log('applyChordPositions: Found ' + chordTextElements.length + ' chord text elements for ' + positions.length + ' positions');
       console.log('applyChordPositions: Chord texts found:', chordTextElements.map(c => c.text).join(', '));
       
       if (chordTextElements.length === 0) {
@@ -668,7 +799,7 @@ export function generateComposerOsmdHtml(
       }
 
       // Sort chord positions by measure then beat (same order OSMD renders them)
-      const sortedPositions = chordPositions.slice().sort((a, b) => {
+      const sortedPositions = positions.slice().sort((a, b) => {
         if (a.measureIndex !== b.measureIndex) return a.measureIndex - b.measureIndex;
         return a.beatPosition - b.beatPosition;
       });
@@ -841,7 +972,6 @@ export function generateComposerOsmdHtml(
       if (!osmd || !osmd.graphic || !osmd.graphic.measureList) return;
 
       const measureList = osmd.graphic.measureList;
-      let globalNoteIndex = 0;
 
       for (let mIdx = 0; mIdx < measureList.length; mIdx++) {
         const staffMeasures = measureList[mIdx];
@@ -850,6 +980,7 @@ export function generateComposerOsmdHtml(
         const staffMeasure = staffMeasures[0]; // Single staff
         if (!staffMeasure || !staffMeasure.staffEntries) continue;
 
+        let measureNoteIndex = 0; // Per-measure index
         for (let seIdx = 0; seIdx < staffMeasure.staffEntries.length; seIdx++) {
           const staffEntry = staffMeasure.staffEntries[seIdx];
           if (!staffEntry || !staffEntry.graphicalVoiceEntries) continue;
@@ -857,14 +988,14 @@ export function generateComposerOsmdHtml(
           for (const gve of staffEntry.graphicalVoiceEntries) {
             if (!gve || !gve.notes) continue;
             for (const note of gve.notes) {
-              // Store reference with position info
+              // Store reference with position info (per-measure noteIndex)
               noteElements.push({
                 measureIndex: mIdx,
-                noteIndex: globalNoteIndex,
+                noteIndex: measureNoteIndex,
                 element: note,
                 boundingBox: note.boundingBox || null,
               });
-              globalNoteIndex++;
+              measureNoteIndex++;
             }
           }
         }

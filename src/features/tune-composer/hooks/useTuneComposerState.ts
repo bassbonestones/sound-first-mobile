@@ -117,6 +117,8 @@ export interface UseTuneComposerStateReturn {
 
   // Measure Operations
   addMeasure: () => void;
+  insertMeasureBefore: () => void;
+  insertMeasureAfter: () => void;
   deleteMeasure: () => void;
   deleteLastMeasure: () => void;
   fillMeasureWithRests: () => void;
@@ -583,6 +585,90 @@ export function useTuneComposerState(
       isDirty: true,
     }));
   }, [state.score.measures.length, state.score.timeSignature, undoManager]);
+
+  const insertMeasureBefore = useCallback(() => {
+    const newMeasure = createMeasure(state.score.timeSignature);
+    const insertIndex = state.cursor.measureIndex;
+
+    const action = createAddMeasureAction(insertIndex, newMeasure);
+    undoManager.pushAction(action);
+
+    // Cursor stays at same index (now pointing to the new measure)
+    const newCursor = { measureIndex: insertIndex, noteIndex: 0 };
+    cursorRef.current = newCursor;
+
+    setState((prev) => {
+      const newMeasures = [...prev.score.measures];
+      newMeasures.splice(insertIndex, 0, newMeasure);
+
+      // Shift chord positions: all chords at or after insertIndex need +1
+      const updatedProgressions = prev.score.chordProgressions.map((prog) => ({
+        ...prog,
+        chords: prog.chords.map((chord) => ({
+          ...chord,
+          measureIndex:
+            chord.measureIndex >= insertIndex
+              ? chord.measureIndex + 1
+              : chord.measureIndex,
+        })),
+      }));
+
+      return {
+        ...prev,
+        score: {
+          ...prev.score,
+          measures: newMeasures,
+          chordProgressions: updatedProgressions,
+          updatedAt: new Date().toISOString(),
+        },
+        cursor: newCursor,
+        selectedNoteId: newMeasure.notes[0]?.id ?? null,
+        isDirty: true,
+      };
+    });
+  }, [state.cursor.measureIndex, state.score.timeSignature, undoManager]);
+
+  const insertMeasureAfter = useCallback(() => {
+    const newMeasure = createMeasure(state.score.timeSignature);
+    const insertIndex = state.cursor.measureIndex + 1;
+
+    const action = createAddMeasureAction(insertIndex, newMeasure);
+    undoManager.pushAction(action);
+
+    // Move cursor to the new measure
+    const newCursor = { measureIndex: insertIndex, noteIndex: 0 };
+    cursorRef.current = newCursor;
+
+    setState((prev) => {
+      const newMeasures = [...prev.score.measures];
+      newMeasures.splice(insertIndex, 0, newMeasure);
+
+      // Shift chord positions: all chords at or after insertIndex need +1
+      const updatedProgressions = prev.score.chordProgressions.map((prog) => ({
+        ...prog,
+        chords: prog.chords.map((chord) => ({
+          ...chord,
+          measureIndex:
+            chord.measureIndex >= insertIndex
+              ? chord.measureIndex + 1
+              : chord.measureIndex,
+        })),
+      }));
+
+      return {
+        ...prev,
+        score: {
+          ...prev.score,
+          measures: newMeasures,
+          chordProgressions: updatedProgressions,
+          updatedAt: new Date().toISOString(),
+        },
+        cursor: newCursor,
+        selectedNoteId: newMeasure.notes[0]?.id ?? null,
+        isDirty: true,
+      };
+    });
+  }, [state.cursor.measureIndex, state.score.timeSignature, undoManager]);
 
   const deleteMeasure = useCallback(() => {
     if (state.score.measures.length <= 1) return;
@@ -1567,6 +1653,8 @@ export function useTuneComposerState(
 
     // Measure Operations
     addMeasure,
+    insertMeasureBefore,
+    insertMeasureAfter,
     deleteMeasure,
     deleteLastMeasure,
     fillMeasureWithRests,
