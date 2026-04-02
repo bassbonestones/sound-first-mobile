@@ -903,11 +903,33 @@ function generateMeasureXml(
     }
   }
 
+  // Calculate note beat positions for this measure (needed for chord positioning checks)
+  const noteBeatPositions: number[] = [];
+  let currentBeatCalc = 0;
+  for (const note of measure.notes) {
+    noteBeatPositions.push(currentBeatCalc);
+    currentBeatCalc += note.duration;
+  }
+
+  // Check if any chord falls in the middle of a note (not at a note boundary).
+  // OSMD crashes with "parentVoiceEntry undefined" when forward/backup steps into
+  // the middle of a note. In such cases, we must use interleaving instead.
+  const hasChordInMiddleOfNote = measureChords.some((chord) => {
+    const chordBeat = chord.beatPositionInQuarters;
+    // Check if this chord beat matches any note start position
+    return !noteBeatPositions.some(
+      (noteBeat) => Math.abs(noteBeat - chordBeat) < 0.001,
+    );
+  });
+
   // Generate harmony elements first using forward/backup for explicit positioning
   // This ensures OSMD positions chords at the correct beat, not relative to adjacent notes
-  // EXCEPTION: For the LAST measure in preview mode, chords are interleaved with notes instead (OSMD workaround)
+  // EXCEPTION: Use interleaving instead when:
+  //   - Last measure in preview mode (historical OSMD workaround)
+  //   - Any chord falls in the middle of a note (forward/backup crashes OSMD)
   // In export mode, always use forward/backup for proper MusicXML output
-  const useForwardBackup = !isLastMeasure || options.exportMode;
+  const useForwardBackup =
+    options.exportMode || (!isLastMeasure && !hasChordInMiddleOfNote);
   let harmoniesXml = "";
   if (measureChords.length > 0 && useForwardBackup) {
     devLog(
@@ -950,9 +972,10 @@ function generateMeasureXml(
     );
   }
 
-  // For the LAST measure in preview mode only, we need to interleave harmonies with notes
-  // because forward/backup crashes OSMD on the last measure.
-  // In export mode, we use forward/backup for all measures (proper MusicXML).
+  // For measures that can't use forward/backup, we interleave harmonies with notes.
+  // This applies to:
+  //   - Last measure in preview mode (historical workaround)
+  //   - Measures where a chord falls in the middle of a note
   // Build a map of which chords go before which note index.
   const useInterleaving = !useForwardBackup;
   const lastMeasureChordsBeforeNote = new Map<
@@ -966,15 +989,8 @@ function generateMeasureXml(
 
   if (useInterleaving && measureChords.length > 0) {
     devLog(
-      `[MusicXML] Last measure ${measureIndex}: ${measureChords.length} chords (interleaving with notes)`,
+      `[MusicXML] Measure ${measureIndex}: ${measureChords.length} chords (interleaving - ${hasChordInMiddleOfNote ? "chord in middle of note" : "last measure"})`,
     );
-    // Calculate beat position for each note
-    const noteBeatPositions: number[] = [];
-    let currentBeat = 0;
-    for (const note of measure.notes) {
-      noteBeatPositions.push(currentBeat);
-      currentBeat += note.duration;
-    }
     devLog(
       `[MusicXML] Note beat positions:`,
       noteBeatPositions.map((b) => b.toFixed(2)).join(", "),
