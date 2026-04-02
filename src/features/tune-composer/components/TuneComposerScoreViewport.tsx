@@ -433,11 +433,17 @@ function TuneComposerScoreViewportComponent({
     // );
     if (!progression || progression.chords.length === 0) return;
 
+    // Find the last measure with chords for repositioning logic
+    const lastMeasureWithChords = Math.max(
+      ...progression.chords.map((c) => c.measureIndex),
+    );
+
     // Calculate X positions for each chord
     const chordPositions: {
       measureIndex: number;
       beatPosition: number;
       x: number;
+      needsRepositioning: boolean;
     }[] = [];
     const beatUnitDuration = getBeatUnitDuration(score.timeSignature);
     const beatsPerMeasure = score.timeSignature.beats;
@@ -558,11 +564,20 @@ function TuneComposerScoreViewportComponent({
         xPosition = measurePos.noteStartX ?? measurePos.x + 50;
       }
 
+      // Check if this chord needs repositioning:
+      // 1. Last measure always uses interleaving (OSMD workaround)
+      // 2. Mid-note chords: OSMD places at forward position, ignoring offset
+      const isLastMeasure = chord.measureIndex === lastMeasureWithChords;
+      const isMidNoteChord = !noteBeatPositions.some(
+        (bp) => Math.abs(bp.beat - targetBeatInQuarters) < 0.001,
+      );
+
       // Convert to OSMD units (divide by 10 since OSMD multiplies by 10)
       chordPositions.push({
         measureIndex: chord.measureIndex,
         beatPosition: chord.beatPosition,
         x: xPosition / 10,
+        needsRepositioning: isLastMeasure || isMidNoteChord,
       });
       // console.log(
       //   `[ChordReposition] Chord m${chord.measureIndex} beat${chord.beatPosition} -> x=${(xPosition / 10).toFixed(1)}`,

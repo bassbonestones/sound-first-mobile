@@ -912,57 +912,77 @@ function generateMeasureXml(
   }
 
   // Check if any chord falls in the middle of a note (not at a note boundary).
-  // OSMD crashes with "parentVoiceEntry undefined" when forward/backup steps into
-  // the middle of a note. In such cases, we must use interleaving instead.
-  const hasChordInMiddleOfNote = measureChords.some((chord) => {
+  // For such chords, we need special handling to avoid OSMD crash.
+  const chordsWithMidNoteInfo = measureChords.map((chord) => {
     const chordBeat = chord.beatPositionInQuarters;
-    // Check if this chord beat matches any note start position
-    return !noteBeatPositions.some(
+    // Find the closest note boundary at or before this chord
+    let prevNoteBeat = 0;
+    for (const noteBeat of noteBeatPositions) {
+      if (noteBeat <= chordBeat + 0.001) {
+        prevNoteBeat = noteBeat;
+      } else {
+        break;
+      }
+    }
+    const isMidNote = !noteBeatPositions.some(
       (noteBeat) => Math.abs(noteBeat - chordBeat) < 0.001,
     );
+    return {
+      chord,
+      isMidNote,
+      prevNoteBeat,
+      offsetFromPrevNote: chordBeat - prevNoteBeat,
+    };
   });
 
-  // Generate harmony elements first using forward/backup for explicit positioning
-  // This ensures OSMD positions chords at the correct beat, not relative to adjacent notes
-  // EXCEPTION: Use interleaving instead when:
-  //   - Last measure in preview mode (historical OSMD workaround)
-  //   - Any chord falls in the middle of a note (forward/backup crashes OSMD)
-  // In export mode, always use forward/backup for proper MusicXML output
-  const useForwardBackup =
-    options.exportMode || (!isLastMeasure && !hasChordInMiddleOfNote);
+  const hasChordInMiddleOfNote = chordsWithMidNoteInfo.some((c) => c.isMidNote);
+
+  // Separate chords into two groups:
+  // 1. Chords at note boundaries: use forward/backup (stable positioning by OSMD)
+  // 2. Mid-note chords: use interleaving (placed before containing note, JS repositions)
+  // Last measure always uses interleaving (historical OSMD workaround)
+  const chordsForForwardBackup = chordsWithMidNoteInfo.filter(
+    (c) => !c.isMidNote,
+  );
+  const chordsForInterleaving = chordsWithMidNoteInfo.filter(
+    (c) => c.isMidNote,
+  );
+
+  // Generate harmony elements using forward/backup for chords at note boundaries
+  // In export mode, use forward/backup for all chords for proper MusicXML output
+  const useForwardBackup = options.exportMode || !isLastMeasure;
   let harmoniesXml = "";
-  if (measureChords.length > 0 && useForwardBackup) {
+  if (useForwardBackup && chordsForForwardBackup.length > 0) {
     devLog(
-      `[MusicXML] Measure ${measureIndex}: ${measureChords.length} chords`,
+      `[MusicXML] Measure ${measureIndex}: ${chordsForForwardBackup.length} chords via forward/backup`,
     );
-    for (const chord of measureChords) {
-      const offsetDivisions = Math.round(chord.beatPositionInQuarters * 12);
+    for (const chordInfo of chordsForForwardBackup) {
+      const { chord } = chordInfo;
       const resolvedSymbol = resolveChordSymbol(
         chord,
         keyInfo.effectiveKey,
         preferFlats,
       );
+      const forwardDivisions = Math.round(chord.beatPositionInQuarters * 12);
+
       devLog(
-        `[MusicXML] Chord "${resolvedSymbol}" at beat ${chord.beatPosition} (${chord.beatPositionInQuarters} quarters), offset=${offsetDivisions} divisions`,
+        `[MusicXML] Chord "${resolvedSymbol}" at beat ${chord.beatPosition} (${chord.beatPositionInQuarters} quarters), forward=${forwardDivisions}`,
       );
 
       // Use forward/backup for non-zero offset positions
-      if (offsetDivisions > 0) {
-        // Forward to the chord's position
+      if (forwardDivisions > 0) {
         harmoniesXml += `
       <forward>
-        <duration>${offsetDivisions}</duration>
+        <duration>${forwardDivisions}</duration>
       </forward>`;
       }
 
-      // Output harmony
       harmoniesXml += "\n" + generateHarmonyXml(resolvedSymbol, 0);
 
-      if (offsetDivisions > 0) {
-        // Backup to start of measure
+      if (forwardDivisions > 0) {
         harmoniesXml += `
       <backup>
-        <duration>${offsetDivisions}</duration>
+        <duration>${forwardDivisions}</duration>
       </backup>`;
       }
     }
@@ -972,24 +992,28 @@ function generateMeasureXml(
     );
   }
 
-  // For measures that can't use forward/backup, we interleave harmonies with notes.
-  // This applies to:
-  //   - Last measure in preview mode (historical workaround)
-  //   - Measures where a chord falls in the middle of a note
+  // For the last measure in preview mode OR mid-note chords, we interleave harmonies with notes.
+  // - Last measure: historical workaround for OSMD rendering issues
+  // - Mid-note chords: forward/backup causes flicker; interleaving is stable
+  // We post-process these chord positions with JavaScript repositioning.
   // Build a map of which chords go before which note index.
-  const useInterleaving = !useForwardBackup;
-  const lastMeasureChordsBeforeNote = new Map<
+  const useInterleavingForAll = !useForwardBackup; // Last measure case
+  const chordsToInterleave = useInterleavingForAll
+    ? measureChords
+    : chordsForInterleaving.map((c) => c.chord);
+
+  const interleavedChordsBeforeNote = new Map<
     number,
     Array<{ chord: (typeof measureChords)[0]; offsetDivisions: number }>
   >();
-  const lastMeasureChordsAtEnd: Array<{
+  const interleavedChordsAtEnd: Array<{
     chord: (typeof measureChords)[0];
     offsetDivisions: number;
   }> = [];
 
-  if (useInterleaving && measureChords.length > 0) {
+  if (chordsToInterleave.length > 0) {
     devLog(
-      `[MusicXML] Measure ${measureIndex}: ${measureChords.length} chords (interleaving - ${hasChordInMiddleOfNote ? "chord in middle of note" : "last measure"})`,
+      `[MusicXML] Measure ${measureIndex}: ${chordsToInterleave.length} chords (interleaving${useInterleavingForAll ? " - last measure" : " - mid-note"})`,
     );
     devLog(
       `[MusicXML] Note beat positions:`,
@@ -997,7 +1021,7 @@ function generateMeasureXml(
     );
 
     // Assign each chord to appear before the appropriate note
-    for (const chord of measureChords) {
+    for (const chord of chordsToInterleave) {
       const chordBeat = chord.beatPositionInQuarters;
       const offsetDivisions = Math.round(chordBeat * 12);
       const resolvedSymbol = resolveChordSymbol(
@@ -1006,22 +1030,38 @@ function generateMeasureXml(
         preferFlats,
       );
 
-      // Find the first note that starts at or after this chord's beat
-      const noteIndex = noteBeatPositions.findIndex(
-        (beat) => beat >= chordBeat,
+      // Check if chord falls exactly on a note boundary
+      const exactNoteIndex = noteBeatPositions.findIndex(
+        (beat) => Math.abs(beat - chordBeat) < 0.001,
       );
 
+      let noteIndex: number;
+      if (exactNoteIndex !== -1) {
+        // Chord is exactly at a note boundary - place before that note
+        noteIndex = exactNoteIndex;
+      } else {
+        // Mid-note chord: find the note that CONTAINS this beat
+        // (the last note that starts before this beat)
+        noteIndex = -1;
+        for (let i = noteBeatPositions.length - 1; i >= 0; i--) {
+          if (noteBeatPositions[i] < chordBeat) {
+            noteIndex = i;
+            break;
+          }
+        }
+      }
+
       if (noteIndex === -1) {
-        // No note at or after this beat - chord goes at end
-        lastMeasureChordsAtEnd.push({ chord, offsetDivisions });
+        // No note contains this beat - chord goes at end
+        interleavedChordsAtEnd.push({ chord, offsetDivisions });
         devLog(
           `[MusicXML] Chord "${resolvedSymbol}" at beat ${chordBeat} -> after all notes`,
         );
       } else {
         // Chord goes before this note
-        const existing = lastMeasureChordsBeforeNote.get(noteIndex) || [];
+        const existing = interleavedChordsBeforeNote.get(noteIndex) || [];
         existing.push({ chord, offsetDivisions });
-        lastMeasureChordsBeforeNote.set(noteIndex, existing);
+        interleavedChordsBeforeNote.set(noteIndex, existing);
         devLog(
           `[MusicXML] Chord "${resolvedSymbol}" at beat ${chordBeat} -> before note ${noteIndex} (at beat ${noteBeatPositions[noteIndex]})`,
         );
@@ -1029,22 +1069,20 @@ function generateMeasureXml(
     }
   }
 
-  // Generate notes with directions (and interleaved harmonies for last measure)
+  // Generate notes with directions (and interleaved harmonies)
   for (let noteIndex = 0; noteIndex < measure.notes.length; noteIndex++) {
     const note = measure.notes[noteIndex];
 
-    // For last measure in preview mode: output any chords that should appear before this note
-    if (useInterleaving) {
-      const chordsHere = lastMeasureChordsBeforeNote.get(noteIndex) || [];
-      for (const { chord } of chordsHere) {
-        const resolvedSymbol = resolveChordSymbol(
-          chord,
-          keyInfo.effectiveKey,
-          preferFlats,
-        );
-        // Don't use offset for interleaved chords - position is determined by document order
-        notesXml += "\n" + generateHarmonyXml(resolvedSymbol, 0);
-      }
+    // Output any interleaved chords that should appear before this note
+    const chordsHere = interleavedChordsBeforeNote.get(noteIndex) || [];
+    for (const { chord } of chordsHere) {
+      const resolvedSymbol = resolveChordSymbol(
+        chord,
+        keyInfo.effectiveKey,
+        preferFlats,
+      );
+      // Don't use offset for interleaved chords - position is determined by document order
+      notesXml += "\n" + generateHarmonyXml(resolvedSymbol, 0);
     }
 
     // Add direction before note for dynamics/expression
@@ -1079,17 +1117,15 @@ function generateMeasureXml(
       );
   }
 
-  // For last measure in preview mode: output any chords that come after all notes
-  if (useInterleaving) {
-    for (const { chord } of lastMeasureChordsAtEnd) {
-      const resolvedSymbol = resolveChordSymbol(
-        chord,
-        keyInfo.effectiveKey,
-        preferFlats,
-      );
-      // Don't use offset - these come after all notes
-      notesXml += "\n" + generateHarmonyXml(resolvedSymbol, 0);
-    }
+  // Output any interleaved chords that come after all notes
+  for (const { chord } of interleavedChordsAtEnd) {
+    const resolvedSymbol = resolveChordSymbol(
+      chord,
+      keyInfo.effectiveKey,
+      preferFlats,
+    );
+    // Don't use offset - these come after all notes
+    notesXml += "\n" + generateHarmonyXml(resolvedSymbol, 0);
   }
 
   // Attributes: full on first measure, key/time changes mid-piece

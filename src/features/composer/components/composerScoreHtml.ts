@@ -148,6 +148,18 @@ export function generateComposerOsmdHtml(
       font-size: 85% !important;
     }
 
+    /* Hide chord symbols initially - they'll be shown after JS repositioning.
+       This prevents visible flicker when chords need repositioning. */
+    svg g.vf-text.chord-needs-reposition,
+    svg g.vf-modifiers.chord-needs-reposition {
+      opacity: 0;
+    }
+    svg g.vf-text.chord-repositioned,
+    svg g.vf-modifiers.chord-repositioned {
+      opacity: 1;
+      transition: opacity 0.05s ease-in;
+    }
+
     /* Make notes clickable */
     svg .vf-notehead,
     svg .vf-stavenote,
@@ -172,6 +184,7 @@ export function generateComposerOsmdHtml(
     let osmd = null;
     let currentZoom = ${initialZoom};
     let pendingMusicXml = null;
+    let pendingChordPositions = null; // Chord positions waiting to be applied after render
     let noteElements = []; // Map of note IDs to SVG elements
     let lastSelectedNoteId = null;
     let lastSmoothScrolledMeasure = -1; // Track last smooth-scrolled measure (for playback only)
@@ -300,7 +313,12 @@ export function generateComposerOsmdHtml(
         setZoom(currentZoom);
         shortenChordSymbols();
         debugChordElements(); // Log what OSMD created
-        // Note: repositionChordSymbols is called from React Native after measurePositions are received
+        
+        // Apply any pending chord positions immediately (before browser paints)
+        if (pendingChordPositions) {
+          applyChordPositions(pendingChordPositions);
+        }
+        
         buildNoteMap();
         addNoteClickHandlers();
         sendMeasurePositions(); // Must run before replaceMetricModulations to populate window.lastMeasurePositions
@@ -585,11 +603,19 @@ export function generateComposerOsmdHtml(
 
     // Reposition chord symbols to their correct beat positions
     // Called from React Native with pre-calculated X positions
-    // chordPositions: Array of { measureIndex, beatPosition, x, symbol }
+    // chordPositions: Array of { measureIndex, beatPosition, x, needsRepositioning }
     window.repositionChordSymbols = function(chordPositions) {
+      // Store positions for use when rendering completes
+      pendingChordPositions = chordPositions;
+      // Also apply immediately if OSMD has already rendered
+      applyChordPositions(chordPositions);
+    };
+
+    // Apply stored chord positions to SVG elements
+    function applyChordPositions(chordPositions) {
       const svgContainer = document.querySelector('#osmd-container svg');
       if (!svgContainer) {
-        console.log('repositionChordSymbols: No SVG container');
+        console.log('applyChordPositions: No SVG container');
         return;
       }
 
@@ -631,8 +657,8 @@ export function generateComposerOsmdHtml(
         }
       });
 
-      console.log('repositionChordSymbols: Found ' + chordTextElements.length + ' chord text elements for ' + chordPositions.length + ' positions');
-      console.log('repositionChordSymbols: Chord texts found:', chordTextElements.map(c => c.text).join(', '));
+      console.log('applyChordPositions: Found ' + chordTextElements.length + ' chord text elements for ' + chordPositions.length + ' positions');
+      console.log('applyChordPositions: Chord texts found:', chordTextElements.map(c => c.text).join(', '));
       
       if (chordTextElements.length === 0) {
         return;
@@ -644,9 +670,6 @@ export function generateComposerOsmdHtml(
         return a.beatPosition - b.beatPosition;
       });
 
-      // Find the last measure index to identify which chords need repositioning
-      const lastMeasureIndex = Math.max(...sortedPositions.map(p => p.measureIndex));
-
       // Match chord elements to positions in order
       const numToProcess = Math.min(chordTextElements.length, sortedPositions.length);
       
@@ -655,16 +678,17 @@ export function generateComposerOsmdHtml(
         const chordGroup = chordInfo.element;
         const position = sortedPositions[i];
         
-        // Only reposition chords in the last measure
-        // Other measures use forward/backup which positions them correctly
-        if (position.measureIndex !== lastMeasureIndex) {
+        // Only reposition chords that need it:
+        // - Last measure chords (always use interleaving due to OSMD workaround)
+        // - Mid-note chords (OSMD places at forward position, ignores offset)
+        if (!position.needsRepositioning) {
           continue;
         }
         
         // Get the text element inside the group
         const textEl = chordGroup.querySelector('text');
         if (!textEl) {
-          console.log('repositionChordSymbols: No text element for chord ' + i + ' (' + chordInfo.text + ')');
+          console.log('applyChordPositions: No text element for chord ' + i + ' (' + chordInfo.text + ')');
           continue;
         }
         
@@ -672,14 +696,15 @@ export function generateComposerOsmdHtml(
         const currentX = parseFloat(textEl.getAttribute('x') || '0');
         // Target position comes divided by 10, so multiply back to get pixels
         const targetX = position.x * 10;
+        const delta = Math.abs(targetX - currentX);
         
-        if (Math.abs(targetX - currentX) > 10) {
+        if (delta > 10) {
           // Move by adding a translate transform to shift the group
           const deltaX = targetX - currentX;
           chordGroup.setAttribute('transform', 'translate(' + deltaX + ', 0)');
           console.log('Chord ' + i + ' ("' + chordInfo.text + '"): moved by delta=' + deltaX.toFixed(1) + ' to x=' + targetX.toFixed(1) + ' (measure ' + position.measureIndex + ', beat ' + position.beatPosition + ')');
         } else {
-          console.log('Chord ' + i + ' ("' + chordInfo.text + '"): already at correct position x=' + currentX.toFixed(1));
+          console.log('Chord ' + i + ' ("' + chordInfo.text + '"): already at correct position x=' + currentX.toFixed(1) + ' (delta=' + delta.toFixed(1) + ')');
         }
       }
     };
