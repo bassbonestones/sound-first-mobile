@@ -173,6 +173,7 @@ export function generateComposerOsmdHtml(
     let currentZoom = ${initialZoom};
     let pendingMusicXml = null;
     let pendingChordPositions = null; // Chord positions waiting to be applied after render
+    let lastRenderedChordCount = 0; // Track chord count from last render (to detect layout changes)
     let hasEverReceivedPositions = false; // Track if we've ever received chord positions
     let noteElements = []; // Map of note IDs to SVG elements
     let lastSelectedNoteId = null;
@@ -286,6 +287,9 @@ export function generateComposerOsmdHtml(
 
       const loadingEl = document.getElementById('loading');
       
+      // Capture chord count BEFORE rendering to detect layout changes
+      const chordCountBeforeRender = countActualChordElements();
+      
       try {
         if (loadingEl) {
           loadingEl.textContent = 'Rendering...';
@@ -303,10 +307,22 @@ export function generateComposerOsmdHtml(
         shortenChordSymbols();
 
         // Apply any pending chord positions immediately (before browser paints)
-        // This reuses cached positions from previous render to prevent flicker
-        if (pendingChordPositions && pendingChordPositions.length > 0) {
-          applyChordPositions(pendingChordPositions);
+        // This reuses cached positions from previous render to prevent flicker during navigation
+        // BUT: only apply if the layout hasn't changed (chord count unchanged)
+        // If layout changed, the cached positions have wrong X values - wait for fresh positions from React
+        const actualChordCount = countActualChordElements();
+        const layoutChanged = actualChordCount !== chordCountBeforeRender;
+        
+        if (pendingChordPositions && pendingChordPositions.length > 0 && !layoutChanged) {
+          if (actualChordCount === pendingChordPositions.length) {
+            // Layout unchanged - safe to apply cached positions (prevents flicker during navigation)
+            applyChordPositions(pendingChordPositions, true);
+          }
         }
+        
+        // Update the last rendered chord count
+        lastRenderedChordCount = actualChordCount;
+        
         // For first load, positions will be sent after measurePositions are received
         
         buildNoteMap();
@@ -320,6 +336,30 @@ export function generateComposerOsmdHtml(
         sendMessage('error', error.message);
       }
     };
+    
+    // Count actual chord elements in SVG using same logic as applyChordPositions
+    function countActualChordElements() {
+      const svgContainer = document.querySelector('#osmd-container svg');
+      if (!svgContainer) return 0;
+      
+      const allTextElements = Array.from(svgContainer.querySelectorAll('g.vf-text text, g.vf-modifiers text'));
+      const chordPatterns = /^[A-G][b#♭♯]?(maj|min|m|dim|aug|sus|add|Δ|°|ø|\\+)?[0-9]*(b5|#5|b9|#9|b11|#11|b13|#13)*(\\\/[A-G][b#♭♯]?)?$/i;
+      
+      let count = 0;
+      allTextElements.forEach((textEl) => {
+        const content = textEl.textContent?.trim();
+        if (!content || content.length === 0 || content.length > 20) return;
+        if (/[,.'!?:]/.test(content) || content.includes(' ')) return;
+        if (/^(=|\\d+|Swing|Straight|Fast|Slow|Moderato|Allegro|Andante)$/i.test(content)) return;
+        if (/^[a-z]+$/.test(content) && content.length < 4) return;
+        
+        if (chordPatterns.test(content) || 
+            /^[A-G][b#♭♯]?(m|maj|min|dim|aug|sus|6|7|9|11|13)/.test(content)) {
+          count++;
+        }
+      });
+      return count;
+    }
 
     // Debug: log all chord-related elements OSMD created
     function debugChordElements() {
@@ -672,8 +712,8 @@ export function generateComposerOsmdHtml(
       pendingChordPositions = chordPositions;
       hasEverReceivedPositions = true;
       
-      // Apply positions
-      applyChordPositions(chordPositions);
+      // Apply positions - force ALL chords to be repositioned since layout may have changed
+      applyChordPositions(chordPositions, true);
     };
 
     // Highlight a note by measure and note index
@@ -743,10 +783,11 @@ export function generateComposerOsmdHtml(
     };
 
     // Apply stored chord positions to SVG elements
-    function applyChordPositions(chordPositions) {
+    // forceAll: if true, reposition ALL chords (for fresh render after chord edit)
+    //           if false, only reposition chords marked needsRepositioning (for cached nav)
+    function applyChordPositions(chordPositions, forceAll) {
       const svgContainer = document.querySelector('#osmd-container svg');
       if (!svgContainer) {
-        console.log('applyChordPositions: No SVG container');
         return;
       }
       
@@ -790,9 +831,6 @@ export function generateComposerOsmdHtml(
           }
         }
       });
-
-      console.log('applyChordPositions: Found ' + chordTextElements.length + ' chord text elements for ' + positions.length + ' positions');
-      console.log('applyChordPositions: Chord texts found:', chordTextElements.map(c => c.text).join(', '));
       
       if (chordTextElements.length === 0) {
         return;
@@ -812,17 +850,17 @@ export function generateComposerOsmdHtml(
         const chordGroup = chordInfo.element;
         const position = sortedPositions[i];
         
-        // Only reposition chords that need it:
+        // Only reposition chords that need it (unless forceAll is set):
         // - Last measure chords (always use interleaving due to OSMD workaround)
         // - Mid-note chords (OSMD places at forward position, ignores offset)
-        if (!position.needsRepositioning) {
+        // forceAll is used when layout may have changed (chord added/edited)
+        if (!forceAll && !position.needsRepositioning) {
           continue;
         }
         
         // Get the text element inside the group
         const textEl = chordGroup.querySelector('text');
         if (!textEl) {
-          console.log('applyChordPositions: No text element for chord ' + i + ' (' + chordInfo.text + ')');
           continue;
         }
         
@@ -836,9 +874,6 @@ export function generateComposerOsmdHtml(
           // Move by adding a translate transform to shift the group
           const deltaX = targetX - currentX;
           chordGroup.setAttribute('transform', 'translate(' + deltaX + ', 0)');
-          console.log('Chord ' + i + ' ("' + chordInfo.text + '"): moved by delta=' + deltaX.toFixed(1) + ' to x=' + targetX.toFixed(1) + ' (measure ' + position.measureIndex + ', beat ' + position.beatPosition + ')');
-        } else {
-          console.log('Chord ' + i + ' ("' + chordInfo.text + '"): already at correct position x=' + currentX.toFixed(1) + ' (delta=' + delta.toFixed(1) + ')');
         }
       }
     };
