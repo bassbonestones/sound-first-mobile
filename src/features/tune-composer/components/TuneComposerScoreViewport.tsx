@@ -77,6 +77,8 @@ export interface TuneComposerScoreViewportProps {
   lyricsCursorPosition?: CursorPosition | null;
   /** Called when a note is tapped */
   onNoteTap?: (measureIndex: number, noteIndex: number) => void;
+  /** Called when a measure is double-tapped (for quick navigation) */
+  onMeasureDoubleTap?: (measureIndex: number) => void;
   /** Called when rendering completes */
   onRenderComplete?: () => void;
   /** Called on error */
@@ -127,6 +129,7 @@ function TuneComposerScoreViewportComponent({
   chordCursor,
   lyricsCursorPosition,
   onNoteTap,
+  onMeasureDoubleTap,
   onRenderComplete,
   onError,
   showZoomControls = true,
@@ -1225,6 +1228,14 @@ function TuneComposerScoreViewportComponent({
             break;
           }
 
+          case "measureDoubleTap": {
+            const { measureIndex } = data.payload as {
+              measureIndex: number;
+            };
+            onMeasureDoubleTap?.(measureIndex);
+            break;
+          }
+
           case "zoomChange":
             setZoom(data.payload as number);
             break;
@@ -1261,7 +1272,7 @@ function TuneComposerScoreViewportComponent({
         // Ignore parse errors
       }
     },
-    [onNoteTap, onRenderComplete, onError, executeScript],
+    [onNoteTap, onMeasureDoubleTap, onRenderComplete, onError, executeScript],
   );
 
   // Web iframe message listener

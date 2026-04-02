@@ -1039,6 +1039,41 @@ export function generateComposerOsmdHtml(
       // console.log('Built note map with ' + noteElements.length + ' notes');
     }
 
+    // Double-tap detection state
+    let lastTapTime = 0;
+    let lastTapX = 0;
+    let lastTapY = 0;
+    const DOUBLE_TAP_THRESHOLD = 300; // ms
+    const DOUBLE_TAP_DISTANCE = 30; // pixels
+
+    // Find measure index from X position using lastMeasurePositions
+    function findMeasureAtX(clickX) {
+      const measurePositions = window.lastMeasurePositions || [];
+      if (measurePositions.length === 0) return -1;
+
+      // clickX is event.offsetX / zoom, which gives us pixel position at zoom=1
+      // measurePositions.x is already in pixels (OSMD units * 10)
+      // So we can compare directly
+
+      // Find the measure that contains this x position
+      for (let i = 0; i < measurePositions.length; i++) {
+        const pos = measurePositions[i];
+        const nextPos = measurePositions[i + 1];
+        const measureStart = pos.x;
+        const measureEnd = nextPos ? nextPos.x : Infinity;
+
+        if (clickX >= measureStart && clickX < measureEnd) {
+          return pos.measureIndex;
+        }
+      }
+
+      // If past all measures, return last measure
+      if (measurePositions.length > 0) {
+        return measurePositions[measurePositions.length - 1].measureIndex;
+      }
+      return -1;
+    }
+
     // Add click handlers for note selection
     function addNoteClickHandlers() {
       const svgContainer = document.querySelector('#osmd-container svg');
@@ -1047,6 +1082,29 @@ export function generateComposerOsmdHtml(
       svgContainer.addEventListener('click', function(event) {
         const x = event.offsetX / currentZoom;
         const y = event.offsetY / currentZoom;
+        const now = Date.now();
+
+        // Check for double-tap
+        const timeSinceLastTap = now - lastTapTime;
+        const distanceFromLastTap = Math.sqrt(
+          Math.pow(event.offsetX - lastTapX, 2) + Math.pow(event.offsetY - lastTapY, 2)
+        );
+
+        if (timeSinceLastTap < DOUBLE_TAP_THRESHOLD && distanceFromLastTap < DOUBLE_TAP_DISTANCE) {
+          // Double-tap detected - find which measure was tapped
+          const measureIndex = findMeasureAtX(x);
+          if (measureIndex >= 0) {
+            sendMessage('measureDoubleTap', { measureIndex });
+          }
+          // Reset tap state to prevent triple-tap triggering again
+          lastTapTime = 0;
+          return;
+        }
+
+        // Update tap state for potential double-tap
+        lastTapTime = now;
+        lastTapX = event.offsetX;
+        lastTapY = event.offsetY;
 
         // Find closest note to click position
         let closestNote = null;

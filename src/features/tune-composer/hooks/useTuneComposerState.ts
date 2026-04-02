@@ -307,6 +307,8 @@ export interface UseTuneComposerStateReturn {
   toggleChordMode: () => void;
   /** Current chord cursor position */
   chordCursor: { measureIndex: number; beatPosition: number } | null;
+  /** Set chord cursor to a specific position */
+  setChordCursorPosition: (measureIndex: number, beatPosition: number) => void;
   /** Current chord symbol at cursor position */
   currentChordSymbol: string;
   /** Set chord at current cursor position */
@@ -1762,6 +1764,7 @@ export function useTuneComposerState(
     chordMode: chordsHook.chordMode,
     toggleChordMode: chordsHook.toggleChordMode,
     chordCursor: chordsHook.chordCursor,
+    setChordCursorPosition: chordsHook.setChordCursorPosition,
     currentChordSymbol: chordsHook.currentChordSymbol,
     setChordAtCursor: chordsHook.setChordAtCursor,
     removeChordAtCursor: chordsHook.removeChordAtCursor,

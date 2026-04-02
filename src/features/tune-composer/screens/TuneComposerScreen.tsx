@@ -1032,6 +1032,24 @@ function TuneComposerScreenContent({
     [composerState],
   );
 
+  // Double-tap on measure handler - navigate to beat 1 of that measure
+  const handleMeasureDoubleTap = useCallback(
+    (measureIndex: number) => {
+      if (composerState.chordMode) {
+        // In chord mode, move chord cursor to beat 0 of that measure
+        composerState.setChordCursorPosition(measureIndex, 0);
+      } else {
+        // In note mode, select the first note of that measure
+        const measure = composerState.score.measures[measureIndex];
+        const firstNote = measure?.notes[0];
+        if (firstNote) {
+          composerState.selectNote(firstNote.id);
+        }
+      }
+    },
+    [composerState],
+  );
+
   // ==========================================================================
   // Computed Values
   // ==========================================================================
@@ -1293,6 +1311,7 @@ function TuneComposerScreenContent({
                   : null
               }
               onNoteTap={handleScoreTap}
+              onMeasureDoubleTap={handleMeasureDoubleTap}
               zoom={zoom}
               onZoomChange={setZoom}
               showZoomControls={false}

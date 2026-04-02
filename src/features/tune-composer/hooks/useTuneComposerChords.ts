@@ -62,6 +62,7 @@ export interface UseTuneComposerChordsReturn {
 
   // Cursor
   chordCursor: { measureIndex: number; beatPosition: number } | null;
+  setChordCursorPosition: (measureIndex: number, beatPosition: number) => void;
   moveChordCursorNext: () => void;
   moveChordCursorPrev: () => void;
   canChordCursorGoPrev: boolean;
@@ -368,6 +369,34 @@ export function useTuneComposerChords(
       return prev;
     });
   }, [setState]);
+
+  /**
+   * Set chord cursor to a specific position.
+   * Used for double-tap navigation to jump to a measure.
+   */
+  const setChordCursorPosition = useCallback(
+    (measureIndex: number, beatPosition: number) => {
+      setState((prev) => {
+        // Only works in chord mode
+        if (!prev.chordMode) return prev;
+
+        // Validate measure index
+        if (measureIndex < 0 || measureIndex >= prev.score.measures.length) {
+          return prev;
+        }
+
+        // Validate beat position
+        const beatCount = getMeasureBeatCount(measureIndex, prev.score);
+        const clampedBeat = Math.max(0, Math.min(beatPosition, beatCount - 1));
+
+        return {
+          ...prev,
+          chordCursor: { measureIndex, beatPosition: clampedBeat },
+        };
+      });
+    },
+    [setState],
+  );
 
   /**
    * Cycle through chord subdivisions: 1 (beat) -> 2 (half) -> 3 (triplet) -> 1
@@ -686,6 +715,7 @@ export function useTuneComposerChords(
 
     // Cursor
     chordCursor: state.chordCursor,
+    setChordCursorPosition,
     moveChordCursorNext,
     moveChordCursorPrev,
     canChordCursorGoPrev,
