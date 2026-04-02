@@ -939,14 +939,15 @@ function generateMeasureXml(
 
   // Separate chords into two groups:
   // 1. Chords at note boundaries: use forward/backup (stable positioning by OSMD)
-  // 2. Mid-note chords: use interleaving (placed before containing note, JS repositions)
-  // Last measure always uses interleaving (historical OSMD workaround)
-  const chordsForForwardBackup = chordsWithMidNoteInfo.filter(
-    (c) => !c.isMidNote,
-  );
-  const chordsForInterleaving = chordsWithMidNoteInfo.filter(
-    (c) => c.isMidNote,
-  );
+  // 2. Mid-note chords: use interleaving in preview (placed before containing note, JS repositions)
+  // Last measure always uses interleaving in preview (historical OSMD workaround)
+  // In EXPORT MODE: ALL chords use forward/backup for proper MusicXML output
+  const chordsForForwardBackup = options.exportMode
+    ? chordsWithMidNoteInfo // Export: all chords via forward/backup
+    : chordsWithMidNoteInfo.filter((c) => !c.isMidNote); // Preview: only note-boundary chords
+  const chordsForInterleaving = options.exportMode
+    ? [] // Export: no interleaving
+    : chordsWithMidNoteInfo.filter((c) => c.isMidNote); // Preview: mid-note chords
 
   // Generate harmony elements using forward/backup for chords at note boundaries
   // In export mode, use forward/backup for all chords for proper MusicXML output

@@ -5,7 +5,7 @@
  * Provides a text input for syllables, note navigation, and melisma controls.
  */
 
-import React, { memo, useState, useCallback, useEffect } from "react";
+import React, { memo, useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   TouchableOpacity,
@@ -88,6 +88,13 @@ function LyricsControlsComponent({
   testID,
 }: LyricsControlsProps): React.ReactElement {
   const [inputText, setInputText] = useState(currentLyricText);
+  const inputRef = useRef<TextInput>(null);
+
+  // Focus the input after actions that might blur it
+  const refocusInput = useCallback(() => {
+    // Small delay to ensure state updates complete before focusing
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, []);
 
   // Infer syllabic: if no current syllabic but prev was begin/middle, default to middle
   const inferredSyllabic = (): SyllabicType => {
@@ -147,7 +154,8 @@ function LyricsControlsComponent({
         : "begin";
     onSetLyric(inputText, newSyllabic);
     onNextNote();
-  }, [inputText, prevSyllabic, onSetLyric, onNextNote]);
+    refocusInput();
+  }, [inputText, prevSyllabic, onSetLyric, onNextNote, refocusInput]);
 
   // Handle "End word" - mark as end and optionally move
   const handleEndWord = useCallback(() => {
@@ -195,6 +203,7 @@ function LyricsControlsComponent({
         <View style={styles.inputRow}>
           <Text style={styles.rowLabel}>Syllable:</Text>
           <TextInput
+            ref={inputRef}
             style={styles.textInput}
             value={inputText}
             onChangeText={handleTextChange}
@@ -274,7 +283,10 @@ function LyricsControlsComponent({
                 styles.arrowButton,
                 !canGoPrev && styles.arrowButtonDisabled,
               ]}
-              onPress={onPrevNote}
+              onPress={() => {
+                onPrevNote();
+                refocusInput();
+              }}
               disabled={!canGoPrev}
               accessibilityRole={"button" as AccessibilityRole}
               accessibilityLabel="Previous note"
@@ -291,7 +303,10 @@ function LyricsControlsComponent({
                 styles.arrowButton,
                 !canGoNext && styles.arrowButtonDisabled,
               ]}
-              onPress={onNextNote}
+              onPress={() => {
+                onNextNote();
+                refocusInput();
+              }}
               disabled={!canGoNext}
               accessibilityRole={"button" as AccessibilityRole}
               accessibilityLabel="Next note"
